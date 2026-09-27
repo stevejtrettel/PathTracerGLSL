@@ -160,6 +160,57 @@ await add('rotated procedural sky', procScene,
     [expected([0.2,0.5,0.8].map(v=>v*1.7*(1+0.5*Math.sin(rotation))) as Vec3,true)],
     { u_envIntensity:{type:'float',value:1.7}, u_envRotCS:{type:'vec2',value:[Math.cos(rotation),Math.sin(rotation)]} });
 
+// Coefficients are lifted without an illuminant; absorption and scattering are separate fields.
+function coefficient(rgb: Vec3): number[] {
+    if (rgb.every(v => v === rgb[0])) return wavelengths.map(() => rgb[0]);
+    const scale = 2 * Math.max(...rgb);
+    const c = spectralCoefficients(rgb.map(v => v / scale) as Vec3, atlas);
+    return wavelengths.map(lambda => scale * evaluatePolynomial(c, lambda));
+}
+const mediumScene = structuredClone(spectralPackedReference);
+const mediumID = Object.keys(mediumScene.materials).length;
+mediumScene.materials.fog = { model: 'none', medium: {
+    sigma_a: { param: 'fog.a', default: [0.3,0.7,1.2], min: 0, max: 3 },
+    sigma_s: [0.2,0.4,0.8],
+} };
+mediumScene.ambientMedium = 'fog';
+const a = coefficient([0.3,0.7,1.2]), scattering = coefficient([0.2,0.4,0.8]);
+const extinction = a.map((v,i) => v + scattering[i]);
+const mediumUniforms = { u_fog_a: { type: 'vec3', value: [0.3,0.7,1.2] } };
+const mediumSetup = `MediumProperties m = scene_medium_properties(${mediumID},vec3(0.0),${carrier});`;
+const coefficientProbe = await add('medium absorption coefficient', mediumScene, mediumSetup + 'fragColor = m.sigma_a;', [a], mediumUniforms);
+await add('medium scattering coefficient', mediumScene, mediumSetup + 'fragColor = m.sigma_s;', [scattering], mediumUniforms);
+await add('medium live absorption update', mediumScene, mediumSetup + 'fragColor = m.sigma_a;',
+    [coefficient([0.9,0.1,0.5])], { u_fog_a: { type: 'vec3', value: [0.9,0.1,0.5] } });
+await add('medium shadow Beer–Lambert', mediumScene,
+    `fragColor = medium_transmittance(${mediumID},make_ray(vec3(0.0),vec3(0.0,0.0,-1.0),${carrier}),0.7);`,
+    [extinction.map(v => Math.exp(-0.7*v))], mediumUniforms);
+const average = (values: number[]) => values.reduce((s,v) => s+v,0)/values.length;
+const sampleCall = (limit: number, y: number) => `medium_sample_analytic(m,make_ray(vec3(0.0),vec3(0.0,0.0,-1.0),${carrier}),${limit.toFixed(1)},vec2((float(int(gl_FragCoord.x)%4)+0.5)/4.0,${y}))`;
+for (const [name,limit,y] of [['collision',10,0.3],['survival',0.1,0.999]] as const) {
+    const weights = extinction.map(sc => {
+        const t = -Math.log(1-y)/sc;
+        const tr = extinction.map(v => Math.exp(-v*Math.min(t,limit)));
+        const pdf = average(tr.map((v,i) => t < limit ? extinction[i]*v : v));
+        return tr.map((v,i) => v*(t < limit ? scattering[i] : 1)/pdf);
+    });
+    await add(`medium ${name} weights in every selected lane`,mediumScene,
+        mediumSetup + `fragColor = ${sampleCall(limit,y)}.weight;`,weights,mediumUniforms);
+    await add(`medium ${name} distance and event`,mediumScene,
+        mediumSetup + `MediumSample ms = ${sampleCall(limit,y)}; fragColor=vec4(ms.t,float(ms.scattered),0.0,0.0);`,
+        extinction.map(sc => { const t=-Math.log(1-y)/sc; return [Math.min(t,limit),Number(t<limit),0,0]; }),mediumUniforms);
+}
+for (const vacuum of [true,false]) {
+    const tr = [0,1,2,3].map(v => Math.exp(-v));
+    await add(`medium zero extinction endpoint, vacuum=${vacuum}`,mediumScene,
+        mediumSetup + `m.sigma_a=vec4(0.0); m.sigma_s=${vacuum ? 'vec4(0.0)' : 'vec4(0.0,1.0,2.0,3.0)'};
+        MediumSample ms=medium_sample_analytic(m,make_ray(vec3(0.0),vec3(0.0,0.0,-1.0),${carrier}),1.0,vec2(0.0));
+        fragColor=ms.scattered ? vec4(-99.0) : ms.weight;`,
+        [vacuum ? [1,1,1,1] : tr.map(v => v/average(tr))],mediumUniforms);
+}
+const mediumMutation = { ...coefficientProbe, name: 'illuminant incorrectly applied to absorption',
+    source: coefficientProbe.source.replace('fragColor = m.sigma_a;', `fragColor = m.sigma_a * vec4(${wavelengths.map(v => `spectral_curves(${v}.0).w`).join(',')});`) };
+
 function verify(probe: typeof probes[number], values: number[]) {
     for (let x = 0; x < width; x++) for (let c = 0; c < 4; c++) {
         const target = probe.expected[x % probe.expected.length][c];
@@ -168,10 +219,11 @@ function verify(probe: typeof probes[number], values: number[]) {
 }
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-    const frames = await renderProbes(await browser.newPage(), [...probes, mutation], width, assets);
+    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation], width, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(mutation, frames[probes.length]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} generated spectral binding/BSDF probes, all four lanes; lost-instance-index mutation rejected`);
+    assert.throws(() => verify(mediumMutation, frames[probes.length+1]), { name: 'AssertionError' });
+    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index and absorption-illuminant mutations rejected`);
 } finally {
     await browser.close();
 }

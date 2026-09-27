@@ -4,6 +4,50 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral homogeneous absorption and scattering
+
+Enabled nonemissive homogeneous media with RGB constants or live RGB coefficients,
+inside bounded regions or as the ambient medium. The existing resolver lifts absorption
+and scattering separately with the coefficient role, without D65. The existing four-lane
+analytic distance mixture, HG/Rayleigh phase models, PT/NEE/MIS, shadow transmittance,
+interior roulette and delta-light equiangular placement use the ray wavelengths. The
+production changes are the validation gate and the analytic sampler's zero-rate case;
+there is no transport-loop, engine-contract, data-layout or parameter-system change.
+
+Zero selected extinction now goes directly to boundary survival, even for an exact zero
+random draw. The previous `max(sigma_t[c], 1e-9)` invented a finite collision rate whose
+sampling density did not match the reported mixture. This correction also applies to RGB.
+The existing small-PDF normalization floors are unchanged; extreme optical-depth behavior
+is not certified by this stage. Spectral expression coefficients, volume emission, GRIN,
+non-RGB forms and reflectance gain above one remain gated. The all-wavelength numerical
+majorant certificate is still required before enabling tracking; the analytic stage needs
+no such majorant. The plan's §5.3 records the mixture argument and staged scope.
+
+Validation: 3,512 tests in 97 files, typecheck and production build pass. All 33 generated
+GPU binding/BSDF/media probes pass, including live absorption updates, distinct coefficient
+roles, shadow attenuation, all four selected collision/survival lanes, distances and vacuum
+endpoints. Both the lost-instance-index and absorption-with-an-illuminant mutations fail
+as intended. Independent 0.25 nm wavelength quadrature gives the coloured unit slab target
+`(0.725201886, 0.495462039, 0.295891864)` and its camera-plus-shadow target
+`(0.509533833, 0.244752846, 0.081877565)`; halving the step changes either by less than
+7e-12. `npx vite-node scripts/audit-spectral-media.ts` reproduces these references.
+
+All 12 rendered checks pass across the six new fixtures and the existing RGB `slab` and
+`furnace-scatter` regressions. Spectral fog NEE/MIS differs by 0.24% in frame mean
+(reduced chi-squared 0.48); the PT tripwire differs by 0.37% (display RMSE 22.48%).
+Equiangular versus collision placement differs by 1.52% (reduced chi-squared 0.95).
+The worst slab channel error is about 0.0011, against a 0.005 tolerance. HG and Rayleigh
+furnaces pass their 0.4 equilibrium targets. Command: `npm run witness -- spectral-slab
+spectral-shadow-slab spectral-scatter-furnace spectral-rayleigh-furnace spectral-fog
+spectral-fog-placement slab furnace-scatter`.
+
+The compiled-scene digest preserves 160 existing scenes exactly. The other 63 existing
+scenes include the analytic volume source and change with its zero-rate correction and
+source-map lines; six spectral fixtures are added. Seven async scenes remain outside the
+digest. The new fixtures cover coloured slabs, both wavelength proposals, scattering ignored
+on camera and shadow paths, HG/Rayleigh equilibrium, fog estimator equality and medium
+light placement. See the colour component README for commands and remaining gates.
+
 ## 2026-09-27 — correct HDR mantissa scaling
 
 RGBE import now uses `byte * 2^(exponent - 136)` and decodes exponent zero as black.

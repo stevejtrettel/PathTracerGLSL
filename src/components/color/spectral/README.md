@@ -4,7 +4,7 @@
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, PT/NEE/MIS,
-light-tree selection and instancing with constant or per-instance RGB colours. Media,
+light-tree selection and instancing with constant or per-instance RGB colours. Homogeneous nonemissive media are supported. Other media,
 material expressions and non-RGB forms remain rejected. All six existing surface models are
 supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
@@ -39,8 +39,8 @@ trilinear interpolation. CPU and GPU use the same nodes and coefficient bytes.
 Reflectance uses the bounded lift directly. A nonnegative coefficient uses
 `scale = 2*max(rgb)` and `scale*rho(rgb/scale)`, with exact zero handled separately.
 Emission additionally multiplies by the normalized D65 curve. Coefficient evaluation
-is implemented and probed, but spectral media remain rejected until their bounds and
-read paths are verified. Reflectance gain above one remains an unresolved policy;
+is used by homogeneous media. Tracking media remain rejected pending their numerical
+majorant certificate. Reflectance gain above one remains an unresolved policy;
 there is no silent clamp or implemented gain extension.
 
 The shipped model is `jh-cie1931-d65-v1`. Its metadata, matrices and SHA-256 hashes
@@ -206,3 +206,24 @@ target in RGB and spectral modes. `spectral-comp-empty` checks the zero-table MI
 case. `spectral-image-constant` compares an actual RGBE texture with a constant sky.
 The fixed-wavelength binding probe separately checks filtered image RGB and rotated
 procedural radiance in all four lanes.
+
+## Homogeneous media
+
+Absorption and scattering accept nonnegative RGB constants or live parameters. Each is
+lifted as a coefficient at the current ray wavelengths; neither includes a D65 illuminant.
+Homogeneous Beer–Lambert attenuation, the four-channel analytic distance mixture, HG and
+Rayleigh phases, medium/shadow NEE and MIS, and delta-light equiangular placement use the
+existing transport seams. `scattering: 'ignored'` removes scattering from both main and
+shadow extinction. Zero selected extinction means survival to the segment boundary.
+
+No all-wavelength majorant is needed for this analytic stage. Heterogeneous coefficients,
+volume emission and GRIN remain gated; the tracking bound proof remains open. Existing
+small-PDF normalization floors are unchanged, so these checks do not certify extreme
+optical depths.
+
+`npx vite-node scripts/audit-spectral-media.ts` computes slab references by independent
+wavelength quadrature. `witness:spectral-bindings` checks the generated medium resolver,
+live coefficients, shadow transmission and all four analytic sampling lanes on the GPU.
+The `spectral-slab`, `spectral-shadow-slab`, `spectral-scatter-furnace`,
+`spectral-rayleigh-furnace`, `spectral-fog` and `spectral-fog-placement` scenes provide the
+rendered checks and gallery examples.

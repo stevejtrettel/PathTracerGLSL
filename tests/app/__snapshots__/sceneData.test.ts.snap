@@ -729,6 +729,10 @@ exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-eta 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-fog-placement 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-furnace 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-image-constant 1`] = `null`;
@@ -777,7 +781,15 @@ exports[`scene-data textures (byte fingerprints) > spectral-plane 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-proc-sky 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-rayleigh-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-scatter-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-shadow-slab 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-slab 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
 {

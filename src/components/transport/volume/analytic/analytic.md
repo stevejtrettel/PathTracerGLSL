@@ -9,16 +9,17 @@ medium lines).
 survive to the boundary":
 
 - Distance drawn from ONE uniformly-selected channel's exponential
-  (`t = −log(1−ξ)/σ_c`), then weighted by the **balance heuristic over all three
+  (`t = −log(1−ξ)/σ_c`), then weighted by the **balance heuristic over all N
   per-channel pdfs** — pbrt-v3's chromatic scheme (owner decision: bounded weights,
   NOT the σ̄-ratio scheme). Scatter branch: `weight = σ_s·T(t)/pdf` with
-  `pdf = ⅓Σ_c σ_c e^{−σ_c t}`; survive branch: `weight = T(t_max)/pdf` with
-  `pdf = ⅓Σ_c e^{−σ_c t_max}`.
+  `pdf = (1/N)Σ_c σ_c e^{−σ_c t}`; survive branch: `weight = T(t_max)/pdf` with
+  `pdf = (1/N)Σ_c e^{−σ_c t_max}`.
 - Grayscale degeneracy: scatter weight → σ_s/σ_t (single-scatter albedo), survive
   weight → 1 — the §7.2 "no weight on survival" pin is the special case.
 - `ms.radiance = SPECTRUM_ZERO` is mandatory (the §3 RTE partition rule: emission is
   a separate capability, not implicitly bundled into sampling).
-- A zero channel gives t = ∞ → the survive branch handles it (the `max(σ_c, 1e-9)`).
+- A zero selected channel survives to the boundary, including an exact zero random draw.
+  It has no finite exponential event; the sampler assigns `t_max` directly.
 
 `medium_transmittance_analytic(m, len)` — seam 2, the per-segment factor the shadow
 walker multiplies: exact Beer–Lambert `exp(−σ_t·len)` over FULL extinction

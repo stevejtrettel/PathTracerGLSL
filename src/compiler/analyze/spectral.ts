@@ -1,4 +1,4 @@
-import { isInstancedObject, isValueParam, type SceneDescription } from '../types.js';
+import { isInstancedObject, isValueParam, isEmissiveMedium, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
 /** Supported spectral inputs; other binding and transport routes remain explicit diagnostics. */
@@ -16,8 +16,6 @@ export function spectralLimitations(scene: SceneDescription): string[] {
             && (v.max === undefined || (typeof v.max === 'number' && constantRGB(v.max, ceiling)))
             && (v.min === undefined || v.max === undefined || v.min <= v.max);
     };
-    if (scene.ambientMedium !== undefined || Object.values(scene.materials).some(m => m.medium !== undefined))
-        reasons.push('spectral media are not supported yet');
     for (const [index, object] of scene.objects.entries()) {
         if (!isInstancedObject(object)) continue;
         const material = scene.materials[object.prototype.material];
@@ -35,6 +33,15 @@ export function spectralLimitations(scene: SceneDescription): string[] {
         }
     }
     for (const [name, mat] of Object.entries(scene.materials)) {
+        const med = mat.medium;
+        if (med !== undefined) {
+            if (mediumIsDeflecting(med) || isEmissiveMedium(med))
+                reasons.push(`spectral medium '${name}' does not support GRIN or volume emission yet`);
+            for (const field of ['sigma_a', 'sigma_s'] as const) {
+                if (!rgbInput(med[field] ?? 0))
+                    reasons.push(`spectral medium '${name}' property '${field}' requires nonnegative RGB constants or parameters, including defaults and bounds`);
+            }
+        }
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
             if (row.semantic !== 'radiometric') continue;
             const value = mat[row.source] ?? row.default;

@@ -10,8 +10,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit

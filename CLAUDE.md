@@ -209,10 +209,10 @@ How a program is assembled:
   once by hand).
 - Spectral foundation: four wavelengths, CIE 1931 sensor, uniform/visible proposals,
   signed linear-RGB film and versioned RGB-to-spectrum assets. Currently restricted to
-  RGB-authored surface scenes (all six material models), including live colour controls,
+  RGB-authored scenes (all six material models), including live colour controls,
   instance colour attributes and light-tree selection; glass uses wavelength-independent
-  IOR. Image and procedural skies are supported; material expressions, media and non-RGB
-  forms remain gated. See
+  IOR. Image/procedural skies and homogeneous nonemissive media are supported; material
+  expressions, other media and non-RGB forms remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 

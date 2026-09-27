@@ -21950,8 +21950,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -22529,99 +22531,99 @@ void main() {
         "startLine": 1006,
       },
       {
-        "endLine": 1073,
+        "endLine": 1075,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1024,
       },
       {
-        "endLine": 1116,
+        "endLine": 1118,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1074,
+        "startLine": 1076,
       },
       {
-        "endLine": 1120,
+        "endLine": 1122,
         "origin": "generated:medium-dispatch",
-        "startLine": 1117,
+        "startLine": 1119,
       },
       {
-        "endLine": 1134,
+        "endLine": 1136,
         "origin": "generated:medium-sample",
-        "startLine": 1121,
+        "startLine": 1123,
       },
       {
-        "endLine": 1145,
+        "endLine": 1147,
         "origin": "generated:medium-survival",
-        "startLine": 1135,
+        "startLine": 1137,
       },
       {
-        "endLine": 1153,
+        "endLine": 1155,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1146,
+        "startLine": 1148,
       },
       {
-        "endLine": 1172,
+        "endLine": 1174,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1154,
+        "startLine": 1156,
       },
       {
-        "endLine": 1176,
+        "endLine": 1178,
         "origin": "generated:environment",
-        "startLine": 1173,
+        "startLine": 1175,
       },
       {
-        "endLine": 1183,
+        "endLine": 1185,
         "origin": "generated:transport/light-query",
-        "startLine": 1177,
+        "startLine": 1179,
       },
       {
-        "endLine": 1203,
+        "endLine": 1205,
         "origin": "generated:transport/state",
-        "startLine": 1184,
+        "startLine": 1186,
       },
       {
-        "endLine": 1210,
+        "endLine": 1212,
         "origin": "generated:transport/combiner",
-        "startLine": 1204,
+        "startLine": 1206,
       },
       {
-        "endLine": 1216,
+        "endLine": 1218,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1211,
+        "startLine": 1213,
       },
       {
-        "endLine": 1224,
+        "endLine": 1226,
         "origin": "generated:transport/roulette",
-        "startLine": 1217,
+        "startLine": 1219,
       },
       {
-        "endLine": 1271,
+        "endLine": 1273,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1225,
+        "startLine": 1227,
       },
       {
-        "endLine": 1306,
+        "endLine": 1308,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1272,
+        "startLine": 1274,
       },
       {
-        "endLine": 1322,
+        "endLine": 1324,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1307,
+        "startLine": 1309,
       },
       {
-        "endLine": 1377,
+        "endLine": 1379,
         "origin": "generated:transport/walk",
-        "startLine": 1323,
+        "startLine": 1325,
       },
       {
-        "endLine": 1378,
+        "endLine": 1380,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1378,
+        "startLine": 1380,
       },
       {
-        "endLine": 1407,
+        "endLine": 1409,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1379,
+        "startLine": 1381,
       },
     ],
   },
@@ -23962,8 +23964,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -24783,159 +24787,159 @@ void main() {
         "startLine": 1028,
       },
       {
-        "endLine": 1095,
+        "endLine": 1097,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1046,
       },
       {
-        "endLine": 1138,
+        "endLine": 1140,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1096,
+        "startLine": 1098,
       },
       {
-        "endLine": 1148,
+        "endLine": 1150,
         "origin": "generated:medium-dispatch",
-        "startLine": 1139,
+        "startLine": 1141,
       },
       {
-        "endLine": 1162,
+        "endLine": 1164,
         "origin": "generated:medium-sample",
-        "startLine": 1149,
+        "startLine": 1151,
       },
       {
-        "endLine": 1173,
+        "endLine": 1175,
         "origin": "generated:medium-survival",
-        "startLine": 1163,
+        "startLine": 1165,
       },
       {
-        "endLine": 1180,
+        "endLine": 1182,
         "origin": "generated:medium-transmittance",
-        "startLine": 1174,
+        "startLine": 1176,
       },
       {
-        "endLine": 1243,
+        "endLine": 1245,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1181,
+        "startLine": 1183,
       },
       {
-        "endLine": 1252,
+        "endLine": 1254,
         "origin": "generated:light-structs",
-        "startLine": 1244,
-      },
-      {
-        "endLine": 1294,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1253,
+        "startLine": 1246,
       },
       {
         "endLine": 1296,
-        "origin": "generated:light-accessors",
-        "startLine": 1295,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1255,
       },
       {
-        "endLine": 1303,
-        "origin": "generated:light-sampling",
+        "endLine": 1298,
+        "origin": "generated:light-accessors",
         "startLine": 1297,
       },
       {
-        "endLine": 1309,
+        "endLine": 1305,
+        "origin": "generated:light-sampling",
+        "startLine": 1299,
+      },
+      {
+        "endLine": 1311,
         "origin": "generated:light-of",
-        "startLine": 1304,
+        "startLine": 1306,
       },
       {
-        "endLine": 1314,
+        "endLine": 1316,
         "origin": "generated:lighting-pdf",
-        "startLine": 1310,
+        "startLine": 1312,
       },
       {
-        "endLine": 1322,
+        "endLine": 1324,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1315,
+        "startLine": 1317,
       },
       {
-        "endLine": 1341,
+        "endLine": 1343,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1323,
+        "startLine": 1325,
       },
       {
-        "endLine": 1345,
+        "endLine": 1347,
         "origin": "generated:environment",
-        "startLine": 1342,
+        "startLine": 1344,
       },
       {
-        "endLine": 1352,
+        "endLine": 1354,
         "origin": "generated:transport/light-query",
-        "startLine": 1346,
+        "startLine": 1348,
       },
       {
-        "endLine": 1377,
+        "endLine": 1379,
         "origin": "generated:transport/state",
-        "startLine": 1353,
+        "startLine": 1355,
       },
       {
-        "endLine": 1391,
+        "endLine": 1393,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1378,
+        "startLine": 1380,
       },
       {
-        "endLine": 1413,
+        "endLine": 1415,
         "origin": "generated:transport/combiner",
-        "startLine": 1392,
+        "startLine": 1394,
       },
       {
-        "endLine": 1421,
+        "endLine": 1423,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1414,
+        "startLine": 1416,
       },
       {
-        "endLine": 1429,
+        "endLine": 1431,
         "origin": "generated:transport/roulette",
-        "startLine": 1422,
+        "startLine": 1424,
       },
       {
-        "endLine": 1476,
+        "endLine": 1478,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1430,
+        "startLine": 1432,
       },
       {
-        "endLine": 1480,
+        "endLine": 1482,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1477,
+        "startLine": 1479,
       },
       {
-        "endLine": 1515,
+        "endLine": 1517,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1481,
+        "startLine": 1483,
       },
       {
-        "endLine": 1531,
+        "endLine": 1533,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1516,
+        "startLine": 1518,
       },
       {
-        "endLine": 1560,
+        "endLine": 1562,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1532,
+        "startLine": 1534,
       },
       {
-        "endLine": 1579,
+        "endLine": 1581,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1561,
+        "startLine": 1563,
       },
       {
-        "endLine": 1636,
+        "endLine": 1638,
         "origin": "generated:transport/walk",
-        "startLine": 1580,
+        "startLine": 1582,
       },
       {
-        "endLine": 1637,
+        "endLine": 1639,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1637,
+        "startLine": 1639,
       },
       {
-        "endLine": 1666,
+        "endLine": 1668,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1638,
+        "startLine": 1640,
       },
     ],
   },
@@ -26270,8 +26274,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -27058,149 +27064,149 @@ void main() {
         "startLine": 1022,
       },
       {
-        "endLine": 1089,
+        "endLine": 1091,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1040,
       },
       {
-        "endLine": 1132,
+        "endLine": 1134,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1090,
+        "startLine": 1092,
       },
       {
-        "endLine": 1139,
+        "endLine": 1141,
         "origin": "generated:medium-dispatch",
-        "startLine": 1133,
+        "startLine": 1135,
       },
       {
-        "endLine": 1153,
+        "endLine": 1155,
         "origin": "generated:medium-sample",
-        "startLine": 1140,
+        "startLine": 1142,
       },
       {
-        "endLine": 1164,
+        "endLine": 1166,
         "origin": "generated:medium-survival",
-        "startLine": 1154,
+        "startLine": 1156,
       },
       {
-        "endLine": 1171,
+        "endLine": 1173,
         "origin": "generated:medium-transmittance",
-        "startLine": 1165,
+        "startLine": 1167,
       },
       {
-        "endLine": 1234,
+        "endLine": 1236,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1172,
+        "startLine": 1174,
       },
       {
-        "endLine": 1243,
+        "endLine": 1245,
         "origin": "generated:light-structs",
-        "startLine": 1235,
-      },
-      {
-        "endLine": 1285,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1244,
+        "startLine": 1237,
       },
       {
         "endLine": 1287,
-        "origin": "generated:light-accessors",
-        "startLine": 1286,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1246,
       },
       {
-        "endLine": 1294,
-        "origin": "generated:light-sampling",
+        "endLine": 1289,
+        "origin": "generated:light-accessors",
         "startLine": 1288,
       },
       {
-        "endLine": 1300,
+        "endLine": 1296,
+        "origin": "generated:light-sampling",
+        "startLine": 1290,
+      },
+      {
+        "endLine": 1302,
         "origin": "generated:light-of",
-        "startLine": 1295,
+        "startLine": 1297,
       },
       {
-        "endLine": 1308,
+        "endLine": 1310,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1301,
+        "startLine": 1303,
       },
       {
-        "endLine": 1327,
+        "endLine": 1329,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1309,
+        "startLine": 1311,
       },
       {
-        "endLine": 1331,
+        "endLine": 1333,
         "origin": "generated:environment",
-        "startLine": 1328,
+        "startLine": 1330,
       },
       {
-        "endLine": 1338,
+        "endLine": 1340,
         "origin": "generated:transport/light-query",
-        "startLine": 1332,
+        "startLine": 1334,
       },
       {
-        "endLine": 1358,
+        "endLine": 1360,
         "origin": "generated:transport/state",
-        "startLine": 1339,
+        "startLine": 1341,
       },
       {
-        "endLine": 1376,
+        "endLine": 1378,
         "origin": "generated:transport/combiner",
-        "startLine": 1359,
+        "startLine": 1361,
       },
       {
-        "endLine": 1382,
+        "endLine": 1384,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1377,
+        "startLine": 1379,
       },
       {
-        "endLine": 1390,
+        "endLine": 1392,
         "origin": "generated:transport/roulette",
-        "startLine": 1383,
+        "startLine": 1385,
       },
       {
-        "endLine": 1437,
+        "endLine": 1439,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1391,
+        "startLine": 1393,
       },
       {
-        "endLine": 1441,
+        "endLine": 1443,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1438,
+        "startLine": 1440,
       },
       {
-        "endLine": 1476,
+        "endLine": 1478,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1442,
+        "startLine": 1444,
       },
       {
-        "endLine": 1492,
+        "endLine": 1494,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1477,
+        "startLine": 1479,
       },
       {
-        "endLine": 1521,
+        "endLine": 1523,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1493,
+        "startLine": 1495,
       },
       {
-        "endLine": 1540,
+        "endLine": 1542,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1522,
+        "startLine": 1524,
       },
       {
-        "endLine": 1597,
+        "endLine": 1599,
         "origin": "generated:transport/walk",
-        "startLine": 1541,
+        "startLine": 1543,
       },
       {
-        "endLine": 1598,
+        "endLine": 1600,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1598,
+        "startLine": 1600,
       },
       {
-        "endLine": 1627,
+        "endLine": 1629,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1599,
+        "startLine": 1601,
       },
     ],
   },
@@ -28538,8 +28544,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -29117,99 +29125,99 @@ void main() {
         "startLine": 1025,
       },
       {
-        "endLine": 1092,
+        "endLine": 1094,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1043,
       },
       {
-        "endLine": 1135,
+        "endLine": 1137,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1093,
+        "startLine": 1095,
       },
       {
-        "endLine": 1139,
+        "endLine": 1141,
         "origin": "generated:medium-dispatch",
-        "startLine": 1136,
+        "startLine": 1138,
       },
       {
-        "endLine": 1153,
+        "endLine": 1155,
         "origin": "generated:medium-sample",
-        "startLine": 1140,
+        "startLine": 1142,
       },
       {
-        "endLine": 1164,
+        "endLine": 1166,
         "origin": "generated:medium-survival",
-        "startLine": 1154,
+        "startLine": 1156,
       },
       {
-        "endLine": 1172,
+        "endLine": 1174,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1165,
+        "startLine": 1167,
       },
       {
-        "endLine": 1191,
+        "endLine": 1193,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1173,
+        "startLine": 1175,
       },
       {
-        "endLine": 1195,
+        "endLine": 1197,
         "origin": "generated:environment",
-        "startLine": 1192,
+        "startLine": 1194,
       },
       {
-        "endLine": 1202,
+        "endLine": 1204,
         "origin": "generated:transport/light-query",
-        "startLine": 1196,
+        "startLine": 1198,
       },
       {
-        "endLine": 1222,
+        "endLine": 1224,
         "origin": "generated:transport/state",
-        "startLine": 1203,
+        "startLine": 1205,
       },
       {
-        "endLine": 1229,
+        "endLine": 1231,
         "origin": "generated:transport/combiner",
-        "startLine": 1223,
+        "startLine": 1225,
       },
       {
-        "endLine": 1235,
+        "endLine": 1237,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1230,
+        "startLine": 1232,
       },
       {
-        "endLine": 1243,
+        "endLine": 1245,
         "origin": "generated:transport/roulette",
-        "startLine": 1236,
+        "startLine": 1238,
       },
       {
-        "endLine": 1290,
+        "endLine": 1292,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1244,
+        "startLine": 1246,
       },
       {
-        "endLine": 1325,
+        "endLine": 1327,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1291,
+        "startLine": 1293,
       },
       {
-        "endLine": 1341,
+        "endLine": 1343,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1326,
+        "startLine": 1328,
       },
       {
-        "endLine": 1396,
+        "endLine": 1398,
         "origin": "generated:transport/walk",
-        "startLine": 1342,
+        "startLine": 1344,
       },
       {
-        "endLine": 1397,
+        "endLine": 1399,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1397,
+        "startLine": 1399,
       },
       {
-        "endLine": 1426,
+        "endLine": 1428,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1398,
+        "startLine": 1400,
       },
     ],
   },
@@ -30563,8 +30571,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -31351,149 +31361,149 @@ void main() {
         "startLine": 1041,
       },
       {
-        "endLine": 1108,
+        "endLine": 1110,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1059,
       },
       {
-        "endLine": 1151,
+        "endLine": 1153,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1109,
+        "startLine": 1111,
       },
       {
-        "endLine": 1158,
+        "endLine": 1160,
         "origin": "generated:medium-dispatch",
-        "startLine": 1152,
+        "startLine": 1154,
       },
       {
-        "endLine": 1172,
+        "endLine": 1174,
         "origin": "generated:medium-sample",
-        "startLine": 1159,
+        "startLine": 1161,
       },
       {
-        "endLine": 1183,
+        "endLine": 1185,
         "origin": "generated:medium-survival",
-        "startLine": 1173,
+        "startLine": 1175,
       },
       {
-        "endLine": 1190,
+        "endLine": 1192,
         "origin": "generated:medium-transmittance",
-        "startLine": 1184,
+        "startLine": 1186,
       },
       {
-        "endLine": 1253,
+        "endLine": 1255,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1191,
+        "startLine": 1193,
       },
       {
-        "endLine": 1262,
+        "endLine": 1264,
         "origin": "generated:light-structs",
-        "startLine": 1254,
-      },
-      {
-        "endLine": 1304,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1263,
+        "startLine": 1256,
       },
       {
         "endLine": 1306,
-        "origin": "generated:light-accessors",
-        "startLine": 1305,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1265,
       },
       {
-        "endLine": 1313,
-        "origin": "generated:light-sampling",
+        "endLine": 1308,
+        "origin": "generated:light-accessors",
         "startLine": 1307,
       },
       {
-        "endLine": 1319,
+        "endLine": 1315,
+        "origin": "generated:light-sampling",
+        "startLine": 1309,
+      },
+      {
+        "endLine": 1321,
         "origin": "generated:light-of",
-        "startLine": 1314,
+        "startLine": 1316,
       },
       {
-        "endLine": 1327,
+        "endLine": 1329,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1320,
+        "startLine": 1322,
       },
       {
-        "endLine": 1346,
+        "endLine": 1348,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1328,
+        "startLine": 1330,
       },
       {
-        "endLine": 1350,
+        "endLine": 1352,
         "origin": "generated:environment",
-        "startLine": 1347,
+        "startLine": 1349,
       },
       {
-        "endLine": 1357,
+        "endLine": 1359,
         "origin": "generated:transport/light-query",
-        "startLine": 1351,
+        "startLine": 1353,
       },
       {
-        "endLine": 1377,
+        "endLine": 1379,
         "origin": "generated:transport/state",
-        "startLine": 1358,
+        "startLine": 1360,
       },
       {
-        "endLine": 1395,
+        "endLine": 1397,
         "origin": "generated:transport/combiner",
-        "startLine": 1378,
+        "startLine": 1380,
       },
       {
-        "endLine": 1401,
+        "endLine": 1403,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1396,
+        "startLine": 1398,
       },
       {
-        "endLine": 1409,
+        "endLine": 1411,
         "origin": "generated:transport/roulette",
-        "startLine": 1402,
+        "startLine": 1404,
       },
       {
-        "endLine": 1456,
+        "endLine": 1458,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1410,
+        "startLine": 1412,
       },
       {
-        "endLine": 1460,
+        "endLine": 1462,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1457,
+        "startLine": 1459,
       },
       {
-        "endLine": 1495,
+        "endLine": 1497,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1461,
+        "startLine": 1463,
       },
       {
-        "endLine": 1511,
+        "endLine": 1513,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1496,
+        "startLine": 1498,
       },
       {
-        "endLine": 1540,
+        "endLine": 1542,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1512,
+        "startLine": 1514,
       },
       {
-        "endLine": 1559,
+        "endLine": 1561,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1541,
+        "startLine": 1543,
       },
       {
-        "endLine": 1616,
+        "endLine": 1618,
         "origin": "generated:transport/walk",
-        "startLine": 1560,
+        "startLine": 1562,
       },
       {
-        "endLine": 1617,
+        "endLine": 1619,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1617,
+        "startLine": 1619,
       },
       {
-        "endLine": 1646,
+        "endLine": 1648,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1618,
+        "startLine": 1620,
       },
     ],
   },
@@ -36608,8 +36618,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -37104,84 +37116,84 @@ void main() {
         "startLine": 728,
       },
       {
-        "endLine": 795,
+        "endLine": 797,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 746,
       },
       {
-        "endLine": 838,
+        "endLine": 840,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 796,
+        "startLine": 798,
       },
       {
-        "endLine": 842,
+        "endLine": 844,
         "origin": "generated:medium-dispatch",
-        "startLine": 839,
+        "startLine": 841,
       },
       {
-        "endLine": 856,
+        "endLine": 858,
         "origin": "generated:medium-sample",
-        "startLine": 843,
+        "startLine": 845,
       },
       {
-        "endLine": 864,
+        "endLine": 866,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 857,
+        "startLine": 859,
       },
       {
-        "endLine": 883,
+        "endLine": 885,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 865,
+        "startLine": 867,
       },
       {
-        "endLine": 887,
+        "endLine": 889,
         "origin": "generated:environment",
-        "startLine": 884,
+        "startLine": 886,
       },
       {
-        "endLine": 894,
+        "endLine": 896,
         "origin": "generated:transport/light-query",
-        "startLine": 888,
+        "startLine": 890,
       },
       {
-        "endLine": 914,
+        "endLine": 916,
         "origin": "generated:transport/state",
-        "startLine": 895,
+        "startLine": 897,
       },
       {
-        "endLine": 921,
+        "endLine": 923,
         "origin": "generated:transport/combiner",
-        "startLine": 915,
+        "startLine": 917,
       },
       {
-        "endLine": 927,
+        "endLine": 929,
         "origin": "generated:transport/kernel-record",
-        "startLine": 922,
+        "startLine": 924,
       },
       {
-        "endLine": 962,
+        "endLine": 964,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 928,
+        "startLine": 930,
       },
       {
-        "endLine": 978,
+        "endLine": 980,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 963,
+        "startLine": 965,
       },
       {
-        "endLine": 1031,
+        "endLine": 1033,
         "origin": "generated:transport/walk",
-        "startLine": 979,
+        "startLine": 981,
       },
       {
-        "endLine": 1032,
+        "endLine": 1034,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1032,
+        "startLine": 1034,
       },
       {
-        "endLine": 1061,
+        "endLine": 1063,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1033,
+        "startLine": 1035,
       },
     ],
   },
@@ -41174,8 +41186,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -41743,99 +41757,99 @@ void main() {
         "startLine": 816,
       },
       {
-        "endLine": 883,
+        "endLine": 885,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 834,
       },
       {
-        "endLine": 926,
+        "endLine": 928,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 884,
+        "startLine": 886,
       },
       {
-        "endLine": 930,
+        "endLine": 932,
         "origin": "generated:medium-dispatch",
-        "startLine": 927,
+        "startLine": 929,
       },
       {
-        "endLine": 944,
+        "endLine": 946,
         "origin": "generated:medium-sample",
-        "startLine": 931,
+        "startLine": 933,
       },
       {
-        "endLine": 955,
+        "endLine": 957,
         "origin": "generated:medium-survival",
-        "startLine": 945,
+        "startLine": 947,
       },
       {
-        "endLine": 963,
+        "endLine": 965,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 956,
+        "startLine": 958,
       },
       {
-        "endLine": 982,
+        "endLine": 984,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 964,
+        "startLine": 966,
       },
       {
-        "endLine": 986,
+        "endLine": 988,
         "origin": "generated:environment",
-        "startLine": 983,
+        "startLine": 985,
       },
       {
-        "endLine": 993,
+        "endLine": 995,
         "origin": "generated:transport/light-query",
-        "startLine": 987,
+        "startLine": 989,
       },
       {
-        "endLine": 1013,
+        "endLine": 1015,
         "origin": "generated:transport/state",
-        "startLine": 994,
+        "startLine": 996,
       },
       {
-        "endLine": 1020,
+        "endLine": 1022,
         "origin": "generated:transport/combiner",
-        "startLine": 1014,
+        "startLine": 1016,
       },
       {
-        "endLine": 1026,
+        "endLine": 1028,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1021,
+        "startLine": 1023,
       },
       {
-        "endLine": 1034,
+        "endLine": 1036,
         "origin": "generated:transport/roulette",
-        "startLine": 1027,
+        "startLine": 1029,
       },
       {
-        "endLine": 1081,
+        "endLine": 1083,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1035,
+        "startLine": 1037,
       },
       {
-        "endLine": 1116,
+        "endLine": 1118,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1082,
+        "startLine": 1084,
       },
       {
-        "endLine": 1132,
+        "endLine": 1134,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1117,
+        "startLine": 1119,
       },
       {
-        "endLine": 1187,
+        "endLine": 1189,
         "origin": "generated:transport/walk",
-        "startLine": 1133,
+        "startLine": 1135,
       },
       {
-        "endLine": 1188,
+        "endLine": 1190,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1188,
+        "startLine": 1190,
       },
       {
-        "endLine": 1217,
+        "endLine": 1219,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1189,
+        "startLine": 1191,
       },
     ],
   },
@@ -42975,8 +42989,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -43720,144 +43736,144 @@ void main() {
         "startLine": 831,
       },
       {
-        "endLine": 898,
+        "endLine": 900,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 849,
       },
       {
-        "endLine": 941,
+        "endLine": 943,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 899,
+        "startLine": 901,
       },
       {
-        "endLine": 948,
+        "endLine": 950,
         "origin": "generated:medium-dispatch",
-        "startLine": 942,
+        "startLine": 944,
       },
       {
-        "endLine": 962,
+        "endLine": 964,
         "origin": "generated:medium-sample",
-        "startLine": 949,
+        "startLine": 951,
       },
       {
-        "endLine": 973,
+        "endLine": 975,
         "origin": "generated:medium-survival",
-        "startLine": 963,
+        "startLine": 965,
       },
       {
-        "endLine": 980,
+        "endLine": 982,
         "origin": "generated:medium-transmittance",
-        "startLine": 974,
+        "startLine": 976,
       },
       {
-        "endLine": 1043,
+        "endLine": 1045,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 981,
+        "startLine": 983,
       },
       {
-        "endLine": 1048,
+        "endLine": 1050,
         "origin": "generated:light-structs",
-        "startLine": 1044,
-      },
-      {
-        "endLine": 1072,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 1049,
+        "startLine": 1046,
       },
       {
         "endLine": 1074,
-        "origin": "generated:light-accessors",
-        "startLine": 1073,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 1051,
       },
       {
-        "endLine": 1081,
-        "origin": "generated:light-sampling",
+        "endLine": 1076,
+        "origin": "generated:light-accessors",
         "startLine": 1075,
       },
       {
-        "endLine": 1089,
+        "endLine": 1083,
+        "origin": "generated:light-sampling",
+        "startLine": 1077,
+      },
+      {
+        "endLine": 1091,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1082,
+        "startLine": 1084,
       },
       {
-        "endLine": 1108,
+        "endLine": 1110,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1090,
+        "startLine": 1092,
       },
       {
-        "endLine": 1112,
+        "endLine": 1114,
         "origin": "generated:environment",
-        "startLine": 1109,
+        "startLine": 1111,
       },
       {
-        "endLine": 1119,
+        "endLine": 1121,
         "origin": "generated:transport/light-query",
-        "startLine": 1113,
+        "startLine": 1115,
       },
       {
-        "endLine": 1139,
+        "endLine": 1141,
         "origin": "generated:transport/state",
-        "startLine": 1120,
+        "startLine": 1122,
       },
       {
-        "endLine": 1152,
+        "endLine": 1154,
         "origin": "generated:transport/combiner",
-        "startLine": 1140,
+        "startLine": 1142,
       },
       {
-        "endLine": 1158,
+        "endLine": 1160,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1153,
+        "startLine": 1155,
       },
       {
-        "endLine": 1166,
+        "endLine": 1168,
         "origin": "generated:transport/roulette",
-        "startLine": 1159,
+        "startLine": 1161,
       },
       {
-        "endLine": 1213,
+        "endLine": 1215,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1167,
+        "startLine": 1169,
       },
       {
-        "endLine": 1217,
+        "endLine": 1219,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1214,
+        "startLine": 1216,
       },
       {
-        "endLine": 1252,
+        "endLine": 1254,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1218,
+        "startLine": 1220,
       },
       {
-        "endLine": 1268,
+        "endLine": 1270,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1253,
+        "startLine": 1255,
       },
       {
-        "endLine": 1297,
+        "endLine": 1299,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1269,
+        "startLine": 1271,
       },
       {
-        "endLine": 1316,
+        "endLine": 1318,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1298,
+        "startLine": 1300,
       },
       {
-        "endLine": 1373,
+        "endLine": 1375,
         "origin": "generated:transport/walk",
-        "startLine": 1317,
+        "startLine": 1319,
       },
       {
-        "endLine": 1374,
+        "endLine": 1376,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1374,
+        "startLine": 1376,
       },
       {
-        "endLine": 1403,
+        "endLine": 1405,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1375,
+        "startLine": 1377,
       },
     ],
   },
@@ -45233,8 +45249,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -45879,119 +45897,119 @@ void main() {
         "startLine": 1069,
       },
       {
-        "endLine": 1132,
+        "endLine": 1134,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 1083,
       },
       {
-        "endLine": 1147,
+        "endLine": 1149,
         "origin": "generated:medium-sample",
-        "startLine": 1133,
+        "startLine": 1135,
       },
       {
-        "endLine": 1154,
+        "endLine": 1156,
         "origin": "generated:medium-transmittance",
-        "startLine": 1148,
+        "startLine": 1150,
       },
       {
-        "endLine": 1217,
+        "endLine": 1219,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1155,
+        "startLine": 1157,
       },
       {
-        "endLine": 1226,
+        "endLine": 1228,
         "origin": "generated:light-structs",
-        "startLine": 1218,
-      },
-      {
-        "endLine": 1268,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1227,
+        "startLine": 1220,
       },
       {
         "endLine": 1270,
-        "origin": "generated:light-accessors",
-        "startLine": 1269,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1229,
       },
       {
-        "endLine": 1277,
-        "origin": "generated:light-sampling",
+        "endLine": 1272,
+        "origin": "generated:light-accessors",
         "startLine": 1271,
       },
       {
-        "endLine": 1283,
+        "endLine": 1279,
+        "origin": "generated:light-sampling",
+        "startLine": 1273,
+      },
+      {
+        "endLine": 1285,
         "origin": "generated:light-of",
-        "startLine": 1278,
+        "startLine": 1280,
       },
       {
-        "endLine": 1291,
+        "endLine": 1293,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1284,
+        "startLine": 1286,
       },
       {
-        "endLine": 1310,
+        "endLine": 1312,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1292,
+        "startLine": 1294,
       },
       {
-        "endLine": 1314,
+        "endLine": 1316,
         "origin": "generated:environment",
-        "startLine": 1311,
+        "startLine": 1313,
       },
       {
-        "endLine": 1321,
+        "endLine": 1323,
         "origin": "generated:transport/light-query",
-        "startLine": 1315,
+        "startLine": 1317,
       },
       {
-        "endLine": 1341,
+        "endLine": 1343,
         "origin": "generated:transport/state",
-        "startLine": 1322,
+        "startLine": 1324,
       },
       {
-        "endLine": 1356,
+        "endLine": 1358,
         "origin": "generated:transport/combiner",
-        "startLine": 1342,
+        "startLine": 1344,
       },
       {
-        "endLine": 1362,
+        "endLine": 1364,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1357,
+        "startLine": 1359,
       },
       {
-        "endLine": 1370,
+        "endLine": 1372,
         "origin": "generated:transport/roulette",
-        "startLine": 1363,
+        "startLine": 1365,
       },
       {
-        "endLine": 1374,
+        "endLine": 1376,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1371,
+        "startLine": 1373,
       },
       {
-        "endLine": 1409,
+        "endLine": 1411,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1375,
+        "startLine": 1377,
       },
       {
-        "endLine": 1438,
+        "endLine": 1440,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1410,
+        "startLine": 1412,
       },
       {
-        "endLine": 1478,
+        "endLine": 1480,
         "origin": "generated:transport/walk",
-        "startLine": 1439,
+        "startLine": 1441,
       },
       {
-        "endLine": 1479,
+        "endLine": 1481,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1479,
+        "startLine": 1481,
       },
       {
-        "endLine": 1508,
+        "endLine": 1510,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1480,
+        "startLine": 1482,
       },
     ],
   },
@@ -48998,8 +49016,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -49577,99 +49597,99 @@ void main() {
         "startLine": 948,
       },
       {
-        "endLine": 1015,
+        "endLine": 1017,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 966,
       },
       {
-        "endLine": 1058,
+        "endLine": 1060,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1016,
+        "startLine": 1018,
       },
       {
-        "endLine": 1062,
+        "endLine": 1064,
         "origin": "generated:medium-dispatch",
-        "startLine": 1059,
+        "startLine": 1061,
       },
       {
-        "endLine": 1076,
+        "endLine": 1078,
         "origin": "generated:medium-sample",
-        "startLine": 1063,
+        "startLine": 1065,
       },
       {
-        "endLine": 1087,
+        "endLine": 1089,
         "origin": "generated:medium-survival",
-        "startLine": 1077,
+        "startLine": 1079,
       },
       {
-        "endLine": 1095,
+        "endLine": 1097,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1088,
+        "startLine": 1090,
       },
       {
-        "endLine": 1114,
+        "endLine": 1116,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1096,
+        "startLine": 1098,
       },
       {
-        "endLine": 1118,
+        "endLine": 1120,
         "origin": "generated:environment",
-        "startLine": 1115,
+        "startLine": 1117,
       },
       {
-        "endLine": 1125,
+        "endLine": 1127,
         "origin": "generated:transport/light-query",
-        "startLine": 1119,
+        "startLine": 1121,
       },
       {
-        "endLine": 1145,
+        "endLine": 1147,
         "origin": "generated:transport/state",
-        "startLine": 1126,
+        "startLine": 1128,
       },
       {
-        "endLine": 1152,
+        "endLine": 1154,
         "origin": "generated:transport/combiner",
-        "startLine": 1146,
+        "startLine": 1148,
       },
       {
-        "endLine": 1158,
+        "endLine": 1160,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1153,
+        "startLine": 1155,
       },
       {
-        "endLine": 1166,
+        "endLine": 1168,
         "origin": "generated:transport/roulette",
-        "startLine": 1159,
+        "startLine": 1161,
       },
       {
-        "endLine": 1213,
+        "endLine": 1215,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1167,
+        "startLine": 1169,
       },
       {
-        "endLine": 1248,
+        "endLine": 1250,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1214,
+        "startLine": 1216,
       },
       {
-        "endLine": 1264,
+        "endLine": 1266,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1249,
+        "startLine": 1251,
       },
       {
-        "endLine": 1314,
+        "endLine": 1316,
         "origin": "generated:transport/walk",
-        "startLine": 1265,
+        "startLine": 1267,
       },
       {
-        "endLine": 1315,
+        "endLine": 1317,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1315,
+        "startLine": 1317,
       },
       {
-        "endLine": 1344,
+        "endLine": 1346,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1316,
+        "startLine": 1318,
       },
     ],
   },
@@ -54272,8 +54292,10 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);                 // zero channel → huge t → survive branch
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // Zero extinction has all its probability at infinity: survive this segment,
+    // including xi.y == 0. A positive floor would invent collisions in vacuum.
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc;
 
     MediumSample ms;
     ms.deflected = false;                             // straight-ray arm — never a GRIN exit
@@ -55022,144 +55044,144 @@ void main() {
         "startLine": 973,
       },
       {
-        "endLine": 1040,
+        "endLine": 1042,
         "origin": "components/transport/volume/analytic/analytic.glsl",
         "startLine": 991,
       },
       {
-        "endLine": 1083,
+        "endLine": 1085,
         "origin": "components/volume_scattering/hg/hg.glsl",
-        "startLine": 1041,
+        "startLine": 1043,
       },
       {
-        "endLine": 1090,
+        "endLine": 1092,
         "origin": "generated:medium-dispatch",
-        "startLine": 1084,
+        "startLine": 1086,
       },
       {
-        "endLine": 1104,
+        "endLine": 1106,
         "origin": "generated:medium-sample",
-        "startLine": 1091,
+        "startLine": 1093,
       },
       {
-        "endLine": 1115,
+        "endLine": 1117,
         "origin": "generated:medium-survival",
-        "startLine": 1105,
+        "startLine": 1107,
       },
       {
-        "endLine": 1122,
+        "endLine": 1124,
         "origin": "generated:medium-transmittance",
-        "startLine": 1116,
+        "startLine": 1118,
       },
       {
-        "endLine": 1185,
+        "endLine": 1187,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1123,
+        "startLine": 1125,
       },
       {
-        "endLine": 1190,
+        "endLine": 1192,
         "origin": "generated:light-structs",
-        "startLine": 1186,
-      },
-      {
-        "endLine": 1214,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 1191,
+        "startLine": 1188,
       },
       {
         "endLine": 1216,
-        "origin": "generated:light-accessors",
-        "startLine": 1215,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 1193,
       },
       {
-        "endLine": 1223,
-        "origin": "generated:light-sampling",
+        "endLine": 1218,
+        "origin": "generated:light-accessors",
         "startLine": 1217,
       },
       {
-        "endLine": 1231,
+        "endLine": 1225,
+        "origin": "generated:light-sampling",
+        "startLine": 1219,
+      },
+      {
+        "endLine": 1233,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1224,
+        "startLine": 1226,
       },
       {
-        "endLine": 1250,
+        "endLine": 1252,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1232,
+        "startLine": 1234,
       },
       {
-        "endLine": 1254,
+        "endLine": 1256,
         "origin": "generated:environment",
-        "startLine": 1251,
+        "startLine": 1253,
       },
       {
-        "endLine": 1261,
+        "endLine": 1263,
         "origin": "generated:transport/light-query",
-        "startLine": 1255,
+        "startLine": 1257,
       },
       {
-        "endLine": 1281,
+        "endLine": 1283,
         "origin": "generated:transport/state",
-        "startLine": 1262,
+        "startLine": 1264,
       },
       {
-        "endLine": 1294,
+        "endLine": 1296,
         "origin": "generated:transport/combiner",
-        "startLine": 1282,
+        "startLine": 1284,
       },
       {
-        "endLine": 1300,
+        "endLine": 1302,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1295,
+        "startLine": 1297,
       },
       {
-        "endLine": 1308,
+        "endLine": 1310,
         "origin": "generated:transport/roulette",
-        "startLine": 1301,
+        "startLine": 1303,
       },
       {
-        "endLine": 1355,
+        "endLine": 1357,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1309,
+        "startLine": 1311,
       },
       {
-        "endLine": 1359,
+        "endLine": 1361,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1356,
+        "startLine": 1358,
       },
       {
-        "endLine": 1394,
+        "endLine": 1396,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1360,
+        "startLine": 1362,
       },
       {
-        "endLine": 1410,
+        "endLine": 1412,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1395,
+        "startLine": 1397,
       },
       {
-        "endLine": 1439,
+        "endLine": 1441,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1411,
+        "startLine": 1413,
       },
       {
-        "endLine": 1458,
+        "endLine": 1460,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1440,
+        "startLine": 1442,
       },
       {
-        "endLine": 1515,
+        "endLine": 1517,
         "origin": "generated:transport/walk",
-        "startLine": 1459,
+        "startLine": 1461,
       },
       {
-        "endLine": 1516,
+        "endLine": 1518,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1516,
+        "startLine": 1518,
       },
       {
-        "endLine": 1545,
+        "endLine": 1547,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1517,
+        "startLine": 1519,
       },
     ],
   },

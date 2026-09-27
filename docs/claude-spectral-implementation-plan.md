@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored surface scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, and image/procedural skies; material expressions/media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, image/procedural skies, and homogeneous nonemissive media; material expressions, other media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -496,8 +496,8 @@ Before enabling tracking in S1, write the numerical certificate for the actual e
   wavelength endpoints and live-bound transitions. Inspect M-sigma_t **before** the existing
   nonnegative null-coefficient guard; that guard must not conceal a violated majorant.
 
-The numerical allowance remains an implementation gate: there is no generated spectral asset
-or emitted evaluation to certify yet. Analytic envelopes plus sampled maxima alone do not
+The numerical allowance remains an implementation gate for tracking. The generated spectral
+assets and emitted lift now exist, but their tracking certificate is not complete. Analytic envelopes plus sampled maxima alone do not
 close it. Keep the same bound contract in main and shadow tracking.
 
 Analytic channel selection uses `SPECTRUM_N` and its actual mixture density. After collapse,
@@ -506,6 +506,32 @@ retain the full mixture denominator; zero contribution lanes do not invalidate t
 Do not switch the proposal to hero-only while retaining the old mixture denominator.
 Delta tracking's throughput-dependent probabilities need independent post-collapse coverage;
 the analogous argument must not be assumed just from the analytic arm.
+
+### 5.3 Homogeneous nonemissive media
+
+The first admitted media stage uses RGB constants and live RGB parameters for absorption
+and scattering, lifted separately with the coefficient role (no D65 multiplier). It covers
+bounded regions and ambient media, HG and Rayleigh phases, and the existing analytic
+PT/NEE/MIS and delta-light equiangular routes. No transport-loop or interface change is needed.
+Volume emission, expression coefficients and GRIN remain validation-rejected in spectral mode.
+
+This stage requires no spectral majorant: for a fixed wavelength packet, each coefficient
+is constant over the segment. Choose one of N lanes uniformly; conditional on lane c,
+draw its exponential free path. The event density is
+`p(t) = sum(sigma_t[i] * exp(-sigma_t[i]*t))/N`; its vector weight is
+`sigma_s * exp(-sigma_t*t)/p(t)`. Survival has mass
+`sum(exp(-sigma_t[i]*L))/N` and weight `exp(-sigma_t*L)` divided by that mass.
+A zero selected extinction survives the segment, including an exact zero random draw;
+it must not acquire a fictitious rate through a numerical floor. The implementation retains
+its existing small-PDF normalization floor; this stage does not certify extreme optical-depth
+numerical behavior. Shadow segments use the same wavelengths and Beer–Lambert extinction. When scattering is ignored, both segment and shadow dispatch use absorption only.
+
+Checks: `scripts/audit-spectral-media.ts` independently integrates the spectral absorption
+slab and its two-traversal shadow variant against CIE/D65; generated GPU probes cover
+coefficient roles, live changes, all four selected lanes, event distances, collision/survival
+weights, shadow extinction and zero-extinction endpoints. Render witnesses add coloured
+slabs, scattering furnaces for both phase models, fog PT/NEE/MIS, and equiangular placement.
+
 
 ## 6. Dispersion and the one-time collapse
 
@@ -738,7 +764,8 @@ slider bounds are checked at compilation; runtime writes retain the same author 
 `setParameter` does not enforce UI ranges or clamp the lift. Repeated live updates and
 session restoration are compared to constant renders, including changes to the selection
 CDF and sky/finite split. Image and procedural skies are also enabled, with the
-support/density corrections in §4.5. Material expressions remain validation-gated; spectral media bounds,
+support/density corrections in §4.5. Homogeneous nonemissive media are admitted as described
+in §5.3. Material expressions and other media remain validation-gated; spectral tracking bounds,
 non-RGB form codes and CPU constant precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 

@@ -145,8 +145,8 @@ MediumSample medium_sample_analytic(MediumProperties m, float t_max, vec2 xi) {
     Spectrum sigma_t = m.sigma_a + m.sigma_s;
 
     int   c  = min(int(xi.x * 3.0), 2);                  // uniform channel selection
-    float sc = max(sigma_t[c], 1e-9);                    // zero channel → t = huge → survive
-    float t  = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    float t  = sc == 0.0 ? t_max : -log(1.0 - xi.y) / sc; // zero extinction survives
 
     MediumSample ms;
     ms.radiance = SPECTRUM_ZERO;                          // §3: mandatory assignment
