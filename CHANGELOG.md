@@ -4,6 +4,22 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — correct HDR mantissa scaling
+
+RGBE import now uses `byte * 2^(exponent - 136)` and decodes exponent zero as black.
+This matches the exporter's 256 mantissa scale, removing the 256/255 brightness
+multiplier. The lower-edge decoding convention matches
+[stb_image's HDR decoder](https://github.com/nothings/stb/blob/master/stb_image.h);
+Radiance's own decoder uses the same scale but reconstructs at the bin midpoint.
+The spectral image fixture now encodes exactly `(0.25, 0.5, 1)` and uses that reference.
+
+Validation: known decoded values, zero-exponent black, exact representable export/import
+round trips and a one-mantissa-step quantization bound; 700 tests across the loader,
+exporter and three snapshot suites pass, as does typecheck. All three image witnesses
+pass: image/constant Δmean 0.07%, sampler comparison 0.15%, RGB mean
+`(0.2502, 0.5005, 1.0009)`. Only the constant-image reference's three planning snapshots
+change. Removed the resolved decoder defect from current-status documentation.
+
 ## 2026-09-27 — spectral image and procedural skies
 
 Enabled image and procedural environments in spectral mode. The existing radiance

@@ -12,28 +12,33 @@ function rawHDR(dimLine: string, pixels: number[]): ArrayBuffer {
 
 describe('HDRLoader.parse', () => {
     it('parses dimensions and decodes a single raw RGBE pixel', () => {
-        // RGBE (128,0,0,128): scale = 2^(128-128) = 1 → R = 128/255
+        // RGBE (128,0,0,128) represents exactly half a unit.
         const hdr = HDRLoader.parse(rawHDR('-Y 1 +X 1', [128, 0, 0, 128]));
         expect(hdr.width).toBe(1);
         expect(hdr.height).toBe(1);
         expect(hdr.data).toHaveLength(3);
-        expect(hdr.data[0]).toBeCloseTo(128 / 255, 5);
+        expect(hdr.data[0]).toBe(0.5);
         expect(hdr.data[1]).toBe(0);
         expect(hdr.data[2]).toBe(0);
     });
 
     it('applies the RGBE exponent scale', () => {
-        // E = 129 → scale = 2^1 = 2 → R = (128/255) * 2
+        // Increasing the shared exponent by one doubles every channel.
         const hdr = HDRLoader.parse(rawHDR('-Y 1 +X 1', [128, 0, 0, 129]));
-        expect(hdr.data[0]).toBeCloseTo((128 / 255) * 2, 5);
+        expect(hdr.data[0]).toBe(1);
     });
 
     it('reads the width from the resolution line and decodes multiple pixels', () => {
         const hdr = HDRLoader.parse(rawHDR('-Y 1 +X 2', [64, 0, 0, 128, 0, 64, 0, 128]));
         expect(hdr.width).toBe(2);
         expect(hdr.height).toBe(1);
-        expect(hdr.data[0]).toBeCloseTo(64 / 255, 5); // pixel 0 red
-        expect(hdr.data[4]).toBeCloseTo(64 / 255, 5); // pixel 1 green
+        expect(hdr.data[0]).toBe(0.25); // pixel 0 red
+        expect(hdr.data[4]).toBe(0.25); // pixel 1 green
+    });
+
+    it('decodes exponent zero as black regardless of mantissas', () => {
+        const hdr = HDRLoader.parse(rawHDR('-Y 1 +X 1', [128, 64, 32, 0]));
+        expect(Array.from(hdr.data)).toEqual([0, 0, 0]);
     });
 
     it('throws when the resolution line is missing', () => {

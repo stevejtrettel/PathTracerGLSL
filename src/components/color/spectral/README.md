@@ -206,7 +206,3 @@ target in RGB and spectral modes. `spectral-comp-empty` checks the zero-table MI
 case. `spectral-image-constant` compares an actual RGBE texture with a constant sky.
 The fixed-wavelength binding probe separately checks filtered image RGB and rotated
 procedural radiance in all four lanes.
-
-The image fixture compares against the loader's decoded RGB. Its existing `/255`
-mantissa conversion differs from the exporter's 256 scaling; that independent HDR
-decoder discrepancy is recorded in the changelog and is not corrected by spectral lifting.

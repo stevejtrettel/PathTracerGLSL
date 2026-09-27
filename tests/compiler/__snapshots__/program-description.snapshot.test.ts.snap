@@ -36051,9 +36051,9 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
   },
   "environment": {
     "color": [
-      0.25098039215686274,
-      0.5019607843137255,
-      1.003921568627451,
+      0.25,
+      0.5,
+      1,
     ],
     "intensity": 2,
     "type": "constant",
@@ -36157,9 +36157,9 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
   },
   "environment": {
     "color": [
-      0.25098039215686274,
-      0.5019607843137255,
-      1.003921568627451,
+      0.25,
+      0.5,
+      1,
     ],
     "intensity": 2,
     "type": "constant",
@@ -36263,9 +36263,9 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
   },
   "environment": {
     "color": [
-      0.25098039215686274,
-      0.5019607843137255,
-      1.003921568627451,
+      0.25,
+      0.5,
+      1,
     ],
     "intensity": 2,
     "type": "constant",

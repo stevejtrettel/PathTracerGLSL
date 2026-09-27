@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { crc32 as zlibCrc32, inflateSync } from 'node:zlib';
 import { floatToRGBE, buildHDRFile, encodePNG, type RenderStamp } from '../../src/app/utils/file-export.js';
+import { HDRLoader } from '../../src/engine/loaders/hdr-loader.js';
 
 const testStamp: RenderStamp = {
     scene: 'furnace',
@@ -48,6 +49,24 @@ describe('floatToRGBE', () => {
 });
 
 describe('buildHDRFile', () => {
+    it('round-trips representable RGB and bounds truncation by one mantissa step', () => {
+        const rgb = [[0.25, 0.5, 1], [3.1, 0.2, 0.7], [0, 0, 0], [256, 128, 64]];
+        const pixels = new Float32Array(rgb.flatMap(c => [...c, 1]));
+        const encoded = floatToRGBE(pixels, rgb.length, 1);
+        const file = buildHDRFile(encoded, rgb.length, 1);
+        const decoded = HDRLoader.parse(file.buffer as ArrayBuffer);
+        expect(Array.from(decoded.data.slice(0, 3))).toEqual(rgb[0]);
+        expect(Array.from(decoded.data.slice(9, 12))).toEqual(rgb[3]);
+        for (let i = 0; i < rgb.length; i++) {
+            const step = 2 ** (encoded[4 * i + 3] - 136);
+            for (let c = 0; c < 3; c++) {
+                const error = pixels[4 * i + c] - decoded.data[3 * i + c];
+                expect(error).toBeGreaterThanOrEqual(0);
+                expect(error).toBeLessThan(step);
+            }
+        }
+    });
+
     it('writes a RADIANCE header with the correct dimension line and total size', () => {
         const w = 4, h = 3;
         const rgbe = new Uint8Array(w * h * 4);

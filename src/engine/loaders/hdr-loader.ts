@@ -172,12 +172,12 @@ export class HDRLoader {
             const b = rgbeData[rgbeOffset++];
             const e = rgbeData[rgbeOffset++];
 
-            // Convert RGBE to float: rgb * 2^(e-128)
-            const scale = Math.pow(2, e - 128);
+            // RGBE mantissas represent byte/256; exponent zero encodes black.
+            const scale = e === 0 ? 0 : Math.pow(2, e - 136);
 
-            floatData[floatOffset++] = (r / 255) * scale;
-            floatData[floatOffset++] = (g / 255) * scale;
-            floatData[floatOffset++] = (b / 255) * scale;
+            floatData[floatOffset++] = r * scale;
+            floatData[floatOffset++] = g * scale;
+            floatData[floatOffset++] = b * scale;
         }
 
         return floatData;

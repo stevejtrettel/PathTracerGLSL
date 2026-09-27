@@ -17,9 +17,8 @@ const plane: SceneDescription = {
 const charts = ['equirect', 'octahedral'];
 const capStrategies = ['rgb', 'spectral'].flatMap(color => charts.map(chart => strategy(`${color}-${chart}`, 'nee', chart, color as 'rgb' | 'spectral')));
 const compStrategies = charts.map(chart => strategy(chart, 'mis', chart, 'spectral', true));
-// Constant 16×16 RGBE fixture. The loader currently decodes channels as byte*2/255;
-// this reference tests the spectral lift of that decoded RGB, not RGBE file accuracy.
-const imageRGB: [number, number, number] = [64/255, 128/255, 256/255];
+// Constant 16×16 RGBE fixture encoding exactly this linear RGB.
+const imageRGB: [number, number, number] = [0.25, 0.5, 1];
 const constantHDR = 'data:image/vnd.radiance;base64,' + btoa(
     '#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 16 +X 16\n' + String.fromCharCode(32,64,128,129).repeat(16*16),
 );

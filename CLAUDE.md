@@ -222,9 +222,7 @@ through glass; MIS with delta tracking; equiangular sampling of area lights; sph
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: HDR import divides RGBE mantissas by 255 while export uses 256
-(engine/loaders/hdr-loader.ts vs app/utils/file-export.ts); the spectral image tests
-compare against decoded RGB and do not certify the file decoder. cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
+**Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
 found (correctness items, duplicated decisions, tests that cannot fail, wrong documents), with
 proposed fixes; docs/claude-improvements-2026-09.md has the other suggested improvements.
