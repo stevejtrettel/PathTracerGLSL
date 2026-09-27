@@ -723,7 +723,16 @@ exports[`scene-data textures (byte fingerprints) > spectral-colored-furnace 1`] 
 
 exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-eta 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-inclusion 1`] = `
+{
+  "nodes": "4096x1 5903415b41a0a4d4",
+  "records": "4096x1 94b01dd94dc255a8",
+}
+`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-live 1`] = `null`;
 
@@ -732,6 +741,15 @@ exports[`scene-data textures (byte fingerprints) > spectral-live-changed 1`] = `
 exports[`scene-data textures (byte fingerprints) > spectral-live-changed-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-live-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-materials 1`] = `
+{
+  "nodes": "4096x1 5fe3415bc91cdd80",
+  "records": "4096x1 fb8c08c3814c9d0f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-mirror 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-packed 1`] = `
 {

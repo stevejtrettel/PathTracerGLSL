@@ -110,6 +110,39 @@ await add('instance sampling matches hit emission', batchOnly, `
 const mutation = { ...probes[0], name: 'lost instance index',
     source: probes[0].source.replace(`fragColor = ${properties}.albedo;`, `h.element=0; fragColor = ${properties}.albedo;`) };
 assert.notEqual(mutation.source, probes[0].source);
+
+// At normal incidence the model weights have closed forms. These run the generated
+// resolver AND the actual BSDF, retaining four unequal wavelengths through the hit.
+const tint: Vec3 = [0.2, 0.5, 0.8];
+const lifted = expected(tint, false);
+for (const model of ['mirror', 'ggx', 'checker', 'dielectric', 'rough_dielectric']) {
+    const scene = structuredClone(spectralPackedReference);
+    for (let i = 0; i < 3; i++) scene.materials[`lamp${i}`] = {
+        model,
+        ...(model === 'mirror' || model === 'ggx' ? { f0: tint } : {}),
+        ...(model === 'ggx' || model === 'rough_dielectric' ? { roughness: 0.5 } : {}),
+        ...(model === 'checker' ? { albedo_a: tint, albedo_b: [0.8, 0.3, 0.1] as Vec3, uv_scale: 1 } : {}),
+        ...(model === 'dielectric' || model === 'rough_dielectric' ? { transmittance: tint, ior: 1.5 } : {}),
+    };
+    const setup = hit + `h.uv = vec2(0.25); MaterialProperties mp = ${properties};`;
+    const glass = model === 'dielectric' || model === 'rough_dielectric';
+    await add(`${model} normal sample`, scene,
+        setup + `fragColor = ${model}_sample(vec3(0.0,0.0,1.0),h,mp,0.9,vec2(0.0)).weight;`,
+        [lifted.map(v => v * (glass ? 1 / 2.25 : 1))]);
+    if (model === 'checker') {
+        await add('checker second cell', scene,
+            setup + 'h.uv.x += 1.0; fragColor = checker_eval(vec3(0.0,0.0,1.0),vec3(0.0,0.0,1.0),h,mp);',
+            [expected([0.8, 0.3, 0.1], false).map(v => v / Math.PI)]);
+    }
+    if (model === 'ggx' || model === 'rough_dielectric') {
+        // alpha = 0.5², D(normal) = 1/(pi*alpha²), G1(normal) = 1.
+        const D = 16 / Math.PI;
+        const scale = glass ? D * (1 - 0.04) * (4 / 9) / (1 / 9) : D / 4;
+        await add(`${model} normal eval`, scene,
+            setup + `fragColor = ${model}_eval(vec3(0.0,0.0,${glass ? '-1.0' : '1.0'}),vec3(0.0,0.0,1.0),h,mp);`,
+            [lifted.map(v => v * scale)]);
+    }
+}
 function verify(probe: typeof probes[number], values: number[]) {
     for (let x = 0; x < width; x++) for (let c = 0; c < 4; c++) {
         const target = probe.expected[x % probe.expected.length][c];
@@ -121,7 +154,7 @@ try {
     const frames = await renderProbes(await browser.newPage(), [...probes, mutation], width, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(mutation, frames[probes.length]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} generated packed spectral readers, all four lanes; lost-instance-index mutation rejected`);
+    console.log(`PASS: ${probes.length} generated spectral binding/BSDF probes, all four lanes; lost-instance-index mutation rejected`);
 } finally {
     await browser.close();
 }

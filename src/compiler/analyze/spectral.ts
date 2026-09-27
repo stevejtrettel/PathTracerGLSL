@@ -35,11 +35,13 @@ export function spectralLimitations(scene: SceneDescription): string[] {
         }
     }
     for (const [name, mat] of Object.entries(scene.materials)) {
-        if (mat.model !== 'lambert') reasons.push(`spectral material '${name}' requires the verified lambert model`);
-        if (mat.albedo !== undefined && !rgbInput(mat.albedo, 1))
-            reasons.push(`spectral material '${name}' requires RGB albedo in [0,1], including parameter defaults and bounds`);
-        if (mat.emission !== undefined && !rgbInput(mat.emission))
-            reasons.push(`spectral material '${name}' requires nonnegative RGB emission, including parameter defaults and bounds`);
+        for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
+            if (row.semantic !== 'radiometric') continue;
+            const value = mat[row.source] ?? row.default;
+            const ceiling = row.role === 'reflectance' ? 1 : Infinity;
+            if (!rgbInput(value, ceiling))
+                reasons.push(`spectral material '${name}' property '${row.source}' requires ${ceiling === 1 ? 'RGB in [0,1]' : 'nonnegative RGB'}, including parameter defaults and bounds`);
+        }
     }
     if (scene.lights.some(l => !rgbInput(l.emission)))
         reasons.push('spectral lights require nonnegative RGB emission, including parameter defaults and bounds');

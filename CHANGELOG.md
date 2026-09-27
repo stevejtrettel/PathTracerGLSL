@@ -4,6 +4,36 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral surface materials
+
+Enabled the existing mirror, GGX, checker, dielectric and rough-dielectric models in
+spectral mode alongside Lambert. Material colour validation now reads each descriptor's
+radiometric roles: both checker colours, conductor f0 and interface tint use the bounded
+reflectance domain; emission remains nonnegative. Constants and live colour parameters
+use the existing lift. Glass keeps its scalar, wavelength-independent IOR. This changes
+validation only: no BSDF, transport, runtime fallback or interface changes. Media,
+expressions, non-RGB forms, reflectance gain and dispersion remain gated or undecided.
+
+Extended the generated-binding GPU probe to 21 cases, including four-lane normal-incidence
+BSDF weights/evaluation against closed forms for the newly admitted models. Added four
+rendered witnesses, all passing at 512 spp: the coloured mixed-material scene's NEE/MIS
+means differ by 0.54% (reduced chi-squared 0.59); the grey mirror returns approximately
+0.5; the air/water radiance-compression witness returns approximately 0.554; and first-event
+rough-glass light-tree selection agrees with power selection within 1.25% (chi-squared
+0.25). The latter keeps the original 2.5% mean tolerance. An exploratory eight-bounce,
+roughness-0.2 inclusion comparison was too noisy for that gate: 4.32% at 512 spp and
+5.02% at 2048 spp, both within about one combined standard error. The committed witness
+isolates the first surface event and uses roughness 0.5; it does not establish a precise
+multi-bounce power/tree comparison. The mixed-material witness separately covers multiple
+bounces and roulette. The new gallery scene is `spectral-materials`.
+
+All 213 pre-existing synchronous scene digests and snapshots are unchanged; four scenes
+are additions. Typecheck and production build pass. The full 95-file / 3,327-test run had
+one five-second timeout in an unchanged spectral-direct static-compile case; its focused
+rerun passed without changing the timeout or implementation. All other tests passed,
+including the new schema-domain and isolated/mixed-model compilation checks. Updated
+fixture snapshots pass. These are targeted GPU checks, not a full witness sweep.
+
 ## 2026-09-27 — live spectral colour controls
 
 Enabled RGB `{param}` values for spectral Lambert albedo/emission, authored lights and

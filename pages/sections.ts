@@ -33,8 +33,8 @@ const e = (id: string, ...partners: string[]): SectionEntry =>
 export const gallerySections: GallerySection[] = [
     {
         title: 'Spectral foundations',
-        blurb: 'four-wavelength transport, CIE sensor response, and constant RGB Lambert validation scenes',
-        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref')],
+        blurb: 'four-wavelength transport, CIE sensor response, live colours, packed data and surface materials',
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-mirror'), e('spectral-eta'), e('spectral-inclusion')],
     },
     {
         title: 'Instance clouds',

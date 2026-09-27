@@ -2,9 +2,11 @@
 
 `measurement.color: 'spectral'` uses four wavelengths in nanometres on [360, 830],
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
-emission and skies, Lambert albedo in [0,1], live RGB colour parameters, PT/NEE/MIS,
+emission and constant-type skies, reflectance colours in [0,1], live RGB colour parameters, PT/NEE/MIS,
 light-tree selection and instancing with constant or per-instance RGB colours. Media,
-expressions and non-RGB forms remain rejected.
+expressions and non-RGB forms remain rejected. All six existing surface models are
+supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
+a wavelength-independent scalar IOR; dispersion is not implemented.
 
 ## Measurement and sampling
 
@@ -85,7 +87,7 @@ and asserts that the live renderer was not recompiled.
 
 ## Packed colours
 
-Instance albedo/emission arrays and ordinary light rows retain authored RGB. The
+Instance colour arrays and ordinary light rows retain authored RGB. The
 existing generated readers lift those values at the supplied wavelengths after the
 texture fetch. No spectral coefficients replace the shared scene-data payload.
 Nested RGB arrays, scalar broadcasts and interleaved float32 arrays follow the existing
@@ -165,3 +167,20 @@ polynomial-only costs of 0.146, 0.188 and 0.254 ms/draw, versus table-lookup cos
 software-renderer draw/readback costs for one repeatedly accessed colour, not native GPU
 shader timings or a scene-level speed estimate. Native-GPU and heavy-scene ray-carriage
 measurements remain outstanding.
+
+## Surface material verification
+
+Radiometric inputs are checked through each model's property schema: albedo, both
+checker colours, conductor `f0` and interface transmittance use the reflectance domain;
+Lambert emission uses the emission domain. Existing scalar IOR validation and the
+opaque-dielectric shadow policy apply unchanged. The shaders already operate on
+`Spectrum`; enabling these models required no BSDF or transport changes.
+
+`npm run witness:spectral-bindings` includes fixed-wavelength BSDF probes: normal
+mirror/GGX weights, both checker colours, glass transmission weights with the η²
+factor, and GGX/rough-glass evaluation against closed forms. All four lanes are checked.
+`npm run witness -- spectral-materials spectral-mirror spectral-eta spectral-inclusion`
+checks a mixed coloured scene's NEE/MIS agreement, grey mirror reflectance, glass
+radiance compression and rough glass's two-sided light-tree selection at the first
+surface event. The mixed
+scene is available in the lab as `spectral-materials`.

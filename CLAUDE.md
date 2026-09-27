@@ -209,8 +209,9 @@ How a program is assembled:
   once by hand).
 - Spectral foundation: four wavelengths, CIE 1931 sensor, uniform/visible proposals,
   signed linear-RGB film and versioned RGB-to-spectrum assets. Currently restricted to
-  RGB Lambert scenes, including live colour controls, instance colour attributes and
-  light-tree selection; media, expressions and non-RGB forms remain gated. See
+  RGB-authored surface scenes (all six material models), including live colour controls,
+  instance colour attributes and light-tree selection; glass uses wavelength-independent
+  IOR. Media, expressions and non-RGB forms remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 
