@@ -313,7 +313,7 @@ No form registry, new tenant or changed stride is needed for this form. The earl
 proposal for a scene-wide form-ID registry is superseded for blackbody; table-backed
 future forms must specify their own reference storage when implemented.
 
-`ProgramDescription.blackbody` records the original-form spectral reader. Packed tags
+`ProgramDescription.spectrumKinds` lists `blackbody` when a spectral program reads the original Planck form. Packed tags
 and Planck parameters are authored scene data and are present irrespective of renderer
 order or whether RGB alone is compiled. RGB programs ignore that header metadata;
 spectral programs with Planck forms read it. `lightTableLayout` remains the shared

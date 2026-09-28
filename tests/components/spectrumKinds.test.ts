@@ -10,7 +10,7 @@ import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
 import { sceneSuite, isAsyncSceneEntry } from '../../pages/registry.js';
 
 const SRC = resolve(__dirname, '../../src');
-const COLOR = join(SRC, 'components/color');
+const SPECTRA = join(SRC, 'components/color/spectra');
 
 function tsFiles(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -19,16 +19,17 @@ function tsFiles(dir: string): string[] {
     });
 }
 
-// Predicates of particular kinds, and comparisons of a kind's id to a name.
-const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier)'/g;
+// Run-time tests for a particular kind: its predicates, its kind object, a comparison of a
+// kind's id to a name, or a check for its authored key.
+const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody|rgbKind|blackbodyKind|cauchyKind|sellmeierKind)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier)'|'(blackbody|cauchy|sellmeier)'\s+in\b/g;
 
 const ALLOWED: Record<string, number> = {};
 
 describe('spectrum kinds', () => {
-    it('code outside components/color/ asks the kind, except the listed uses', () => {
+    it('code outside color/spectra/ asks the kind, except the listed uses', () => {
         const found: Record<string, number> = {};
         for (const file of tsFiles(SRC)) {
-            if (file.startsWith(COLOR)) continue;
+            if (file.startsWith(SPECTRA)) continue;
             const lines = readFileSync(file, 'utf8').split('\n').filter((l) => !/^\s*(import|export)\s.*from\s/.test(l));
             const n = lines.reduce((sum, l) => sum + (l.match(KIND_TEST)?.length ?? 0), 0);
             if (n > 0) found[relative(SRC, file)] = n;

@@ -16,8 +16,10 @@ then `rgb`.
 `spectrumKinds`: the kinds a program evaluates at wavelengths, in registry order. The program
 links each kind's GLSL helpers from the kind itself (no longer by name in core.ts), and the
 packed-row reader takes its header readers from the listed kinds. The `IndexForm` type is gone.
-Nothing outside the color folder now tests for a particular kind: the scan test's allow-list
-is empty.
+Outside the spectra folder, no code tests for a particular kind at run time: the scan test's
+allow-list is empty. (The authored value types in compiler/types.ts still name each kind's
+spelling.) Reordering the registry changes one diagnostic: a value carrying both blackbody and
+Cauchy keys now lists them as "(Cauchy, blackbody)".
 
 Verification: shader text is unchanged in all 265 digest scenes; the source maps of the 13
 scenes that link a moved GLSL file differ only in the new path (a digest with the old paths
@@ -26,6 +28,16 @@ programs by exactly the field swap: 466 empty lists, 18 lists holding `blackbody
 the index kinds formerly in `dispersion.forms`. Typecheck; the full test run, 104 files and
 3,982 tests. Documentation links into the moved folders were updated in the component READMEs
 and the spectral docs; CHANGELOG entries keep the paths they had when written.
+
+An independent review compiled 42 further edge scenes (RGB and spectral; zero-dispersion
+Cauchy; blackbody only in a light, the sky or a material; open meshes and interior-less batches;
+all three kinds together) at both commits: `spectrumKinds` equals the old flag plus forms in
+every program, and all 384 generated shaders are byte-identical. Its fixes: the scan test now
+excludes only `color/spectra/` and also catches kind objects and authored-key checks; each kind
+folder must have a README (the `rgb` kind gained one); `core.ts` skips a listed kind without
+helpers instead of assuming it has some; a diagnostics case pins the two-named-kinds message;
+stale references to the old paths and the removed field were corrected. Final run: 104 files,
+3,983 tests; digest unchanged by these fixes.
 
 ## 2026-09-28 — one spectrum type, step 2: fixes from the independent review
 

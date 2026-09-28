@@ -1,5 +1,5 @@
 // Questions the compiler asks about an authored spectrum value, answered by the value's kind
-// (spectrumKinds.ts). Classification is independent of the transport representation.
+// (spectra/index.ts). Classification is independent of the transport representation.
 import type { Vec3 } from '../../compiler/types.js';
 import { kindOf, namedKindOf } from './spectra/index.js';
 

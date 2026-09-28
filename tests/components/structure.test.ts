@@ -34,7 +34,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'values.ts',                           // colour shared questions about authored spectrum values
-    'spectrumKind.ts',                     // colour/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)
+    'spectrumKind.ts',                     // color/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
 ]);
 
@@ -63,6 +63,9 @@ describe('components structure', () => {
             .filter((e) => e.isFile() && !ALLOWED_ROOT_FILES.has(e.name))
             .map((e) => e.name);
         expect(loose, `loose files at color/spectra/: ${loose.join(', ')}`).toEqual([]);
+        for (const kind of readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory())) {
+            expect(existsSync(join(dir, kind.name, 'README.md')), `color/spectra/${kind.name}/README.md`).toBe(true);
+        }
     });
     it('transport subfamilies keep occupant code in folders too', () => {
         for (const sub of ['techniques', 'integrators', 'volume', 'shadow']) {

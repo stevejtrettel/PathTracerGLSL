@@ -78,6 +78,7 @@ const cases: Record<string, Mutation> = {
     'unknown object as albedo': set((s) => { s.materials.m.albedo = { foo: 1 }; }),
     'unknown object as light emission': set((s) => { s.lights[0].emission = { foo: 1 }; }),
     'unknown object as surface ior': set((s) => { s.materials.glass.ior = { foo: 1 }; }),
+    'blackbody and Cauchy keys together': set((s) => { s.lights[0].emission = { ...blackbody(3000), cauchy: [1.5, 0.01] }; }),
     'blackbody and param keys together': set((s) => { s.lights[0].emission = { ...blackbody(3000), param: 'lamp.x', default: [1, 1, 1] }; }),
     // Role domains: the same in both colour models, except reflectance above 1 (spectral only).
     'material emission slider default -1': set((s) => { s.materials.m.emission = { param: 'm.glow', default: -1 }; }),

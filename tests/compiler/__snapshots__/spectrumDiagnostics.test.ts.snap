@@ -115,6 +115,35 @@ exports[`spectrum diagnostics > albedo slider max not a number 1`] = `
 }
 `;
 
+exports[`spectrum diagnostics > blackbody and Cauchy keys together 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
 exports[`spectrum diagnostics > blackbody and param keys together 1`] = `
 {
   "rgb": {

@@ -143,8 +143,8 @@ None of this is an estimator error.
 
 ## 7. The code interface
 
-Each way of producing a spectrum is a *kind*, described once. As built in step 1
-(`src/components/color/spectrumKind.ts`):
+Each way of producing a spectrum is a *kind*, described once. As built
+(`src/components/color/spectra/spectrumKind.ts`):
 
 ```ts
 type SpectrumRole = 'reflectance' | 'coefficient' | 'emission' | 'index';
@@ -161,6 +161,7 @@ interface SpectrumKind<V> {
     mayBeNonzero(value: V): boolean;             // can its emission be nonzero at run time
     dispersive(value: V): boolean;               // varies with wavelength as an index (collapse)
     emit(value: V, ctx: EmitContext): string;    // GLSL: Spectrum for radiometric roles, float for index
+    glsl?: { origin: string; source: string };   // helpers emit calls, linked when the program lists the kind
     mint?(value: V, ctx: MintContext): void;     // uniforms and sliders it derives (blackbody's T)
     packed?: { code: number; header(value: V): [number, number]; read(header: string, wl: string): string };
 }

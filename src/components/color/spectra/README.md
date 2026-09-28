@@ -37,12 +37,15 @@ a literal, uniform or expression; the color model's lift; minting a slider) reac
 `EmitContext` and `MintContext`.
 
 `index.ts` is the registry: `SPECTRUM_KINDS` in lookup order (the index formulas, then
-blackbody, then `rgb`, which claims everything else), `kindOf`, `namedKindOf` and `kindById`.
+blackbody, then `rgb`, which claims everything else), `kindOf`, `namedKindOf`,
+`namedKindsClaiming` (more than one is a malformed value), `kindById` and `rgbKind`.
 A program lists the kinds it evaluates at wavelengths in `ProgramDescription.spectrumKinds`
 (registry order); their `glsl` helpers are linked in that order.
 
-Outside this folder the compiler never tests for a particular kind;
-tests/components/spectrumKinds.test.ts enforces it.
+Outside this folder, code does not test for a particular kind at run time (no kind predicate,
+kind object, id comparison or authored-key check); tests/components/spectrumKinds.test.ts scans
+for these. The authored value types (`BlackbodyValue`, `CauchyIndex`, `SellmeierIndex` in
+compiler/types.ts) still name each kind's spelling, so a new kind also extends those unions.
 
 ## Adding a kind
 
