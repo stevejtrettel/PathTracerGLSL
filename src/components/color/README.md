@@ -6,8 +6,9 @@
 [spectral occupant](spectral/README.md) implements four-lane transport on a restricted
 RGB-authored capability set (all six existing material models), including live
 colour parameters, packed light rows and per-instance colours, image/procedural skies,
-and homogeneous nonemissive media. Material expressions, other media and non-RGB forms
-remain validation-rejected.
+and nonemissive homogeneous/heterogeneous media. Surface material expressions, emissive/GRIN
+media and non-RGB forms remain validation-rejected. Tracking uses the colour model’s
+separate field ceiling and spectral majorant; see the spectral README for its numerical domain.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:
 

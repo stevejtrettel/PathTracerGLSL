@@ -4,6 +4,57 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral bounds and nonemissive heterogeneous media
+
+Enabled RGB-expression absorption/scattering under the existing delta/ratio trackers for
+PT and NEE. The colour descriptor supplies separate field and sampling ceilings: the
+field still uses the common RGB scale before either coefficient is lifted; the sampling
+rate bounds their reconstructed sum over wavelength. Main and shadow dispatch share that
+rate. There are no changes to the tracking loops, PathState, engine contract or scene-data
+layout. Volume emission, GRIN, MIS with tracking, equiangular heterogeneous lighting and
+non-RGB forms remain outside this stage.
+
+The [spectral README's Tracking bound](src/components/color/spectral/README.md#tracking-bound)
+derives `4*A*(1+delta)^5/(1-delta)^2`, delta=2^-20, for the documented numerical domain.
+It accounts for field-clamp arithmetic, separate coefficient amplitudes, their sum, and
+both field/rate literal conversions. The CPU evaluates a finite chain of binary64
+products/division and steps above round-to-nearest float32; that step also covers host
+arithmetic error. The nominal ceiling range [2^-60, 2^18], finite evaluated components
+at most 2^60, and zero-or-at-least-2^-120 effective vector maxima are explicit conditions,
+not a claim to support infinities or arbitrary subnormal normalization. Compilation checks
+the ceiling and authored constants/declared controls; expressions and live writes carry
+the stated numerical contract. The sampler bound does not repair undefined expressions.
+
+The sigmoid now enforces its mathematical [0,1] range after finite evaluation. Asset-wide
+coefficient/node checks bound the intermediate polynomial and rule out overflow in that
+calculation. Both spectral table samplers explicitly request highp through a compiler-owned
+texture precision fact: the default float qualifier does not control texture-fetch return
+precision (GLSL ES 3.00 §8). The independent lookup probe and benchmark use the same
+qualifier. Other float samplers retain their declarations; their portability audit is
+recorded as a follow-up in CLAUDE.md, not claimed complete here.
+
+Final static checks: 3,554 tests in 98 files, typecheck and production build pass. GPU checks:
+61,440 lane margins are finite and nonnegative before the null-coefficient guard; substituting
+the RGB ceiling for the spectral rate fails. All 52 four-wavelength lookup cases and both
+wavelength proposal/PDF/white integrations pass (worst lookup error 9.64e-7); the three
+compiled spectral defects remain rejected. All 33 generated binding/BSDF/media probes and
+their two mutation checks pass. `npm run witness:spectral-majorant` joins the manual GPU CI
+job. The rounding unit check includes field-up/rate-down neighboring float32 values.
+
+The final compiled-output digest preserves 203 existing scenes exactly, changes the spectral
+programs in 26 scenes for the bounded lift/highp declarations, and adds four tracking scenes.
+Existing shared scene data, data-read contracts and warnings are unchanged; RGB programs,
+including the RGB strategies in the two mixed-colour sky fixtures, are unchanged. Seven
+async scenes remain outside this digest.
+
+All nine targeted rendered checks pass. The varying-density slab and live ceiling-clamp
+fixture agree with independent wavelength quadrature within 0.0011 per channel; camera
+and shadow extinction agree within 0.0002. Delta-tracked fog differs from its analytic
+homogeneous twin by 0.92% in frame mean with NEE (display RMSE 23.38%) and 1.11% with
+PT (RMSE 21.40%). Both spectral white checks and the existing RGB heterogeneous slab
+pass. Command: `npm run witness -- spectral-tracking-slab spectral-tracking-clamp
+spectral-tracking-shadow spectral-tracking-fog spectral-direct het-slab`.
+
 ## 2026-09-27 — spectral homogeneous absorption and scattering
 
 Enabled nonemissive homogeneous media with RGB constants or live RGB coefficients,

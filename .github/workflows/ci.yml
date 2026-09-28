@@ -73,6 +73,8 @@ jobs:
         run: npm run witness:spectral
       - name: Spectral packed-reader witnesses
         run: npm run witness:spectral-bindings
+      - name: Spectral tracking majorant
+        run: npm run witness:spectral-majorant
       - name: Environment sampling witnesses
         run: npm run witness:environment
       - name: Wavelength carrier witnesses

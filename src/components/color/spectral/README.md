@@ -4,8 +4,8 @@
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, PT/NEE/MIS,
-light-tree selection and instancing with constant or per-instance RGB colours. Homogeneous nonemissive media are supported. Other media,
-material expressions and non-RGB forms remain rejected. All six existing surface models are
+light-tree selection and instancing with constant or per-instance RGB colours. Nonemissive homogeneous and heterogeneous media are supported. Emissive/GRIN media,
+surface material expressions and non-RGB forms remain rejected. All six existing surface models are
 supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
 
@@ -39,8 +39,8 @@ trilinear interpolation. CPU and GPU use the same nodes and coefficient bytes.
 Reflectance uses the bounded lift directly. A nonnegative coefficient uses
 `scale = 2*max(rgb)` and `scale*rho(rgb/scale)`, with exact zero handled separately.
 Emission additionally multiplies by the normalized D65 curve. Coefficient evaluation
-is used by homogeneous media. Tracking media remain rejected pending their numerical
-majorant certificate. Reflectance gain above one remains an unresolved policy;
+is used by homogeneous and heterogeneous media. Nonemissive tracking uses the numerical
+majorant certificate below. Reflectance gain above one remains an unresolved policy;
 there is no silent clamp or implemented gain extension.
 
 The shipped model is `jh-cie1931-d65-v1`. Its metadata, matrices and SHA-256 hashes
@@ -216,8 +216,8 @@ Rayleigh phases, medium/shadow NEE and MIS, and delta-light equiangular placemen
 existing transport seams. `scattering: 'ignored'` removes scattering from both main and
 shadow extinction. Zero selected extinction means survival to the segment boundary.
 
-No all-wavelength majorant is needed for this analytic stage. Heterogeneous coefficients,
-volume emission and GRIN remain gated; the tracking bound proof remains open. Existing
+No all-wavelength majorant is needed for this analytic stage. Expression coefficients
+use the separate tracking bound below; volume emission and GRIN remain gated. Existing
 small-PDF normalization floors are unchanged, so these checks do not certify extreme
 optical depths.
 
@@ -227,3 +227,81 @@ live coefficients, shadow transmission and all four analytic sampling lanes on t
 The `spectral-slab`, `spectral-shadow-slab`, `spectral-scatter-furnace`,
 `spectral-rayleigh-furnace`, `spectral-fog` and `spectral-fog-placement` scenes provide the
 rendered checks and gallery examples.
+
+## Tracking bound
+
+Nonemissive RGB-expression media use the existing delta/ratio trackers under PT or NEE.
+The authored `majorant` is a **field ceiling**, A. The colour descriptor returns its
+nominal float32 value and a separate, outward-rounded **sampling majorant**, M. Both path and
+shadow dispatch consume the same planned sampling rate. Raising M does not change the
+field clamp. MIS with tracking, equiangular heterogeneous lighting, volume emission and
+GRIN remain gated.
+
+Numerical author contract for this stage:
+
+- The nominal quantized ceiling is in [2^-60, 2^18]. Compilation checks the authored value against
+  this interval. The upper limit keeps the existing signed-int tracking cap representable
+  even at the 1000-unit far clip; the lower limit supports the division error bound below.
+- Evaluated, nonnegative RGB absorption and scattering components are finite and at most
+  2^60, after the existing expression nonnegativity floor. Constants and declared parameter
+  bounds are checked; expression results and runtime writes carry the author contract.
+- Each effective RGB coefficient vector after the common field scale is either zero or
+  has maximum at least 2^-120. This keeps its normalization denominator normal. No claim
+  is made for overflowing formulas, infinities or subnormal normalization denominators;
+  they are outside this stage's domain, with no runtime replacement value.
+- Wavelengths stay in [360,830] nm and the versioned spectral assets are unchanged.
+  Their samplers explicitly request
+  highp: GLSL ES texture-fetch return precision follows the sampler, independently of
+  the default float precision (§8 of the specification linked below).
+
+For a highp normal result, use delta = 2^-20 as a conservative relative envelope for
+addition/multiplication and division. This exceeds the 1-ULP rounding allowance and the
+2.5-ULP division allowance in [GLSL ES 3.00 §4.5.1](https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf).
+Subnormal components may flush to zero; normalization denominators must remain normal.
+The proof starts from shader-evaluated RGB, so it does not assume accurate transcendental
+functions in authored formulas.
+
+Let A_g be the ceiling actually parsed by the shader. Literal conversion is covered by
+`A_g <= A*(1+delta)`; being a nominal float32 does not make its shortened decimal text an
+exact real-number spelling. Let x be the computed max channel of a+s. A true channel
+sum is at most x/(1-delta).
+If the field clamp fires, division A_g/x and multiplication by that scale each contribute
+at most (1+delta). Thus each effective coefficient's maximum is bounded by
+`B = A_g * (1+delta)^2 / (1-delta)`. If the clamp does not fire, x <= A_g gives a smaller
+bound. The clamp division's denominator is within rounding distance of [2^-60, 2^61];
+its positive result is
+at least approximately 2^-121, so it does not encounter a subnormal denominator or result.
+
+The bounded lift returns a finite value in [0,1]. For the coefficient lookup, the largest
+normalized RGB channel is near 1/2, keeping table addresses in range. The asset checks
+establish finite polynomial coefficients below 2048 in magnitude, increasing intensity
+nodes with gaps at least 2^-24, and endpoints 0 and 1. With coordinate rounding, interpolation
+fractions stay within [0,1.001]; three interpolation stages keep coefficients below 4096.
+On the wavelength interval the quadratic magnitude is below 16384. Squaring it cannot
+overflow; sqrt's argument is at least one. The final range clamp enforces the sigmoid's
+mathematical range, including rounded endpoint evaluations. The exact-grey branch is
+also within [0,1] for coefficient-normalized RGB.
+
+Multiplication by twice the effective maximum gives at most `2*B*(1+delta)` for each
+coefficient. Summing absorption and scattering contributes one more factor. Therefore
+
+```
+M >= 4*A * (1+delta)^5 / (1-delta)^2,  delta = 2^-20.
+```
+
+Power-of-two amplitude scaling is exact in this domain. Underflow of a small component
+cannot exceed this bound: its rounding error is below one ULP of the normal amplitude;
+flushing only lowers it. `spectralMediumBound` rounds the positive envelope upward to
+float32: one representable step above round-to-nearest also covers the finite chain of
+CPU binary64 products/division (no approximate power function is used). That chain’s
+relative rounding error is below 2^-48, far below half a float32 ULP. The fifth numerator
+factor covers A’s literal conversion; the second denominator
+factor covers a downward literal conversion of M, since `M_g >= M*(1-delta)`. The
+allowance is about 6.7 ppm above 4A, before the outward float32 step. It also bounds absorption-only tracking when scattering is ignored;
+the field definition still scales the authored absorption-plus-scattering pair first.
+
+`npm run witness:spectral-majorant` checks the asset premises and executes generated
+lookups across ceiling extremes, black/grey/saturated inputs, table-cell neighbors,
+wavelength endpoints, oversaturation and live gains. It inspects M-(sigma_a+sigma_s)
+before the tracker's null clamp. An RGB-ceiling-as-majorant mutation must fail. These
+samples test the implementation; the inequality above supplies the all-wavelength bound.

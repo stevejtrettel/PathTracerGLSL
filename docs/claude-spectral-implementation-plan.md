@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, image/procedural skies, and homogeneous nonemissive media; material expressions, other media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, image/procedural skies, and nonemissive homogeneous/heterogeneous media; surface material expressions, emissive/GRIN media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -496,9 +496,13 @@ Before enabling tracking in S1, write the numerical certificate for the actual e
   wavelength endpoints and live-bound transitions. Inspect M-sigma_t **before** the existing
   nonnegative null-coefficient guard; that guard must not conceal a violated majorant.
 
-The numerical allowance remains an implementation gate for tracking. The generated spectral
-assets and emitted lift now exist, but their tracking certificate is not complete. Analytic envelopes plus sampled maxima alone do not
-close it. Keep the same bound contract in main and shadow tracking.
+**Implemented for nonemissive expression media:** the [spectral component README](../src/components/color/spectral/README.md#tracking-bound)
+contains the numerical certificate for the emitted clamp and lift, its finite input domain,
+and the outward-rounded `4*A*(1+delta)^5/(1-delta)^2` envelope (`delta=2^-20`). The colour
+model supplies distinct float32 field and sampling ceilings. Main and shadow tracking
+share the generated rate. Asset-premise checks and GPU margins supplement the proof;
+they are not substituted for it. Volume emission, GRIN and non-RGB coefficients remain
+outside this stage. Derived bounds for homogeneous emissive tracking remain unimplemented.
 
 Analytic channel selection uses `SPECTRUM_N` and its actual mixture density. After collapse,
 the first implementation may still choose uniformly among all four coefficient channels and
@@ -513,7 +517,8 @@ The first admitted media stage uses RGB constants and live RGB parameters for ab
 and scattering, lifted separately with the coefficient role (no D65 multiplier). It covers
 bounded regions and ambient media, HG and Rayleigh phases, and the existing analytic
 PT/NEE/MIS and delta-light equiangular routes. No transport-loop or interface change is needed.
-Volume emission, expression coefficients and GRIN remain validation-rejected in spectral mode.
+Volume emission and GRIN remain validation-rejected. Expression coefficients use the
+separate tracking stage in §5.2.
 
 This stage requires no spectral majorant: for a fixed wavelength packet, each coefficient
 is constant over the segment. Choose one of N lanes uniformly; conditional on lane c,
@@ -765,7 +770,8 @@ slider bounds are checked at compilation; runtime writes retain the same author 
 session restoration are compared to constant renders, including changes to the selection
 CDF and sky/finite split. Image and procedural skies are also enabled, with the
 support/density corrections in §4.5. Homogeneous nonemissive media are admitted as described
-in §5.3. Material expressions and other media remain validation-gated; spectral tracking bounds,
+in §5.3; nonemissive expression media use the certified domain in §5.2. Surface material
+expressions and emissive/GRIN media remain validation-gated; homogeneous emission bounds,
 non-RGB form codes and CPU constant precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 

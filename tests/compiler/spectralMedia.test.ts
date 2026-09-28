@@ -26,7 +26,7 @@ describe('spectral homogeneous media', () => {
         for (const [id,shader] of compiler.compile(scene,choice).shaders) glslangCheck(shader.fragment,'frag',id);
     });
     for (const medium of [
-        { sigma_a: { kind:'glsl',source:'vec3(0.1)' },majorant:1 },
+        { sigma_a: { kind:'glsl',source:'vec3(0.1)' } },
         { sigma_a:0.1,emission:0.2 }, { sigma_a:0.1,ior:1.5 },
         { sigma_a:-0.1 }, { sigma_s:[0,NaN,1] },
         { sigma_a:{param:'bad',default:0.1,min:-1} },

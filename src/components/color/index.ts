@@ -5,6 +5,8 @@ import { rgb } from './rgb/rgb.js';
 export interface ColorModelDescriptor {
     id: string;
     defaultSensor: string;
+    /** Authored RGB-field ceiling and a sampling rate bounding its reconstructed extinction. */
+    mediumBound(ceiling: number): { ceiling: number; majorant: number };
     version?: string;
     /** Helpers required before the sensor response is defined. */
     supportGLSL?: string;

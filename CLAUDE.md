@@ -211,8 +211,9 @@ How a program is assembled:
   signed linear-RGB film and versioned RGB-to-spectrum assets. Currently restricted to
   RGB-authored scenes (all six material models), including live colour controls,
   instance colour attributes and light-tree selection; glass uses wavelength-independent
-  IOR. Image/procedural skies and homogeneous nonemissive media are supported; material
-  expressions, other media and non-RGB forms remain gated. See
+  IOR. Image/procedural skies and nonemissive homogeneous/heterogeneous media are supported
+  (PT/NEE for tracking, with a documented numerical field domain). Surface material
+  expressions, emissive/GRIN media and non-RGB forms remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 
@@ -222,7 +223,9 @@ through glass; MIS with delta tracking; equiangular sampling of area lights; sph
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
+**Known open defects**: float-sampler precision outside the two spectral tables still needs
+a portability audit (many declarations use GLSL's default lowp; SwiftShader does not expose
+reduced-precision failures). cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
 found (correctness items, duplicated decisions, tests that cannot fail, wrong documents), with
 proposed fixes; docs/claude-improvements-2026-09.md has the other suggested improvements.

@@ -24,8 +24,8 @@ precision highp float;
 precision highp int;
 #define Direction vec3
 #define SPECTRUM_ZERO vec4(0.0)
-uniform sampler2D u_spectralCoefficients;
-uniform sampler2D u_spectralCurves;
+uniform highp sampler2D u_spectralCoefficients;
+uniform highp sampler2D u_spectralCurves;
 out vec4 result;
 ${spectral.typesGLSL}
 float random() { return (gl_FragCoord.x - 0.5) / ${width - 1}.0; }

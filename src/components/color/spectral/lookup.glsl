@@ -40,7 +40,8 @@ Spectrum spectral_bounded(vec3 rgb, Wavelengths wl) {
     vec3 c = spectral_coefficients(rgb);
     vec4 t = (wl.lambda - 360.0) / 470.0;
     vec4 p = (c.x * t + c.y) * t + c.z;
-    return 0.5 + 0.5 * p / sqrt(1.0 + p * p);
+    // Enforce the sigmoid's mathematical range after floating-point evaluation.
+    return clamp(0.5 + 0.5 * p / sqrt(1.0 + p * p), 0.0, 1.0);
 }
 
 Spectrum color_lift_reflectance(vec3 rgb, Wavelengths wl) {

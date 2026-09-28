@@ -20,6 +20,8 @@ export interface PlannedTexture {
      *  (RGBA32UI — the cwbvh node channel, fable-accel-cwbvh §6). Integer samplers
      *  have no default precision in ES 3.00, so the builder declares them highp. */
     samplerType?: 'usampler2D';
+    /** Precision of sampled values; numerical tables can require float32 reads. */
+    precision?: 'highp';
 }
 
 /**

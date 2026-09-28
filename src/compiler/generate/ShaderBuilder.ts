@@ -171,7 +171,8 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
     // pass-input name PipelineBuilder threads through as `extern:<name>`. Integer
     // samplers carry explicit highp (no default precision for them in ES 3.00).
     for (const t of textures) {
-        lines.push(t.samplerType === 'usampler2D' ? `uniform highp usampler2D ${t.name};` : `uniform sampler2D ${t.name};`);
+        const precision = t.samplerType === 'usampler2D' || t.precision === 'highp' ? 'highp ' : '';
+        lines.push(`uniform ${precision}${t.samplerType ?? 'sampler2D'} ${t.name};`);
     }
 
     // The accumulator's ping-pong inputs (u_previous / u_previousMoment) are declared by

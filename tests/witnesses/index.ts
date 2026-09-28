@@ -15,6 +15,7 @@
 
 import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralMaterialsSuite } from './scenes/spectralMaterials.js';
+import { spectralTrackingSuite } from './scenes/spectralTracking.js';
 import { spectralMediaSuite } from './scenes/spectralMedia.js';
 import { spectralSkiesSuite } from './scenes/spectralSkies.js';
 import { spectralPackedSuite } from './scenes/spectralPacked.js';
@@ -142,6 +143,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralMaterialsSuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
+    ...spectralTrackingSuite,
     'thinlens-zero': {
         scene: camCornell,
         strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),

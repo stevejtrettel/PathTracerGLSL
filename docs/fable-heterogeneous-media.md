@@ -71,6 +71,14 @@ converges to the true transmittance (ratio tracking, Novák et al. 2014; pbrt-v4
 
 ---
 
+Spectral mode distinguishes the authored RGB-field ceiling A from the sampling rate M.
+The field clamp below still happens in RGB before lifting absorption and scattering
+separately. The colour model supplies an outward-rounded spectral bound; both path and
+shadow trackers use it. The [spectral component's numerical certificate](../src/components/color/spectral/README.md#tracking-bound)
+states the finite input domain and rounding allowance. The real-arithmetic D1 equations
+alone do not certify a float32 bound. Spectral nonemissive tracking supports PT/NEE;
+emission and GRIN remain gated.
+
 ## 1. Pinned decisions (owner, July 17 2026)
 
 ### D1 — The ceiling is part of the medium's definition

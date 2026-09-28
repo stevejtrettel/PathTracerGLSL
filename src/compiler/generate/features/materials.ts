@@ -4,6 +4,7 @@
 // parameter path (e.g. clay.albedo → u_clay_albedo) — live-editable, no recompile.
 
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
+import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
 import { emitColor } from '../color.js';
 import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
@@ -112,17 +113,17 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // is_null_interface has two callers: the walk's null branch (nullInterfaces) and the
     // static shadow_media walker, which probes it unconditionally (shadowWalker).
     const wantsNullTable = media.nullInterfaces || media.shadowWalker;
-    // The tracking arms' σ̄ per medium (batch 2 of impl-plan-env-power-selection):
-    // ONE routing computation shared by the arm emitter and the uniform minting below.
+    // Resolve each tracking rate once for main/shadow dispatch and uniform bindings.
+    const color = COLOR_MODELS[plan.program.measurement.color];
     const majorants = new Map<number, MajorantSpec>();
     for (const mat of plan.materials) {
         if (mat.medium === null) continue;
         const scatters = media.scatteringMedia.includes(mat.id);   // the Planner's record
-        if (mediumRoutesToTracking(mat.medium, scatters)) majorants.set(mat.id, majorantSpec(mat));
+        if (mediumRoutesToTracking(mat.medium, scatters)) majorants.set(mat.id, majorantSpec(mat, color));
     }
     if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials, wantsNullTable) });
-        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission, color) });
         // IOR is consumed by its GRADIENT (the ray bends by ∇n), evaluated at many nearby points
         // per GRIN step — so it gets its OWN cheap accessor, NOT a MediumProperties field (which
         // bundles the value-consumed σ_a/σ_s/ε, read once per collision). fable-variable-ior.
@@ -181,7 +182,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         }
         // Seam 2 dispatch — its only caller is shadow_media (lighting selects it when media+NEE).
         if (wantsShadowMedia) {
-            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials, plan.program.media.scatteringMedia) });
+            blocks.push({ origin: 'generated:medium-transmittance', source: generateMediumTransmittance(plan.materials, plan.program.media.scatteringMedia, majorants) });
         }
     }
 
@@ -527,7 +528,7 @@ function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) =
     });
 }
 
-function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean, color: ColorModelDescriptor): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
     // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
@@ -559,7 +560,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
             // extinction saturates. Emitted ONLY for expression media (constant branches
             // are byte-identical to before). DEFLECTING media are exempt (impl-plan-grin-
             // media): the GRIN walker paces by the ODE, not σ̄ — no ceiling exists there.
-            const maj = med.majorant;
+            const maj = med.majorant === undefined ? undefined : color.mediumBound(med.majorant).ceiling;
             if (maj === undefined) {
                 // Backstop — the Validator pairs expressions with a declared majorant.
                 throw new Error(`materials: medium of '${mat.name}' has expression coefficients but no majorant`);
@@ -771,23 +772,20 @@ export function derivedMajorant(med: PlannedMedium, params: Record<string, unkno
     return Math.max(1e-6, ...a.map((x, i) => x + s[i]));
 }
 
-/** How a tracking-routed medium's σ̄ is spelled in the emitted arm (batch 2):
- *  - expression coefficients → the AUTHORED ceiling literal (D1: the medium IS min(σ, σ̄),
- *    clamped in the lookup; Validator-guaranteed present);
- *  - all-constant → the derived literal (P5 — byte-identical to before);
- *  - any {param} coefficient → a DERIVED `u_majorant_<id>` uniform whose compute closure
- *    re-derives max-channel σ_t from the live params (bake ≡ ship — the light-CDF sibling).
- *  Authored majorants on non-expression media are inert (Validator warns). */
+/** Expression media use the colour model's bound on the authored, ceiling-clamped
+ * field. Constant/driven emissive RGB media derive the rate from live extinction;
+ * driven rates carry their dependencies so a parameter update cannot leave them stale.
+ * Spectral homogeneous emission remains validation-gated. */
 type MajorantSpec = { expr: string; uniform?: PlannedUniform };
 
-function majorantSpec(mat: PlannedMaterial): MajorantSpec {
+function majorantSpec(mat: PlannedMaterial, color: ColorModelDescriptor): MajorantSpec {
     const med = mat.medium!;
     if (isHeterogeneousMedium(med)) {
         if (med.majorant === undefined) {
             // Backstop — the Validator pairs expression coefficients with a declared σ̄.
             throw new Error(`materials: medium of '${mat.name}' has expression coefficients but no majorant`);
         }
-        return { expr: formatFloat(med.majorant) };
+        return { expr: formatFloat(color.mediumBound(med.majorant).majorant) };
     }
     const deps = [med.sigma_a, med.sigma_s].filter((v) => isValueParam(v)).map((v) => (v as ValueParam<Vec3>).param);
     if (deps.length === 0) return { expr: formatFloat(derivedMajorant(med)) };
@@ -811,7 +809,7 @@ function majorantSpec(mat: PlannedMaterial): MajorantSpec {
 // dispatch above), so its shadow transmittance drops σ_s too, through the same arms: the
 // closed form on σ_a, or the σ_a ratio tracker. (Until Sep 25 2026 shadows kept σ_a + σ_s,
 // so NEE darkened light that pt carried — the estimator changed the image.)
-function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMedia: number[]): string {
+function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMedia: number[], majorants: Map<number, MajorantSpec>): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const lines: string[] = ['// Generated volumetric-component dispatch (seam 2, fable-volumetric-component §2)'];
     lines.push('Spectrum medium_transmittance(int med, Ray ray, float len) {');
@@ -828,9 +826,9 @@ function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMed
         }
         const scatteringDropped = mediumMayScatter(mat.medium!) && !scatteringMedia.includes(mat.id);   // σ_s authored, not computed
         if (isHeterogeneousMedium(mat.medium!)) {
-            // Expression media only on this arm — the AUTHORED ceiling (Validator-paired);
+            // Expression media share the resolved sampling rate with the main tracking arm;
             // {param}/constant media take the exact analytic branch below.
-            const maj = majorantSpec(mat).expr;
+            const maj = majorants.get(mat.id)!.expr;
             lines.push(`    if (med == ${mat.id}) {   // '${mat.name}' — heterogeneous (ratio tracking${scatteringDropped ? ', σ_a only: scattering ignored' : ''})`);
             lines.push(scatteringDropped
                 ? `        return medium_sample_ratio_absorb(${mat.id}, ${maj}, ray, len).weight;`

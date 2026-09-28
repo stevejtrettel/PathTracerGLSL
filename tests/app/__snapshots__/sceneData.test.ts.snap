@@ -791,6 +791,14 @@ exports[`scene-data textures (byte fingerprints) > spectral-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-slab 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-tracking-clamp 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-tracking-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-tracking-shadow 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-tracking-slab 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
 {
   "nodes": "4096x1 28179de8a0ce8bf9",

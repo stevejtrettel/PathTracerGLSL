@@ -11,7 +11,7 @@ function read(name: string): number[] {
 }
 const atlas = read('coefficients'), curves = read('curves');
 const coeff = spectralCoefficients([.2, .5, .8], new Float32Array(atlas));
-const prefix = `#version 300 es\nprecision highp float;\nprecision highp int;\n#define SPECTRUM_ZERO vec4(0.0)\nuniform sampler2D u_spectralCoefficients;\nuniform sampler2D u_spectralCurves;\n${spectral.typesGLSL}\n${spectral.supportGLSL}\nout vec4 result;\n`;
+const prefix = `#version 300 es\nprecision highp float;\nprecision highp int;\n#define SPECTRUM_ZERO vec4(0.0)\nuniform highp sampler2D u_spectralCoefficients;\nuniform highp sampler2D u_spectralCurves;\n${spectral.typesGLSL}\n${spectral.supportGLSL}\nout vec4 result;\n`;
 const coord = 'vec4 t = fract(vec4(gl_FragCoord.x / 256.0) + vec4(0.0,0.25,0.5,0.75));';
 const sources = [
     prefix + `void main(){${coord} vec3 c=vec3(${coeff.join(',')});vec4 p=(c.x*t+c.y)*t+c.z;result=0.5+0.5*p/sqrt(1.0+p*p);}`,
