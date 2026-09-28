@@ -211,7 +211,7 @@ How a program is assembled:
   signed linear-RGB film and versioned RGB-to-spectrum assets. Supports
   RGB-authored scenes (all six material models), including live colour controls,
   instance colour attributes and light-tree selection; smooth/rough glass supports scalar
-  and Cauchy wavelength-dependent IOR. Image/procedural skies and homogeneous/heterogeneous media with emission are supported
+  and Cauchy/Sellmeier wavelength-dependent IOR (with an N-BK7 authoring constant). Image/procedural skies and homogeneous/heterogeneous media with emission are supported
   (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
   use the same reflectance/emission domains. GRIN supports wavelength-independent index
   fields, absorbing/emitting fields and constant-coefficient scattering. Planck blackbody emission supports

@@ -8,6 +8,7 @@ import { spectralData } from '../src/components/color/spectral/data.js';
 import { spectralCurves } from '../src/components/color/spectral/lookup.js';
 import { dispersionSlab, dispersionStrategy } from '../tests/witnesses/scenes/spectralDispersion.js';
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
+import { N_BK7 } from '../src/authoring/opticalGlass.js';
 import { renderProbes } from '../tools/render-glsl-probes.mjs';
 const compiler = new Compiler();
 const assets = ['coefficients', 'curves'].map((name, i) => {
@@ -75,19 +76,42 @@ const mutations = [
     { ...twice, name: 'repeated factor', source: twice.source.replace('if (s.wavelengths_collapsed) return;', '') },
     { ...twice, name: 'missing compensation', source: twice.source.replace('vec4(4.0, 0.0, 0.0, 0.0)', 'vec4(1.0, 0.0, 0.0, 0.0)') },
 ];
+const bk7Slab = structuredClone(dispersionSlab);
+bk7Slab.materials.glass.ior = N_BK7;
+for (const objectDispatch of ['unrolled', 'table'] as const) {
+    const p = await program(bk7Slab, { ...dispersionStrategy,
+        estimator: { ...dispersionStrategy.estimator, objectDispatch } });
+    for (const [lambda, n] of [[404.6561, 1.53024], [587.5618, 1.51680], [706.5188, 1.51289]]) {
+        const probe = add(`N-BK7 ${lambda} nm / ${objectDispatch}`,
+            `fragColor=vec4(ior_of(0,vec3(0),Wavelengths(vec4(${lambda},500,600,700))));`, Array(4).fill(n), p);
+        if (lambda === 404.6561 && objectDispatch === 'unrolled') mutations.push({
+            ...probe, name: 'missing Sellmeier square root',
+            source: probe.source.replace('sqrt(1.0 + terms.x + terms.y + terms.z)', '(1.0 + terms.x + terms.y + terms.z)'),
+        });
+    }
+    const n = 1.53024;
+    add(`N-BK7 Snell / ${objectDispatch}`,
+        `Ray ray=make_ray(vec3(0,0,2),vec3(0.4,0,-sqrt(0.84)),Wavelengths(vec4(404.6561,500,600,700)));
+        Hit hit; scene_intersect(ray,hit); MaterialProperties mp=scene_material_properties(0,hit.p,hit.uv,hit.element,hit.wl);
+        InteractionSample bs=dielectric_sample(-ray.direction,hit,mp,0.999,vec2(0.5)); fragColor=vec4(bs.wi,bs.weight.x);`,
+        [0.4/n, 0, -Math.sqrt(1-(0.4/n)**2), 1/n**2], p);
+}
 function verify(p: typeof fixed[number], values: number[]) {
     p.expected.forEach((v,c) => assert(Math.abs(values[c]-v) < 2e-5, `${p.name}: lane ${c}: ${values[c]} != ${v}`));
 }
 // Unit RGB emission reconstructs the shipped normalized D65. At normal incidence and
 // maxBounces=2, only two transmissions reach the far-side emitter: (1-F(lambda))².
 const curves = new Float32Array(assets[1].data);
-const xyz = [0,0,0];
-for (let i=0; i<=1880; i++) {
-    const lambda=360+i*0.25, n=1.5+0.01/(lambda*0.001)**2, F=((n-1)/(n+1))**2;
-    const cmf=spectralCurves(lambda,curves), w=0.25/3*(i===0||i===1880?1:i%2?4:2);
-    for(let c=0;c<3;c++) xyz[c]+=w*(1-F)**2*cmf[3]*cmf[c]/spectralData.cieYIntegral;
+function slabTarget(index: (lambda: number) => number): number[] {
+    const xyz = [0,0,0];
+    for (let i=0; i<=1880; i++) {
+        const lambda=360+i*0.25, n=index(lambda), F=((n-1)/(n+1))**2;
+        const cmf=spectralCurves(lambda,curves), w=0.25/3*(i===0||i===1880?1:i%2?4:2);
+        for(let c=0;c<3;c++) xyz[c]+=w*(1-F)**2*cmf[3]*cmf[c]/spectralData.cieYIntegral;
+    }
+    return spectralData.xyzToRGB.map(row=>row.reduce((s,v,i)=>s+v*xyz[i],0));
 }
-const target=spectralData.xyzToRGB.map(row=>row.reduce((s,v,i)=>s+v*xyz[i],0));
+const target=slabTarget(lambda => 1.5+0.01/(lambda*0.001)**2);
 function integralProbe(name: string, p: Awaited<ReturnType<typeof program>>, scalar = false, origin = 'vec3(0,0,2)') {
     // Scalar reference: all four evaluation coordinates equal the hero. The four equal
     // lanes are averaged as usual; there is no packet collapse or factor-of-four operation.
@@ -121,11 +145,17 @@ try {
     const frames=await renderProbes(page,[...fixed,...mutations],1,assets);
     fixed.forEach((p,i)=>verify(p,frames[i]));
     mutations.forEach((p,i)=>assert.throws(()=>verify(p,frames[fixed.length+i]),{name:'AssertionError'}));
-    console.log(`PASS ${fixed.length} fixed probes; repeated/missing compensation mutations rejected`);
+    console.log(`PASS ${fixed.length} fixed probes; index/compensation mutations rejected`);
     if (!process.argv.includes('--fixed')) {
     const slab=stats((await renderProbes(page,[integralProbe('normal slab',base)],128,assets,128))[0]);
     agrees('normal slab vs independent quadrature',slab,target);
     console.log(`slab target: ${target.join(', ')}`);
+    const bk7Program = await program(bk7Slab);
+    const bk7Frame = stats((await renderProbes(page,[integralProbe('N-BK7 slab',bk7Program)],128,assets,128))[0]);
+    // Independent evaluation of the datasheet equation, expressed as B/(1-C/lambda²).
+    const bk7Target = slabTarget(lambda => Math.sqrt(1 + N_BK7.sellmeier.B.reduce(
+        (sum, b, i) => sum + b / (1 - N_BK7.sellmeier.C[i] * (1000/lambda)**2), 0)));
+    agrees('N-BK7 slab vs independent quadrature',bk7Frame,bk7Target);
     const cases = ['dielectric','rough_dielectric'].flatMap(model =>
         (['none','nee','mis'] as const).map(method => ({model,method,medium:'analytic'})));
     cases.push({model:'dielectric',method:'none',medium:'tracking'},

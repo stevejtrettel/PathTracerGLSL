@@ -4,6 +4,36 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — Sellmeier indices and an N-BK7 example
+
+Added constant three-term Sellmeier surface indices, with dimensionless B and C in
+micrometres squared. The normal-dispersion domain requires finite nonnegative triples,
+no poles in 360–830 nm, and positive finite index throughout. The all-wavelength
+validation uses monotonicity and endpoint values, not a sampled grid. RGB evaluates
+the same formula at the helium d line; constant-index forms fold to scalars.
+
+Shared authored-index helpers live in the existing colour values module. The planner
+records the used formula kinds, and generated index access includes only those helpers.
+The transport loop, BSDFs and one-time collapse are unchanged. Added an authoring
+constant for nominal SCHOTT N-BK7 with vendor provenance and a thin-stripe prism scene;
+the constant supplies index only, not absorption or temperature dependence. Component,
+design and status docs describe the supported form and remaining scope.
+
+Verification: CPU indices agree with eight vendor-tabulated spectral lines. All 21 fixed
+GPU probes pass, including Sellmeier index and oblique refraction in both region layouts;
+a missing-square-root mutation fails. The integrated N-BK7 slab agrees with independent
+Fresnel quadrature within measured sampling error. The complete targeted dispersion GPU
+script passes, including its existing analytic/tracked/GRIN medium comparisons and
+collapse-order mutation. This does not replace the historical full-scene GPU sweep.
+
+The full Vitest run passed 3,910 checks and found one shared-file location violation;
+after moving the helpers into the existing values module, all 661 affected structure,
+purity, dispersion and program-snapshot checks pass. Final typecheck and build pass.
+All 262 pre-existing scene digests remain identical; only the N-BK7 fixture is added.
+The helper relocation also preserves every compiled output, checked by all 263 digests.
+The N-BK7 prism was rendered at 160×128 and 256 spp; its oblique view shows a chromatic
+stripe through the glass. Final scene compiler/snapshot checks and typecheck pass.
+
 ## 2026-09-27 — Cauchy surface dispersion
 
 Smooth and rough glass accept constant `ior: { cauchy: [A, B, C?] }` with finite

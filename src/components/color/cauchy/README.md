@@ -14,8 +14,9 @@ There is no runtime index clamp or replacement value. Wavelength carriers remain
 the evaluator converts the units. RGB evaluates the same function at the helium d line,
 587.5618 nm. Zero B/C folds to the scalar index in both renderers and needs no collapse.
 
-This is an explicit authoring function, not a fit to a named glass. Sellmeier/Abbe forms,
-glass catalogues, live coefficients and spatially dispersive GRIN remain separate work.
+This is an explicit authoring function, not a fit to a named glass. [Sellmeier](../sellmeier/README.md) supplies a separate three-term form and an N-BK7
+authoring example. Abbe forms, broader glass catalogues, live coefficients and spatially
+dispersive GRIN remain separate work.
 Cauchy is rejected on radiometric fields and on `medium.ior`. Existing wavelength-independent
 spatial index formulas keep their current GRIN behaviour. This stage supports smooth and
 rough dielectric interfaces, including closed meshes and instances, with the existing
@@ -26,7 +27,7 @@ opaque-dielectric shadow policy.
 Material descriptors mark region-index rows with `semantic: 'index'`. `modelIndexRow`
 reads that declaration; the planner records the consumer materials and actual dispersive
 interior regions. Open meshes and thin batches do not supply an interior index. The
-spectral program's dispersion record also selects the Cauchy evaluator; an empty region
+spectral program's dispersion record also lists the used index forms; an empty region
 list needs no collapse state. RGB has no dispersion record or collapse code.
 
 `ior_of(region,p,wl)` keeps its existing signature and evaluates the hero's index. The

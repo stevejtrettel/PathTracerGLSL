@@ -5,7 +5,7 @@ with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
 instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
-Wavelength-independent GRIN and [Planck blackbody emission](../blackbody/README.md) are supported; Cauchy index is also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar and Cauchy wavelength-dependent IOR; see the
+Wavelength-independent GRIN and [Planck blackbody emission](../blackbody/README.md) are supported; Cauchy and Sellmeier indices are also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar, Cauchy and Sellmeier wavelength-dependent IOR; see the
 [index/collapse contract](../cauchy/README.md).
 
 ## Measurement and sampling
@@ -426,5 +426,7 @@ Arrival emission is scored first; rough NEE sees the collapsed packet. Sensor re
 camera PDFs and accumulated radiance remain unchanged. RGB uses the helium d-line index.
 
 The [Cauchy component contract](../cauchy/README.md) records ownership, the prehistory
-symmetry argument, numerical checks and scope. Spatially dispersive GRIN, live Cauchy
-coefficients, other index forms and named glass catalogues remain unimplemented.
+symmetry argument, numerical checks and scope. The [Sellmeier component](../sellmeier/README.md)
+adds the three-term normal-dispersion formula and an N-BK7 authoring example; it uses
+the same collapse and index accessors. Spatially dispersive GRIN, live coefficients,
+other index forms and broader glass catalogues remain unimplemented.

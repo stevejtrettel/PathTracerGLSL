@@ -1,6 +1,8 @@
-// Authored radiometric forms: classification is independent of the transport representation.
-import type { Value, ValueParam, BlackbodyValue, Vec3 } from '../../compiler/types.js';
+// Authored radiometric and index forms: classification is independent of the transport representation.
+import type { Value, ValueParam, BlackbodyValue, Vec3, SpectralIndex } from '../../compiler/types.js';
 import { blackbodyRGB } from './blackbody/blackbody.js';
+import { isCauchyIndex, cauchyIndex } from './cauchy/cauchy.js';
+import { isSellmeierIndex, sellmeierIndex } from './sellmeier/sellmeier.js';
 
 export function isValueParam<T>(v: Value<T>): v is ValueParam<T> {
     return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
@@ -58,4 +60,26 @@ export function projectRGB(v: number | number[] | ValueParam<number | number[]> 
     }
     const raw = isValueParam(v) ? params[v.param] ?? v.default : v;
     return typeof raw === 'number' ? [raw, raw, raw] : raw as Vec3;
+}
+
+/** Helium d line, in nm: the RGB preview's fixed index reference. */
+export const indexReferenceNM = 587.5618;
+export type IndexForm = 'cauchy' | 'sellmeier';
+
+export function isSpectralIndex(value: unknown): value is SpectralIndex {
+    return isCauchyIndex(value) || isSellmeierIndex(value);
+}
+
+export function indexForm(value: SpectralIndex): IndexForm {
+    return isCauchyIndex(value) ? 'cauchy' : 'sellmeier';
+}
+
+export function evaluateIndex(value: SpectralIndex, lambdaNM: number): number {
+    return isCauchyIndex(value) ? cauchyIndex(value, lambdaNM) : sellmeierIndex(value, lambdaNM);
+}
+
+export function indexIsDispersive(value: unknown): boolean {
+    if (isCauchyIndex(value)) return value.cauchy[1] !== 0 || (value.cauchy[2] ?? 0) !== 0;
+    if (isSellmeierIndex(value)) return value.sellmeier.B.some((b, i) => b !== 0 && value.sellmeier.C[i] !== 0);
+    return false;
 }

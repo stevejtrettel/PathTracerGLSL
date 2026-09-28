@@ -3,8 +3,8 @@
 **Author:** Claude, Sep 26 2026. **Status (Sep 27):** four-wavelength spectral rendering
 is built for the capability set documented in the
 [spectral component](../src/components/color/spectral/README.md), including Planck emission.
-Wavelengths belong on the ray; the sensor owns spectral response. Initial Cauchy surface
-dispersion is built; other non-RGB/index forms, dispersive GRIN and full public-release
+Wavelengths belong on the ray; the sensor owns spectral response. Cauchy and Sellmeier surface
+dispersion are built; other non-RGB/index forms, dispersive GRIN and full public-release
 verification remain planned. The original analysis
 below records the design's starting point; the implementation plan identifies accepted
 choices and the current verification evidence.

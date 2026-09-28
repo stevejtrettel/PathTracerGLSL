@@ -7,6 +7,8 @@
 import { isGlslExpression, isValueParam, isBlackbody, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { isCauchyIndex } from '../../components/color/cauchy/cauchy.js';
+import { isSellmeierIndex, sellmeierIndex } from '../../components/color/sellmeier/sellmeier.js';
+import { spectralData } from '../../components/color/spectral/data.js';
 import { blackbodyTemperatureRange } from '../../components/color/blackbody/blackbody.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -81,6 +83,32 @@ export function validatePropertyValue(
     bag: DiagnosticBag,
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
+    if (isSellmeierIndex(value)) {
+        if (contract.role !== 'index') {
+            bag.error('invalid-setting', `${label}: Sellmeier is an index form`).add();
+            return;
+        }
+        const coefficients = value.sellmeier;
+        const validTriplet = (v: unknown): v is [number, number, number] => Array.isArray(v)
+            && v.length === 3 && v.every(x => typeof x === 'number' && Number.isFinite(x) && x >= 0);
+        if (!coefficients || !validTriplet(coefficients.B) || !validTriplet(coefficients.C)) {
+            bag.error('invalid-setting', `${label}: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)`).add();
+            return;
+        }
+        const min2 = (spectralData.lambdaMin / 1000) ** 2;
+        const max2 = (spectralData.lambdaMax / 1000) ** 2;
+        if (coefficients.C.some(c => c >= min2 && c <= max2)) {
+            bag.error('invalid-setting', `${label}: Sellmeier poles must lie outside ${spectralData.lambdaMin}–${spectralData.lambdaMax} nm`).add();
+        } else {
+            // With B,C >= 0 and no poles, d(n²)/d(lambda²) = -sum(B*C/(lambda²-C)²) <= 0.
+            // The red endpoint is therefore the minimum across the whole interval.
+            const minIndex = sellmeierIndex(value, spectralData.lambdaMax);
+            const maxIndex = sellmeierIndex(value, spectralData.lambdaMin);
+            if (!(minIndex > 0) || !Number.isFinite(maxIndex))
+                bag.error('invalid-setting', `${label}: Sellmeier must give finite positive n² throughout the spectral interval`).add();
+        }
+        return;
+    }
     if (isCauchyIndex(value)) {
         const coefficients = value.cauchy;
         if (contract.role !== 'index') {

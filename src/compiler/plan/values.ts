@@ -4,7 +4,7 @@
 // lights and emissive objects alike, whose light rows and hit-side emission must be equal
 // for pt ≡ pt-nee).
 
-import { isCauchyIndex } from '../../components/color/cauchy/cauchy.js';
+import { isSpectralIndex } from '../../components/color/values.js';
 import type { Vec3, MaterialProperty, GlslExpression, ValueParam, BlackbodyValue } from '../types.js';
 import { isGlslExpression, isValueParam, isBlackbody } from '../types.js';
 
@@ -13,7 +13,7 @@ import { isGlslExpression, isValueParam, isBlackbody } from '../types.js';
  *  broadcasts), and an absent value takes the fallback. */
 export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | BlackbodyValue {
     if (value === undefined) return fallback;
-    if (isCauchyIndex(value)) throw new Error('Cauchy index reached a non-index property');
+    if (isSpectralIndex(value)) throw new Error('Spectral index reached a non-index property');
     if (isGlslExpression(value)) return value;
     if (isBlackbody(value)) return value;
     if (isValueParam(value)) {
@@ -32,7 +32,7 @@ export function resolveColorProperty(value: MaterialProperty | undefined, fallba
  *  takes the fallback; a vector is a Planner bug (the Validator rejects it first). */
 export function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
     if (value === undefined) return fallback;
-    if (isCauchyIndex(value)) throw new Error('Cauchy index reached a non-index property');
+    if (isSpectralIndex(value)) throw new Error('Spectral index reached a non-index property');
     if (isGlslExpression(value)) return value;
     if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)
     if (typeof value === 'number') return value;

@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission, and wavelength-independent GRIN; Planck blackbody migration is implemented; initial Cauchy surface dispersion is implemented; public release verification (S1c), other S2 forms and dispersive GRIN remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission, and wavelength-independent GRIN; Planck blackbody migration is implemented; Cauchy and three-term Sellmeier surface dispersion are implemented; public release verification (S1c), other S2 forms and dispersive GRIN remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -812,9 +812,11 @@ claiming a partially run sweep passed. Release criteria are §8 and §10, not at
 
 ### S2a — explicit spectrum and index authoring
 
-**First index form implemented (Sep 27):** constant normal-dispersion Cauchy
-`[A,B,C?]`, with micrometre coefficients and RGB evaluated at the helium d line.
-This is a staged subset, not all S2 authoring. Named/tabulated spectra, Sellmeier/Abbe,
+**Initial index forms implemented (Sep 27):** constant normal-dispersion Cauchy
+`[A,B,C?]` and three-term Sellmeier `{B,C}`, with micrometre units and RGB evaluated
+at the helium d line. Sellmeier includes an N-BK7 authoring constant with source
+provenance and tabulated-index checks; see its [contract](../src/components/color/sellmeier/README.md).
+This is a staged subset, not all S2 authoring. Named/tabulated radiometric spectra, Abbe,
 live coefficients and wavelength-dependent spatial formulas remain planned. The
 [implemented contract](../src/components/color/cauchy/README.md) specifies the domain.
 

@@ -296,7 +296,11 @@ export type ScalarProperty = Value<number> | GlslExpression;
 /** Normal-dispersion Cauchy index. Wavelength units for B/C are micrometres²/⁴.
  * A > 0, B >= 0, C >= 0; coefficients are constant. */
 export interface CauchyIndex { cauchy: [number, number, number?]; }
-export type IndexProperty = ScalarProperty | CauchyIndex;
+/** Three-term Sellmeier index: n² = 1 + sum(B_i lambda² / (lambda² - C_i)).
+ * B is dimensionless, C uses micrometres²; coefficients are constant. */
+export interface SellmeierIndex { sellmeier: { B: Vec3; C: Vec3 }; }
+export type SpectralIndex = CauchyIndex | SellmeierIndex;
+export type IndexProperty = ScalarProperty | SpectralIndex;
 
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
@@ -318,7 +322,7 @@ export interface BlackbodyValue {
 export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
-export type MaterialProperty = ScalarProperty | SpectrumProperty | CauchyIndex;
+export type MaterialProperty = ScalarProperty | SpectrumProperty | SpectralIndex;
 
 export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';

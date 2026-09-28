@@ -756,6 +756,16 @@ exports[`scene-data textures (byte fingerprints) > spectral-dispersion-beam 1`] 
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > spectral-dispersion-bk7 1`] = `
+{
+  "indices": "4096x1 6ac9314b34c4a780",
+  "nodes": "4096x1 da2ad37567e26004",
+  "normals": "4096x1 de2f256064a0af79",
+  "uvs": "4096x1 de2f256064a0af79",
+  "vertices": "4096x1 61c11b5e4ef3dd29",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-dispersion-prism 1`] = `
 {
   "indices": "4096x1 6ac9314b34c4a780",

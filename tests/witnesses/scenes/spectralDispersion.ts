@@ -1,5 +1,6 @@
 import type { SceneDescription, RenderStrategy } from '../../../src/compiler/types.js';
 import type { SceneSuiteEntry } from '../types.js';
+import { N_BK7 } from '../../../src/authoring/opticalGlass.js';
 
 export const dispersionSlab: SceneDescription = {
     id: 'spectral-dispersion-slab', name: 'Dispersive slab — two transmissions',
@@ -72,6 +73,20 @@ const prismBeamStrategies: RenderStrategy[] = prismStrategies.map(strategy => ({
         camera: { type: 'pinhole', position: [-3.8, 3.4, 5], target: [0.4, -0.1, -0.3], fov: 43 * Math.PI / 180 } },
     estimator: { ...strategy.estimator, directLighting: 'mis' },
 }));
+const bk7Prism: SceneDescription = {
+    ...prism, id: 'spectral-dispersion-bk7', name: 'N-BK7 prism — published optical glass',
+    materials: { ...prism.materials, glass: { model: 'dielectric', ior: N_BK7 } },
+    // A finer source stripe exposes the much smaller dispersion of this crown glass.
+    objects: [prism.objects[0]!,
+        { type: 'box', parameters: { center: [-2, 0, -0.75], halfSize: [0.03, 3, 0.02] }, material: 'lamp' },
+        { type: 'plane', parameters: { normal: [1, 0, 0], offset: 2.1 }, material: 'surround' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 1.05 }, material: 'surround' }],
+    environment: { type: 'constant', color: 0.1 },
+};
+const bk7Strategies: RenderStrategy[] = prismStrategies.map(strategy => ({
+    ...strategy, measurement: { ...strategy.measurement,
+        camera: { type: 'pinhole', position: [4, 0.3, -1.4], target: [0, 0, -0.13], fov: 38 * Math.PI / 180 } },
+}));
 export const spectralDispersionSuite: Record<string, SceneSuiteEntry> = {
     [dispersionSlab.id]: {
         scene: dispersionSlab, strategies: [dispersionStrategy],
@@ -86,4 +101,6 @@ export const spectralDispersionSuite: Record<string, SceneSuiteEntry> = {
         exercises: 'Original Cauchy index in a closed mesh; chromatic displacement of a white stripe' },
     [prismBeam.id]: { scene: prismBeam, strategies: prismBeamStrategies,
         exercises: 'Finite-cone white source refracted through a prism onto a diffuse screen; slowly converging caustic' },
+    [bk7Prism.id]: { scene: bk7Prism, strategies: bk7Strategies,
+        exercises: 'Published N-BK7 Sellmeier coefficients in a closed prism, with spectral / RGB comparison' },
 };
