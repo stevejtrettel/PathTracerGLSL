@@ -1,23 +1,27 @@
 import { projectRGB, isDrivenRadiometric, emissionMayBeNonzero, hasConstantNonzeroEmission } from '../../src/components/color/values.js';
-// Planck projection preserves signed linear RGB and the max-channel scale convention.
+// Planck projection preserves signed linear RGB at fixed reference CIE Y.
 
 import { describe, it, expect } from 'vitest';
-import { blackbodyRGB } from '../../src/components/color/blackbody/blackbody.js';
+import { blackbodyColor, blackbodyRGB, planckShape } from '../../src/components/color/blackbody/blackbody.js';
+import { spectralData } from '../../src/components/color/spectral/data.js';
+import { referenceY } from '../helpers/planckReference.js';
 
 describe('Planck → normalized signed linear sRGB', () => {
-    it('is max-channel normalized everywhere', () => {
-        for (const k of [1000, 2000, 3200, 5000, 6500, 9000, 12000, 25000]) {
-            const rgb = blackbodyRGB(k);
-            expect(Math.max(...rgb)).toBeCloseTo(1, 9);
+    it('holds the evaluated spectrum and its RGB projection at unit reference Y', () => {
+        for (const k of [1000, 2000, 3200, 5000, 6500, 9000, 12000, 25000, 40000]) {
+            const { rgb, normalization } = blackbodyColor(k);
+            expect(referenceY(lambda => normalization * planckShape(lambda, k))).toBeCloseTo(1, 9);
+            const y = spectralData.rgbToXYZ[1].reduce((sum, v, i) => sum + v * rgb[i], 0);
+            expect(y).toBeCloseTo(1, 9);
             for (const c of rgb) { expect(Number.isFinite(c)).toBe(true); }
         }
     });
 
     it('2000K is strongly red-dominant (candle/tungsten)', () => {
         const [r, g, b] = blackbodyRGB(2000);
-        expect(r).toBe(1);
-        expect(g).toBeLessThan(0.75);
-        expect(b).toBeLessThan(0.35);
+        expect(r).toBeGreaterThan(g);
+        expect(g / r).toBeLessThan(0.75);
+        expect(b / r).toBeLessThan(0.35);
     });
 
     it('~6500K is near white (all channels high)', () => {
@@ -27,24 +31,35 @@ describe('Planck → normalized signed linear sRGB', () => {
 
     it('12000K is blue-dominant', () => {
         const [r, , b] = blackbodyRGB(12000);
-        expect(b).toBe(1);
-        expect(r).toBeLessThan(1);
+        expect(b).toBeGreaterThan(r);
     });
 
     it('blue/red ratio is monotone in temperature (the physical direction)', () => {
         let prev = -Infinity;
         for (const k of [1800, 2500, 3500, 5000, 6500, 8500, 12000, 20000]) {
             const [r, , b] = blackbodyRGB(k);
-            const ratio = b / Math.max(r, 1e-9);
+            const ratio = b / r;
             expect(ratio).toBeGreaterThan(prev);
             prev = ratio;
         }
     });
 
     it('retains low-temperature signed projection and evaluates the authored temperature', () => {
-        expect(blackbodyRGB(1000)[1]).toBeCloseTo(0.008696905553, 8);
-        expect(blackbodyRGB(1000)[2]).toBeCloseTo(-0.019583581807, 8);
-        expect(blackbodyRGB(40000)[0]).toBeCloseTo(0.342393, 6);
+        const warm = blackbodyRGB(1000), cool = blackbodyRGB(40000);
+        expect(warm[1] / warm[0]).toBeCloseTo(0.008696905553, 8);
+        expect(warm[2] / warm[0]).toBeCloseTo(-0.019583581807, 8);
+        expect(cool[0] / cool[2]).toBeCloseTo(0.342393, 6);
+    });
+
+    it('scales the spectrum linearly, including zero', () => {
+        for (const k of [1000, 6500, 40000]) {
+            const { normalization } = blackbodyColor(k);
+            for (const scale of [0, 0.25, 2]) {
+                const y = referenceY(lambda => scale * normalization * planckShape(lambda, k));
+                expect(Math.abs(y - scale)).toBeLessThan(1e-9 * Math.max(1, scale));
+                blackbodyRGB(k, scale).forEach((v, i) => expect(v).toBe(blackbodyRGB(k)[i] * scale));
+            }
+        }
     });
 });
 

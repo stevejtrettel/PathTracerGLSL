@@ -986,6 +986,11 @@ narrow-band emitter, has negative linear-sRGB components. That is correct.
 
 ### 5.1 Authoring forms
 
+The [September 28 production-practice survey](claude-spectral-authoring-survey.md)
+informs the next sampled-spectrum stage: shared curve values for reflectance/emission,
+explicit role and normalization, and preserved wavelength knots. The syntax below is
+still a sketch; the implementation plan records built forms and pending decisions.
+
 Today's colour inputs are `number | Vec3 | {param} | {blackbody} | GlslExpression`
 (`SpectrumProperty`, types.ts:300 — *read*). Proposed additions (sketch, not final syntax):
 
@@ -1061,13 +1066,14 @@ Two properties follow from the table:
 | authored constants | GLSL literals (coefficients, grey values, formula code) | the program that emitted them |
 | driven colours | uniforms (RGB) | per renderer; spectral converts in GLSL |
 | run-time colours in shared memory | unchanged RGB (§6) | every renderer; spectral converts on read |
-| tabulated spectra of the scene | `const float[]` arrays in the spectral shader (resampled at 5 nm → 95 values; *prediction*: enough for smooth data, not for line spectra like F11, which want 1 nm) | the spectral program only — nothing shared |
+| tabulated spectra of the scene | preserve authored wavelength knots; shader/data encoding is pending the sampled-value contract, including packed light readers; no blanket 5 nm resampling | readers evaluate the original curve at their wavelengths |
 | the upsampling table | one static texture (§7) | spectral programs |
 | x̄, ȳ, z̄ and D65ₙ | one small static texture (1 nm × 4 channels) | spectral programs |
 
-A shared "spectra table" in the data rail becomes necessary only when spectra vary per
-instance or per texel. Nothing does that yet, and the rule is never to build data nothing
-reads (claude-data-exact-linkage.md).
+Whether scene spectra are emitted as shader constants or occupy shared data remains an
+implementation decision. It must cover packed emitter lookups as well as ordinary material
+reads, and follow the existing layout ownership and exact-linkage rules
+(claude-data-exact-linkage.md).
 
 ### 5.4 Blackbody — built
 
@@ -1077,18 +1083,21 @@ Both renderers use one Planck emission definition:
 emission(λ) = scale · B(λ, T) / K(T)
 ```
 
-K(T) makes the largest **fixed reference** CIE 1931 → linear-sRGB channel equal to one.
+K(T) makes the **fixed reference CIE Y** of the spectrum equal to one on 360–830 nm.
 It does not depend on the active sensor; that sensor owns the measurement response.
 RGB uses the signed projection of this same spectrum. Spectral readers evaluate Planck
 at the ray's wavelengths, without an RGB lift or D65 multiplier. Temperature-derived
 chroma/normalization and intensity have separate bindings, so shared temperature controls
 do not accidentally share intensities. The supported temperature domain is 1000–40000 K.
 
-The [Sep 27 comparison](claude-blackbody-comparison.md) measures the intentional migration:
+The [Sep 27 comparison](claude-blackbody-comparison.md) measures the formula migration
+under the former maximum-RGB normalization:
 on the old 1667–25000 K integer grid, maximum signed linear-channel difference is
 1.392% of the unit peak (negative blue clipped by the old implementation); after
 display-only clipping it is 0.189%. These are direct-emission comparisons, not bounds
 on rendered scenes. True 1000 K emission also replaces the old low-temperature clamp.
+Reference-Y normalization now gives scale a temperature-independent reference-brightness
+meaning; the gallery's strengths were explicitly converted to preserve its source spectra.
 The owner accepted D5's single definition. See the
 [implemented contract](../src/components/color/blackbody/README.md) for normalization,
 quadrature, supported binding sites and verification.

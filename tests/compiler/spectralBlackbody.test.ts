@@ -21,8 +21,11 @@ describe('Planck definition', () => {
             const reference = planckReference(T);
             const color = blackbodyColor(T);
             color.rgb.forEach((v, c) => expect(v).toBeCloseTo(reference.rgb[c], 8));
-            for (const lambda of [360, 410, 555, 660, 830])
-                expect(color.normalization * planckShape(lambda, T)).toBeCloseTo(reference.spectrum(lambda), 7);
+            // Relative error: red-tail amplitudes exceed 200 at 1000 K and unit Y.
+            for (const lambda of [360, 410, 555, 660, 830]) {
+                const value = color.normalization * planckShape(lambda, T);
+                expect(Math.abs(value / reference.spectrum(lambda) - 1)).toBeLessThan(1e-9);
+            }
         });
     }
 });

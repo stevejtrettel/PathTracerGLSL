@@ -20,6 +20,17 @@ export function planckReference(kelvin: number, scale = 1) {
         for (let c = 0; c < 3; c++) xyz[c] += weight * raw(lambda) * response[c] / spectralData.cieYIntegral;
     }
     const rgb = spectralData.xyzToRGB.map(row => row.reduce((s, v, c) => s + v * xyz[c], 0)) as Vec3;
-    const gain = scale / Math.max(...rgb);
+    const gain = scale / xyz[1];
     return { rgb: rgb.map(v => v * gain) as Vec3, spectrum: (lambda: number) => gain * raw(lambda) };
+}
+
+/** Integrate an evaluated spectrum independently of its normalization implementation. */
+export function referenceY(spectrum: (lambda: number) => number): number {
+    let integral = 0;
+    for (let i = 0; i <= 1880; i++) {
+        const lambda = 360 + 0.25 * i;
+        const weight = 0.25 / 3 * (i === 0 || i === 1880 ? 1 : i % 2 ? 4 : 2);
+        integral += weight * spectrum(lambda) * spectralCurves(lambda, curves)[1];
+    }
+    return integral / spectralData.cieYIntegral;
 }

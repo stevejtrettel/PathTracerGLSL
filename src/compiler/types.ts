@@ -306,12 +306,12 @@ export type IndexProperty = ScalarProperty | SpectralIndex;
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
-/** Authored temperature and magnitude, preserved through scene planning. The RGB model
- * evaluates max-normalized linear-sRGB chroma × scale at its read boundaries. */
+/** Authored temperature and reference brightness, preserved through scene planning.
+ * RGB evaluates the signed projection of the same normalized Planck spectrum. */
 export interface BlackbodyValue {
     blackbody: {
         kelvin: Value<number>;
-        /** Radiometric magnitude multiplying the unit-max chroma. Default 1. */
+        /** Fixed reference CIE Y of the emission, in renderer-relative units. Default 1. */
         scale?: Value<number>;
     };
 }

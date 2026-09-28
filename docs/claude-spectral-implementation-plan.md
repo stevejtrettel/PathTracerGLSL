@@ -21,6 +21,12 @@ the boundary, and add runtime cases only when required by a supported algorithm.
 obligations and diagnostic probes do not each imply another production branch. Build one
 coherent stage at a time; avoid temporary APIs for stages whose real inputs are not present yet.
 
+**Current design checkpoint (Sep 28):** further spectrum-authoring code is paused at the
+owner's request to review the system. Reference-Y blackbody normalization is built and
+verified, but the shared authoring interface is not settled. See the
+[authoring audit](#authoring-design-checkpoint-sep-28) for the sequencing deviation,
+existing ownership, and the concrete design work required before resuming this stage.
+
 Review navigation: [decisions](#1-authority-decisions-and-scope),
 [runtime contracts](#3-runtime-contracts-to-review-before-s0),
 [media bounds](#5-media-field-definition-and-estimator-bounds-are-different),
@@ -63,9 +69,10 @@ Redshift, fluorescence, polarization, complex-IOR conductors, thin films, arbitr
 new transparent-shadow policies and spectral MIS for delta tracking are outside this build.
 Existing validation restrictions on estimator/media combinations remain in force.
 
-## 2. What the current code requires us to change
+## 2. What the inspected baseline required us to change
 
-These are code observations, not claims that the proposed replacement already exists.
+These observations describe the original inspected baseline, not today's implementation.
+Use the status and implemented-stage notes for the current state.
 
 | Concern | Current source and observation | Planned responsibility |
 |---|---|---|
@@ -820,6 +827,34 @@ This is a staged subset, not all S2 authoring. Named/tabulated radiometric spect
 live coefficients and wavelength-dependent spatial formulas remain planned. The
 [implemented contract](../src/components/color/cauchy/README.md) specifies the domain.
 
+**Emission authoring priorities (Sep 27):** the owner's expected usage is blackbody
+most often, then artist-authored coloured lights, then specific real lamp spectra.
+Keep Planck temperature/scale first-class. RGB remains a convenient colour input;
+HSV can be an authoring/UI conversion to RGB, not a separate transport representation
+or a claim to identify a unique physical spectrum. Artificial coloured spectra may
+use the existing RGB reconstruction; explicit spectral shapes should also be authorable.
+
+**Production-practice research (Sep 28):** the [authoring survey](claude-spectral-authoring-survey.md)
+compares Indigo, Octane, Maxwell and Wētā's published workflow with Mitsuba/PBRT source
+interfaces. It supports one sampled spectral value shared by reflectance and emission,
+with role-specific units/conversion. Preserve raw curve magnitudes; normalization belongs
+to explicit authoring helpers. Proposed point-sample interpolation is piecewise linear in
+nm with native knot spacing and zero outside the stated support. The relative light-strength
+convention is accepted below; syntax, absolute-unit conversion and packed storage remain
+to be settled before implementation.
+
+First establish the shared shape/amount convention on the existing emission forms, then
+add the shared sampled value with emission readers and source-documented presets for
+fluorescent, neon, sodium-vapour and mercury lamps, followed by outdoor illuminants.
+These describe a light's spectrum, independently of its geometry and angular emission;
+they are not new light kinds or BSDFs. Named presets should resolve to the same sampled
+form accepted for custom data. Keep spectral shape and source strength separate.
+Pin normalization, interpolation, wavelength coverage and narrow-band energy preservation
+before implementing storage/readers. Relative light helpers use the accepted fixed-CIE-Y
+convention below, without silently normalizing the underlying shared curve; importing
+absolute spectral units needs an explicit contract. Outdoor illuminants do not by themselves replace a sky's
+spatial/angular model. No new spectrum authoring or lamp presets are built by this note.
+
 Begin with grey/RGB/blackbody already supported, then named/tabulated spectra and Cauchy,
 Sellmeier or Abbe index forms. Specify units per form (carrier nm; catalogue formulas may use
 micrometres), interpolation, domain and extrapolation/rejection. Validate pole-free positive
@@ -831,6 +866,207 @@ illuminant convention, emission uses radiance projection, and coefficients requi
 preview convention rather than an implicit claim that projecting extinction preserves Beer
 attenuation. A sampled narrow-band emitter must keep its integrated energy under refinement.
 Do not resample every form at 5 nm regardless of spectral bandwidth.
+
+#### Accepted shared shape-and-strength direction (Sep 28; blackbody step implemented)
+
+**Built subset:** Planck normalization now uses reference CIE Y across all existing
+binding sites. Gallery strengths are explicitly converted; the component
+[contract](../src/components/color/blackbody/README.md) records the formula and migration.
+The authored spelling remains `{ blackbody: { kelvin, scale } }`. A common shape/amount
+spelling, normalized RGB controls and sampled curves remain unimplemented. Exact RGB
+normalization needs the reconstruction atlas available to CPU projection; currently the
+App loads it for GPU use after compilation. Resolve that ownership explicitly before
+adding the RGB control, rather than substituting approximate RGB luminance or loading
+assets implicitly inside the synchronous compiler.
+
+The mathematical operation is shared by every radiometric role:
+
+`value(lambda) = amount * curve(lambda)`.
+
+The curve describes wavelength dependence. The amount multiplies its evaluated values;
+it is not applied to an RGB input before spectral reconstruction. RGB reconstruction
+need not commute with scaling, especially for bounded reflectance. Preserve this ordering
+in both spectral evaluation and the linear RGB projection of explicit spectra.
+
+Keep three responsibilities separate:
+
+- The spectral value owns the original curve and its evaluation: RGB reconstruction,
+  Planck, or sampled data. Raw measured values retain their supplied magnitude.
+- An explicit authoring operation may turn that curve into a normalized shape. Its
+  definition is fixed and independent of the active camera sensor.
+- The receiving property supplies the units, physical meaning and supported domain of
+  the result. The same scalar multiplication does not make emitted light and reflected
+  fractions interchangeable physical quantities.
+
+Material emission and area-light emission are the same radiance quantity and must use
+the same evaluation/normalization path. The current light contract distinguishes point/
+spot radiant intensity, area/softbeam radiance, and directional/beam irradiance. A spectral
+normalization cannot convert these geometry-dependent quantities into each other. If
+total-flux authoring is added, the light's area and angular profile own that conversion.
+
+For surface reflectance, scalar multiplication adjusts the fraction reflected at every
+wavelength. A passive reflectance requires the final curve to stay in [0,1]. A peak-one
+shape provides a simple physical authoring control: an amount in [0,1] is its maximum
+reflectance. This does not change the project's separate allowance for explicitly
+nonphysical materials; the generic curve operation must not silently clamp them.
+
+For ordinary light colour controls, the owner accepted **fixed reference CIE photometric
+brightness**. The alternatives explain the choice; they are not three required UI modes:
+
+| Fixed amount holds constant | Normalizer for a nonzero curve S | Effect of changing shape |
+|---|---|---|
+| Reference photometric brightness | Fixed CIE Y projection of S | Same reference light level; radiant energy can change |
+| Radiant energy over the rendered band | Integral of S over 360–830 nm | Same band-integrated energy; reference brightness can change |
+| Peak spectral amplitude | Maximum of S over the rendered band | Simple bounded shape; both integrated energy and reference brightness can change |
+
+The first is the default for a relative light-colour control. It is a fixed-reference
+photometric convention, not a promise of
+equal perceived brightness or equal pixel values under every sensor, material and view.
+Unit-integral normalization introduces inverse-wavelength units into the shape; it must
+not be presented as a dimensionless reflectance-strength convention. For reflectance,
+reference brightness depends on a reference illuminant as well as the observer.
+
+In the renderer's existing relative units, define
+
+```
+Y_ref(S) = integral_360^830(y_bar(lambda) * S(lambda) d_lambda) / cieYIntegral
+shape(lambda) = S(lambda) / Y_ref(S)
+emission(lambda) = amount * shape(lambda)
+```
+
+Use the shipped fixed CIE 1931 observer and its declared integral. Thus
+`Y_ref(emission) = amount`. This is a relative reference-Y control, not a claim that the
+number is lumens, watts or electrical bulb wattage. Absolute photometric/radiometric
+authoring will need explicit unit conversion. The active camera retains its own response;
+changing cameras must not change the scene's emitted spectrum.
+
+RGB, Planck and sampled light colours follow this same definition. For RGB, normalize
+the reconstructed emission spectrum, rather than assume an approximate RGB luminance
+formula exactly describes the reconstruction. HSV is only an input conversion to the
+declared RGB space. For sampled curves, preserve original ordinates and apply the
+normalizer as a separate multiplier. Constants can fold that multiplier; live colour or
+temperature controls derive it when their inputs change, not at every ray evaluation.
+
+Peak normalization, radiant-energy normalization and photometric normalization cannot
+all hold simultaneously when the shape changes. For example, a triangular band of peak
+one and width 10 nm has area 5 nm; widening it to 20 nm doubles the area while keeping
+the peak fixed. Unit-area normalization instead halves that broader band's peak.
+
+The normalized form is defined only for nonzero supported curves. Black is the ordinary
+zero spectral value, not a normalized shape with an invented denominator. Analytic bounds
+and wavelength support must establish which nonzero normalizers exist before a form is
+accepted; this is an authoring contract, not a runtime epsilon fallback.
+
+Migration must be explicit: the former blackbody scale meant maximum fixed-reference RGB
+channel, and direct RGB inputs carry their current magnitudes. Choosing a new default
+for all normalized light helpers would change old scenes unless gains are converted.
+Record and compare that change before replacing a convention. Source data and renderer
+storage must not acquire extra hidden normalizations while adding the sampled form.
+
+For a fixed Planck temperature, preserving the current spectrum has an exact conversion:
+`newAmount = oldScale * Y_ref(b) / max(P_CIE[b])`. Once converted, varying temperature
+at fixed new amount intentionally holds reference Y constant. It cannot simultaneously
+preserve the old fixed-scale temperature sweep, whose Y varied. Record that distinction
+for live controls. Keep one light-colour normalization after migration; do not introduce
+a permanent legacy-normalization branch. Existing direct RGB magnitudes and raw spectra
+remain value inputs, distinct from the explicit shape/amount authoring operation.
+
+Implement in bounded steps:
+
+1. Pin the minimal authored shape/amount representation and its constant/live resolution
+   through existing value plumbing. Reuse the current fixed-observer projection; keep
+   geometry and transport interfaces unchanged.
+2. Apply it consistently to RGB and Planck emission, including material emission, skies
+   and packed light readers. Convert existing blackbody scene strengths explicitly,
+   document the new control meaning, and verify sampled-light/hit-side agreement before
+   adding another spectral form.
+3. Add sampled curves and then source-backed lamp presets through the same path. Raw
+   imports retain their magnitudes; relative presets opt into reference-Y normalization.
+   Enable reflectance readers with their existing fractional interpretation, not the
+   light-colour normalizer.
+
+This direction does not require a new integrator, wavelength sampler, light kind, or
+fallback spectrum. Exact authoring syntax and sampled storage remain implementation
+design work; the normalization decision itself is settled.
+
+Required checks for the final contract: doubling amount doubles the evaluated spectrum;
+curve times amount agrees through RGB projection and every binding site; emissive
+geometry and its corresponding area-light sampling agree; normalized shapes integrate
+to the selected reference quantity; raw measured data survive unchanged; passive
+reflectance helpers obey their final per-wavelength bound. Existing zero, shared-live-
+control and packed-emitter cases must keep one answer at all reader sites.
+
+#### Authoring design checkpoint (Sep 28)
+
+**Audit scope:** the shape/strength work and the existing routes it must extend. This is
+not a fresh audit of every transport, media or dispersion proof. No production changes
+are part of this checkpoint.
+
+**Sequencing deviation:** step 1 above required the shared representation before step 2's
+normalization rollout. The blackbody subset of step 2 was implemented first, after the
+owner accepted the normalization principle. It changed the denominator in
+[`blackbodyColor`](../src/components/color/blackbody/blackbody.ts), not the transport or
+binding interfaces. Its tests establish the current spectrum and reader agreement. They
+do not establish that the future shared API, asset lifecycle or sampled storage is designed.
+Retain this verified implementation as the current state; do not treat its existing
+`{ blackbody: { kelvin, scale } }` spelling as a commitment for every future curve.
+
+The present ownership is concrete:
+
+| Responsibility | Existing owner | Required design boundary |
+|---|---|---|
+| Authored value types | `compiler/types.ts`: `SpectrumValue`, `SpectrumProperty`, `BlackbodyValue` | Separate a curve from scalar multiplication and the optional operation that normalizes it; decide the public spelling with examples before extending these unions |
+| Parameter dependencies and CPU RGB projection | `components/color/values.ts` | One definition of dependencies and projection for each supported form, reused by bindings and light-selection data |
+| Constant/live resolution and shader use | `compiler/plan/values.ts`, `generate/values.ts`, `generate/color.ts` | Resolve normalization when source inputs change; preserve independent strength controls; evaluate the original curve at the ray wavelengths |
+| Physical role | Material/light descriptor rows | Reflectance, emission and coefficients retain distinct meanings and domains; a shared curve does not supply a BSDF, light geometry or units conversion |
+| Reference observer versus active measurement | Fixed CIE data used by `blackbodyColor`; sensor occupant used during film projection | Authoring normalization is independent of the selected camera response |
+| Asset I/O and lifetime | `app/BuiltinAssets.ts`; `App` uploads after compilation | CPU reconstruction needs explicit provisioning; the synchronous compiler must not start hidden network loads or depend on a previous render having loaded an asset |
+| Packed emission identity and layout | `components/lights/table.ts`, consumed by generated row loaders | New forms must have one declared layout and agree with hit-side evaluation; original spectral data must survive packing |
+
+**Design questions that remain real work:**
+
+1. **Value algebra and public API.** Show raw RGB, relative Planck, raw sampled data,
+   normalized light colour, scalar multiplication, and a sampled material reflectance.
+   State whether helpers simply construct plain descriptions, which forms can be nested,
+   and where normalization ends up in the resolved value. Prefer the smallest closed set
+   of operations needed by these examples; a general expression graph is not implied.
+   Decide the migration of the existing blackbody spelling explicitly, without a second
+   permanent normalization convention.
+2. **RGB-mode meaning.** Existing direct RGB values remain identity values in RGB mode.
+   For a new normalized RGB-derived spectral source, recommend projecting the actual
+   normalized reconstructed spectrum in RGB mode, as Planck already does. Dividing the
+   original RGB triplet by the spectral normalizer would generally retain reconstruction
+   error in the RGB reference Y. Document the choice and its deliberate distinction from
+   existing raw RGB inputs before implementation.
+3. **Resource preparation and live updates.** The atlas is already retained as CPU bytes
+   by `BuiltinAssets`, but unavailable to the compiler's present projection path. Specify
+   who requests, loads and supplies those bytes, including command-line compilation,
+   RGB-only rendering of the new form, recompilation and live colour updates. Compare
+   preparation outside compilation with explicit immutable compiler resources. Choose
+   based on those flows; do not add a global cache or turn compilation asynchronous as
+   an incidental fix to normalization.
+4. **Supported inputs and roles.** Write the support matrix for constant/live values,
+   spatial RGB expressions, image/procedural skies, surface emission, material reflectance
+   and medium coefficients/emission. CPU normalization of a single colour is not a
+   solution for spatially varying spectra. Preserve existing input behaviour and explicitly
+   scope the first new form instead of silently routing every RGB reader through it.
+5. **Sampled evaluation and storage.** Pin nm point samples, interpolation, support,
+   integral accuracy, and shared data ownership together. A narrow feature must survive
+   both projection and GPU evaluation. A normalizer for a sampled curve must integrate
+   its knots; reusing Planck's smooth-function quadrature blindly is insufficient. Show
+   the same curve through an ordinary surface reader and a packed emitter before choosing
+   storage. Presets then supply data through this path rather than adding lamp-specific
+   cases to the compiler.
+
+**Next deliverable, before more production code:** replace these open items with one
+reviewable contract in this section: concrete authored examples/types, an ownership and
+data-flow diagram, a support matrix, a migration list, and a file-bounded implementation
+sequence with independent numerical targets. Distinguish recommendations from owner
+decisions. Check the design against shared live controls, an emissive object sampled as
+a light, a measured lamp curve, and that same sampled representation used as reflectance.
+Review that concrete contract with the owner before implementing the next authoring slice.
+The normalization decision remains accepted; the remaining architecture must earn its own
+review rather than inheriting approval from a successful scene render.
 
 **Proposed D6 scope:** defer arbitrary wavelength GLSL in the first S2 release. Reject it with
 a precise diagnostic rather than pretend a fixed small quadrature is generally accurate.

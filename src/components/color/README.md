@@ -37,7 +37,7 @@ identities in RGB. RGB-authored uniforms and packed payloads stay RGB; filtering
 evaluation and medium clamps happen before conversion. Blackbody temperature and scale
 survive scene planning. `values.ts` owns authored-form predicates and the shared `projectRGB`
 used by RGB shader constants, live bindings, and light packing/power selection. `blackbody/`
-owns the shared Planck definition and its fixed-reference RGB projection. Packed Planck
+owns the shared Planck definition, unit-reference-CIE-Y normalization and signed RGB projection. Packed Planck
 emitters retain their original definition in the light header. A zero fixed scale is black
 even when temperature is driven; a driven scale is potentially emissive.
 

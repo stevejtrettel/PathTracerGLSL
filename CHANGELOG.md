@@ -4,6 +4,78 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — spectrum-authoring design checkpoint
+
+Paused further authoring implementation for the owner's architecture review. Audited
+the shape/strength plan against its existing value, binding, asset and packed-light
+owners. Recorded the sequencing deviation: the verified blackbody normalization landed
+before the shared representation was settled. Listed the unresolved public API, RGB-mode
+projection, CPU resource lifecycle, supported-reader matrix and sampled-storage decisions,
+with a concrete design deliverable required before resuming code. Relabelled the plan's
+original baseline inventory so it is not presented as today's implementation. No production
+code changed and no numerical tests were rerun for this documentation update.
+
+## 2026-09-28 — reference-Y blackbody strength
+
+Blackbody scale now means fixed reference CIE Y in renderer-relative units. The existing
+CPU projection supplies the normalizer; every RGB/spectral, constant/live, sky and packed
+emitter reader receives it through its existing path. Temperature at fixed scale changes
+spectral shape while holding reference Y constant. The active sensor still owns the
+measurement response. No GLSL evaluator, transport interface or runtime fallback was added.
+
+Converted the seven blackbody gallery scenes' authored strengths and the live witness
+overrides explicitly, preserving their source spectra at the specified settings. The
+direct-emission and selective-receiver numerical targets are unchanged. The component
+README records the scale conversion and the new meaning of temperature sweeps. The
+historical formula-comparison report is explicitly labelled with its former normalization.
+
+Verification: independent SI/serialized-observer integration checks unit Y, scale linearity
+and signed RGB. All 48 generated-reader GPU probes pass, including integrated reference Y
+at 1000, 3200, 6500 and 40000 K; discarded-form and old-normalization mutations fail.
+The full Vitest run passed 3,896 tests and identified 15 expected authored-scale snapshot
+changes; after review/update, all 484 structural snapshot tests pass. Typecheck and build
+pass. Compiled digests leave all 256 non-blackbody scenes identical.
+All nine targeted rendered checks pass: both direct-emission modes retain their numeric
+target, the selective receiver agrees under PT/NEE/MIS, live/constant pairs agree, and
+power/tree sampling agrees. This is the blackbody slice, not the full historical GPU sweep.
+
+This implements the blackbody normalization step only. Shared normalized RGB controls
+need CPU access to the reconstruction atlas, currently loaded by the App after compilation.
+The common authored shape/amount form, sampled spectra and lamp presets remain planned.
+
+## 2026-09-28 — shape and strength direction (accepted; not implemented)
+
+Expanded the spectral implementation plan with a common evaluated-curve-times-amount
+operation, independent of light geometry and camera response. Distinguished raw measured
+values from explicitly normalized authoring shapes, retained the physical meanings of
+light and reflectance properties, and compared photometric, band-energy and peak
+normalization. The owner accepted fixed-reference CIE Y for ordinary light colour
+controls; raw spectra preserve supplied values and material reflectance retains its
+fractional meaning. Pinned the relative-Y formula, the Planck strength conversion and
+its deliberate change to fixed-strength temperature sweeps. Implementation starts with
+consistent RGB/Planck controls before sampled curves and lamp presets. Exact authoring
+syntax and storage remain design work. No renderer behaviour changed.
+
+## 2026-09-28 — production spectral-authoring research
+
+Surveyed primary documentation for Indigo, Octane, Maxwell and Wētā's published
+pipeline, plus Mitsuba/PBRT spectrum interfaces and source. Recorded evidence and
+limitations in `docs/claude-spectral-authoring-survey.md`, with recommendations for
+a shared sampled value, explicit role-specific interpretation, unnormalized raw curves
+and source-backed lamp presets. CIE fluorescent metadata provides a concrete linear-
+interpolation/zero-extrapolation example. Updated the active plan and removed the old
+blanket 5 nm resampling prediction. Authoring syntax, strength conventions and storage
+remain proposed; production code is unchanged by this research.
+
+## 2026-09-27 — emission authoring priorities (plan only)
+
+Recorded the owner's usage order in the spectral implementation plan: blackbody,
+artist-coloured sources (RGB or HSV authoring), then specific lamp spectra and outdoor
+illuminants. The proposed next slice uses one sampled-emission form with source-backed
+presets, independently of light geometry. Normalization, interpolation, wavelength
+coverage and narrow-band energy preservation remain contracts to pin before coding.
+No new emission forms or presets are implemented by this planning update.
+
 ## 2026-09-27 — Sellmeier indices and an N-BK7 example
 
 Added constant three-term Sellmeier surface indices, with dimensionless B and C in

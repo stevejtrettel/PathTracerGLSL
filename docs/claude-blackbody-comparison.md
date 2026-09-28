@@ -2,6 +2,10 @@
 
 **Status (Sep 27, 2026): comparison complete; the subsequent migration is implemented. See the [current contract](../src/components/color/blackbody/README.md).**
 
+This report compares formulae under maximum-RGB normalization. The renderer now uses
+reference-CIE-Y strengths; the current contract records that separate normalization change
+and the gallery's converted strengths. The numbers below remain the historical audit.
+
 The Planck projection is close to the current RGB approximation within its effective
 1667–25,000 K range. The largest signed linear-channel difference on an inclusive 1 K
 sweep is **0.013921645 at 1667 K** (1.392% of the unit peak). It is the negative blue

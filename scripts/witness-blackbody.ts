@@ -47,6 +47,32 @@ const target = (color: 'rgb' | 'spectral', temperature: number, scale: number) =
     return color === 'spectral' ? wavelengths.map(reference.spectrum) : [...reference.rgb, 1];
 };
 let packedMutation: typeof probes[number] | undefined;
+let normalizationMutation: typeof probes[number] | undefined;
+for (const T of [1000, 3200, 6500, 40000]) {
+    const scene = blackbodyFixture('surface', { blackbody: {
+        kelvin: { param: 'lamp.kelvin', default: 3200 }, scale: { param: 'lamp.scale', default: 1 },
+    } });
+    const probe = await add(`reference Y ${T} K`, scene, strategy('spectral', 'power'), `
+        float y = 0.0;
+        for (int i = 0; i <= 940; ++i) {
+            float lambda = 360.0 + 0.5 * float(i);
+            Wavelengths wl = Wavelengths(vec4(lambda));
+            float emission = scene_material_properties(2,vec3(0),vec2(0),-1,wl).emission.x;
+            float weight = i == 0 || i == 940 ? 1.0 : (i % 2 == 0 ? 2.0 : 4.0);
+            y += weight * emission * spectral_curves(lambda).y;
+        }
+        y *= 0.5 / (3.0 * CIE_Y_INTEGRAL);
+        fragColor = vec4(y);
+    `, [2, 2, 2, 2], { 'lamp.kelvin': T, 'lamp.scale': 2 });
+    if (T === 1000) {
+        // Recreate the former max-RGB normalization in a live spectral binding.
+        const binding = (probe.uniforms as Record<string, { type: string; value: number[] }>).u_lamp_kelvin_blackbody;
+        const peak = Math.max(...planckReference(T).rgb);
+        normalizationMutation = { ...probe, name: 'max-RGB normalization instead of reference Y',
+            uniforms: { ...probe.uniforms,
+                u_lamp_kelvin_blackbody: { ...binding, value: [T, binding.value[1] / peak] } } };
+    }
+}
 for (const color of ['rgb', 'spectral'] as const) {
     for (const T of [1000, 3200, 6500, 40000]) {
         const scene = blackbodyFixture('surface', { blackbody: { kelvin: T, scale: 2 } });
@@ -110,14 +136,16 @@ for (const color of ['rgb', 'spectral'] as const) {
     }
 }
 assert(packedMutation);
+assert(normalizationMutation);
 function verify(probe: typeof probes[number], values: number[]) {
     probe.expected.forEach((expected, i) => assert(Math.abs(values[i] - expected) < 2e-5 * Math.max(1, Math.abs(expected)),
         `${probe.name} lane ${i}: ${values[i]} != ${expected}`));
 }
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-    const frames = await renderProbes(await browser.newPage(), [...probes, packedMutation], 1, assets);
+    const frames = await renderProbes(await browser.newPage(), [...probes, packedMutation, normalizationMutation], 1, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(packedMutation, frames[probes.length]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} Planck GPU probes; discarded-form mutation rejected`);
+    assert.throws(() => verify(normalizationMutation, frames[probes.length + 1]), { name: 'AssertionError' });
+    console.log(`PASS: ${probes.length} Planck GPU probes; discarded-form and max-RGB normalization mutations rejected`);
 } finally { await browser.close(); }

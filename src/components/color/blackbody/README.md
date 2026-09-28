@@ -19,15 +19,17 @@ With wavelengths in nm and temperature in K, the dimensionless relative Planck s
 ```
 b(lambda,T) = (550/lambda)^5 * expm1(c2/(550*T)) / expm1(c2/(lambda*T))
 c2 = h*c/k = 14387768.775039338 nm K
-K(T) = max(P_CIE[b])
+K(T) = integral_360^830(y_bar(lambda) * b(lambda,T) d_lambda) / cieYIntegral
 E(lambda,T,scale) = scale * b(lambda,T) / K(T)
 ```
 
-`P_CIE` is the fixed reference CIE 1931 → linear-sRGB projection on 360–830 nm, using the
-same float32 piecewise-linear curves and matrix as the shipped spectral sensor. Its
-normalization is an authoring convention: the largest reference RGB channel equals
-`scale`. It is independent of the active camera sensor. Total radiant power/luminance
-can vary with temperature at fixed scale; this is not absolute thermal-power authoring.
+The reference uses the shipped float32 piecewise-linear CIE 1931 curves on 360–830 nm.
+Its normalization is an authoring convention: reference **CIE Y equals `scale`**.
+Changing temperature at fixed scale preserves this reference brightness while radiant
+energy can change. The scale is in renderer-relative units, not lumens or electrical
+watts; this is not absolute thermal-power authoring. The active camera sensor owns the
+measurement response and does not participate in defining the source. Equal reference
+Y does not promise equal perceived brightness or equal pixels after coloured reflection.
 Planck has no D65 multiplier and does not pass through the RGB emission lift.
 
 `blackbody.ts` integrates the reference projection on the CPU with 0.5 nm Simpson
@@ -44,8 +46,33 @@ floor, clamped temperature or fallback colour is needed.
 
 Physics: [Planck law in PBRT](https://www.pbr-book.org/4ed/Radiometry%2C_Spectra%2C_and_Color/Light_Emission).
 Constants: [NIST exact SI h, c and k](https://physics.nist.gov/cuu/Constants/Table/allascii.txt).
-The [migration comparison](../../../../docs/claude-blackbody-comparison.md) records the
-intentional old/new RGB differences and the separate temperature-range change.
+The [historical Planck comparison](../../../../docs/claude-blackbody-comparison.md) records
+the formula and temperature-range migration under the former maximum-RGB convention.
+It does not define the current scale.
+
+## Converting maximum-RGB strengths
+
+For a source previously normalized by `M(T) = max(P_CIE[b])`, preserve its evaluated
+spectrum at a chosen temperature using `newScale = oldScale * K(T) / M(T)`.
+`P_CIE` is the fixed CIE 1931 → signed linear-sRGB projection. This conversion concerns
+authored strengths only; runtime evaluation has a single reference-Y convention.
+
+The blackbody gallery uses the following converted values. Its direct-emission and
+selective-receiver numeric targets retain their previous values.
+
+| Source | Temperature | Former scale | Reference-Y scale |
+|---|---:|---:|---:|
+| Direct emitter | 1000 K | 1 | 0.2174975862105915 |
+| Receiver sky | 6500 K | 1 | 0.9586431216686195 |
+| Warm quad | 2900 K | 14 | 7.687615923237919 |
+| Changed quad | 1000 K | 8 | 1.739980689684732 |
+| Cool point | 12000 K | 3 | 1.914207773915614 |
+| Scene sky | 6500 K | 0.04 | 0.03834572486674478 |
+
+The live quad's slider spans reference Y 0–22. Its default and the separate 1000 K
+witness setting preserve their source spectra. Sweeping temperature while leaving the
+slider alone now keeps Y constant; preserving the former temperature-dependent
+brightness would be a different control.
 
 ## Constants, uniforms and packed data
 
@@ -87,8 +114,9 @@ preserve shared data.
 
 `npm run witness:blackbody` executes real generated readers and the actual App packer.
 It tests low/high temperatures, signed RGB, four spectral lanes, live temperature/scale,
-shared controls, sky intensity and sampled instances. A deliberate discarded-form
-mutation must fail. `spectral-blackbody-*` witnesses cover true 1000 K direct emission,
+shared controls, sky intensity and sampled instances. Deterministic integration of the
+generated GPU reader checks reference Y at four temperatures. Deliberately discarded-form
+and maximum-RGB-normalization mutations must fail. `spectral-blackbody-*` witnesses cover true 1000 K direct emission,
 a selective receiver with an independently integrated target, live/constant comparisons,
 and power/tree NEE/MIS equality. The old Kim fit exists only in the historical audit
 helper; no renderer imports it.

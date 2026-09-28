@@ -12,8 +12,8 @@ export function planckShape(lambda: number, kelvin: number): number {
         / Math.expm1(planckC2 / (lambda * kelvin));
 }
 
-/** Temperature-only normalization against the fixed reference observer, independent of
- * the active camera sensor. Scale multiplies this spectrum after normalization. */
+/** Unit reference CIE Y, independent of the active camera sensor. Scale multiplies
+ * this spectrum after normalization, so it controls reference brightness. */
 export function blackbodyColor(kelvin: number): { rgb: Vec3; normalization: number } {
     const xyz = [0, 0, 0];
     // Simpson quadrature in each 5 nm CMF interval. The response is piecewise linear;
@@ -32,7 +32,7 @@ export function blackbodyColor(kelvin: number): { rgb: Vec3; normalization: numb
         }
     }
     const rgb = spectralData.xyzToRGB.map(row => row.reduce((sum, v, i) => sum + v * xyz[i], 0)) as Vec3;
-    const normalization = 1 / Math.max(...rgb);
+    const normalization = 1 / xyz[1];
     return { rgb: rgb.map(v => v * normalization) as Vec3, normalization };
 }
 
