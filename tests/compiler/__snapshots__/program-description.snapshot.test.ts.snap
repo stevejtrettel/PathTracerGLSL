@@ -3,6 +3,7 @@
 exports[`ProgramDescription structural snapshot (the link map) > accel-triple + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -103,6 +104,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
 exports[`ProgramDescription structural snapshot (the link map) > accel-triple + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -203,6 +205,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
 exports[`ProgramDescription structural snapshot (the link map) > accel-triple + pt-found 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -300,6 +303,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accel-triple + 
 exports[`ProgramDescription structural snapshot (the link map) > accretion + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -411,6 +415,7 @@ exports[`ProgramDescription structural snapshot (the link map) > accretion + pt 
 exports[`ProgramDescription structural snapshot (the link map) > analytic-glass + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -514,6 +519,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-glass 
 exports[`ProgramDescription structural snapshot (the link map) > analytic-minimal + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -622,6 +628,7 @@ exports[`ProgramDescription structural snapshot (the link map) > analytic-minima
 exports[`ProgramDescription structural snapshot (the link map) > attr-twin + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -730,6 +737,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin + pat
 exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -838,6 +846,7 @@ exports[`ProgramDescription structural snapshot (the link map) > attr-twin-ref +
 exports[`ProgramDescription structural snapshot (the link map) > bazaar + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -946,6 +955,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + table 
 exports[`ProgramDescription structural snapshot (the link map) > bazaar + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1054,6 +1064,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bazaar + unroll
 exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1158,6 +1169,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1262,6 +1274,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-fog + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > beam-slab + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1361,6 +1374,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-slab + pt-
 exports[`ProgramDescription structural snapshot (the link map) > beam-wall + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1460,6 +1474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > beam-wall + pt-
 exports[`ProgramDescription structural snapshot (the link map) > blackhole + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1572,6 +1587,7 @@ exports[`ProgramDescription structural snapshot (the link map) > blackhole + pt 
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1679,6 +1695,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-1 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1786,6 +1803,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-mis-0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -1896,6 +1914,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-mis-1 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2006,6 +2025,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-nee-0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2116,6 +2136,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > bounce-budget + pt-nee-1 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2226,6 +2247,7 @@ exports[`ProgramDescription structural snapshot (the link map) > bounce-budget +
 exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2335,6 +2357,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtracer-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -2444,6 +2467,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cacti + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > charts + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2549,6 +2573,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > charts + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2657,6 +2682,7 @@ exports[`ProgramDescription structural snapshot (the link map) > charts + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2764,6 +2790,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -2874,6 +2901,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-mis
 exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -2984,6 +3012,7 @@ exports[`ProgramDescription structural snapshot (the link map) > chrome + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3081,6 +3110,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pathtracer-ref 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3178,6 +3208,7 @@ exports[`ProgramDescription structural snapshot (the link map) > clamp-ref + pat
 exports[`ProgramDescription structural snapshot (the link map) > conjugation + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3286,6 +3317,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation + p
 exports[`ProgramDescription structural snapshot (the link map) > conjugation-base + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3394,6 +3426,7 @@ exports[`ProgramDescription structural snapshot (the link map) > conjugation-bas
 exports[`ProgramDescription structural snapshot (the link map) > cornell + cylindrical 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3496,6 +3529,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + cylin
 exports[`ProgramDescription structural snapshot (the link map) > cornell + equirect 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3597,6 +3631,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + equir
 exports[`ProgramDescription structural snapshot (the link map) > cornell + fisheye-equidistant 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3700,6 +3735,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + fishe
 exports[`ProgramDescription structural snapshot (the link map) > cornell + orthographic 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3802,6 +3838,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + ortho
 exports[`ProgramDescription structural snapshot (the link map) > cornell + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -3909,6 +3946,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + patht
 exports[`ProgramDescription structural snapshot (the link map) > cornell + thinlens 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4018,6 +4056,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell + thinl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4122,6 +4161,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -4229,6 +4269,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4336,6 +4377,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4441,6 +4483,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -4549,6 +4592,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-area-glass + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4657,6 +4701,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-area-gl
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4761,6 +4806,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -4868,6 +4914,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -4975,6 +5022,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-disk + 
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equidistant 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5078,6 +5126,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-equisolid 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5181,6 +5230,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-orthographic 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5284,6 +5334,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye + fisheye-stereographic 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5387,6 +5438,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-fisheye
 exports[`ProgramDescription structural snapshot (the link map) > cornell-glass + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5490,6 +5542,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-glass +
 exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot + oneshot 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5592,6 +5645,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cornell-oneshot
 exports[`ProgramDescription structural snapshot (the link map) > cube-cloud + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5698,6 +5752,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud + pa
 exports[`ProgramDescription structural snapshot (the link map) > cube-cloud-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -5804,6 +5859,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cube-cloud-ref 
 exports[`ProgramDescription structural snapshot (the link map) > custom-fields + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -5914,6 +5970,7 @@ exports[`ProgramDescription structural snapshot (the link map) > custom-fields +
 exports[`ProgramDescription structural snapshot (the link map) > cylinders + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6022,6 +6079,7 @@ exports[`ProgramDescription structural snapshot (the link map) > cylinders + pat
 exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6129,6 +6187,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake + pt-
 exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6236,6 +6295,7 @@ exports[`ProgramDescription structural snapshot (the link map) > disk-bake-ref +
 exports[`ProgramDescription structural snapshot (the link map) > driven + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6344,6 +6404,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven + pathtr
 exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6452,6 +6513,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
 exports[`ProgramDescription structural snapshot (the link map) > driven-baked-theta2 + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6560,6 +6622,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-baked-th
 exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6668,6 +6731,7 @@ exports[`ProgramDescription structural snapshot (the link map) > driven-theta2 +
 exports[`ProgramDescription structural snapshot (the link map) > embers + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -6770,6 +6834,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + mis-bv
 exports[`ProgramDescription structural snapshot (the link map) > embers + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6872,6 +6937,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + nee-bv
 exports[`ProgramDescription structural snapshot (the link map) > embers + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -6971,6 +7037,7 @@ exports[`ProgramDescription structural snapshot (the link map) > embers + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > emit + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7068,6 +7135,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit + pathtrac
 exports[`ProgramDescription structural snapshot (the link map) > emit-driven + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7169,6 +7237,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-driven + p
 exports[`ProgramDescription structural snapshot (the link map) > emit-sat + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7270,6 +7339,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat + path
 exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7371,6 +7441,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget
 exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-1 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7472,6 +7543,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget
 exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget + budget-2 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7573,6 +7645,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-sat-budget
 exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-emit 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7676,6 +7749,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
 exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + pt-nee-emit 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7782,6 +7856,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-scatter + 
 exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pathtracer-swap 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7879,6 +7954,7 @@ exports[`ProgramDescription structural snapshot (the link map) > emit-swap + pat
 exports[`ProgramDescription structural snapshot (the link map) > eta + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -7977,6 +8053,7 @@ exports[`ProgramDescription structural snapshot (the link map) > eta + pathtrace
 exports[`ProgramDescription structural snapshot (the link map) > expr-const + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8075,6 +8152,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const + pt
 exports[`ProgramDescription structural snapshot (the link map) > expr-const-ref + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8173,6 +8251,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const-ref 
 exports[`ProgramDescription structural snapshot (the link map) > field-glass + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8279,6 +8358,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
 exports[`ProgramDescription structural snapshot (the link map) > field-glass + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -8388,6 +8468,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
 exports[`ProgramDescription structural snapshot (the link map) > field-glass + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8497,6 +8578,7 @@ exports[`ProgramDescription structural snapshot (the link map) > field-glass + p
 exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8605,6 +8687,7 @@ exports[`ProgramDescription structural snapshot (the link map) > flatten-tree + 
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8713,6 +8796,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -8824,6 +8908,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -8935,6 +9020,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignored + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9039,6 +9125,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignore
 exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignored + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -9146,6 +9233,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignore
 exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignored + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9253,6 +9341,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-area-ignore
 exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9361,6 +9450,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt 
 exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9472,6 +9562,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-panel + pt-
 exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9579,6 +9670,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt 1`
 exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9689,6 +9781,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-mi
 exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9799,6 +9892,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fog-sky + pt-ne
 exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -9905,6 +9999,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogblobs + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > fogcube + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10002,6 +10097,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
 exports[`ProgramDescription structural snapshot (the link map) > forest + linear 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10110,6 +10206,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + linear
 exports[`ProgramDescription structural snapshot (the link map) > forest + tlas 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10218,6 +10315,7 @@ exports[`ProgramDescription structural snapshot (the link map) > forest + tlas 1
 exports[`ProgramDescription structural snapshot (the link map) > fractals + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -10327,6 +10425,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fractals + path
 exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10424,6 +10523,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
 exports[`ProgramDescription structural snapshot (the link map) > furnace + furnace-var 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10521,6 +10621,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
 exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter + furnace-scatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10622,6 +10723,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-scatter
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10729,6 +10831,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10839,6 +10942,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -10949,6 +11053,7 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace-sky + p
 exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -11055,6 +11160,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
 exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -11164,6 +11270,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
 exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -11273,6 +11380,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
 exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion + pt-nee-power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -11382,6 +11490,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-inclusion
 exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b4 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -11492,6 +11601,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b4 
 exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b8 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -11602,6 +11712,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b8 
 exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b16 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -11712,6 +11823,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b16
 exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b32 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -11822,6 +11934,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glass-lab + b32
 exports[`ProgramDescription structural snapshot (the link map) > glassball + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -11934,6 +12047,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glassball + pt 
 exports[`ProgramDescription structural snapshot (the link map) > glow-shell + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -12034,6 +12148,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + mi
 exports[`ProgramDescription structural snapshot (the link map) > glow-shell + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12134,6 +12249,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + ne
 exports[`ProgramDescription structural snapshot (the link map) > glow-shell + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12231,6 +12347,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glow-shell + pt
 exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12334,6 +12451,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
 exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -12440,6 +12558,7 @@ exports[`ProgramDescription structural snapshot (the link map) > glowblobs + pt-
 exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12549,6 +12668,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
 exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + table-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12658,6 +12778,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grand-bazaar + 
 exports[`ProgramDescription structural snapshot (the link map) > grin + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12769,6 +12890,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt 1`] =
 exports[`ProgramDescription structural snapshot (the link map) > grin + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12883,6 +13005,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > grin-emit + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -12986,6 +13109,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit + pt 
 exports[`ProgramDescription structural snapshot (the link map) > grin-emit-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13089,6 +13213,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-emit-ref +
 exports[`ProgramDescription structural snapshot (the link map) > grin-furnace + grin-furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13190,6 +13315,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace + 
 exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-emit + grin-kirchhoff 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13287,6 +13413,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-em
 exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-hard + grin-hard 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13385,6 +13512,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-ha
 exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-scatter + grin-scatfurnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13486,6 +13614,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-furnace-sc
 exports[`ProgramDescription structural snapshot (the link map) > grin-glass + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13590,6 +13719,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass + pt
 exports[`ProgramDescription structural snapshot (the link map) > grin-glass-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13694,6 +13824,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-glass-ref 
 exports[`ProgramDescription structural snapshot (the link map) > grin-long + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13795,6 +13926,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-long + pt 
 exports[`ProgramDescription structural snapshot (the link map) > grin-scatter + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -13902,6 +14034,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter + 
 exports[`ProgramDescription structural snapshot (the link map) > grin-scatter-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14009,6 +14142,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-scatter-re
 exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14112,6 +14246,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum + p
 exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14215,6 +14350,7 @@ exports[`ProgramDescription structural snapshot (the link map) > grin-vacuum-ref
 exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14322,6 +14458,7 @@ exports[`ProgramDescription structural snapshot (the link map) > groundfog + pt-
 exports[`ProgramDescription structural snapshot (the link map) > gyroid-field + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -14431,6 +14568,7 @@ exports[`ProgramDescription structural snapshot (the link map) > gyroid-field + 
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14534,6 +14672,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt 1`] =
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14640,6 +14779,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-eq 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14746,6 +14886,7 @@ exports[`ProgramDescription structural snapshot (the link map) > haze + pt-nee-e
 exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -14852,6 +14993,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -14961,6 +15103,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hearth + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15064,6 +15207,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
 exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15170,6 +15314,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const + pt-
 exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-nee-ref 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15276,6 +15421,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
 exports[`ProgramDescription structural snapshot (the link map) > het-const-ref + pt-ref 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15379,6 +15525,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-const-ref +
 exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15485,6 +15632,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven + pt
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked + pt-nee-ref 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15591,6 +15739,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-baked2 + pt-nee-ref 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15697,6 +15846,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-bake
 exports[`ProgramDescription structural snapshot (the link map) > het-driven-theta2 + pt-nee-het 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15803,6 +15953,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-driven-thet
 exports[`ProgramDescription structural snapshot (the link map) > het-slab + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -15900,6 +16051,7 @@ exports[`ProgramDescription structural snapshot (the link map) > het-slab + path
 exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -16000,6 +16152,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
 exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres + mis-power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -16100,6 +16253,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
 exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16200,6 +16354,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
 exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres + nee-power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16300,6 +16455,7 @@ exports[`ProgramDescription structural snapshot (the link map) > hundred-spheres
 exports[`ProgramDescription structural snapshot (the link map) > instance-fog + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16409,6 +16565,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-fog + 
 exports[`ProgramDescription structural snapshot (the link map) > instance-fog-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16518,6 +16675,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-fog-re
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16627,6 +16785,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer-linear 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16736,6 +16895,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass + pathtracer-lowrr 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16846,6 +17006,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass 
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass-mesh + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -16955,6 +17116,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass-mesh-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17064,6 +17226,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
 exports[`ProgramDescription structural snapshot (the link map) > instance-glass-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17173,6 +17336,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-glass-
 exports[`ProgramDescription structural snapshot (the link map) > instance-lights + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -17273,6 +17437,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
 exports[`ProgramDescription structural snapshot (the link map) > instance-lights + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17373,6 +17538,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
 exports[`ProgramDescription structural snapshot (the link map) > instance-lights-ref + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17473,6 +17639,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
 exports[`ProgramDescription structural snapshot (the link map) > instance-lights-sky + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -17579,6 +17746,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
 exports[`ProgramDescription structural snapshot (the link map) > instance-lights-sky + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17685,6 +17853,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-lights
 exports[`ProgramDescription structural snapshot (the link map) > instance-params-frame + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17793,6 +17962,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
 exports[`ProgramDescription structural snapshot (the link map) > instance-params-twin + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -17901,6 +18071,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
 exports[`ProgramDescription structural snapshot (the link map) > instance-params-twin + pathtracer-cwbvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18009,6 +18180,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-params
 exports[`ProgramDescription structural snapshot (the link map) > instance-twin + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18117,6 +18289,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
 exports[`ProgramDescription structural snapshot (the link map) > instance-twin + pathtracer-linear 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18225,6 +18398,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin +
 exports[`ProgramDescription structural snapshot (the link map) > instance-twin-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18333,6 +18507,7 @@ exports[`ProgramDescription structural snapshot (the link map) > instance-twin-r
 exports[`ProgramDescription structural snapshot (the link map) > laser + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18445,6 +18620,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-mis 
 exports[`ProgramDescription structural snapshot (the link map) > laser + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18557,6 +18733,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser + pt-nee 
 exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -18680,6 +18857,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
 exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -18803,6 +18981,7 @@ exports[`ProgramDescription structural snapshot (the link map) > laser-soft + pt
 exports[`ProgramDescription structural snapshot (the link map) > light-driven + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": true,
@@ -18905,6 +19084,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
 exports[`ProgramDescription structural snapshot (the link map) > light-driven + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -19007,6 +19187,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven + 
 exports[`ProgramDescription structural snapshot (the link map) > light-driven-baked + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19109,6 +19290,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
 exports[`ProgramDescription structural snapshot (the link map) > light-driven-baked2 + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19211,6 +19393,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-ba
 exports[`ProgramDescription structural snapshot (the link map) > light-driven-theta2 + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -19313,6 +19496,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-driven-th
 exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -19415,6 +19599,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off + pt-
 exports[`ProgramDescription structural snapshot (the link map) > light-off-baked + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19517,6 +19702,7 @@ exports[`ProgramDescription structural snapshot (the link map) > light-off-baked
 exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19627,6 +19813,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > marble + pt-noscatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19733,6 +19920,7 @@ exports[`ProgramDescription structural snapshot (the link map) > marble + pt-nos
 exports[`ProgramDescription structural snapshot (the link map) > maxwell + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19844,6 +20032,7 @@ exports[`ProgramDescription structural snapshot (the link map) > maxwell + pt 1`
 exports[`ProgramDescription structural snapshot (the link map) > mesh-fog + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -19953,6 +20142,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog + path
 exports[`ProgramDescription structural snapshot (the link map) > mesh-fog-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20062,6 +20252,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-fog-ref + 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + mesh-furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20159,6 +20350,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-furnace + 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20268,6 +20460,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20377,6 +20570,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-glass-box-
 exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20485,6 +20679,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-r
 exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-twin + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20593,6 +20788,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-instance-t
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20692,6 +20888,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -20794,6 +20991,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -20896,6 +21094,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-ref 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-smooth + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -20998,6 +21197,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-smoo
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-smooth + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21100,6 +21300,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-smoo
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -21202,6 +21403,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21304,6 +21506,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21403,6 +21606,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -21505,6 +21709,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21607,6 +21812,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-light-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21715,6 +21921,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-ref +
 exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21823,6 +22030,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin + pathtracer-brute 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -21931,6 +22139,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-quad-twin 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-scale-twin + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22034,6 +22243,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-scale-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-scale-twin-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22137,6 +22347,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-scale-twin
 exports[`ProgramDescription structural snapshot (the link map) > mesh-slab-albedo + grazing 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22242,6 +22453,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-slab-albed
 exports[`ProgramDescription structural snapshot (the link map) > mesh-slab-albedo + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22347,6 +22559,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-slab-albed
 exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22456,6 +22669,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged 
 exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22565,6 +22779,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mesh-submerged-
 exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22673,6 +22888,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pathtr
 exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22778,6 +22994,7 @@ exports[`ProgramDescription structural snapshot (the link map) > meshes + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > minimal + direct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22884,6 +23101,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + direc
 exports[`ProgramDescription structural snapshot (the link map) > minimal + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -22992,6 +23210,7 @@ exports[`ProgramDescription structural snapshot (the link map) > minimal + patht
 exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23099,6 +23318,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23209,6 +23429,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mirror + pt-nee
 exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23321,6 +23542,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mist + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23429,6 +23651,7 @@ exports[`ProgramDescription structural snapshot (the link map) > mixed + pathtra
 exports[`ProgramDescription structural snapshot (the link map) > models + brute 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23537,6 +23760,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + brute 
 exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23645,6 +23869,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + bvh 1`
 exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23750,6 +23975,7 @@ exports[`ProgramDescription structural snapshot (the link map) > models + pt 1`]
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23847,6 +24073,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt-11 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -23944,6 +24171,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -24044,6 +24272,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt-mis-11 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -24144,6 +24373,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24244,6 +24474,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget + pt-nee-11 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24344,6 +24575,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget + p
 exports[`ProgramDescription structural snapshot (the link map) > null-budget-view + budget-default 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24441,6 +24673,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget-vie
 exports[`ProgramDescription structural snapshot (the link map) > null-budget-view + budget-exact 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24538,6 +24771,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget-vie
 exports[`ProgramDescription structural snapshot (the link map) > null-budget-view + budget-short 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24635,6 +24869,7 @@ exports[`ProgramDescription structural snapshot (the link map) > null-budget-vie
 exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24741,6 +24976,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt 1`] = 
 exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24850,6 +25086,7 @@ exports[`ProgramDescription structural snapshot (the link map) > orb + pt-nee 1`
 exports[`ProgramDescription structural snapshot (the link map) > paint + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -24954,6 +25191,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt 1`] 
 exports[`ProgramDescription structural snapshot (the link map) > paint + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25061,6 +25299,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt-nee 
 exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25169,6 +25408,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
 exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pathtracer-cwbvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25277,6 +25517,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud + pa
 exports[`ProgramDescription structural snapshot (the link map) > perf-cloud-frame + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25385,6 +25626,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-cloud-fram
 exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b12 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25484,6 +25726,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
 exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b24 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25583,6 +25826,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
 exports[`ProgramDescription structural snapshot (the link map) > perf-instance-glass + perf-b48 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25682,6 +25926,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-g
 exports[`ProgramDescription structural snapshot (the link map) > perf-instance-opaque + perf-b48 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25781,6 +26026,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-instance-o
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-0 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25887,6 +26133,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-0 + ta
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -25993,6 +26240,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + ta
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26099,6 +26347,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-8 + un
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26205,6 +26454,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + t
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26311,6 +26561,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-32 + u
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26417,6 +26668,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26523,6 +26775,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-128 + 
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26629,6 +26882,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26735,6 +26989,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-blob +
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-8 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26841,6 +27096,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-8 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -26947,6 +27203,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-32 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -27053,6 +27310,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-32 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -27159,6 +27417,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-128 + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -27265,6 +27524,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluster-128 + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -27371,6 +27631,7 @@ exports[`ProgramDescription structural snapshot (the link map) > perf-sdf-cluste
 exports[`ProgramDescription structural snapshot (the link map) > porcelain + lanterns 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -27486,6 +27747,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain + lan
 exports[`ProgramDescription structural snapshot (the link map) > porcelain + lanterns-pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -27598,6 +27860,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain + lan
 exports[`ProgramDescription structural snapshot (the link map) > porcelain + noscatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -27708,6 +27971,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain + nos
 exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + noscatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -27818,6 +28082,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain-array
 exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -27943,6 +28208,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain-array
 exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + wedge 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -28068,6 +28334,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain-array
 exports[`ProgramDescription structural snapshot (the link map) > porcelain-array + wedge-128 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -28193,6 +28460,7 @@ exports[`ProgramDescription structural snapshot (the link map) > porcelain-array
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28304,6 +28572,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28418,6 +28687,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-mis-comp 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28532,6 +28802,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28646,6 +28917,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotated + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28760,6 +29032,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotate
 exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotated + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28874,6 +29147,7 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotate
 exports[`ProgramDescription structural snapshot (the link map) > rayleigh + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -28979,6 +29253,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
 exports[`ProgramDescription structural snapshot (the link map) > region-overlap + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29087,6 +29362,7 @@ exports[`ProgramDescription structural snapshot (the link map) > region-overlap 
 exports[`ProgramDescription structural snapshot (the link map) > region-overlap + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29195,6 +29471,7 @@ exports[`ProgramDescription structural snapshot (the link map) > region-overlap 
 exports[`ProgramDescription structural snapshot (the link map) > regions-transformed + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29304,6 +29581,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
 exports[`ProgramDescription structural snapshot (the link map) > regions-transformed-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29413,6 +29691,7 @@ exports[`ProgramDescription structural snapshot (the link map) > regions-transfo
 exports[`ProgramDescription structural snapshot (the link map) > rough-furnace + furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29516,6 +29795,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-furnace +
 exports[`ProgramDescription structural snapshot (the link map) > rough-grin + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29620,6 +29900,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-grin + pt
 exports[`ProgramDescription structural snapshot (the link map) > rough-grin-ref + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29724,6 +30005,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-grin-ref 
 exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -29830,6 +30112,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt 
 exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -29939,6 +30222,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-
 exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30048,6 +30332,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-mis + pt-
 exports[`ProgramDescription structural snapshot (the link map) > rough-sheet + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -30156,6 +30441,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-sheet + p
 exports[`ProgramDescription structural snapshot (the link map) > rough-smooth-limit + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30254,6 +30540,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rough-smooth-li
 exports[`ProgramDescription structural snapshot (the link map) > sdf-field + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30362,6 +30649,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-field + tab
 exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-twin + inst 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30468,6 +30756,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
 exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-twin-ref + inst 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30574,6 +30863,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-instance-tw
 exports[`ProgramDescription structural snapshot (the link map) > sdf-knot + knot 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30682,6 +30972,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-knot + knot
 exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -30792,6 +31083,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pa
 exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -30899,6 +31191,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-shapes + pt
 exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin + table 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31005,6 +31298,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
 exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin + unrolled 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31111,6 +31405,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31208,6 +31503,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -31308,6 +31604,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31408,6 +31705,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31505,6 +31803,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -31605,6 +31904,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31705,6 +32005,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-fog 
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-march + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -31802,6 +32103,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-marc
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-march + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -31902,6 +32204,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-marc
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-march + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32002,6 +32305,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-marc
 exports[`ProgramDescription structural snapshot (the link map) > shadow-medium + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32101,6 +32405,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
 exports[`ProgramDescription structural snapshot (the link map) > shadow-medium + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32203,6 +32508,7 @@ exports[`ProgramDescription structural snapshot (the link map) > shadow-medium +
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32311,6 +32617,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt 1`] = 
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32422,6 +32729,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis 1`
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32533,6 +32841,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-mis-oc
 exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32644,6 +32953,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky + pt-nee 1`
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32752,6 +33062,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt 1
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -32863,6 +33174,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-m
 exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -32974,6 +33286,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-lamp + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap + rgb-equirect 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33080,6 +33393,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap 
 exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap + rgb-octahedral 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33186,6 +33500,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap 
 exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap + spectral-equirect 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33293,6 +33608,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap 
 exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap + spectral-octahedral 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33400,6 +33716,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sky-missed-cap 
 exports[`ProgramDescription structural snapshot (the link map) > slab + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33497,6 +33814,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab + pathtrac
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + grazing 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33602,6 +33920,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + g
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + oblique 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33707,6 +34026,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + o
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + rr-interior 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33814,6 +34134,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + r
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -33919,6 +34240,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo + r
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-aniso + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34024,6 +34346,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ani
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + grazing 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34127,6 +34450,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + oblique 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34230,6 +34554,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + rr-interior 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34335,6 +34660,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34438,6 +34764,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-ref
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-sparse + grazing 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34543,6 +34870,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-spa
 exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-sparse + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34648,6 +34976,7 @@ exports[`ProgramDescription structural snapshot (the link map) > slab-albedo-spa
 exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -34758,6 +35087,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
 exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34868,6 +35198,7 @@ exports[`ProgramDescription structural snapshot (the link map) > softbeam-wall +
 exports[`ProgramDescription structural snapshot (the link map) > solids-analytic + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -34974,6 +35305,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-analytic
 exports[`ProgramDescription structural snapshot (the link map) > solids-sdf + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -35080,6 +35412,7 @@ exports[`ProgramDescription structural snapshot (the link map) > solids-sdf + pa
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody + mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": true,
@@ -35188,6 +35521,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody + nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -35296,6 +35630,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-changed + mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": true,
@@ -35404,6 +35739,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-changed + nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -35512,6 +35848,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-changed-ref + mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -35620,6 +35957,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-changed-ref + nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -35728,6 +36066,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-direct + rgb 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -35824,6 +36163,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-direct + spectral 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -35921,6 +36261,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-receiver + mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36028,6 +36369,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-receiver + nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36135,6 +36477,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-receiver + none 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36239,6 +36582,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-ref + mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -36347,6 +36691,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-ref + nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36455,6 +36800,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-tree + bvh-mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -36563,6 +36909,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-tree + bvh-nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36671,6 +37018,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-tree + power-mis 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -36779,6 +37127,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-blackbody-tree + power-nee 1`] = `
 {
   "blackbody": true,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36887,6 +37236,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
 exports[`ProgramDescription structural snapshot (the link map) > spectral-colored-furnace + uniform-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -36984,6 +37334,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-colore
 exports[`ProgramDescription structural snapshot (the link map) > spectral-colored-furnace + visible-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37081,6 +37432,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-colore
 exports[`ProgramDescription structural snapshot (the link map) > spectral-comp-empty + equirect 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37188,6 +37540,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-comp-e
 exports[`ProgramDescription structural snapshot (the link map) > spectral-comp-empty + octahedral 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37295,6 +37648,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-comp-e
 exports[`ProgramDescription structural snapshot (the link map) > spectral-direct + uniform-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37392,6 +37746,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-direct
 exports[`ProgramDescription structural snapshot (the link map) > spectral-direct + visible-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37486,9 +37841,580 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-direct
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > spectral-dispersion-beam + rgb 1`] = `
+{
+  "blackbody": false,
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.2,
+      0.2,
+      0.2,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": true,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "emissionCones": [
+      {
+        "cosDivergence": 0.9982005399352042,
+        "direction": [
+          0.9210609940028851,
+          0,
+          0.3894183423086505,
+        ],
+        "materialId": 4,
+      },
+    ],
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.7504915783575616,
+      "position": [
+        -3.8,
+        3.4,
+        5,
+      ],
+      "target": [
+        0.4,
+        -0.1,
+        -0.3,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 12,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "aces",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-dispersion-beam + spectral 1`] = `
+{
+  "blackbody": false,
+  "dispersion": {
+    "indexMaterials": [
+      0,
+    ],
+    "regions": [
+      0,
+    ],
+  },
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.2,
+      0.2,
+      0.2,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": true,
+  "environmentSamplable": true,
+  "environmentSelectionLive": true,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": true,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "emissionCones": [
+      {
+        "cosDivergence": 0.9982005399352042,
+        "direction": [
+          0.9210609940028851,
+          0,
+          0.3894183423086505,
+        ],
+        "materialId": 4,
+      },
+    ],
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.7504915783575616,
+      "position": [
+        -3.8,
+        3.4,
+        5,
+      ],
+      "target": [
+        0.4,
+        -0.1,
+        -0.3,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 12,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "aces",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-dispersion-prism + rgb 1`] = `
+{
+  "blackbody": false,
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.015,
+      0.015,
+      0.015,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": true,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.6632251157578452,
+      "position": [
+        0,
+        0.3,
+        5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 12,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "aces",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-dispersion-prism + spectral 1`] = `
+{
+  "blackbody": false,
+  "dispersion": {
+    "indexMaterials": [
+      0,
+    ],
+    "regions": [
+      0,
+    ],
+  },
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.015,
+      0.015,
+      0.015,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": true,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.6632251157578452,
+      "position": [
+        0,
+        0.3,
+        5,
+      ],
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 12,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "aces",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-dispersion-slab + spectral 1`] = `
+{
+  "blackbody": false,
+  "dispersion": {
+    "indexMaterials": [
+      0,
+    ],
+    "regions": [
+      0,
+    ],
+  },
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+      "dielectric",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 2,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "type": "none",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37587,6 +38513,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37685,6 +38612,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37787,6 +38715,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-b
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-1 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37889,6 +38818,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-b
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-2 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -37991,6 +38921,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-b
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-clamp + tracking 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38089,6 +39020,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-c
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-driven + budget-2 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38191,6 +39123,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-d
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-scatter + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38298,6 +39231,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-scatter + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38402,6 +39336,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-tracking + tracking 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38500,6 +39435,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-t
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-vacuum + analytic 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38598,6 +39534,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-v
 exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-vacuum-tracking + tracking 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38696,6 +39633,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-v
 exports[`ProgramDescription structural snapshot (the link map) > spectral-eta + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38795,6 +39733,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-eta + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -38901,6 +39840,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39007,6 +39947,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39110,6 +40051,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-constant + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39216,6 +40158,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-constant + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39322,6 +40265,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-constant + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39425,6 +40369,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-ref + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39531,6 +40476,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-ref + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39637,6 +40583,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-expressions-ref + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39740,6 +40687,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
 exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -39847,6 +40795,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -39954,6 +40903,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40058,6 +41008,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-fog + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-fog-placement + equiangular 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40165,6 +41116,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-fog-pl
 exports[`ProgramDescription structural snapshot (the link map) > spectral-fog-placement + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40272,6 +41224,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-fog-pl
 exports[`ProgramDescription structural snapshot (the link map) > spectral-furnace + uniform-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40369,6 +41322,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-furnac
 exports[`ProgramDescription structural snapshot (the link map) > spectral-furnace + visible-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40466,6 +41420,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-furnac
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -40576,6 +41531,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40686,6 +41642,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-furnace-emit + furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40784,6 +41741,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-f
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-furnace-hard + furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40883,6 +41841,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-f
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-furnace-scatter + furnace 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -40985,6 +41944,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-f
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-scatter + scatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41093,6 +42053,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-scatter-ref + scatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41201,6 +42162,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-slab + absorption 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41299,6 +42261,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-vacuum + vacuum 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41397,6 +42360,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-grin-v
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41501,6 +42465,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41605,6 +42570,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant + oct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41709,6 +42675,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant + rgb 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41812,6 +42779,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant-ref + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -41919,6 +42887,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant-ref + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -42026,6 +42995,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-image-constant-ref + oct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -42133,6 +43103,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-image-
 exports[`ProgramDescription structural snapshot (the link map) > spectral-inclusion + bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -42241,6 +43212,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-inclus
 exports[`ProgramDescription structural snapshot (the link map) > spectral-inclusion + power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -42349,6 +43321,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-inclus
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": true,
@@ -42461,6 +43434,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -42573,6 +43547,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-changed + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": true,
@@ -42685,6 +43660,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-c
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-changed + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": true,
     "lightingPdf": false,
@@ -42797,6 +43773,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-c
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-changed-ref + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -42904,6 +43881,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-c
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-changed-ref + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43011,6 +43989,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-c
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-ref + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -43118,6 +44097,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-r
 exports[`ProgramDescription structural snapshot (the link map) > spectral-live-ref + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43225,6 +44205,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-live-r
 exports[`ProgramDescription structural snapshot (the link map) > spectral-materials + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -43339,6 +44320,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-materi
 exports[`ProgramDescription structural snapshot (the link map) > spectral-materials + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43453,6 +44435,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-materi
 exports[`ProgramDescription structural snapshot (the link map) > spectral-mirror + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43562,6 +44545,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-mirror
 exports[`ProgramDescription structural snapshot (the link map) > spectral-packed + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -43669,6 +44653,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-packed
 exports[`ProgramDescription structural snapshot (the link map) > spectral-packed + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43776,6 +44761,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-packed
 exports[`ProgramDescription structural snapshot (the link map) > spectral-packed-ref + mis-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -43883,6 +44869,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-packed
 exports[`ProgramDescription structural snapshot (the link map) > spectral-packed-ref + nee-bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -43990,6 +44977,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-packed
 exports[`ProgramDescription structural snapshot (the link map) > spectral-packed-ref + nee-power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44097,6 +45085,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-packed
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + uniform-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44203,6 +45192,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + uniform-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44309,6 +45299,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + uniform-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44412,6 +45403,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + visible-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44518,6 +45510,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + visible-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44624,6 +45617,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-plane + visible-none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44727,6 +45721,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-plane 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-sky + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44835,6 +45830,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-sky + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -44943,6 +45939,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-sky + oct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45051,6 +46048,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-proc-s
 exports[`ProgramDescription structural snapshot (the link map) > spectral-rayleigh-furnace + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45153,6 +46151,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-raylei
 exports[`ProgramDescription structural snapshot (the link map) > spectral-scatter-furnace + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45255,6 +46254,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-scatte
 exports[`ProgramDescription structural snapshot (the link map) > spectral-scatter-furnace + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45357,6 +46357,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-scatte
 exports[`ProgramDescription structural snapshot (the link map) > spectral-shadow-slab + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45458,6 +46459,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-shadow
 exports[`ProgramDescription structural snapshot (the link map) > spectral-shadow-slab + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45559,6 +46561,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-shadow
 exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45664,6 +46667,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45769,6 +46773,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + oct 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45874,6 +46879,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-sky + 
 exports[`ProgramDescription structural snapshot (the link map) > spectral-slab + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -45972,6 +46978,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-slab +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-slab + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46070,6 +47077,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-slab +
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-clamp + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46168,6 +47176,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-fog + nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46275,6 +47284,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-fog + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46379,6 +47389,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-shadow + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46480,6 +47491,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-slab + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46578,6 +47590,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spectral-tracking-slab + visible 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46676,6 +47689,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-tracki
 exports[`ProgramDescription structural snapshot (the link map) > spheres + linear 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46784,6 +47798,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + linea
 exports[`ProgramDescription structural snapshot (the link map) > spheres + tlas 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46892,6 +47907,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spheres + tlas 
 exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -46996,6 +48012,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spot + pt-nee 1
 exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + rr-interior 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -47100,6 +48117,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + r
 exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + rr-off 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -47202,6 +48220,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-furnace + r
 exports[`ProgramDescription structural snapshot (the link map) > sss-lab + noscatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -47313,6 +48332,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-lab + nosca
 exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -47433,6 +48453,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss 1
 exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-8 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -47553,6 +48574,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-8
 exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -47670,6 +48692,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-lab + sss-p
 exports[`ProgramDescription structural snapshot (the link map) > sss-presets + noscatter 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -47781,6 +48804,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-presets + n
 exports[`ProgramDescription structural snapshot (the link map) > sss-presets + presets 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -47901,6 +48925,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-presets + p
 exports[`ProgramDescription structural snapshot (the link map) > sss-presets + presets-1024 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -48021,6 +49046,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sss-presets + p
 exports[`ProgramDescription structural snapshot (the link map) > submerged + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48119,6 +49145,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
 exports[`ProgramDescription structural snapshot (the link map) > sun + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48218,6 +49245,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sun + pt-nee 1`
 exports[`ProgramDescription structural snapshot (the link map) > sun-haze + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48317,6 +49345,7 @@ exports[`ProgramDescription structural snapshot (the link map) > sun-haze + pt-n
 exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48419,6 +49448,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
 exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero + thinlens0 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48523,6 +49553,7 @@ exports[`ProgramDescription structural snapshot (the link map) > thinlens-zero +
 exports[`ProgramDescription structural snapshot (the link map) > tiny-sphere + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48619,6 +49650,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tiny-sphere + p
 exports[`ProgramDescription structural snapshot (the link map) > tiny-sphere-light + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48718,6 +49750,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tiny-sphere-lig
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48829,6 +49862,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + aces 
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -48940,6 +49974,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + agx 1
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49051,6 +50086,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + gt 1`
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49162,6 +50198,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + hable
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + khronos 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49273,6 +50310,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + khron
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49383,6 +50421,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + none 
 exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinhard 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49494,6 +50533,7 @@ exports[`ProgramDescription structural snapshot (the link map) > tonemap + reinh
 exports[`ProgramDescription structural snapshot (the link map) > transform-bake + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49602,6 +50642,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake 
 exports[`ProgramDescription structural snapshot (the link map) > transform-bake-ref + pathtracer 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49710,6 +50751,7 @@ exports[`ProgramDescription structural snapshot (the link map) > transform-bake-
 exports[`ProgramDescription structural snapshot (the link map) > two-light + bvh 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49810,6 +50852,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + bvh
 exports[`ProgramDescription structural snapshot (the link map) > two-light + power 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -49910,6 +50953,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + pow
 exports[`ProgramDescription structural snapshot (the link map) > two-light + uniform 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -50010,6 +51054,7 @@ exports[`ProgramDescription structural snapshot (the link map) > two-light + uni
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,
@@ -50116,6 +51161,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt 
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-mis 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": true,
@@ -50225,6 +51271,7 @@ exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-
 exports[`ProgramDescription structural snapshot (the link map) > veach-mis + pt-nee 1`] = `
 {
   "blackbody": false,
+  "dispersion": null,
   "emitters": {
     "driven": false,
     "lightingPdf": false,

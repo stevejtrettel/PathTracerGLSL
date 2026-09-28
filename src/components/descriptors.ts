@@ -50,7 +50,7 @@ export type ColorSemantic =
  * property vocabulary (materials-§7): no compiler type names a property, so a new model
  * with a new property adds a row here and nothing anywhere else.
  */
-export type PropertySchema<TSource extends string = string> = ColorSemantic & {
+export type PropertySchema<TSource extends string = string> = (ColorSemantic | { semantic: 'index' }) & {
     /** Struct field name; shared across models by name+type (same name, different
      *  glslType is a Validator error — module-anatomy §3). */
     name: string;

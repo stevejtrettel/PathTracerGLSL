@@ -6,6 +6,7 @@
 
 import { isGlslExpression, isValueParam, isBlackbody, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
+import { isCauchyIndex } from '../../components/color/cauchy/cauchy.js';
 import { blackbodyTemperatureRange } from '../../components/color/blackbody/blackbody.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
@@ -23,7 +24,7 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
 
 export interface PropertyValueContract {
     shape: 'scalar' | 'spectrum';
-    role?: RadiometricRole;
+    role?: RadiometricRole | 'index';
     /** Only domains required by current transport mathematics, not artistic policy —
      *  the shared RowConstraint vocabulary (descriptor-unification D1). */
     constraint?: RowConstraint;
@@ -38,7 +39,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
                 validatePropertyValue(
                     (mat as unknown as Record<string, unknown>)[field.source],
-                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : undefined },
+                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : field.semantic === 'index' ? 'index' : undefined },
                     `Material '${name}': ${field.source}`,
                     bag,
                 );
@@ -58,11 +59,14 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         validatePropertyValue(mat.medium.sigma_s, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
             `Material '${name}': medium.sigma_s`, bag);
 
+        validatePropertyValue(mat.medium.ior, { shape: 'scalar', constraint: { kind: 'positive' } },
+            `Material '${name}': medium.ior`, bag);
+
         const phase = VOLUME_SCATTERING_MODELS[mat.medium.model ?? 'hg'];
         for (const field of phase?.properties ?? []) {
             validatePropertyValue(
                 (mat.medium as unknown as Record<string, unknown>)[field.source],
-                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : undefined },
+                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : field.semantic === 'index' ? 'index' : undefined },
                 `Material '${name}': medium.${field.source}`,
                 bag,
             );
@@ -77,6 +81,17 @@ export function validatePropertyValue(
     bag: DiagnosticBag,
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
+    if (isCauchyIndex(value)) {
+        const coefficients = value.cauchy;
+        if (contract.role !== 'index') {
+            bag.error('invalid-setting', `${label}: Cauchy is an index form`).add();
+        } else if (!Array.isArray(coefficients) || coefficients.length < 2 || coefficients.length > 3
+            || coefficients.some(v => typeof v !== 'number' || !Number.isFinite(v))
+            || !(coefficients[0] > 0) || coefficients.slice(1).some(v => v! < 0)) {
+            bag.error('invalid-setting', `${label}: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)`).add();
+        }
+        return;
+    }
     if (isBlackbody(value)) {
         if (contract.role !== 'emission') {
             bag.error('invalid-setting', `${label}: blackbody is an emission form`).add();

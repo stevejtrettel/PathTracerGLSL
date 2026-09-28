@@ -5,8 +5,8 @@ with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
 instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
-Wavelength-independent GRIN and [Planck blackbody emission](../blackbody/README.md) are supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
-a wavelength-independent scalar IOR; dispersion is not implemented.
+Wavelength-independent GRIN and [Planck blackbody emission](../blackbody/README.md) are supported; Cauchy index is also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar and Cauchy wavelength-dependent IOR; see the
+[index/collapse contract](../cauchy/README.md).
 
 ## Measurement and sampling
 
@@ -415,3 +415,16 @@ lookups across ceiling extremes, black/grey/saturated inputs, table-cell neighbo
 wavelength endpoints, oversaturation and live gains. It inspects M-(sigma_a+sigma_s)
 before the tracker's null clamp. An RGB-ceiling-as-majorant mutation must fail. These
 samples test the implementation; the inequality above supplies the all-wavelength bound.
+
+
+## Surface dispersion
+
+`ior: { cauchy: [A, B, C?] }` uses micrometre coefficients with nm wavelength carriers.
+The initial form supports constant A > 0 and B/C >= 0. Smooth and rough glass evaluate
+index at lane zero, after the generated transport has collapsed future throughput once.
+Arrival emission is scored first; rough NEE sees the collapsed packet. Sensor response,
+camera PDFs and accumulated radiance remain unchanged. RGB uses the helium d-line index.
+
+The [Cauchy component contract](../cauchy/README.md) records ownership, the prehistory
+symmetry argument, numerical checks and scope. Spatially dispersive GRIN, live Cauchy
+coefficients, other index forms and named glass catalogues remain unimplemented.

@@ -6,13 +6,14 @@
 // so "swapping the details of intersect" is exactly what the codegen does. Region ids are
 // globally unique across both backends (§2.3), so material_of() spans them.
 
+import type { IndexProperty } from '../../types.js';
 import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedSceneTable, DrivenPlacement, PlannedPlacement } from '../../plan/types.js';
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
-import { emitValue, type ParamValue } from '../values.js';
-import { MATERIAL_MODELS, modelTransmission } from '../../../components/materials/index.js';
+import { emitValue, emitIndex, type ParamValue } from '../values.js';
+import { modelTransmission, modelIndexRow } from '../../../components/materials/index.js';
 import {
     PRIMITIVES,
     primitive,
@@ -351,9 +352,17 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({
             origin: 'generated:ior-of',
             source: regionData
-                ? generateIorOfData(plan.meshes, plan.instanceBatches, plan.materials)
-                : generateIorOf(plan.objects, plan.meshes, plan.instanceBatches, plan.materials),
+                ? generateIorOfData(plan.meshes, plan.instanceBatches, plan.materials, plan.program.measurement.color)
+                : generateIorOf(plan.objects, plan.meshes, plan.instanceBatches, plan.materials, plan.program.measurement.color),
         });
+    }
+
+    const dispersion = plan.program.dispersion;
+    if (dispersion !== null && dispersion.regions.length > 0) {
+        const consumers = dispersion.indexMaterials.map(id => `mat == ${id}`).join(' || ');
+        const adjacent = dispersion.regions.map(id => `from == ${id} || to == ${id}`).join(' || ');
+        blocks.push({ origin: 'generated:surface-dispersion', source:
+            `bool surface_uses_dispersion(int mat, int from, int to) { return (${consumers}) && (${adjacent}); }` });
     }
 
     // Point classification (§2.7 innermost-wins) — consumed by the dispatcher's §4.2 step.
@@ -399,6 +408,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     if (plan.materials.some((m) => modelTransmission(m.model))) {
         provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p, Wavelengths wl)' });
     }
+
+    if (dispersion !== null && dispersion.regions.length > 0)
+        provides.push({ name: 'surface_uses_dispersion', signature: 'bool surface_uses_dispersion(int mat, int from, int to)' });
 
     // Self-require: the generated scene_intersect classifies its boundary through
     // scene_region_at (§4.2) — honest linkage for the seam-unused check. The placement
@@ -1565,7 +1577,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  semantic pins of the baked form carry over exactly: region −1 answers 1.0 before
  *  any fetch, and OPEN meshes (thin — excluded from the baked table) keep explicit
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
-function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
+function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
     lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
     for (const mat of materials) {
@@ -1574,12 +1586,10 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
             continue;
         }
         if (!modelTransmission(mat.model)) continue;
-        const row = MATERIAL_MODELS[mat.model]?.properties.find((r) => r.storage === 'region-table');
+        const row = modelIndexRow(mat.model);
         const ior = row !== undefined ? mat.values[row.source] : undefined;
         if (ior === undefined) continue;
-        const expr = emitValue(ior as ParamValue, formatFloat as (x: never) => string, () => {
-            throw new Error(`intersection: material '${mat.name}': the surface ior row cannot be a GLSL expression — a spatial index is a medium: author it as medium: { ior: <formula> } (fable-variable-ior)`);
-        });
+        const expr = emitIndex(ior as IndexProperty, color);
         lines.push(`    if (mat == ${mat.id}) return ${expr};`);
     }
     lines.push('    return 1.0;'); // non-transmissive / ambient
@@ -1616,7 +1626,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
 // p (fold away). Non-dielectric materials are 1.0 (vacuum-like — pinned in the Planner),
 // ior_of(-1, p) = 1.0 (ambient; ambientMedium is a media-era concern, §2.4). Value<T>-driven ior
 // reads its uniform (declared via the materials {param} scan — same for formula params).
-function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[]): string {
+function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
     lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
@@ -1644,15 +1654,13 @@ function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[],
         if (!modelTransmission(mat.model)) continue;
         // No property name here (materials-§7): the transmission capability implies a
         // region-table row on the declaring model's schema — found structurally.
-        const row = MATERIAL_MODELS[mat.model]?.properties.find((p) => p.storage === 'region-table');
+        const row = modelIndexRow(mat.model);
         const ior = row !== undefined ? mat.values[row.source] : undefined;
         if (ior === undefined) continue;   // registry-test-enforced; unreachable backstop
         // The constant/driven split is emitValue's — ior_of is a region-indexed SCENE_VALUE
         // (no shading point, so it can't ride scene_material_properties, but the read obeys the
         // same one split point). An expression is rejected (the Validator already diagnosed it).
-        const expr = emitValue(ior as ParamValue, formatFloat as (x: never) => string, () => {
-            throw new Error(`intersection: material '${mat.name}': the surface ior row cannot be a GLSL expression — a spatial index is a medium: author it as medium: { ior: <formula> } (fable-variable-ior)`);
-        });
+        const expr = emitIndex(ior as IndexProperty, color);
         lines.push(`    if (region == ${obj.index}) return ${expr};`);
     }
     lines.push('    return 1.0;'); // ambient / vacuum / non-transmissive regions

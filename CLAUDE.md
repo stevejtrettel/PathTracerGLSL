@@ -210,18 +210,18 @@ How a program is assembled:
 - Spectral foundation: four wavelengths, CIE 1931 sensor, uniform/visible proposals,
   signed linear-RGB film and versioned RGB-to-spectrum assets. Supports
   RGB-authored scenes (all six material models), including live colour controls,
-  instance colour attributes and light-tree selection; glass uses wavelength-independent
-  IOR. Image/procedural skies and homogeneous/heterogeneous media with emission are supported
+  instance colour attributes and light-tree selection; smooth/rough glass supports scalar
+  and Cauchy wavelength-dependent IOR. Image/procedural skies and homogeneous/heterogeneous media with emission are supported
   (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
   use the same reflectance/emission domains. GRIN supports wavelength-independent index
   fields, absorbing/emitting fields and constant-coefficient scattering. Planck blackbody emission supports
-  constants/live controls and packed emitters in both modes; other non-RGB forms and
-  dispersion remain gated. See
+  constants/live controls and packed emitters in both modes. Surface dispersion uses
+  one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); general spectral bindings/media and dispersion; transparent shadow rays
+registered); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.

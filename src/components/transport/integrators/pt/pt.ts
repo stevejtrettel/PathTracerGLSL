@@ -50,6 +50,7 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
     // out of the interface header: an internal helper, not a cross-feature seam).
     if (f.mis) blocks.push({ origin: 'components/transport/math_mis.glsl', source: mathMisGLSL });
     blocks.push(combinerFns(f), kernelRecordFn(f));
+    if (f.dispersion) blocks.push(collapseWavelengths());
     if (f.rr) blocks.push(roulette(f));
     // The interior rule exists only where a collision leaves a survival OWED — a weighted
     // absorption arm. Under tracking, the lottery already settled it (see medium_survival).
@@ -97,6 +98,7 @@ function walkRequires(f: Flags): string[] {
     if (f.rr && f.weightedAbsorption) req.push('medium_survival');
     if (f.nulls) req.push('is_null_interface');
     if (f.transmission) req.push('ior_of');
+    if (f.dispersion) req.push('surface_uses_dispersion');
     // The generated light-query constructor's runtime arm (fable-rough-dielectric §3.3).
     if (f.twoSided) req.push('material_two_sided');
     return req;
@@ -144,6 +146,7 @@ function pathState(f: Flags): ShaderBlock {
         '    Radiance radiance;',
         ...kernelStateFields(f),
     ];
+    if (f.dispersion) lines.push('    bool wavelengths_collapsed;');
     if (f.media) lines.push('    int current_medium;      // walk, §4.4: THE medium variable — classified, never a stack');
     if (f.nulls) lines.push('    int null_crossings;      // walk: crossings so far, against measurement.maxNullCrossings');
     if (f.transmission) lines.push('    float eta_scale;         // walk, §7.2: η² compression divided out of the RR metric only');
@@ -157,6 +160,7 @@ function pathState(f: Flags): ShaderBlock {
         '    s.radiance = SPECTRUM_ZERO;',
         ...kernelStateInit(f),
     );
+    if (f.dispersion) lines.push('    s.wavelengths_collapsed = false;');
     if (f.media) lines.push('    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
     if (f.nulls) lines.push('    s.null_crossings = 0;');
     if (f.transmission) lines.push('    s.eta_scale = 1.0;');
@@ -408,6 +412,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
         `        if (bounce == ${N}) break;   // budget reached: emission is the last term counted`,
     );
+    if (f.dispersion) lines.push('        if (surface_uses_dispersion(mat, hit.region_from, hit.region_to)) collapse_wavelengths(s);');
     if (f.nee) lines.push('        light_sample_direct(s, hit, mat, wo, props);        // NEE: sample + score locally');
     lines.push(
         '        InteractionSample bs;',
@@ -431,4 +436,15 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         '}',
     );
     return { origin: 'generated:transport/walk', source: lines.join('\n') };
+}
+
+/** Only future contributions lose their companion lanes. Camera PDFs and accumulated
+ * radiance retain the original four-lane estimate. Repeated interfaces do not rescale. */
+function collapseWavelengths(): ShaderBlock {
+    return { origin: 'generated:transport/collapse', source: `
+void collapse_wavelengths(inout PathState s) {
+    if (s.wavelengths_collapsed) return;
+    s.throughput *= vec4(4.0, 0.0, 0.0, 0.0);
+    s.wavelengths_collapsed = true;
+}` };
 }

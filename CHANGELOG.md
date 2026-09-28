@@ -4,6 +4,38 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — Cauchy surface dispersion
+
+Smooth and rough glass accept constant `ior: { cauchy: [A, B, C?] }` with finite
+A > 0 and B, C >= 0. Spectral rendering evaluates the original function at the hero
+wavelength; RGB uses the helium d-line index. Descriptor-declared index rows govern
+validation and both region-table layouts. Scalar indices and zero-dispersion Cauchy
+need no collapse. Other index forms and spatially dispersive GRIN remain deferred.
+
+At the first index-consuming dispersive boundary, transport multiplies future
+throughput by `(4,0,0,0)` once, before NEE and BSDF sampling. Earlier radiance, ray
+wavelengths and camera PDFs are untouched. Index-independent boundaries retain all
+lanes. No BSDF body, engine interface or texture layout changes were needed.
+The component README documents ownership, the prehistory symmetry argument and scope.
+
+Verification: all 3,865 tests passed before the additional beam demo; typecheck and
+build passed. Thirteen fixed generated-GLSL probes cover Snell entry/exit, internal
+reflection, coefficient/hero reads, collapse and preceding volume emission. Missing
+and repeated compensation mutations fail. Integrated GPU comparisons cover the
+independent normal-slab quadrature and monochromatic reference paths through analytic,
+tracked and wavelength-independent GRIN media, including rough glass and an inside
+camera. A surviving-lane probe rejects collapse after rough NEE. Comparisons use
+measured standard errors; rough-glass NEE remains noisy. The registered slab image
+also passes its independent mean check. These are targeted GPU gates, not a full sweep.
+With the beam demo added, 1,755 targeted compiler, static GLSL and scene-data checks
+pass, as does typechecking. All 259 pre-dispersion scene digests remain identical;
+only the three new dispersion fixtures are added.
+
+Gallery scenes include a refracted white stripe and a separate finite-cone softbeam,
+prism and receiving screen with a visible floor. The latter uses existing hittable
+aperture paths to form a slowly converging caustic; straight shadow sampling cannot
+follow the refracted chain. No new caustic sampler or artificial visible beam was added.
+
 ## 2026-09-27 — one normalized Planck emission definition
 
 Replaced the production Kim RGB approximation with normalized Planck in both colour modes.

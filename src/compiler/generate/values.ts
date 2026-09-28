@@ -28,10 +28,11 @@
 // keeps its own idiom because it is not a name swap: the light selection CDF (a float[] fed by
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
-import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
+import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata, type IndexProperty } from '../types.js';
 import { projectRGB, isDrivenRadiometric } from '../../components/color/values.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform, formatFloat, formatVec3 } from '../../components/glsl-format.js';
+import { isCauchyIndex, cauchyIndex, indexReferenceNM, indexIsDispersive } from '../../components/color/cauchy/cauchy.js';
 import { blackbodyColor } from '../../components/color/blackbody/blackbody.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
@@ -192,4 +193,14 @@ export function mintValueUniform(
 
 function capitalize(s: string): string {
     return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+/** Index reads keep the surface formula separate from radiometric RGB lifting. */
+export function emitIndex(value: IndexProperty, color: 'rgb' | 'spectral'): string {
+    if (isCauchyIndex(value)) {
+        if (color === 'rgb' || !indexIsDispersive(value)) return formatFloat(cauchyIndex(value, indexReferenceNM));
+        const [a, b, c = 0] = value.cauchy;
+        return `cauchy_index(${formatVec3([a, b, c])}, wl.lambda.x)`;
+    }
+    return emitValue(value, formatFloat);
 }

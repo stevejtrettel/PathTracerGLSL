@@ -24,6 +24,7 @@ export function flags(p: ProgramDescription) {
         /** A deflecting (GRIN) medium exists (fable-variable-ior): the walk handles the
          *  ms.deflected outcome — spawn the bent exit ray, recompute current_medium. */
         deflecting: p.media.deflecting,
+        dispersion: p.dispersion !== null && p.dispersion.regions.length > 0,
         transmission: p.materials.models.some(modelTransmission),
         /** Some material can be lit from below its shading normal (fable-rough-dielectric
          *  §3.1): light_query_surface asks material_two_sided at runtime instead of

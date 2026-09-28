@@ -293,6 +293,11 @@ export interface GlslExpression {
  * vector roughness/IOR before the runtime Validator has to report serialized JS input. */
 export type ScalarProperty = Value<number> | GlslExpression;
 
+/** Normal-dispersion Cauchy index. Wavelength units for B/C are micrometres²/⁴.
+ * A > 0, B >= 0, C >= 0; coefficients are constant. */
+export interface CauchyIndex { cauchy: [number, number, number?]; }
+export type IndexProperty = ScalarProperty | CauchyIndex;
+
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
@@ -313,7 +318,7 @@ export interface BlackbodyValue {
 export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
-export type MaterialProperty = ScalarProperty | SpectrumProperty;
+export type MaterialProperty = ScalarProperty | SpectrumProperty | CauchyIndex;
 
 export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
@@ -454,7 +459,7 @@ export interface MaterialDescription {
     albedo?: SpectrumProperty;
     roughness?: ScalarProperty;       // ggx: alpha = roughness², clamped ≥ 1e-3 (mirrors are a delta model)
     f0?: SpectrumProperty;            // ggx: normal-incidence reflectance — the conductor's color
-    ior?: ScalarProperty;             // dielectric: region's interior IOR (→ generated ior_of table)
+    ior?: IndexProperty;              // dielectric: region's interior IOR (→ generated ior_of table)
     transmittance?: SpectrumProperty; // dielectric: interface tint; interior absorption is the medium's job (§4.4)
     emission?: SpectrumProperty;
     /** Interior medium (§3.5/§4.4). Composes with any surface model; required for model 'none'. */

@@ -1,12 +1,13 @@
 // compiler/plan/Planner.ts
 
+import { isCauchyIndex, indexIsDispersive } from '../../components/color/cauchy/cauchy.js';
 import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/index.js';
 import { isDrivenRadiometric } from '../../components/color/values.js';
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
 import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
-import { MATERIAL_MODELS, modelTwoSidedShading, EMISSION_KEY } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
@@ -556,6 +557,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
 
     return {
+        dispersion: measurement.color === 'spectral' ? planDispersion(scenePlan) : null,
         blackbody: measurement.color === 'spectral' && (
             scenePlan.materials.some(m => Object.values(m.values).some(isBlackbody))
             || scenePlan.lights.some(l => Object.values(l.values).some(isBlackbody))
@@ -920,7 +922,7 @@ export function resolveMaterialValues(
     if (model === 'none') return values;
     for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
         const v = authored[row.source];
-        values[row.source] = row.glslType === 'Spectrum'
+        values[row.source] = row.semantic === 'index' && isCauchyIndex(v) ? v : row.glslType === 'Spectrum'
             ? resolveColorProperty(v, [row.default, row.default, row.default])
             : resolveScalarProperty(v, row.default);
     }
@@ -998,4 +1000,17 @@ function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[])
         any = true;
     }
     return any ? Math.max(r, 1e-3) : 10;
+}
+
+/** Only real interiors supply a region index; thin meshes/batches remain vacuum. */
+function planDispersion(scene: ScenePlan): ProgramDescription['dispersion'] {
+    const indexMaterials = scene.materials.filter(m => modelIndexRow(m.model) !== undefined).map(m => m.id);
+    const dispersiveMaterials = new Set(scene.materials.filter(m => {
+        const row = modelIndexRow(m.model);
+        return m.medium?.ior === undefined && row !== undefined && indexIsDispersive(m.values[row.source]);
+    }).map(m => m.id));
+    const regions = [...scene.objects, ...scene.meshes.filter(m => m.closed),
+        ...scene.instanceBatches.filter(b => b.hasInterior === true)]
+        .filter(o => dispersiveMaterials.has(o.materialId)).map(o => o.index);
+    return dispersiveMaterials.size > 0 ? { indexMaterials, regions } : null;
 }

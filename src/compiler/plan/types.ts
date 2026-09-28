@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, CauchyIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -39,6 +39,8 @@ import type { AABB } from '../../components/accel/bvh/bvh.js';
 export interface ProgramDescription {
     /** Original Planck evaluation is read by this spectral program. */
     blackbody: boolean;
+    /** Index consumers and real interior regions requiring the one-time hero collapse. */
+    dispersion: { indexMaterials: number[]; regions: number[] } | null;
     /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations
      *  (the bias ledger, each with a declared exact limit — taxonomy §4). */
     measurement: {
@@ -438,7 +440,7 @@ export function isAttributeValue(v: unknown): v is AttributeValue {
 
 /** A schema-resolved property value: constant, expression, live param (§2.8), or a
  *  per-instance attribute reference. */
-export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue | AttributeValue;   // BlackbodyValue survives resolution ONLY when driven (constants fold at plan entry)
+export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue | CauchyIndex | AttributeValue;
 
 /**
  * Resolved interior medium (§3.5) — sigma_a/sigma_s/model are the RTE partition CORE, read

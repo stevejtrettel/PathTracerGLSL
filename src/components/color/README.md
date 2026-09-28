@@ -7,7 +7,7 @@
 RGB-authored capability set (all six existing material models), including live
 colour parameters, packed light rows and per-instance colours, image/procedural skies,
 surface RGB expressions, homogeneous/heterogeneous media with volume emission, and
-wavelength-independent GRIN. [Planck blackbody emission](blackbody/README.md) is supported; other non-RGB forms and dispersion remain unimplemented. Tracking uses the colour model’s
+wavelength-independent GRIN. [Planck blackbody emission](blackbody/README.md) is supported; [Cauchy surface dispersion](cauchy/README.md) is supported; other spectral/index forms and spatially dispersive GRIN remain unimplemented. Tracking uses the colour model’s
 separate field ceiling and spectral majorant; see the spectral README for its numerical domain.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:

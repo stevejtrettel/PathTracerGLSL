@@ -74,3 +74,8 @@ export function modelTwoSidedShading(id: MaterialModel): boolean {
  *  Everything else is read only through schema rows; ior is found structurally (the
  *  declaring model's region-table row), never by name. */
 export const EMISSION_KEY = 'emission';
+
+/** The schema declares which surface models consume the adjacent regions' index. */
+export function modelIndexRow(id: MaterialModel): PropertySchema | undefined {
+    return MATERIAL_MODELS[id]?.properties.find(row => row.semantic === 'index' && row.storage === 'region-table');
+}

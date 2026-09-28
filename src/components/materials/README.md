@@ -54,3 +54,10 @@ Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy conver
 `dielectric/` (delta, η² factor — F-ETA 0.554), `ggx/` (VNDF; see `ggx/ggx.md`),
 `mirror/` (delta conductor, Schlick — shares the `f0` row with ggx, the first real
 §3.4 union-dedupe pair; F-MIRROR = f0·L convex).
+
+
+Index-consuming models mark their region-table row with `semantic: 'index'`.
+`modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics
+accept scalar indices or the [Cauchy form](../color/cauchy/README.md); spectral transport
+collapses once before index-dependent scattering/NEE. Radiometric rows still declare
+reflectance/emission roles separately; an index is not an RGB lift.
