@@ -211,9 +211,9 @@ How a program is assembled:
   signed linear-RGB film and versioned RGB-to-spectrum assets. Currently restricted to
   RGB-authored scenes (all six material models), including live colour controls,
   instance colour attributes and light-tree selection; glass uses wavelength-independent
-  IOR. Image/procedural skies and nonemissive homogeneous/heterogeneous media are supported
+  IOR. Image/procedural skies and homogeneous/heterogeneous media with emission are supported
   (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
-  use the same reflectance/emission domains. Emissive/GRIN media and non-RGB forms remain gated. See
+  use the same reflectance/emission domains. GRIN media and non-RGB forms remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 
@@ -223,7 +223,10 @@ through glass; MIS with delta tracking; equiangular sampling of area lights; sph
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: float-sampler precision outside the two spectral tables still needs
+**Known open defects**: GRIN's per-step and boundary source integrals still use the
+absorption floor and cancellation-prone exponential subtraction; the straight analytic
+arm is corrected, and the GRIN counterpart must be addressed before spectral GRIN is enabled.
+Float-sampler precision outside the two spectral tables still needs
 a portability audit (many declarations use GLSL's default lowp; SwiftShader does not expose
 reduced-precision failures). cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work

@@ -35341,6 +35341,1201 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-direct
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit + uniform 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "uniform",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit + visible 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-0 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        0,
+        30,
+      ],
+      "target": [
+        0,
+        0,
+        31,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 0,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-1 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        0,
+        30,
+      ],
+      "target": [
+        0,
+        0,
+        31,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-budget + budget-2 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        0,
+        30,
+      ],
+      "target": [
+        0,
+        0,
+        31,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 2,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-clamp + tracking 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-driven + budget-2 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        0,
+        30,
+      ],
+      "target": [
+        0,
+        0,
+        31,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 2,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-scatter + nee 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 8,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": true,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": true,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-scatter + none 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "delta-tracking",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0,
+        1,
+        4,
+      ],
+      "target": [
+        0,
+        1,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 8,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [
+      "hg",
+    ],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": true,
+    "scatteringMedia": [
+      1,
+    ],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-tracking + tracking 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-vacuum + analytic 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > spectral-emit-vacuum-tracking + tracking 1`] = `
+{
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": "visible",
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "position": [
+        0,
+        0,
+        2,
+      ],
+      "scale": 0.5,
+      "target": [
+        0,
+        0,
+        -1,
+      ],
+      "type": "orthographic",
+    },
+    "color": "spectral",
+    "colorModelVersion": "jh-cie1931-d65-v1",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "cie1931",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": true,
+    "heterogeneousArms": true,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > spectral-eta + pt 1`] = `
 {
   "emitters": {

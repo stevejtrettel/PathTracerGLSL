@@ -20,6 +20,7 @@ import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
+import mediumEmissionGLSL from '../../../components/transport/volume/analytic/emission.glsl?raw';
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 import mediumDeltaTrackingGLSL from '../../../components/transport/volume/delta_tracking/delta_tracking.glsl?raw';
 import mediumGrinGLSL from '../../../components/transport/volume/grin/grin.glsl?raw';
@@ -134,6 +135,11 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         // arms (seam 1) and by the spectral shadow walker's per-segment form (seam 2).
         if (scatteringLive || wantsShadowMedia) {
             blocks.push({ origin: 'components/transport/volume/analytic/analytic.glsl', source: mediumAnalyticGLSL });
+        }
+        if (plan.materials.some(m => m.medium !== null && isEmissiveMedium(m.medium)
+            && !mediumIsDeflecting(m.medium)
+            && !mediumRoutesToTracking(m.medium, media.scatteringMedia.includes(m.id)))) {
+            blocks.push({ origin: 'components/transport/volume/analytic/emission.glsl', source: mediumEmissionGLSL });
         }
         // The null-collision bodies (fable-heterogeneous-media.md): included wholesale
         // (§2.12) iff some medium routes to them — a Planner decision. Must follow the
@@ -694,13 +700,10 @@ function generateMediumSample(plan: RenderPlan, majorants: Map<number, MajorantS
             } else {
                 lines.push(`        MediumProperties m = scene_medium_properties(${mat.id}, ray.origin, ray.wl);`);
                 if (wantsEmission && isEmissiveMedium(med)) {
-                    // Emission closed form (impl-plan-medium-emission E1.5): the exact
-                    // ∫₀ᵗ e^{−σ_a s} ε ds = ε·(1−e^{−σ_a t})/σ_a. σ_a floored at 1e-6
-                    // for BOTH factors so the pair stays consistent — the σ_a→0 limit
-                    // ε·t is reached with relative error ~1e-6·t, below fp32 noise.
-                    lines.push('        Spectrum sa = max(m.sigma_a, Spectrum(1e-6));');
-                    lines.push('        ms.weight = spectrum_exp(-sa * t_max);');
-                    lines.push('        ms.radiance = m.emission * (SPECTRUM_ONE - ms.weight) / sa;');
+                    // Attenuation uses the authored absorption, including exact vacuum.
+                    // The source integral evaluates its zero-extinction limit without cancellation.
+                    lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
+                    lines.push('        ms.radiance = m.emission * medium_absorption_integral(m.sigma_a, t_max);');
                 } else {
                     lines.push('        ms.weight = spectrum_exp(-m.sigma_a * t_max);');
                 }
@@ -754,11 +757,9 @@ function generateMediumSurvival(plan: RenderPlan): string {
     return lines.join('\n');
 }
 
-/** Resolved max-channel σ_t of a NON-expression medium (constants + {param} substituted
- *  live) — THE derived majorant (impl-plan-env-power-selection batch 2): for constant and
- *  {param}-driven coefficients the exact ceiling IS the live extinction, so σ̄ can never
- *  go stale under a slider. Floored at 1e-6: sliding to vacuum keeps the tracking jump
- *  finite (one giant step → transmitted — the right physics, no ÷0). */
+/** Live RGB max-channel extinction before the colour model's sampling bound.
+ * The positive floor paces emission even when driven extinction reaches zero;
+ * it changes only the sampling rate, never the resolved medium coefficients. */
 export function derivedMajorant(med: PlannedMedium, params: Record<string, unknown> = {}): number {
     const resolve = (v: Vec3 | GlslExpression | ValueParam<Vec3>): number[] => {
         if (isValueParam(v)) {
@@ -772,10 +773,8 @@ export function derivedMajorant(med: PlannedMedium, params: Record<string, unkno
     return Math.max(1e-6, ...a.map((x, i) => x + s[i]));
 }
 
-/** Expression media use the colour model's bound on the authored, ceiling-clamped
- * field. Constant/driven emissive RGB media derive the rate from live extinction;
- * driven rates carry their dependencies so a parameter update cannot leave them stale.
- * Spectral homogeneous emission remains validation-gated. */
+/** The colour model bounds either the ceiling-clamped field or live homogeneous
+ * extinction. Driven rates carry dependencies so coefficient edits update the rate. */
 type MajorantSpec = { expr: string; uniform?: PlannedUniform };
 
 function majorantSpec(mat: PlannedMaterial, color: ColorModelDescriptor): MajorantSpec {
@@ -788,15 +787,16 @@ function majorantSpec(mat: PlannedMaterial, color: ColorModelDescriptor): Majora
         return { expr: formatFloat(color.mediumBound(med.majorant).majorant) };
     }
     const deps = [med.sigma_a, med.sigma_s].filter((v) => isValueParam(v)).map((v) => (v as ValueParam<Vec3>).param);
-    if (deps.length === 0) return { expr: formatFloat(derivedMajorant(med)) };
+    const rate = (params: Record<string, unknown> = {}) => color.mediumBound(derivedMajorant(med, params)).majorant;
+    if (deps.length === 0) return { expr: formatFloat(rate()) };
     const name = `u_majorant_${mat.id}`;
     return {
         expr: name,
         uniform: {
             name, type: 'float',
             parameterPath: deps[0], parameterPaths: deps,
-            default: derivedMajorant(med),
-            compute: (p) => derivedMajorant(med, p),
+            default: rate(),
+            compute: rate,
         },
     };
 }

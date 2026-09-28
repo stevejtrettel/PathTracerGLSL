@@ -727,6 +727,22 @@ exports[`scene-data textures (byte fingerprints) > spectral-comp-empty 1`] = `nu
 
 exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-emit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-budget 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-clamp 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-driven 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-tracking 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-vacuum 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-emit-vacuum-tracking 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-eta 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-expressions 1`] = `null`;

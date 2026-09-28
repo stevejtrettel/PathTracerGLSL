@@ -6,7 +6,7 @@
 [spectral occupant](spectral/README.md) implements four-lane transport on a restricted
 RGB-authored capability set (all six existing material models), including live
 colour parameters, packed light rows and per-instance colours, image/procedural skies,
-surface RGB expressions and nonemissive homogeneous/heterogeneous media. Emissive/GRIN
+surface RGB expressions and homogeneous/heterogeneous media with volume emission. GRIN
 media and non-RGB forms remain validation-rejected. Tracking uses the colour model’s
 separate field ceiling and spectral majorant; see the spectral README for its numerical domain.
 

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { Compiler } from '../src/compiler/Compiler.js';
 import { packSceneData } from '../src/app/sceneData.js';
-import type { InstancedObject, LightDescription, SceneDescription, Vec3 } from '../src/compiler/types.js';
+import type { InstancedObject, LightDescription, SceneDescription, Vec3, RenderStrategy } from '../src/compiler/types.js';
 import { MATERIAL_MODELS } from '../src/components/materials/index.js';
 import { LIGHT_KINDS } from '../src/components/lights/index.js';
 import { blackbodyFixture } from '../tests/helpers/blackbodyFixtures.js';
@@ -35,8 +35,9 @@ const width = 96;
 const compiler = new Compiler();
 const probes: Array<{ name: string; source: string; textures: object[]; expected: number[][] }> = [];
 async function add(name: string, scene: SceneDescription, body: string, values: number[][],
-    uniforms: Record<string, { type: string; value: number | number[] }> = {}) {
-    const compiled = compiler.compileScene(scene, [packedStrategy('mis', 'bvh')]);
+    uniforms: Record<string, { type: string; value: number | number[] }> = {},
+    strategy: RenderStrategy = packedStrategy('mis', 'bvh')) {
+    const compiled = compiler.compileScene(scene, [strategy]);
     const source = [...compiled.renderers[0].shaders.values()].find(s => s.fragment.includes('transport_trace'))!.fragment;
     const main = source.lastIndexOf('void main()');
     assert(main >= 0, 'generated accumulator entry point');
@@ -249,6 +250,39 @@ for (const vacuum of [true,false]) {
 const mediumMutation = { ...coefficientProbe, name: 'illuminant incorrectly applied to absorption',
     source: coefficientProbe.source.replace('fragColor = m.sigma_a;', `fragColor = m.sigma_a * vec4(${wavelengths.map(v => `spectral_curves(${v}.0).w`).join(',')});`) };
 
+// Emission uses the illuminant role; the analytic integral retains exact vacuum
+// and remains stable on both sides of its small-optical-depth branch.
+const emitting = structuredClone(mediumScene);
+emitting.materials.fog.medium = { sigma_a: 0, emission: [0.4,0.8,1.2] };
+const emissionLanes = expected([0.4,0.8,1.2],true);
+const analyticCall = `medium_sample(${mediumID},make_ray(vec3(0.0),vec3(0.0,0.0,-1.0),${carrier}),1.0,vec2(0.5))`;
+let emissionMutation: typeof probes[number] | undefined;
+for (const sigma of [0,1e-9,0.0999,0.1,0.1001,100]) {
+    emitting.materials.fog.medium!.sigma_a = sigma;
+    const integral = sigma === 0 ? 1 : -Math.expm1(-sigma)/sigma;
+    const probe = await add(`analytic volume emission, absorption=${sigma}`,emitting,
+        `fragColor=${analyticCall}.radiance;`,[emissionLanes.map(v=>v*integral)]);
+    await add(`emitting medium transmittance, absorption=${sigma}`,emitting,
+        `fragColor=${analyticCall}.weight;`,[wavelengths.map(()=>Math.exp(-sigma))]);
+    if (sigma === 0) {
+        emissionMutation = {...probe,name:'artificial absorption floor in luminous vacuum',source:probe.source.replace(
+            'ms.radiance = m.emission * medium_absorption_integral(m.sigma_a, t_max);',
+            'ms.radiance = m.emission * (SPECTRUM_ONE - spectrum_exp(-max(m.sigma_a,Spectrum(1e-6))*t_max)) / max(m.sigma_a,Spectrum(1e-6));')};
+        assert.notEqual(emissionMutation.source,probe.source);
+    }
+}
+assert(emissionMutation);
+const emittingTracked = structuredClone(emitting);
+emittingTracked.materials.fog.medium = {
+    sigma_a: {kind:'glsl',source:'vec3(0.3,0.7,1.2)*u_emission_gain',params:[{param:'emission.gain',default:4,min:0,max:8}]},
+    emission: {kind:'glsl',source:'vec3(0.4,0.8,1.2)*u_emission_gain'}, majorant:1.2,
+};
+const trackedChoice = packedStrategy('nee','bvh');
+trackedChoice.estimator = {...trackedChoice.estimator,volumeSampling:'delta-tracking'};
+await add('RGB density scale applies to emission before lift',emittingTracked,
+    `fragColor=scene_medium_properties(${mediumID},vec3(0.0),${carrier}).emission;`,[emissionLanes],
+    {u_emission_gain:{type:'float',value:4}},trackedChoice);
+
 function verify(probe: typeof probes[number], values: number[]) {
     for (let x = 0; x < width; x++) for (let c = 0; c < 4; c++) {
         const target = probe.expected[x % probe.expected.length][c];
@@ -257,12 +291,13 @@ function verify(probe: typeof probes[number], values: number[]) {
 }
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation, expressionMutation], width, assets);
+    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation, expressionMutation, emissionMutation], width, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(mutation, frames[probes.length]), { name: 'AssertionError' });
     assert.throws(() => verify(mediumMutation, frames[probes.length+1]), { name: 'AssertionError' });
     assert.throws(() => verify(expressionMutation, frames[probes.length+2]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index, absorption-illuminant and RGB-blend-order mutations rejected`);
+    assert.throws(() => verify(emissionMutation, frames[probes.length+3]), { name: 'AssertionError' });
+    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index, absorption-illuminant, RGB-blend-order and luminous-vacuum mutations rejected`);
 } finally {
     await browser.close();
 }

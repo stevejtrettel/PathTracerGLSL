@@ -27,5 +27,17 @@ walker multiplies: exact Beer–Lambert `exp(−σ_t·len)` over FULL extinction
 tracking degenerates to exactly this for homogeneous media, so the heterogeneous
 upgrade is a strict superset. Caller clamps `len` finite (inf × 0 = NaN, pbrt note).
 
+`emission.glsl` supplies `medium_absorption_integral(sigma, len)` for the generated
+homogeneous absorbing-emission arm. Per lane it returns
+`integral_0^len exp(-sigma*s) ds`; the dispatcher multiplies by the resolved volume
+emission coefficient. At zero extinction the result is exactly `len`, while path
+attenuation remains exactly one. For optical depth `tau < 0.1`, a fourth-degree
+Taylor polynomial evaluates `(1-exp(-tau))/tau` without cancellation; its omitted
+term is at most `tau^5/720`. Larger depths use `(1-exp(-tau))/sigma` directly.
+The helper is included only when an analytic emitting arm calls it. Emissive
+scattering media use the tracking bodies, whose per-collision source collection
+already fits the same `MediumSample.radiance` contract.
+
 Witnesses: slab (exact Beer–Lambert numbers per channel), F-BOX-M (0.4/channel —
-catches the channel-MIS weights), fogcube (absorbing-only, no rim).
+catches the channel-MIS weights), fogcube (absorbing-only, no rim), emit and
+spectral-emit (source integrals), spectral-emit-vacuum (zero-extinction limit).

@@ -63,10 +63,39 @@ const example=probes.find(p=>p.name==='ceiling=1, gain=8')!;
 const bound=spectralMediumBound(1).majorant;
 const mutation={...example,name:'RGB ceiling used as spectral rate',source:example.source.replace(`fragColor=vec4(${bound})`, 'fragColor=vec4(1.0)')};
 assert.notEqual(mutation.source,example.source);
+// Homogeneous emissive tracking derives its rate from the same live RGB inputs
+// uploaded to the medium resolver. Probe the compiled bindings, including vacuum.
+const homogeneous=structuredClone(spectralSlab);
+homogeneous.materials.ink.medium={
+    sigma_a:{param:'majorant.a',default:0.01,min:0,max:2**17},
+    sigma_s:{param:'majorant.s',default:0.01,min:0,max:2**17}, emission:1,
+};
+const choice=mediaStrategy('derived');
+const derived=compiler.compile(homogeneous,{...choice,estimator:{...choice.estimator,volumeSampling:'delta-tracking'}});
+const derivedSource=[...derived.shaders.values()].find(s=>s.fragment.includes('transport_trace'))!.fragment;
+const derivedMain=derivedSource.lastIndexOf('void main()');
+const derivedFragment=derivedSource.slice(0,derivedMain)+`
+void main() {
+    float k=mod(floor(gl_FragCoord.x),471.0);
+    Wavelengths wl=Wavelengths(vec4(360.0+k,830.0-k,360.0,830.0));
+    MediumProperties m=scene_medium_properties(1,vec3(0.0),wl);
+    fragColor=vec4(u_majorant_1)-(m.sigma_a+m.sigma_s);
+}`;
+for (const [a,s] of [[0,0],[2**-120,0],[[0.3,0.7,1.2],[1.5,0.2,0.8]],
+    [[2**17,0,0],[0,2**17,0]],[2**17,2**17]]) {
+    const values={'majorant.a':a,'majorant.s':s};
+    const uniforms=Object.fromEntries(derived.uniforms.filter(u=>u.uniform.startsWith('u_majorant_'))
+        .map(u=>[u.uniform,{type:u.type,value:u.compute(values)}]));
+    probes.push({name:`derived a=${a}, s=${s}`,source:derivedFragment,textures:[],uniforms});
+}
+const stale=probes.at(-1)!;
+const staleMutation={...stale,name:'stale derived spectral majorant',uniforms:{...stale.uniforms,
+    u_majorant_1:{type:'float',value:derived.uniforms.find(u=>u.uniform==='u_majorant_1')!.compute({})}}};
 const browser=await chromium.launch({args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try {
-    const frames=await renderProbes(await browser.newPage(),[...probes,mutation],width,assets);
+    const frames=await renderProbes(await browser.newPage(),[...probes,mutation,staleMutation],width,assets);
     for (let i=0;i<probes.length;i++) assert(frames[i].every(v=>Number.isFinite(v) && v>=0),probes[i].name);
     assert(frames[probes.length].some(v=>v<0),'an RGB-only majorant must fail');
-    console.log(`PASS: ${probes.length*width*4} lane margins nonnegative before null clamping; RGB-majorant mutation rejected; asset range premises checked`);
+    assert(frames[probes.length+1].some(v=>v<0),'a stale derived majorant must fail');
+    console.log(`PASS: ${probes.length*width*4} lane margins nonnegative before null clamping; RGB-majorant and stale-live-rate mutations rejected; asset range premises checked`);
 } finally { await browser.close(); }

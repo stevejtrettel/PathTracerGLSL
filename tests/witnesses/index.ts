@@ -13,6 +13,7 @@
 // live here so a twin check's scene-id reference can never dangle when demos churn.
 // See ./README.md for the gate policy (χ² vs rmse) and how to add a witness.
 
+import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralMaterialsSuite } from './scenes/spectralMaterials.js';
@@ -142,6 +143,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralPackedSuite,
     ...spectralLiveSuite,
     ...spectralExpressionsSuite,
+    ...spectralEmissionSuite,
     ...spectralMaterialsSuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,

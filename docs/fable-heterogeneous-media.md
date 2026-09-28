@@ -76,8 +76,8 @@ The field clamp below still happens in RGB before lifting absorption and scatter
 separately. The colour model supplies an outward-rounded spectral bound; both path and
 shadow trackers use it. The [spectral component's numerical certificate](../src/components/color/spectral/README.md#tracking-bound)
 states the finite input domain and rounding allowance. The real-arithmetic D1 equations
-alone do not certify a float32 bound. Spectral nonemissive tracking supports PT/NEE;
-emission and GRIN remain gated.
+alone do not certify a float32 bound. Spectral tracking supports PT/NEE;
+GRIN remains gated; volume emission uses the same RGB field scale before its emission-role lift.
 
 ## 1. Pinned decisions (owner, July 17 2026)
 

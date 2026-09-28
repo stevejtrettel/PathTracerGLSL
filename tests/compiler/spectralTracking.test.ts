@@ -45,10 +45,8 @@ describe('spectral tracking bounds', () => {
     for (const a of [0,2**-61,2**19,Infinity,NaN]) it(`rejects uncertified ceiling ${a}`, () => {
         expect(() => compiler.compile(scene(a),strategy)).toThrow(/ceiling|majorant/);
     });
-    it('keeps unsupported tracking combinations and volume emission gated', () => {
+    it('keeps unsupported tracking combinations gated', () => {
         expect(() => compiler.compile(scene(),{...strategy,estimator:{...strategy.estimator,directLighting:'mis'}})).toThrow();
         expect(() => compiler.compile(scene(),{...strategy,estimator:{...strategy.estimator,mediumLightSampling:'equiangular'}})).toThrow();
-        const s=scene(); s.materials.ink.medium!.emission=1;
-        expect(() => compiler.compile(s,strategy)).toThrow(/volume emission/);
     });
 });

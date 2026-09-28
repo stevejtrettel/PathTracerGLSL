@@ -1,4 +1,4 @@
-import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumIsDeflecting, type SceneDescription } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { spectralCeilingRange } from '../../components/color/spectral/majorant.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
@@ -36,16 +36,19 @@ export function spectralLimitations(scene: SceneDescription): string[] {
     for (const [name, mat] of Object.entries(scene.materials)) {
         const med = mat.medium;
         if (med !== undefined) {
-            if (mediumIsDeflecting(med) || isEmissiveMedium(med))
-                reasons.push(`spectral medium '${name}' does not support GRIN or volume emission yet`);
+            if (mediumIsDeflecting(med))
+                reasons.push(`spectral medium '${name}' does not support GRIN yet`);
             const heterogeneous = isHeterogeneousMedium(med);
             if (heterogeneous && !(typeof med.majorant === 'number' && Number.isFinite(med.majorant)
                 && med.majorant >= spectralCeilingRange[0] && med.majorant <= spectralCeilingRange[1]))
                 reasons.push(`spectral medium '${name}' requires a density ceiling in [2^-60, 2^18]`);
-            for (const field of ['sigma_a', 'sigma_s'] as const) {
+            const derivedTracking = !heterogeneous && isEmissiveMedium(med) && mediumMayScatter(med);
+            const coefficientCeiling = heterogeneous ? 2 ** 60 : derivedTracking ? spectralCeilingRange[1] / 2 : Infinity;
+            for (const field of ['sigma_a', 'sigma_s', 'emission'] as const) {
                 if (isGlslExpression(med[field])) continue;
-                if (!rgbInput(med[field] ?? 0, heterogeneous ? 2 ** 60 : Infinity))
-                    reasons.push(`spectral medium '${name}' property '${field}' requires nonnegative RGB constants or parameters, bounded by 2^60 for tracking, including defaults and bounds`);
+                const ceiling = field === 'emission' ? Infinity : coefficientCeiling;
+                if (!rgbInput(med[field] ?? 0, ceiling))
+                    reasons.push(`spectral medium '${name}' property '${field}' requires nonnegative RGB constants or parameters${Number.isFinite(ceiling) ? ` bounded by ${ceiling}` : ''}, including defaults and bounds`);
             }
         }
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {

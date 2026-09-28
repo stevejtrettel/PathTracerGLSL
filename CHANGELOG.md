@@ -4,6 +4,55 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral volume emission
+
+Enabled RGB constant, live and expression volume emission through the existing absorbing
+and scattering routes. Emission uses the D65 emission lift; extinction uses coefficient
+lifts. Expression fields scale all three RGB densities together before lifting. The
+existing delta/ratio loops collect the source before the collision lottery/weight update;
+those loops and the transport contract are unchanged. Emission remains path-found.
+
+Homogeneous emissive scattering now applies the colour model's bound to the live RGB
+extinction ceiling. Both coefficient dependencies update the existing derived uniform.
+The spectral component README proves that the existing outward-rounded envelope also
+covers this unclamped route. Each authored coefficient component is limited to 2^17 for
+this route, keeping the derived ceiling within the certified range; live writes carry
+the same contract. RGB derived rates remain unchanged. The positive sampling-rate floor
+does not change the physical extinction, including luminous vacuum.
+
+Corrected the inherited analytic emission integral in both colour modes: attenuation uses
+actual absorption, and a small static GLSL helper evaluates the source integral stably.
+Its vacuum limit is exactly the segment length. A fourth-degree polynomial at optical
+depth below 0.1 avoids cancellation; the omitted term is bounded by 1.4e-8. The helper
+is linked only for analytic emitting arms. No artificial absorption floor remains there.
+GRIN still uses the older per-step/boundary formula; that follow-up is recorded in
+CLAUDE.md and must precede spectral GRIN enablement.
+
+Static validation: all 3,659 tests in 99 files, typecheck and production build pass.
+The generated GPU binding suite passes 62 probes and rejects four deliberate defects,
+including the old artificial-absorption expression in luminous vacuum. The majorant suite
+passes 81,920 lane margins before null clamping and rejects both an RGB rate and a stale
+live spectral rate. Independent 0.25 nm wavelength quadrature supplies slab and finite-
+scattering-order targets; halving the step changes them by less than 3e-11.
+
+Compiled-output digests preserve 234 existing scenes exactly. Only `emit` and
+`grin-emit-ref` change for the analytic integral correction; shared data, read contracts
+and warnings are unchanged. Eight spectral emission fixtures are added, and seven async
+scenes remain outside the digest. GRIN and non-RGB forms remain gated in spectral mode;
+tracking still supports PT/NEE, not MIS.
+
+All 18 targeted render checks pass across the eight spectral fixtures and the existing
+RGB `emit`, `emit-swap`, `emit-driven` and `emit-sat-budget` scenes. Spectral slab errors
+stay below 0.0034 per channel; analytic and tracked luminous vacuum both return the
+1.5 target within 0.0024. Scattering orders 0–2 and the live-rate fixture agree with
+their independent targets within 0.0025. Glowing fog PT/NEE differs by 0.21% in mean
+and 5.64% display RMSE. Command: `npm run witness -- spectral-emit spectral-emit-tracking
+spectral-emit-clamp spectral-emit-vacuum spectral-emit-vacuum-tracking spectral-emit-budget
+spectral-emit-driven spectral-emit-scatter emit emit-swap emit-sat-budget emit-driven`.
+The additional `npm run witness -- grin-emit` regression also passes against its corrected
+analytic reference: mean difference 0.06%, display RMSE 2.13%. This checks the existing
+moderate-absorption fixture, not GRIN's unresolved near-vacuum formula.
+
 ## 2026-09-27 — spectral surface RGB expressions
 
 Enabled RGB-valued expressions on each surface model's radiometric rows: albedo,

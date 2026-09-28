@@ -4,9 +4,8 @@
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
-instancing with constant or per-instance RGB colours. Nonemissive homogeneous and
-heterogeneous media are supported. Emissive/GRIN media and non-RGB forms remain
-rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
+instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
+GRIN media and non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
 
 ## Measurement and sampling
@@ -39,8 +38,8 @@ trilinear interpolation. CPU and GPU use the same nodes and coefficient bytes.
 Reflectance uses the bounded lift directly. A nonnegative coefficient uses
 `scale = 2*max(rgb)` and `scale*rho(rgb/scale)`, with exact zero handled separately.
 Emission additionally multiplies by the normalized D65 curve. Coefficient evaluation
-is used by homogeneous and heterogeneous media. Nonemissive tracking uses the numerical
-majorant certificate below. Reflectance gain above one remains an unresolved policy;
+is used by homogeneous and heterogeneous media. Tracking uses the numerical majorant
+certificate below. Reflectance gain above one remains an unresolved policy;
 there is no silent clamp or implemented gain extension.
 
 The shipped model is `jh-cie1931-d65-v1`. Its metadata, matrices and SHA-256 hashes
@@ -245,8 +244,8 @@ Rayleigh phases, medium/shadow NEE and MIS, and delta-light equiangular placemen
 existing transport seams. `scattering: 'ignored'` removes scattering from both main and
 shadow extinction. Zero selected extinction means survival to the segment boundary.
 
-No all-wavelength majorant is needed for this analytic stage. Expression coefficients
-use the separate tracking bound below; volume emission and GRIN remain gated. Existing
+Nonemissive analytic sampling needs no all-wavelength majorant. Expression coefficients
+and emissive scattering media use the tracking bound below; GRIN remains gated. Existing
 small-PDF normalization floors are unchanged, so these checks do not certify extreme
 optical depths.
 
@@ -257,14 +256,67 @@ The `spectral-slab`, `spectral-shadow-slab`, `spectral-scatter-furnace`,
 `spectral-rayleigh-furnace`, `spectral-fog` and `spectral-fog-placement` scenes provide the
 rendered checks and gallery examples.
 
+## Volume emission
+
+A medium's `emission` is radiance added per unit path length. Its RGB value is lifted
+with the emission role, including D65; absorption and scattering use the coefficient
+role without an illuminant. Constants, live RGB controls and RGB expressions are
+supported. The existing expression nonnegativity floor applies before conversion.
+Emission must stay finite through evaluation and lifting; a nonzero RGB vector needs
+a normal normalization denominator, as with the coefficient lift below.
+
+Homogeneous absorbing media integrate the source analytically:
+`epsilon * integral_0^len exp(-sigma_a*s) ds`. Attenuation uses the actual absorption,
+including exact zero. The integral returns `len` in vacuum. For optical depth below
+0.1, it evaluates the fourth-degree Taylor polynomial of `(1-exp(-tau))/tau`; the
+omitted term is bounded by `0.1^5/720 < 1.4e-8`. Larger depths use the exponential
+formula. This avoids cancellation without inventing extinction, and applies to RGB too.
+The GRIN walker still uses its older per-step formula; its correction belongs to the
+GRIN stage, which remains gated here.
+
+Expression media and homogeneous emissive scattering media use the existing tracking
+arms. They collect `weight * epsilon / M` at every tentative collision, **before**
+the absorption/scattering/null lottery or ratio-weight update. Emission is path-found;
+there is no volume light sampler. Shadow queries return transmittance only. Ignoring
+scattering retains volume emission, integrating it against absorption alone. PT and NEE
+support tracking; MIS remains available only for the analytic absorbing-emission route.
+
+For expression media, the common authored RGB field scale multiplies emission as well
+as absorption and scattering before any lift. This preserves the source-function
+convention. The sampling rate bounds extinction, not emission brightness; luminous
+vacuum with spatial emission still needs an authored positive rate/ceiling.
+
+For homogeneous emissive scattering media, let `A0 = max(1e-6, maxRGB(a+s))` on the CPU,
+using current authored constants or live values. The colour model applies the same
+outward-rounded envelope below to `A = float32(A0)`. This does **not** clamp the field.
+Both input dependencies drive the existing derived uniform. The small positive floor
+keeps a sampling process when live extinction reaches zero; at very small extinction,
+path-found glow can have high variance under that inherited rate choice.
+
+The derived-rate domain limits each authored absorption/scattering component to
+`2^17`, so A0 stays at most `2^18`; compilation checks constants, defaults and declared
+bounds. Live writes carry the same contract. Each GPU input maximum is at most
+`A*(1+delta)/(1-delta)`, accounting for its upload/literal conversion and A's float32
+rounding. The finite bounded lift and final sum therefore give
+`sigma_t <= 4*A*(1+delta)^3/(1-delta)`. Even after downward serialization of M, the
+existing `(1+delta)^5/(1-delta)^2` envelope exceeds that bound. Nonzero coefficient
+maxima retain the normal-denominator condition below. Emission does not enter this
+extinction bound and need not have its magnitude limited to the density ceiling.
+
+`scripts/audit-spectral-emission.ts` independently integrates slab and finite-scattering-
+order targets in wavelength space. The `spectral-emit*` witnesses cover analytic and
+varying-density glow, common field scaling, luminous vacuum, scattering orders 0–2,
+live derived rates and glowing fog under PT/NEE. Binding probes check vacuum and the
+Taylor branch boundary; the majorant probe also executes the actual derived uniform
+bindings. Deliberate artificial-absorption and stale-rate mutations must fail.
+
 ## Tracking bound
 
 Nonemissive RGB-expression media use the existing delta/ratio trackers under PT or NEE.
 The authored `majorant` is a **field ceiling**, A. The colour descriptor returns its
 nominal float32 value and a separate, outward-rounded **sampling majorant**, M. Both path and
 shadow dispatch consume the same planned sampling rate. Raising M does not change the
-field clamp. MIS with tracking, equiangular heterogeneous lighting, volume emission and
-GRIN remain gated.
+field clamp. MIS with tracking, equiangular heterogeneous lighting and GRIN remain gated.
 
 Numerical author contract for this stage:
 
