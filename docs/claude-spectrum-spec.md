@@ -206,10 +206,10 @@ How the readers change:
 | Validator light branch, material emission checks, analyze/spectral.ts | unchanged in step 1; one table of role domains in step 2 | 2 |
 | `projectRGB`, `resolveLightValues` (radiometric rows only), env selection, sceneData projection | `kind.toRGB` | 1 |
 | `emitIndex` (behind `ior_of`), `evaluateIndex`, `planDispersion`, `indexIsDispersive` | `kind.emit`, `kind.toRGB`, `kind.dispersive` | 1 |
-| `radiometricValueDeps`, `isDrivenRadiometric` | `kind.dials` | 1 |
+| `radiometricValueDeps`, `isDrivenRadiometric` | `kind.liveParams` | 1 |
 | `hasConstantNonzeroEmission`, `emissionMayBeNonzero` | kind methods with today's semantics; one rule in step 2 | 1, 2 |
 | `emitSpectrum`, `emitBlackbody`, the constant sky | `kind.emit` (sky via `ctx.factor`) | 1 |
-| `mintValueUniform`'s blackbody branch | `kind.uniforms` | 1 |
+| `mintValueUniform`'s blackbody branch | `kind.mint` | 1 |
 | `packLightTable` header and the generated row reader | `kind.packed` | 1 |
 | Planner `blackbody` flag, core.ts includes | the kinds a program evaluates spectrally | 3 |
 | attribute binding, media, `ior_at`, derived fields, majorant | unchanged | 4+ |
@@ -251,8 +251,9 @@ named allow-list below.
 5. `compiler/generate/features/` `environment.ts`, `lighting.ts`, `core.ts` and (through
    `emitIndex`) `intersection.ts` emit **exactly the same text**. The kelvin slider keeps its
    default range `[1000, 12000]`.
-6. `compiler/sceneData.ts`, `components/lights/table.ts` (header via `kind.packed`; the blackbody
-   tag stays `1`), `compiler/plan/values.ts`, `plan/Planner.ts`: recognition through `kindOf`.
+6. `components/lights/table.ts` (header via `kind.packed`; the blackbody tag stays `1`),
+   `compiler/plan/values.ts`, `plan/Planner.ts`: recognition through `kindOf`.
+   (`compiler/sceneData.ts` needed no change: it reaches the kinds through `projectRGB`.)
 7. `compiler/analyze/propertyValidation.ts`: the three named-kind blocks become `kind.validate`,
    same messages. **The checks on plain RGB values stay where they are** (Validator light
    branch, material checks, analyze/spectral.ts with its current exemption), so every diagnostic
@@ -300,10 +301,11 @@ Cauchy formula as medium emission passes RGB validation and throws an internal e
 with blackbody and `param` keys compiles. RGB never sign-checks reflectance, medium emission or
 per-instance colors, and never checks a slider's `max`.
 
-**Rule after this step:** every spectrum slot is checked by one function
-(`validatePropertyValue`) against its role's domain, in both color models, for constants, slider
-defaults and both slider bounds: reflectance, coefficient and emission are nonnegative, index is
-positive. The spectral model then narrows only where its lift or its tracking bound cannot
+**Rule after this step:** every spectrum slot is checked against its role's domain by one
+shared checker (`validatePropertyValue`, with `roleDomain` also used for per-instance values), in
+both color models, for constants, slider defaults and both slider bounds: reflectance, coefficient
+and emission are nonnegative, index is positive. A few slot rules the role cannot express stay
+beside it: media take no named kind, and lights and the constant sky take no expression. The spectral model then narrows only where its lift or its tracking bound cannot
 represent a value: reflectance at most 1, and the media ceilings. A value is either plain or one
 named kind; one that carries two kinds' keys is an error.
 

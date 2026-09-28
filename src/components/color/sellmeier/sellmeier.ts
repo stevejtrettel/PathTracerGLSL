@@ -43,8 +43,9 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
         }
     },
     toRGB: v => sellmeierIndex(v, indexReferenceNM),
+    // An index is never emission.
     constantNonzero: () => false,
-    mayBeNonzero: () => true,
+    mayBeNonzero: () => false,
     dispersive: v => v.sellmeier.B.some((b, i) => b !== 0 && v.sellmeier.C[i] !== 0),
     emit(v, ctx) {
         if (!ctx.spectral || !sellmeierKind.dispersive(v)) return formatFloat(sellmeierIndex(v, indexReferenceNM));

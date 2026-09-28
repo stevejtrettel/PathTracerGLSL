@@ -1,6 +1,35 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > albedo 1.5 1`] = `
+exports[`spectrum diagnostics > albedo -0.1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > albedo 1.5 1`] = `
 {
   "rgb": {
     "compile": {
@@ -28,7 +57,65 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > albed
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody and param keys together 1`] = `
+exports[`spectrum diagnostics > albedo slider max -1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo parameter max components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter max components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo parameter max components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter max components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > albedo slider max not a number 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo parameter max must be a finite number",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter max must be a finite number",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo parameter max must be a finite number",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter max must be a finite number",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > blackbody and param keys together 1`] = `
 {
   "rgb": {
     "compile": {
@@ -57,7 +144,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as albedo 1`] = `
+exports[`spectrum diagnostics > blackbody as albedo 1`] = `
 {
   "rgb": {
     "compile": {
@@ -86,7 +173,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as medium emission 1`] = `
+exports[`spectrum diagnostics > blackbody as medium emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -115,7 +202,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as medium sigma_a 1`] = `
+exports[`spectrum diagnostics > blackbody as medium sigma_a 1`] = `
 {
   "rgb": {
     "compile": {
@@ -144,7 +231,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as surface ior 1`] = `
+exports[`spectrum diagnostics > blackbody as surface ior 1`] = `
 {
   "rgb": {
     "compile": {
@@ -173,7 +260,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin below range 1`] = `
+exports[`spectrum diagnostics > blackbody kelvin below range 1`] = `
 {
   "rgb": {
     "compile": {
@@ -202,7 +289,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin slider default above range 1`] = `
+exports[`spectrum diagnostics > blackbody kelvin slider default above range 1`] = `
 {
   "rgb": {
     "compile": {
@@ -231,7 +318,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin slider min above max 1`] = `
+exports[`spectrum diagnostics > blackbody kelvin slider min above max 1`] = `
 {
   "rgb": {
     "compile": {
@@ -260,7 +347,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody negative scale 1`] = `
+exports[`spectrum diagnostics > blackbody negative scale 1`] = `
 {
   "rgb": {
     "compile": {
@@ -289,32 +376,28 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody negative scale on a non-emitting model 1`] = `
+exports[`spectrum diagnostics > blackbody negative scale on a non-emitting model 1`] = `
 {
   "rgb": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (2 errors):
-  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds
-  - Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
     },
     "validator": {
       "errors": [
         "Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
-        "Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
       ],
       "warnings": [],
     },
   },
   "spectral": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (2 errors):
-  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds
-  - Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
     },
     "validator": {
       "errors": [
         "Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
-        "Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
       ],
       "warnings": [],
     },
@@ -322,7 +405,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > black
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as albedo 1`] = `
+exports[`spectrum diagnostics > cauchy as albedo 1`] = `
 {
   "rgb": {
     "compile": {
@@ -351,7 +434,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as light emission 1`] = `
+exports[`spectrum diagnostics > cauchy as light emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -380,7 +463,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as material emission 1`] = `
+exports[`spectrum diagnostics > cauchy as material emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -409,7 +492,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as medium emission 1`] = `
+exports[`spectrum diagnostics > cauchy as medium emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -438,7 +521,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as medium ior 1`] = `
+exports[`spectrum diagnostics > cauchy as medium ior 1`] = `
 {
   "rgb": {
     "compile": {
@@ -467,7 +550,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as sky color 1`] = `
+exports[`spectrum diagnostics > cauchy as sky color 1`] = `
 {
   "rgb": {
     "compile": {
@@ -496,7 +579,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy negative B 1`] = `
+exports[`spectrum diagnostics > cauchy negative B 1`] = `
 {
   "rgb": {
     "compile": {
@@ -525,7 +608,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy nonpositive A 1`] = `
+exports[`spectrum diagnostics > cauchy nonpositive A 1`] = `
 {
   "rgb": {
     "compile": {
@@ -554,7 +637,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy too few coefficients 1`] = `
+exports[`spectrum diagnostics > cauchy too few coefficients 1`] = `
 {
   "rgb": {
     "compile": {
@@ -583,7 +666,71 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauch
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > expression as sky color 1`] = `
+exports[`spectrum diagnostics > emission slider min -1 on a non-emitting model 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error, 2 warnings):
+  - Material 'glass': emission parameter min components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': emission parameter min components must be >= 0",
+      ],
+      "warnings": [
+        "Material 'glass': 'emission' is {param}-driven but model 'dielectric' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)",
+        "Material 'glass': emission is set but model 'dielectric' cannot emit (its emission is identically zero) — the value is ignored",
+      ],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error, 2 warnings):
+  - Material 'glass': emission parameter min components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': emission parameter min components must be >= 0",
+      ],
+      "warnings": [
+        "Material 'glass': 'emission' is {param}-driven but model 'dielectric' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)",
+        "Material 'glass': emission is set but model 'dielectric' cannot emit (its emission is identically zero) — the value is ignored",
+      ],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression and blackbody keys together 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression as sky color 1`] = `
 {
   "rgb": {
     "compile": {
@@ -612,7 +759,94 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > expre
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > material emission slider default -1 1`] = `
+exports[`spectrum diagnostics > glass tint -0.2 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': transmittance components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': transmittance components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': transmittance components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': transmittance components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > light emission slider min -1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission parameter min components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission parameter min components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission parameter min components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission parameter min components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > light emission slider min above max 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission parameter min must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission parameter min must be <= max",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission parameter min must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission parameter min must be <= max",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > material emission slider default -1 1`] = `
 {
   "rgb": {
     "compile": {
@@ -641,7 +875,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > mater
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > medium emission -1 1`] = `
+exports[`spectrum diagnostics > medium emission -1 1`] = `
 {
   "rgb": {
     "compile": {
@@ -670,7 +904,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > mediu
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier as albedo 1`] = `
+exports[`spectrum diagnostics > sellmeier as albedo 1`] = `
 {
   "rgb": {
     "compile": {
@@ -699,7 +933,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellm
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier as medium ior 1`] = `
+exports[`spectrum diagnostics > sellmeier as medium ior 1`] = `
 {
   "rgb": {
     "compile": {
@@ -728,7 +962,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellm
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier negative B 1`] = `
+exports[`spectrum diagnostics > sellmeier negative B 1`] = `
 {
   "rgb": {
     "compile": {
@@ -757,7 +991,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellm
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier pole inside the visible range 1`] = `
+exports[`spectrum diagnostics > sellmeier pole inside the visible range 1`] = `
 {
   "rgb": {
     "compile": {
@@ -786,7 +1020,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellm
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier wrong length 1`] = `
+exports[`spectrum diagnostics > sellmeier wrong length 1`] = `
 {
   "rgb": {
     "compile": {
@@ -815,7 +1049,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellm
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as albedo 1`] = `
+exports[`spectrum diagnostics > unknown object as albedo 1`] = `
 {
   "rgb": {
     "compile": {
@@ -844,7 +1078,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unkno
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as light emission 1`] = `
+exports[`spectrum diagnostics > unknown object as light emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -873,7 +1107,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unkno
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as surface ior 1`] = `
+exports[`spectrum diagnostics > unknown object as surface ior 1`] = `
 {
   "rgb": {
     "compile": {
@@ -902,7 +1136,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unkno
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > zero-area quad light, RGB emission 1`] = `
+exports[`spectrum diagnostics > zero-area quad light, RGB emission 1`] = `
 {
   "rgb": {
     "compile": {
@@ -931,7 +1165,7 @@ exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > zero-
 }
 `;
 
-exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > zero-area quad light, blackbody emission 1`] = `
+exports[`spectrum diagnostics > zero-area quad light, blackbody emission 1`] = `
 {
   "rgb": {
     "compile": {

@@ -1,5 +1,5 @@
-// The registry of spectrum kinds (contract: spectrumKind.ts). The named kinds are tried in
-// order; a value none of them claims is the `rgb` kind: a number (gray, or one index at every
+// The registry of spectrum kinds (contract: spectrumKind.ts). Kinds are tried in order; the
+// last, `rgb`, claims whatever the named kinds do not: a number (gray, or one index at every
 // wavelength), an RGB triple, a {param}, a GLSL expression or a per-instance attribute.
 
 import type { Vec3 } from '../../compiler/types.js';
@@ -23,8 +23,8 @@ export const rgbKind: SpectrumKind = {
         const raw = isValueParam(v) ? params[v.param] ?? v.default : v;
         return typeof raw === 'number' ? [raw, raw, raw] : raw as Vec3;
     },
-    constantNonzero: v => typeof v === 'number' ? v !== 0
-        : Array.isArray(v) ? v.some(c => typeof c === 'number' && c !== 0) : false,
+    constantNonzero: v => typeof v === 'number' ? v > 0
+        : Array.isArray(v) ? v.some(c => typeof c === 'number' && c > 0) : false,
     mayBeNonzero: v => v === undefined ? false
         : typeof v === 'number' ? v > 0
         : Array.isArray(v) ? v.some(c => c > 0) : true,
@@ -38,7 +38,8 @@ export const rgbKind: SpectrumKind = {
 
 const NAMED_KINDS: readonly SpectrumKind[] = [blackbodyKind, cauchyKind, sellmeierKind];
 
-export const SPECTRUM_KINDS: readonly SpectrumKind[] = [rgbKind, ...NAMED_KINDS];
+/** Every kind, in lookup order: the first whose `is` accepts a value is its kind. */
+export const SPECTRUM_KINDS: readonly SpectrumKind[] = [...NAMED_KINDS, rgbKind];
 
 /** Every named kind whose keys the value carries; more than one is a malformed value. */
 export function namedKindsClaiming(value: unknown): SpectrumKind[] {
@@ -51,5 +52,5 @@ export function namedKindOf(value: unknown): SpectrumKind | undefined {
 }
 
 export function kindOf(value: unknown): SpectrumKind {
-    return namedKindOf(value) ?? rgbKind;
+    return SPECTRUM_KINDS.find(k => k.is(value))!;
 }

@@ -12,7 +12,8 @@ import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
-import { emitValue, emitIndex, type ParamValue } from '../values.js';
+import { emitValue, type ParamValue } from '../values.js';
+import { emitIndex } from '../color.js';
 import { modelTransmission, modelIndexRow } from '../../../components/materials/index.js';
 import {
     PRIMITIVES,

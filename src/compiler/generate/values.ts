@@ -28,11 +28,10 @@
 // keeps its own idiom because it is not a name swap: the light selection CDF (a float[] fed by
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
-import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata, type IndexProperty } from '../types.js';
+import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
-import { kindOf, namedKindOf } from '../../components/color/spectrumKinds.js';
-import { spectrumContext } from './color.js';
+import { namedKindOf } from '../../components/color/spectrumKinds.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (surface properties and medium coefficients). */
@@ -156,10 +155,4 @@ export function mintValueUniform(
 
 function capitalize(s: string): string {
     return s.length ? s[0].toUpperCase() + s.slice(1) : s;
-}
-
-/** Index reads keep the surface formula separate from radiometric RGB lifting: the value's
- *  kind emits the index at the hero wavelength, or its d-line value in RGB programs. */
-export function emitIndex(value: IndexProperty, color: 'rgb' | 'spectral'): string {
-    return kindOf(value).emit(value, spectrumContext('index', 'wl', color));
 }

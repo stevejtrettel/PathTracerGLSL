@@ -720,9 +720,8 @@ function fieldExpr(f: number, vec3: boolean): string {
  *  (the ONE layout truth on both sides). */
 function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, blackbody: boolean): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
-    // Kinds that pack their own numbers into the row header. The plan's `blackbody` flag says
-    // whether any are read; blackbody is the only such kind until the plan lists the kinds a
-    // program uses (docs/claude-spectrum-spec.md, step 3).
+    // Kinds that pack their own numbers into the row header. Blackbody is the only one, and
+    // the plan's `blackbody` flag says whether this program reads it.
     const packedKinds = blackbody ? SPECTRUM_KINDS.filter((k) => k.packed !== undefined) : [];
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];

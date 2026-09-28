@@ -26,7 +26,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, validatePropertyValue, constraintViolation } from './propertyValidation.js';
+import { validateSceneProperties, validatePropertyValue, constraintViolation, roleDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -1195,6 +1195,9 @@ export function validate(
                     continue;
                 }
                 const spectrum = row.glslType === 'Spectrum';
+                // Per-instance values lie in the row's role domain, like any other value there.
+                const role = row.semantic === 'radiometric' ? row.role : undefined;
+                const domain = roleDomain(role);
                 if (arr instanceof Float32Array) {
                     // Packed arm (fable-instance-clouds §4): N floats or 3N interleaved.
                     const expected = (spectrum ? 3 : 1) * count;
@@ -1207,9 +1210,12 @@ export function validate(
                         if (!ok) {
                             bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a non-finite value`)
                                 .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                        } else if (row.semantic === 'radiometric' && arr.some((v) => v < 0)) {
-                            bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a negative value — ${row.role} is nonnegative`)
-                                .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                        } else if (domain !== undefined) {
+                            const j = arr.findIndex((v) => constraintViolation(v, domain) !== null);
+                            if (j !== -1) {
+                                bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) [${j}] ${constraintViolation(arr[j], domain)} (${role})`)
+                                    .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                            }
                         }
                     }
                     continue;
@@ -1224,10 +1230,10 @@ export function validate(
                 if (bad !== -1) {
                     bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${bad}] must be a finite ${spectrum ? 'number or vec3' : 'number'}`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                } else if (row.semantic === 'radiometric') {
-                    const negative = (arr as Array<number | number[]>).findIndex((v) => typeof v === 'number' ? v < 0 : v.some((c) => c < 0));
-                    if (negative !== -1) {
-                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${negative}] must be >= 0 — ${row.role} is nonnegative`)
+                } else if (domain !== undefined) {
+                    const j = (arr as Array<number | number[]>).findIndex((v) => constraintViolation(v, domain) !== null);
+                    if (j !== -1) {
+                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${j}] ${constraintViolation((arr as Array<number | number[]>)[j], domain)} (${role})`)
                             .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     }
                 }

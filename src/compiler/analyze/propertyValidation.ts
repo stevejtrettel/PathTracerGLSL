@@ -82,18 +82,25 @@ export function validatePropertyValue(
     label: string,
     bag: DiagnosticBag,
 ): void {
-    if (value === undefined || isGlslExpression(value)) return;
-    const claiming = [...namedKindsClaiming(value).map((k) => k.label), ...(isValueParam(value as never) ? ['{param}'] : [])];
+    if (value === undefined) return;
+    // A value is one thing: a named kind, a {param} or an expression, never keys of two.
+    const claiming = [
+        ...namedKindsClaiming(value).map((k) => k.label),
+        ...(isValueParam(value as never) ? ['{param}'] : []),
+        ...(isGlslExpression(value) ? ['expression'] : []),
+    ];
     if (claiming.length > 1) {
         bag.error('invalid-setting', `${label} carries the keys of more than one kind of value (${claiming.join(', ')})`).add();
         return;
     }
+    if (isGlslExpression(value)) return;
     // A named spectrum kind (blackbody, Cauchy, Sellmeier) belongs in slots of its roles and
     // checks its own numbers.
     const kind = namedKindOf(value);
     if (kind) {
         if (contract.role === undefined || !kind.roles.includes(contract.role)) {
-            bag.error('invalid-setting', `${label}: ${kind.label} is an ${kind.roles[0]} form`).add();
+            const role = kind.roles[0];
+            bag.error('invalid-setting', `${label}: ${kind.label} is ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role} form`).add();
             return;
         }
         kind.validate?.(value, label, (message) => bag.error('invalid-setting', message).add());
@@ -103,14 +110,14 @@ export function validatePropertyValue(
     // The role's domain applies when the row declares none of its own.
     const domain = contract.constraint ?? roleDomain(contract.role);
     let authored: unknown = value;
-    let parameterMin: number | undefined;
-    let parameterMax: number | undefined;
+    let parameterMin: unknown;
+    let parameterMax: unknown;
     if (isValueParam(value as never)) {
-        const param = value as { param?: unknown; default?: unknown; min?: number; max?: number };
+        const param = value as { param?: unknown; default?: unknown; min?: unknown; max?: unknown };
         if (typeof param.param !== 'string' || param.param.trim() === '') {
             bag.error('invalid-setting', `${label} parameter path must be a non-empty string`).add();
         }
-        if (param.min !== undefined && param.max !== undefined && param.min > param.max) {
+        if (isFiniteNumber(param.min) && isFiniteNumber(param.max) && param.min > param.max) {
             bag.error('invalid-setting', `${label} parameter min must be <= max`).add();
         }
         authored = param.default;
@@ -147,19 +154,24 @@ export function validatePropertyValue(
 /** The domain every value in a slot of this role must lie in: the multipliers and emitted
  *  light are nonnegative, an index is positive. The spectral model narrows reflectance to
  *  [0,1] separately (analyze/spectral.ts), where its bounded lift requires it. */
-function roleDomain(role: PropertyValueContract['role']): RowConstraint | undefined {
+export function roleDomain(role: PropertyValueContract['role']): RowConstraint | undefined {
     if (role === undefined) return undefined;
     return role === 'index' ? { kind: 'positive' } : { kind: 'nonnegative' };
 }
 
 /** A slider bound (min or max) must lie in the slot's domain too: the slider can reach it. */
 function validateBound(
-    bound: number | undefined,
+    bound: unknown,
     constraint: RowConstraint | undefined,
     label: string,
     bag: DiagnosticBag,
 ): void {
-    if (bound === undefined || constraint === undefined || constraint.kind === 'min-length') return;
+    if (bound === undefined) return;
+    if (!isFiniteNumber(bound)) {
+        bag.error('invalid-setting', `${label} must be a finite number`).add();
+        return;
+    }
+    if (constraint === undefined || constraint.kind === 'min-length') return;
     const violation = constraintViolation(bound, constraint);
     if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
 }

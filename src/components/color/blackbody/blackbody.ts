@@ -109,7 +109,7 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
     },
     constantNonzero(v) {
         const { kelvin, scale } = v.blackbody;
-        return !isValueParam(kelvin) && (scale === undefined || (!isValueParam(scale) && scale !== 0));
+        return !isValueParam(kelvin) && (scale === undefined || (!isValueParam(scale) && scale > 0));
     },
     mayBeNonzero(v) {
         const scale = v.blackbody.scale;

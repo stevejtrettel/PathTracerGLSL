@@ -939,10 +939,10 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         values[row.source] = resolveScalarProperty(
             (med as unknown as Record<string, MaterialProperty | undefined>)[row.source], row.default);
     }
-    // Media coefficients and emission accept plain values only; the Validator rejects a named
-    // spectrum kind (blackbody) here, so the narrowing below is honest.
+    // Media take plain values only; the Validator rejects a named spectrum kind here, so the
+    // narrowing below is honest.
     const noBB = (v: ReturnType<typeof resolveColorProperty>): Vec3 | GlslExpression | ValueParam<Vec3> => {
-        if (namedKindOf(v)) throw new Error('blackbody spelling on a medium coefficient (Validator should have rejected it)');
+        if (namedKindOf(v)) throw new Error(`a ${namedKindOf(v)!.label} value reached a medium property (the Validator should have rejected it)`);
         return v as Vec3 | GlslExpression | ValueParam<Vec3>;
     };
     return {

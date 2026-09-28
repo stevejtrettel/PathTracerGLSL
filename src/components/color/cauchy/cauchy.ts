@@ -29,8 +29,9 @@ export const cauchyKind: SpectrumKind<CauchyIndex> = {
         }
     },
     toRGB: v => cauchyIndex(v, indexReferenceNM),
+    // An index is never emission.
     constantNonzero: () => false,
-    mayBeNonzero: () => true,
+    mayBeNonzero: () => false,
     dispersive: v => v.cauchy[1] !== 0 || (v.cauchy[2] ?? 0) !== 0,
     emit(v, ctx) {
         if (!ctx.spectral || !cauchyKind.dispersive(v)) return formatFloat(cauchyIndex(v, indexReferenceNM));

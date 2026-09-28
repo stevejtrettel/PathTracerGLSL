@@ -338,19 +338,12 @@ export function isHeterogeneousMedium(med: { sigma_a?: unknown; sigma_s?: unknow
     return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s) || isGlslExpression(med.emission);
 }
 
-/** A medium property that may be nonzero at runtime: a positive constant, a {param} (live —
- * can become nonzero) or an expression. The same answer as for any emission value; values
- * are nonnegative after validation. Authored and planned shapes alike. */
-function mediumPropertyMayBeNonzero(v: unknown): boolean {
-    return emissionMayBeNonzero(v);
-}
-
-/** The medium emits (impl-plan-medium-emission): ε may be nonzero. */
+/** The medium emits: ε may be nonzero at runtime (a positive constant, a {param} or an
+ *  expression), by the same rule as any spectrum value. Authored and planned shapes alike. */
 export function isEmissiveMedium(med: { emission?: unknown }): boolean {
-    return mediumPropertyMayBeNonzero(med.emission);
+    return emissionMayBeNonzero(med.emission);
 }
 
-/** The medium may scatter: σ_s may be nonzero (the Analyzer's census rule). */
 /** The medium scatters under this measurement: it may scatter (mediumMayScatter) and the
  *  measurement computes scattering ('full'; under 'ignored' it renders absorbing-only). The
  *  Planner records the answer per medium (ProgramDescription.media.scatteringMedia), which is
@@ -359,8 +352,9 @@ export function mediumScatters(med: { sigma_s?: unknown }, scattering: 'full' | 
     return scattering === 'full' && mediumMayScatter(med);
 }
 
+/** The medium may scatter: σ_s may be nonzero at runtime, by the same rule as ε. */
 export function mediumMayScatter(med: { sigma_s?: unknown }): boolean {
-    return mediumPropertyMayBeNonzero(med.sigma_s);
+    return emissionMayBeNonzero(med.sigma_s);
 }
 
 /** DEFLECTING (gradient-index / GRIN) medium: an authored refractive index makes the region

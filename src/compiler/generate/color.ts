@@ -1,4 +1,5 @@
 import { emitValue, type ParamValue } from './values.js';
+import type { IndexProperty } from '../types.js';
 import type { RadiometricRole } from '../../components/descriptors.js';
 import { kindOf } from '../../components/color/spectrumKinds.js';
 import type { EmitContext, SpectrumRole } from '../../components/color/spectrumKind.js';
@@ -21,4 +22,10 @@ export function spectrumContext(role: SpectrumRole, wl: string, color: 'rgb' | '
  *  strength (the constant sky's intensity). */
 export function emitSpectrum(value: ParamValue, role: RadiometricRole, wl: string, color: 'rgb' | 'spectral', factor?: string): string {
     return kindOf(value).emit(value, spectrumContext(role, wl, color, factor));
+}
+
+/** Index reads keep the surface formula separate from radiometric RGB lifting: the value's
+ *  kind emits the index at the hero wavelength, or its d-line value in RGB programs. */
+export function emitIndex(value: IndexProperty, color: 'rgb' | 'spectral'): string {
+    return kindOf(value).emit(value, spectrumContext('index', 'wl', color));
 }

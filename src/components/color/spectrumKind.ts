@@ -56,9 +56,10 @@ export interface SpectrumKind<V = unknown> {
     /** The RGB stand-in at the given slider values: a triple for a radiometric role, the
      *  index at indexReferenceNM for the index role. */
     toRGB(value: V, role: SpectrumRole, params: Record<string, unknown>): Vec3 | number;
-    /** A constant value that is not zero (the light census's question). */
+    /** A constant, positive value: the light census's question. Implies mayBeNonzero. */
     constantNonzero(value: V): boolean;
-    /** Whether its emission can be nonzero at run time. */
+    /** Whether the value can be positive at run time (a positive constant, or a live slider
+     *  or expression that can become one). */
     mayBeNonzero(value: V): boolean;
     /** Whether, as an index, it varies with wavelength (and so forces the hero collapse). */
     dispersive(value: V): boolean;

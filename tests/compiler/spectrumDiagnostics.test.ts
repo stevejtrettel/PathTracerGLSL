@@ -1,9 +1,6 @@
-// What the compiler says about spectrum values it should not accept, pinned before the spectrum
-// kinds move behind one interface (docs/claude-spectrum-spec.md, step 0). Each case records, in
-// both colour models, the validator's sorted errors and warnings and the outcome of a full
-// compile: its warnings, or the message it throws. The snapshot is today's behaviour, including
-// the inconsistencies the spec lists (§6); a later step that changes a diagnostic changes this
-// snapshot visibly.
+// What the compiler says about spectrum values it should not accept. Each case records, in both
+// colour models, the validator's sorted errors and warnings and the outcome of a full compile:
+// its warnings, or the message it throws. A change to any diagnostic shows up here.
 
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
@@ -82,11 +79,19 @@ const cases: Record<string, Mutation> = {
     'unknown object as light emission': set((s) => { s.lights[0].emission = { foo: 1 }; }),
     'unknown object as surface ior': set((s) => { s.materials.glass.ior = { foo: 1 }; }),
     'blackbody and param keys together': set((s) => { s.lights[0].emission = { ...blackbody(3000), param: 'lamp.x', default: [1, 1, 1] }; }),
-    // Domain checks that differ between colour models today.
+    // Role domains: the same in both colour models, except reflectance above 1 (spectral only).
     'material emission slider default -1': set((s) => { s.materials.m.emission = { param: 'm.glow', default: -1 }; }),
     'medium emission -1': set((s) => { s.materials.fog.medium.emission = -1; }),
     'albedo 1.5': set((s) => { s.materials.m.albedo = 1.5; }),
+    'albedo -0.1': set((s) => { s.materials.m.albedo = -0.1; }),
+    'glass tint -0.2': set((s) => { s.materials.glass.transmittance = -0.2; }),
+    'albedo slider max -1': set((s) => { s.materials.m.albedo = { param: 'm.a', default: 0.5, max: -1 }; }),
+    'albedo slider max not a number': set((s) => { s.materials.m.albedo = { param: 'm.a', default: 0.5, min: 0, max: 'x' }; }),
+    'light emission slider min -1': set((s) => { s.lights[0].emission = { param: 'lamp.e', default: 5, min: -1 }; }),
+    'light emission slider min above max': set((s) => { s.lights[0].emission = { param: 'lamp.e', default: 5, min: 9, max: 2 }; }),
+    'emission slider min -1 on a non-emitting model': set((s) => { s.materials.glass.emission = { param: 'g.e', default: 1, min: -1 }; }),
     'expression as sky color': set((s) => { s.environment.color = { kind: 'glsl', source: 'vec3(0.1)' }; }),
+    'expression and blackbody keys together': set((s) => { s.materials.m.emission = { kind: 'glsl', source: 'vec3(1.0)', ...blackbody(3000) }; }),
 };
 
 function outcome(mutate: Mutation, color: 'rgb' | 'spectral') {
@@ -112,7 +117,7 @@ function outcome(mutate: Mutation, color: 'rgb' | 'spectral') {
     return { validator, compile };
 }
 
-describe('spectrum diagnostics (pinned before the spectrum-kind refactor)', () => {
+describe('spectrum diagnostics', () => {
     it('the base scene compiles cleanly in both colour models', () => {
         for (const color of ['rgb', 'spectral'] as const) {
             expect(outcome(() => {}, color).validator).toEqual({ errors: [], warnings: [] });

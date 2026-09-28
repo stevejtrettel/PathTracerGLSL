@@ -22,10 +22,10 @@ function tsFiles(dir: string): string[] {
 // Predicates of particular kinds, and comparisons of a kind's id to a name.
 const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier)'/g;
 
-// Uses that stay until the step that removes them. Each keeps a diagnostic's wording or a
-// plan field unchanged while the kinds move (spec §8).
+// Uses that remain on purpose: ProgramDescription records blackbody as its own flag rather
+// than as one of a list of kinds (docs/claude-spectrum-spec.md §8).
 const ALLOWED: Record<string, number> = {
-    'compiler/plan/Planner.ts': 3,               // ProgramDescription.blackbody (step 3)
+    'compiler/plan/Planner.ts': 3,
 };
 
 describe('spectrum kinds', () => {

@@ -4,17 +4,50 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 2: fixes from the independent review
+
+A fresh reviewer re-ran the digest (identical before and after both steps), compiled unusual
+valid scenes and malformed values against all three versions, and found these problems in
+step 2, now fixed. It also found the step-2 entry below incomplete and overclaiming in three
+places; that entry has been corrected (the list of newly rejected inputs; "suite scenes" rather
+than "valid scenes"; the "can this emit" rules).
+
+- **A crash in validation:** a slider bound that is not a number (`max: 'x'`) made the
+  validator throw a raw TypeError, breaking "validation never throws". Bounds must now be finite
+  numbers, with a diagnostic.
+- **An expression carrying a kind's keys** (`{ kind: 'glsl', …, blackbody: … }`) still passed
+  validation, and readers disagreed on it. Expressions now count in the two-kinds check.
+- **"Constant and nonzero" now means positive**, like "may be nonzero", so the two answers
+  agree; a negative blackbody scale on glass reports only its real error. An index formula is
+  never emission for either question.
+- **Per-instance colors** use the role's domain function, not a copy of it.
+- Smaller: the kinds are listed in lookup order with the plain `rgb` kind last; the role-form
+  message picks "a" or "an"; the planner's media backstop names the kind it found; `emitIndex`
+  moved beside `emitSpectrum`, removing an import cycle; the medium predicates call the shared
+  rule directly; two comments that cited plan steps were rewritten.
+
+The diagnostics snapshot gains eight cases (negative constant albedo and glass tint, slider
+bounds below zero or not a number, a light slider with `min > max`, a negative slider on a
+non-emitting model, an expression with blackbody keys); one existing case changes (the
+negative-scale case above). Verification: digest 265 of 265 identical; typecheck; the full test
+run, 104 files and 3,980 tests. Not verifiable here: the seven async data scenes, built from
+untracked `.inst` files; the new per-instance sign check would reject a file whose colors have a
+negative channel.
+
 ## 2026-09-28 — one spectrum type, step 2: one set of checks per role
 
-Every spectrum slot is now checked by one function against its role's domain, the same in RGB
-and spectral renders: reflectance, coefficients and emission are nonnegative, an index is
+Every spectrum slot is now checked against its role's domain by one shared checker, the same in
+RGB and spectral renders: reflectance, coefficients and emission are nonnegative, an index is
 positive, for constants, slider defaults and both slider bounds. The spectral model adds only
 what its lift or tracking bound needs: reflectance at most 1, and the media ceilings
-([spec](docs/claude-spectrum-spec.md) §8, step 2). Valid scenes compile exactly as before.
+([spec](docs/claude-spectrum-spec.md) §8, step 2). Every suite scene compiles exactly as before.
 
 Now rejected with a message, in both colour models (each was accepted in RGB, or crashed):
-- negative emission from a material slider, a negative medium emission, and negative
-  per-instance colors (RGB never sign-checked these);
+- negative reflectance (albedo, checker colors, f0, glass tint), negative emission from a
+  material or light slider, a negative medium emission, and negative per-instance colors (RGB
+  never sign-checked these);
+- a slider bound outside its slot's domain (a `min` or `max` below zero on a color or emission
+  slider; `max` was never checked before), and a light emission slider with `min > max`;
 - an expression as a constant sky's color (RGB would have computed a NaN light-selection
   weight);
 - a value carrying two kinds' keys, such as `blackbody` with `param`;
@@ -27,9 +60,10 @@ Clearer: media take plain values only, with one message for any named kind ("med
 be a Cauchy value — media take a constant, a {param} or an expression", replacing a misleading
 "Cauchy is an index form"). Eleven spectral cases that reported the same problem twice now
 report it once. Blackbody errors on lights name the field ("Light 0 (point): emission: …").
-The four "can this emit" answers are now one (the Validator's private copy and the medium
-predicate use the shared rule). analyze/spectral.ts keeps only the spectral narrowing; the scan
-test's allow-list is down to the Planner's `blackbody` flag.
+The Validator's private "can this emit" copy and the medium predicate now use the shared rule
+(the light census's "constant and nonzero" still disagreed with it on negative values until the
+review fixes below). analyze/spectral.ts keeps only the spectral narrowing; the scan test's
+allow-list is down to the Planner's `blackbody` flag.
 
 Unchanged by choice: RGB reflectance above 1 stays allowed, as before. `formatSpectrum`
 (unused, with a wrong comment) is left for the owner to decide.
