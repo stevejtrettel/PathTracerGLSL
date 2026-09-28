@@ -1,7 +1,7 @@
 # impl-plan-blackbody-uv — the blackbody lamp + the first Hit.uv reader
 
 **Historical plan.** The blackbody implementation below is superseded by the
-[shared Planck emission contract](../src/components/color/blackbody/README.md).
+[shared Planck emission contract](../src/components/color/spectra/blackbody/README.md).
 Original forms now survive planning, temperature and scale have separate bindings,
 and both colour modes use normalized Planck rather than the Kim fit.
 

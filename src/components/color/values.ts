@@ -1,11 +1,11 @@
 // Questions the compiler asks about an authored spectrum value, answered by the value's kind
 // (spectrumKinds.ts). Classification is independent of the transport representation.
 import type { Vec3 } from '../../compiler/types.js';
-import { kindOf, namedKindOf } from './spectrumKinds.js';
+import { kindOf, namedKindOf } from './spectra/index.js';
 
 export { isValueParam } from '../param.js';
-export { isBlackbody } from './blackbody/blackbody.js';
-export { indexReferenceNM } from './spectrumKind.js';
+export { isBlackbody } from './spectra/blackbody/blackbody.js';
+export { indexReferenceNM } from './spectra/spectrumKind.js';
 
 /** Parameter paths read by an authored value. Constant blackbodies have no dependencies. */
 export function radiometricValueDeps(v: unknown): string[] {
@@ -37,6 +37,3 @@ export function packedEmissionHeader(v: unknown): [number, number, number] | nul
     const packed = namedKindOf(v)?.packed;
     return packed ? [packed.code, ...packed.header(v)] : null;
 }
-
-/** Index formulas the dispersion plan records by kind id. */
-export type IndexForm = 'cauchy' | 'sellmeier';

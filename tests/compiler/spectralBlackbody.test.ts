@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { packLightTable, lightTableLayout } from '../../src/components/lights/table.js';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { blackbodyColor, planckShape } from '../../src/components/color/blackbody/blackbody.js';
+import { blackbodyColor, planckShape } from '../../src/components/color/spectra/blackbody/blackbody.js';
 import { blackbodyFixture, blackbodySites } from '../helpers/blackbodyFixtures.js';
 import { planckReference } from '../helpers/planckReference.js';
 import { minimalStrategy } from '../witnesses/scenes/minimalScene.js';

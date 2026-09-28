@@ -1,6 +1,7 @@
-import type { CauchyIndex } from '../../../compiler/types.js';
+import type { CauchyIndex } from '../../../../compiler/types.js';
 import { indexReferenceNM, type SpectrumKind } from '../spectrumKind.js';
-import { formatFloat, formatVec3 } from '../../glsl-format.js';
+import { formatFloat, formatVec3 } from '../../../glsl-format.js';
+import cauchyGLSL from './cauchy.glsl?raw';
 
 export function isCauchyIndex(value: unknown): value is CauchyIndex {
     return typeof value === 'object' && value !== null && 'cauchy' in value;
@@ -32,6 +33,7 @@ export const cauchyKind: SpectrumKind<CauchyIndex> = {
     // An index is never emission.
     constantNonzero: () => false,
     mayBeNonzero: () => false,
+    glsl: { origin: 'components/color/spectra/cauchy/cauchy.glsl', source: cauchyGLSL },
     dispersive: v => v.cauchy[1] !== 0 || (v.cauchy[2] ?? 0) !== 0,
     emit(v, ctx) {
         if (!ctx.spectral || !cauchyKind.dispersive(v)) return formatFloat(cauchyIndex(v, indexReferenceNM));

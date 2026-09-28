@@ -6,7 +6,7 @@
 
 import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { namedKindOf, namedKindsClaiming } from '../../components/color/spectrumKinds.js';
+import { namedKindOf, namedKindsClaiming } from '../../components/color/spectra/index.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';

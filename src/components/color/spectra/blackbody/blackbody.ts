@@ -1,9 +1,10 @@
-import type { Vec3, BlackbodyValue, ValueParam } from '../../../compiler/types.js';
+import type { Vec3, BlackbodyValue, ValueParam } from '../../../../compiler/types.js';
 import type { SpectrumKind, EmitContext } from '../spectrumKind.js';
-import { cie1931Curves } from '../../sensor/cie1931/curves.js';
-import { spectralData } from '../spectral/data.js';
-import { isValueParam } from '../../param.js';
-import { formatFloat, formatVec3, paramToUniform } from '../../glsl-format.js';
+import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
+import { spectralData } from '../../spectral/data.js';
+import { isValueParam } from '../../../param.js';
+import { formatFloat, formatVec3, paramToUniform } from '../../../glsl-format.js';
+import blackbodyGLSL from './blackbody.glsl?raw';
 
 export const blackbodyTemperatureRange = [1000, 40000] as const;
 // Exact SI h*c/k, expressed in nm K; wavelengths in this renderer are nanometres.
@@ -115,6 +116,7 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
         const scale = v.blackbody.scale;
         return scale === undefined || isValueParam(scale) || scale > 0;
     },
+    glsl: { origin: 'components/color/spectra/blackbody/blackbody.glsl', source: blackbodyGLSL },
     dispersive: () => false,
     emit(v, ctx) {
         const expr = ctx.spectral ? emitSpectral(v, ctx) : ctx.lift(emitRGB(v, ctx));

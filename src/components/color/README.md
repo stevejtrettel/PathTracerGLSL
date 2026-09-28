@@ -7,7 +7,7 @@
 RGB-authored capability set (all six existing material models), including live
 colour parameters, packed light rows and per-instance colours, image/procedural skies,
 surface RGB expressions, homogeneous/heterogeneous media with volume emission, and
-wavelength-independent GRIN. [Planck blackbody emission](blackbody/README.md) is supported; [Cauchy](cauchy/README.md) and [Sellmeier surface dispersion](sellmeier/README.md) are supported; other spectral/index forms and spatially dispersive GRIN remain unimplemented. Tracking uses the colour model’s
+wavelength-independent GRIN. [Planck blackbody emission](spectra/blackbody/README.md) is supported; [Cauchy](spectra/cauchy/README.md) and [Sellmeier surface dispersion](spectra/sellmeier/README.md) are supported; other spectral/index forms and spatially dispersive GRIN remain unimplemented. Tracking uses the colour model’s
 separate field ceiling and spectral majorant; see the spectral README for its numerical domain.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:
@@ -38,19 +38,11 @@ evaluation and medium clamps happen before conversion.
 
 ## Spectrum kinds
 
-An authored spectrum value has one **kind**, the way it was produced
-([spec](../../../docs/claude-spectrum-spec.md)): `rgb` (numbers, triples, `{param}`,
-expressions and attributes), `blackbody`, `cauchy` or `sellmeier`. `spectrumKind.ts` is the
-contract; `spectrumKinds.ts` is the registry (`kindOf`, `namedKindOf`). A kind answers every
-question the compiler asks about its values: the roles of the slots that may hold it, its live
-sliders, its own domain checks, its RGB stand-in (`toRGB`), whether it can emit, whether it
-disperses as an index, its GLSL, the sliders it derives, and, for blackbody, how a light-table
-row keeps it whole. The slot supplies the role (reflectance, coefficient, emission or index).
-The compiler reaches the kinds through `values.ts` helpers and the two lookups; outside this
-folder it does not test for a particular kind (tests/components/spectrumKinds.test.ts lists
-the remaining uses and the step that removes each).
+An authored spectrum value (a color, a blackbody, a Cauchy or Sellmeier index formula) has one
+**kind**; the kinds live in [`spectra/`](spectra/README.md), which is the contract for them.
+`values.ts` answers the compiler's questions about a value through its kind.
 
-`blackbody/` owns the shared Planck definition, unit-reference-CIE-Y normalization and signed
+`spectra/blackbody/` owns the shared Planck definition, unit-reference-CIE-Y normalization and signed
 RGB projection. Packed Planck emitters retain their original definition in the light header.
 A zero fixed scale is black even when temperature is driven; a driven scale is potentially
 emissive.

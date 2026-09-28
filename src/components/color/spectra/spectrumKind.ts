@@ -7,9 +7,9 @@
 // compiler owns reach them through the two contexts below: binding a number as a literal, a
 // uniform or an expression; the colour model's RGB lift; minting a slider.
 
-import type { Vec3, ParameterMetadata } from '../../compiler/types.js';
-import type { PlannedUniform } from '../../compiler/plan/types.js';
-import type { RadiometricRole } from '../descriptors.js';
+import type { Vec3, ParameterMetadata } from '../../../compiler/types.js';
+import type { PlannedUniform } from '../../../compiler/plan/types.js';
+import type { RadiometricRole } from '../../descriptors.js';
 
 /** How a slot reads a spectrum: light itself (emission), or a multiplier acting on light. */
 export type SpectrumRole = RadiometricRole | 'index';
@@ -65,6 +65,9 @@ export interface SpectrumKind<V = unknown> {
     dispersive(value: V): boolean;
     /** GLSL for the value at ctx.wl: a Spectrum for radiometric roles, a float for index. */
     emit(value: V, ctx: EmitContext): string;
+    /** GLSL helpers the kind's `emit` calls when a program evaluates it spectrally or
+     *  dispersively (ProgramDescription.spectrumKinds); linked once. */
+    glsl?: { origin: string; source: string };
     /** Uniforms and sliders the kind derives from its live numbers. */
     mint?(value: V, ctx: MintContext): void;
     /** Light-table rows keep the kind whole in the row header: `code` tags the header's

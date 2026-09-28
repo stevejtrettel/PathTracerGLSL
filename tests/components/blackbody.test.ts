@@ -2,7 +2,7 @@ import { projectRGB, isDrivenRadiometric, emissionMayBeNonzero, hasConstantNonze
 // Planck projection preserves signed linear RGB at fixed reference CIE Y.
 
 import { describe, it, expect } from 'vitest';
-import { blackbodyColor, blackbodyRGB, planckShape } from '../../src/components/color/blackbody/blackbody.js';
+import { blackbodyColor, blackbodyRGB, planckShape } from '../../src/components/color/spectra/blackbody/blackbody.js';
 import { spectralData } from '../../src/components/color/spectral/data.js';
 import { referenceY } from '../helpers/planckReference.js';
 

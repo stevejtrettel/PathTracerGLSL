@@ -1,7 +1,6 @@
 // compiler/plan/types.ts
 
 import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
-import type { IndexForm } from '../../components/color/values.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -38,10 +37,12 @@ import type { AABB } from '../../components/accel/bvh/bvh.js';
  * structural snapshot test).
  */
 export interface ProgramDescription {
-    /** Original Planck evaluation is read by this spectral program. */
-    blackbody: boolean;
+    /** Ids of the named spectrum kinds this program evaluates at wavelengths, in registry
+     *  order: a radiometric kind (blackbody) in a spectral program, a dispersive index formula.
+     *  Their GLSL helpers are linked, and packed light rows may carry them in their headers. */
+    spectrumKinds: string[];
     /** Index consumers and real interior regions requiring the one-time hero collapse. */
-    dispersion: { forms: IndexForm[]; indexMaterials: number[]; regions: number[] } | null;
+    dispersion: { indexMaterials: number[]; regions: number[] } | null;
     /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations
      *  (the bias ledger, each with a declared exact limit — taxonomy §4). */
     measurement: {

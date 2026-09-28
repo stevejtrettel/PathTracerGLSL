@@ -367,7 +367,7 @@ if absent. Do not describe the existing scene-origin validation as implemented w
 Validate actual sampler counts with the existing assembled-program check.
 
 Blackbody's Planck implementation uses nm throughout its relative spectrum, with the SI
-constant `hc/k` converted to nm K. The [implemented contract](../src/components/color/blackbody/README.md)
+constant `hc/k` converted to nm K. The [implemented contract](../src/components/color/spectra/blackbody/README.md)
 states the 1000–40000 K domain, exponential bounds and fixed-reference normalization.
 Driven temperature uses CPU-derived normalization; no fragment integrates the CMFs.
 RGB keeps the signed projection. S0 retained the Kim approximation; the owner-approved
@@ -803,7 +803,7 @@ reference RGB projection, and separate intensity controls. Verification: 44 orig
 GPU probes, the 69 existing binding probes, and nine targeted rendered checks pass;
 full Vitest, typecheck and production build pass (details in CHANGELOG.md).
 The full historical GPU sweep remains a separate release gate. See the
-[implemented contract](../src/components/color/blackbody/README.md).
+[implemented contract](../src/components/color/spectra/blackbody/README.md).
 The [comparison report](claude-blackbody-comparison.md) records the measured signed/display
 differences and separates the existing temperature clamp from any domain extension.
 Cover constant/driven temperatures and scales, zero scale, the temperature domain, tree rows,
@@ -822,10 +822,10 @@ claiming a partially run sweep passed. Release criteria are §8 and §10, not at
 **Initial index forms implemented (Sep 27):** constant normal-dispersion Cauchy
 `[A,B,C?]` and three-term Sellmeier `{B,C}`, with micrometre units and RGB evaluated
 at the helium d line. Sellmeier includes an N-BK7 authoring constant with source
-provenance and tabulated-index checks; see its [contract](../src/components/color/sellmeier/README.md).
+provenance and tabulated-index checks; see its [contract](../src/components/color/spectra/sellmeier/README.md).
 This is a staged subset, not all S2 authoring. Named/tabulated radiometric spectra, Abbe,
 live coefficients and wavelength-dependent spatial formulas remain planned. The
-[implemented contract](../src/components/color/cauchy/README.md) specifies the domain.
+[implemented contract](../src/components/color/spectra/cauchy/README.md) specifies the domain.
 
 **Emission authoring priorities (Sep 27):** the owner's expected usage is blackbody
 most often, then artist-authored coloured lights, then specific real lamp spectra.
@@ -871,7 +871,7 @@ Do not resample every form at 5 nm regardless of spectral bandwidth.
 
 **Built subset:** Planck normalization now uses reference CIE Y across all existing
 binding sites. Gallery strengths are explicitly converted; the component
-[contract](../src/components/color/blackbody/README.md) records the formula and migration.
+[contract](../src/components/color/spectra/blackbody/README.md) records the formula and migration.
 The authored spelling remains `{ blackbody: { kelvin, scale } }`. A common shape/amount
 spelling, normalized RGB controls and sampled curves remain unimplemented. Exact RGB
 normalization needs the reconstruction atlas available to CPU projection; currently the
@@ -1005,7 +1005,7 @@ are part of this checkpoint.
 **Sequencing deviation:** step 1 above required the shared representation before step 2's
 normalization rollout. The blackbody subset of step 2 was implemented first, after the
 owner accepted the normalization principle. It changed the denominator in
-[`blackbodyColor`](../src/components/color/blackbody/blackbody.ts), not the transport or
+[`blackbodyColor`](../src/components/color/spectra/blackbody/blackbody.ts), not the transport or
 binding interfaces. Its tests establish the current spectrum and reader agreement. They
 do not establish that the future shared API, asset lifecycle or sampled storage is designed.
 Retain this verified implementation as the current state; do not treat its existing
@@ -1080,7 +1080,7 @@ claiming S2 completion; do not quietly expand the parser project during dispersi
 **Initial surface stage implemented (Sep 27):** smooth and rough dielectric, including
 closed meshes/instances, with one-time throughput collapse. Descriptors declare index
 consumption with `semantic: 'index'` on a region-table row; the planner owns the consumer
-and dispersive-region lists. The [component note](../src/components/color/cauchy/README.md)
+and dispersive-region lists. The [component note](../src/components/color/spectra/cauchy/README.md)
 records the current proposal-symmetry argument and state cases. Spatially dispersive GRIN
 is not accepted by this stage; its interior-advance hook and full S2 gate below remain open.
 

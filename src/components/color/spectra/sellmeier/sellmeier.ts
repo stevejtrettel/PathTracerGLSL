@@ -1,7 +1,8 @@
-import type { SellmeierIndex } from '../../../compiler/types.js';
+import type { SellmeierIndex } from '../../../../compiler/types.js';
 import { indexReferenceNM, type SpectrumKind } from '../spectrumKind.js';
-import { spectralData } from '../spectral/data.js';
-import { formatFloat, formatVec3 } from '../../glsl-format.js';
+import { spectralData } from '../../spectral/data.js';
+import { formatFloat, formatVec3 } from '../../../glsl-format.js';
+import sellmeierGLSL from './sellmeier.glsl?raw';
 
 export function isSellmeierIndex(value: unknown): value is SellmeierIndex {
     return typeof value === 'object' && value !== null && 'sellmeier' in value;
@@ -46,6 +47,7 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
     // An index is never emission.
     constantNonzero: () => false,
     mayBeNonzero: () => false,
+    glsl: { origin: 'components/color/spectra/sellmeier/sellmeier.glsl', source: sellmeierGLSL },
     dispersive: v => v.sellmeier.B.some((b, i) => b !== 0 && v.sellmeier.C[i] !== 0),
     emit(v, ctx) {
         if (!ctx.spectral || !sellmeierKind.dispersive(v)) return formatFloat(sellmeierIndex(v, indexReferenceNM));

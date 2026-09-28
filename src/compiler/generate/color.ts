@@ -1,8 +1,8 @@
 import { emitValue, type ParamValue } from './values.js';
 import type { IndexProperty } from '../types.js';
 import type { RadiometricRole } from '../../components/descriptors.js';
-import { kindOf } from '../../components/color/spectrumKinds.js';
-import type { EmitContext, SpectrumRole } from '../../components/color/spectrumKind.js';
+import { kindOf } from '../../components/color/spectra/index.js';
+import type { EmitContext, SpectrumRole } from '../../components/color/spectra/spectrumKind.js';
 
 /** Evaluate authored RGB at the current wavelengths, after authored arithmetic. */
 export function emitColor(rgb: string, role: RadiometricRole, wl: string): string {

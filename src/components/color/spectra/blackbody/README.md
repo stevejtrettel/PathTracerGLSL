@@ -46,7 +46,7 @@ floor, clamped temperature or fallback colour is needed.
 
 Physics: [Planck law in PBRT](https://www.pbr-book.org/4ed/Radiometry%2C_Spectra%2C_and_Color/Light_Emission).
 Constants: [NIST exact SI h, c and k](https://physics.nist.gov/cuu/Constants/Table/allascii.txt).
-The [historical Planck comparison](../../../../docs/claude-blackbody-comparison.md) records
+The [historical Planck comparison](../../../../../docs/claude-blackbody-comparison.md) records
 the formula and temperature-range migration under the former maximum-RGB convention.
 It does not define the current scale.
 

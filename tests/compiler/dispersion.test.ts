@@ -3,14 +3,14 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
-import { cauchyIndex } from '../../src/components/color/cauchy/cauchy.js';
+import { cauchyIndex } from '../../src/components/color/spectra/cauchy/cauchy.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import { boxMesh } from '../witnesses/scenes/meshWitness.js';
 import { glslangCheck } from '../helpers/glslangCheck.js';
 import { compiledJson } from '../helpers/compiledJson.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 import { indexReferenceNM } from '../../src/components/color/values.js';
-import { sellmeierIndex } from '../../src/components/color/sellmeier/sellmeier.js';
+import { sellmeierIndex } from '../../src/components/color/spectra/sellmeier/sellmeier.js';
 import { N_BK7 } from '../../src/authoring/opticalGlass.js';
 const compiler = new Compiler();
 const spectral: RenderStrategy = { ...minimalStrategy, measurement: { ...minimalStrategy.measurement, color: 'spectral' } };
@@ -57,7 +57,8 @@ describe('Cauchy authoring and dispersion planning', () => {
             expect(walk.indexOf('kernel_score_emitter_hit')).toBeLessThan(walk.indexOf('collapse_wavelengths(s)'));
             expect(walk.indexOf('if (bounce ==')).toBeLessThan(walk.indexOf('collapse_wavelengths(s)'));
             expect(walk.indexOf('collapse_wavelengths(s)')).toBeLessThan(walk.indexOf('light_sample_direct(s'));
-            expect(program(scene, choice).dispersion).toEqual({ forms: ['cauchy'], indexMaterials: [0], regions: [1] });
+            expect(program(scene, choice).dispersion).toEqual({ indexMaterials: [0], regions: [1] });
+            expect(program(scene, choice).spectrumKinds).toEqual(['cauchy']);
         });
     }
     it('records only index consumers and real interiors', () => {
@@ -73,7 +74,8 @@ describe('Cauchy authoring and dispersion planning', () => {
         const scene = fixture();
         scene.objects = [{ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 1 }, material: 'sphere' },
             placements: [{ position: [-1, 0, 0] }, { position: [1, 0, 0] }] }];
-        expect(program(scene).dispersion).toEqual({ forms: ['cauchy'], indexMaterials: [0], regions: [0] });
+        expect(program(scene).dispersion).toEqual({ indexMaterials: [0], regions: [0] });
+        expect(program(scene).spectrumKinds).toEqual(['cauchy']);
         for (const [id, shader] of compiler.compile(scene, spectral).shaders) glslangCheck(shader.fragment, 'frag', id);
     });
     it('retains constant-index data under mixed renderer ordering', () => {
@@ -121,7 +123,8 @@ describe('Sellmeier authoring', () => {
             const scene = fixture(); scene.materials.sphere = { model, ior: N_BK7 };
             const strategy = { ...spectral, estimator: { ...spectral.estimator, objectDispatch } };
             const p = program(scene, strategy);
-            expect(p.dispersion).toEqual({ forms: ['sellmeier'], indexMaterials: [0], regions: [1] });
+            expect(p.dispersion).toEqual({ indexMaterials: [0], regions: [1] });
+            expect(p.spectrumKinds).toEqual(['sellmeier']);
             const renderer = compiler.compile(scene, strategy);
             for (const [id, shader] of renderer.shaders) glslangCheck(shader.fragment, 'frag', id);
             const source = [...renderer.shaders.values()].map(s => s.fragment).join('\n');
@@ -129,7 +132,7 @@ describe('Sellmeier authoring', () => {
             expect(source).not.toContain('cauchy_index');
             // Both forms coexist without changing the material or transport contracts.
             scene.materials.ground = { model: 'dielectric', ior: { cauchy: [1.4, 0.01] } };
-            expect(program(scene, strategy).dispersion?.forms).toEqual(['cauchy', 'sellmeier']);
+            expect(program(scene, strategy).spectrumKinds).toEqual(['cauchy', 'sellmeier']);
             for (const [id, shader] of compiler.compile(scene, strategy).shaders) glslangCheck(shader.fragment, 'frag', id);
         });
     }

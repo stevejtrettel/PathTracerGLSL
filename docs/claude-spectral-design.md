@@ -1099,7 +1099,7 @@ on rendered scenes. True 1000 K emission also replaces the old low-temperature c
 Reference-Y normalization now gives scale a temperature-independent reference-brightness
 meaning; the gallery's strengths were explicitly converted to preserve its source spectra.
 The owner accepted D5's single definition. See the
-[implemented contract](../src/components/color/blackbody/README.md) for normalization,
+[implemented contract](../src/components/color/spectra/blackbody/README.md) for normalization,
 quadrature, supported binding sites and verification.
 
 ### 5.5 Media

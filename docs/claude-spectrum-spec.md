@@ -337,13 +337,16 @@ scan test's allow-list shrinks to the Planner's `blackbody` flag; typecheck and 
 **Not in this step:** `formatSpectrum` (unused, with a wrong comment) is left for the owner to
 decide; RGB reflectance above 1 stays allowed, as today.
 
-### Step 3: folders and plan fields (own plan)
+### Step 3: folders and plan fields (built Sep 28)
 
-Move the kinds to `components/color/spectra/` (one folder each: `rgb/`, `blackbody/`, `cauchy/`,
-`sellmeier/`, later `sampled/`, beside the two color models); replace
-`ProgramDescription.blackbody` and `dispersion.forms` with one list of the kinds a program
-evaluates spectrally, and retire the old `IndexForm` type. Shaders then differ only in
-origin-path comments, shown by a path-normalized compare.
+The kinds live in `components/color/spectra/`: `spectrumKind.ts` (the contract), `index.ts` (the
+registry), and one folder per kind (`rgb/`, `blackbody/`, `cauchy/`, `sellmeier/`), with a
+contract README. `ProgramDescription.blackbody` and `dispersion.forms` are replaced by
+`spectrumKinds`, the ids of the kinds a program evaluates at wavelengths in registry order; the
+program links their `glsl` helpers in that order, and the packed-row reader asks them for header
+readers. The `IndexForm` type is gone, and the scan test's allow-list is empty. Shader text is
+unchanged in every suite scene; source maps differ only in the moved paths (a path-normalized
+digest compares identical).
 
 ### Step 4: bindings in one place (own plan)
 

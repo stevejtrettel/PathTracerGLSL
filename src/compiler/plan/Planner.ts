@@ -1,7 +1,7 @@
 // compiler/plan/Planner.ts
 
-import { isDrivenRadiometric, isBlackbody, type IndexForm } from '../../components/color/values.js';
-import { namedKindOf } from '../../components/color/spectrumKinds.js';
+import { isDrivenRadiometric } from '../../components/color/values.js';
+import { namedKindOf, SPECTRUM_KINDS } from '../../components/color/spectra/index.js';
 import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/index.js';
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads, SpectralIndex } from '../types.js';
 import { isValueParam, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
@@ -556,12 +556,11 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const objectDispatch = strategy.estimator.objectDispatch
         ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
 
+    // Dispersion needs a spectral program: RGB evaluates every index at the d line.
+    const dispersion = measurement.color === 'spectral' ? planDispersion(scenePlan) : { record: null, kinds: new Set<string>() };
     return {
-        dispersion: measurement.color === 'spectral' ? planDispersion(scenePlan) : null,
-        blackbody: measurement.color === 'spectral' && (
-            scenePlan.materials.some(m => Object.values(m.values).some(isBlackbody))
-            || scenePlan.lights.some(l => Object.values(l.values).some(isBlackbody))
-            || (scene.environment?.type === 'constant' && isBlackbody(scene.environment.color))),
+        dispersion: dispersion.record,
+        spectrumKinds: measurement.color === 'spectral' ? spectrallyEvaluatedKinds(scenePlan, scene, dispersion.kinds) : [],
         measurement,
         estimator: {
             wavelengths: resolveWavelengthSampler(COLOR_MODELS[measurement.color], strategy.estimator.wavelengths),
@@ -1002,20 +1001,38 @@ function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[])
     return any ? Math.max(r, 1e-3) : 10;
 }
 
-/** Only real interiors supply a region index; thin meshes/batches remain vacuum. */
-function planDispersion(scene: ScenePlan): ProgramDescription['dispersion'] {
+/** The named kinds a spectral program evaluates at wavelengths, in registry order: a
+ *  radiometric kind in any material, light or constant-sky value, and the dispersive index
+ *  kinds. */
+function spectrallyEvaluatedKinds(scenePlan: ScenePlan, scene: SceneDescription, dispersive: Set<string>): string[] {
+    const used = new Set(dispersive);
+    const values = [
+        ...scenePlan.materials.flatMap(m => Object.values(m.values)),
+        ...scenePlan.lights.flatMap(l => Object.values(l.values)),
+        ...(scene.environment?.type === 'constant' ? [scene.environment.color] : []),
+    ];
+    for (const v of values) {
+        const kind = namedKindOf(v);
+        if (kind !== undefined && !kind.roles.includes('index')) used.add(kind.id);
+    }
+    return SPECTRUM_KINDS.filter(k => used.has(k.id)).map(k => k.id);
+}
+
+/** Dispersive index materials and the real interiors they fill; only real interiors supply a
+ *  region index, thin meshes and batches remain vacuum. Also returns the index kinds used. */
+function planDispersion(scene: ScenePlan): { record: ProgramDescription['dispersion']; kinds: Set<string> } {
     const indexMaterials = scene.materials.filter(m => modelIndexRow(m.model) !== undefined).map(m => m.id);
-    const forms = new Set<IndexForm>();
+    const kinds = new Set<string>();
     const dispersiveMaterials = new Set(scene.materials.filter(m => {
         const row = modelIndexRow(m.model);
         const value = row !== undefined ? m.values[row.source] : undefined;
         const kind = namedKindOf(value);
         if (m.medium?.ior !== undefined || kind === undefined || !kind.dispersive(value)) return false;
-        forms.add(kind.id as IndexForm);
+        kinds.add(kind.id);
         return true;
     }).map(m => m.id));
     const regions = [...scene.objects, ...scene.meshes.filter(m => m.closed),
         ...scene.instanceBatches.filter(b => b.hasInterior === true)]
         .filter(o => dispersiveMaterials.has(o.materialId)).map(o => o.index);
-    return dispersiveMaterials.size > 0 ? { forms: [...forms].sort(), indexMaterials, regions } : null;
+    return { record: dispersiveMaterials.size > 0 ? { indexMaterials, regions } : null, kinds };
 }

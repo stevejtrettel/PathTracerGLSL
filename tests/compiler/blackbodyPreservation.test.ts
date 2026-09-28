@@ -5,7 +5,7 @@ import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import { describe, expect, it } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { blackbodyRGB } from '../../src/components/color/blackbody/blackbody.js';
+import { blackbodyRGB } from '../../src/components/color/spectra/blackbody/blackbody.js';
 import { minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import { compiledJson } from '../helpers/compiledJson.js';
 import { blackbodyFixture, blackbodySites } from '../helpers/blackbodyFixtures.js';

@@ -9,9 +9,7 @@ import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/
 import { SAMPLERS } from '../../../components/sampler/index.js';
 import { SENSORS } from '../../../components/sensor/index.js';
 import { COLOR_MODELS } from '../../../components/color/index.js';
-import sellmeierGLSL from '../../../components/color/sellmeier/sellmeier.glsl?raw';
-import cauchyGLSL from '../../../components/color/cauchy/cauchy.glsl?raw';
-import blackbodyGLSL from '../../../components/color/blackbody/blackbody.glsl?raw';
+import { kindById } from '../../../components/color/spectra/index.js';
 import spectrumGLSL from '../../../components/color/spectrum.glsl?raw';
 
 import structsGLSL from '../../../glsl/core/structs.glsl?raw';
@@ -101,9 +99,8 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ambientBlock(plan.program.measurement.ambient),
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
-    if (plan.program.dispersion?.forms.includes('cauchy')) blocks.push({ origin: 'components/color/cauchy/cauchy.glsl', source: cauchyGLSL });
-    if (plan.program.dispersion?.forms.includes('sellmeier')) blocks.push({ origin: 'components/color/sellmeier/sellmeier.glsl', source: sellmeierGLSL });
-    if (plan.program.blackbody) blocks.push({ origin: 'components/color/blackbody/blackbody.glsl', source: blackbodyGLSL });
+    // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).
+    for (const id of plan.program.spectrumKinds) blocks.push(kindById(id).glsl!);
     // Microfacet stdlib (fable-rough-dielectric §4): D / Smith G₁ / VNDF / the frame maps,
     // shared by every microfacet MODEL. Gated on the descriptors' declared fact — a
     // program with no microfacet occupant carries none of it, and one with several

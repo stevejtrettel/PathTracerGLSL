@@ -1,6 +1,6 @@
 import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { spectralCeilingRange } from '../../components/color/spectral/majorant.js';
-import { namedKindOf } from '../../components/color/spectrumKinds.js';
+import { namedKindOf } from '../../components/color/spectra/index.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
 /** Where the spectral model narrows a role's domain. Every spectrum slot is already checked

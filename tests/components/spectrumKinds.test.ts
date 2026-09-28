@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { SPECTRUM_KINDS, kindOf, namedKindOf, rgbKind } from '../../src/components/color/spectrumKinds.js';
+import { SPECTRUM_KINDS, kindOf, namedKindOf, rgbKind } from '../../src/components/color/spectra/index.js';
 import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
 import { sceneSuite, isAsyncSceneEntry } from '../../pages/registry.js';
 
@@ -22,11 +22,7 @@ function tsFiles(dir: string): string[] {
 // Predicates of particular kinds, and comparisons of a kind's id to a name.
 const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier)'/g;
 
-// Uses that remain on purpose: ProgramDescription records blackbody as its own flag rather
-// than as one of a list of kinds (docs/claude-spectrum-spec.md §8).
-const ALLOWED: Record<string, number> = {
-    'compiler/plan/Planner.ts': 3,
-};
+const ALLOWED: Record<string, number> = {};
 
 describe('spectrum kinds', () => {
     it('code outside components/color/ asks the kind, except the listed uses', () => {

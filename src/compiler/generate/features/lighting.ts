@@ -8,7 +8,7 @@ import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
 import { isValueParam, type Vec3, type BlackbodyValue } from '../../types.js';
-import { namedKindOf, SPECTRUM_KINDS } from '../../../components/color/spectrumKinds.js';
+import { namedKindOf, kindById } from '../../../components/color/spectra/index.js';
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -136,7 +136,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (bvh && layout !== null && plan.lightTree !== undefined) {
         blocks.push({ origin: 'components/accel/light_tree/light_tree.glsl', source: lightTreeGLSL });
         if (plan.lights.length > 0) {
-            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree, plan.program.blackbody) });
+            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree, plan.program.spectrumKinds) });
         }
         blocks.push({ origin: 'generated:light-tree-walks', source: generateLightTreeWalks(plan.lightTree) });
     }
@@ -718,11 +718,10 @@ function fieldExpr(f: number, vec3: boolean): string {
 /** One loader per present kind: `<Kind>Light <kind>_light_row(int li, Wavelengths wl)` — positional
  *  float reads in ctor order (rows then derived), mirroring packLightTable exactly
  *  (the ONE layout truth on both sides). */
-function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, blackbody: boolean): string {
+function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: string[]): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
-    // Kinds that pack their own numbers into the row header. Blackbody is the only one, and
-    // the plan's `blackbody` flag says whether this program reads it.
-    const packedKinds = blackbody ? SPECTRUM_KINDS.filter((k) => k.packed !== undefined) : [];
+    // Spectrum kinds this program evaluates that pack their own numbers into the row header.
+    const packedKinds = spectrumKinds.map(kindById).filter((k) => k.packed !== undefined);
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
         const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.semantic === 'radiometric' ? r.role : undefined })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];

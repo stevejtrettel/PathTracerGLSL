@@ -4,7 +4,7 @@
 // lights and emissive objects alike, whose light rows and hit-side emission must be equal
 // for pt ≡ pt-nee).
 
-import { namedKindOf } from '../../components/color/spectrumKinds.js';
+import { namedKindOf } from '../../components/color/spectra/index.js';
 import type { Vec3, MaterialProperty, GlslExpression, ValueParam, BlackbodyValue, SpectralIndex } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 

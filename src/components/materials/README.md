@@ -58,7 +58,7 @@ Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy conver
 
 Index-consuming models mark their region-table row with `semantic: 'index'`.
 `modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics
-accept scalar indices, [Cauchy](../color/cauchy/README.md), or
-[Sellmeier](../color/sellmeier/README.md); spectral transport
+accept scalar indices, [Cauchy](../color/spectra/cauchy/README.md), or
+[Sellmeier](../color/spectra/sellmeier/README.md); spectral transport
 collapses once before index-dependent scattering/NEE. Radiometric rows still declare
 reflectance/emission roles separately; an index is not an RGB lift.

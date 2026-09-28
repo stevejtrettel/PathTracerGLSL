@@ -31,7 +31,7 @@
 import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
-import { namedKindOf } from '../../components/color/spectrumKinds.js';
+import { namedKindOf } from '../../components/color/spectra/index.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (surface properties and medium coefficients). */

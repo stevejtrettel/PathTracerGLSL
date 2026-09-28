@@ -1,6 +1,6 @@
 # Blackbody migration: measured comparison
 
-**Status (Sep 27, 2026): comparison complete; the subsequent migration is implemented. See the [current contract](../src/components/color/blackbody/README.md).**
+**Status (Sep 27, 2026): comparison complete; the subsequent migration is implemented. See the [current contract](../src/components/color/spectra/blackbody/README.md).**
 
 This report compares formulae under maximum-RGB normalization. The renderer now uses
 reference-CIE-Y strengths; the current contract records that separate normalization change

@@ -4,6 +4,29 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 3: the kinds' folder and one plan field
+
+The spectrum kinds now live in `components/color/spectra/`
+([contract README](src/components/color/spectra/README.md)): `spectrumKind.ts`, the registry
+`index.ts`, and one folder per kind, with the plain `rgb` kind in its own folder beside
+`blackbody/`, `cauchy/` and `sellmeier/`. The registry lists the index formulas, then blackbody,
+then `rgb`.
+
+`ProgramDescription.blackbody` and `dispersion.forms` are replaced by one list,
+`spectrumKinds`: the kinds a program evaluates at wavelengths, in registry order. The program
+links each kind's GLSL helpers from the kind itself (no longer by name in core.ts), and the
+packed-row reader takes its header readers from the listed kinds. The `IndexForm` type is gone.
+Nothing outside the color folder now tests for a particular kind: the scan test's allow-list
+is empty.
+
+Verification: shader text is unchanged in all 265 digest scenes; the source maps of the 13
+scenes that link a moved GLSL file differ only in the new path (a digest with the old paths
+rewritten compares 265 of 265 identical). The program-description snapshot changes in all 488
+programs by exactly the field swap: 466 empty lists, 18 lists holding `blackbody`, and 4 holding
+the index kinds formerly in `dispersion.forms`. Typecheck; the full test run, 104 files and
+3,982 tests. Documentation links into the moved folders were updated in the component READMEs
+and the spectral docs; CHANGELOG entries keep the paths they had when written.
+
 ## 2026-09-28 — one spectrum type, step 2: fixes from the independent review
 
 A fresh reviewer re-ran the digest (identical before and after both steps), compiled unusual
