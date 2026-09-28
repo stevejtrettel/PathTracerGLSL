@@ -37,10 +37,15 @@ describe('spectral volume emission', () => {
         });
     it('keeps tracking MIS gated and checks emission and derived-rate domains', () => {
         expect(() => compiler.compile(scene(), { ...tracked, estimator: { ...tracked.estimator, directLighting: 'mis' } })).toThrow();
-        for (const invalid of [{ emission: -1 }, { emission: { blackbody: { kelvin: 3000 } } },
-            { sigma_a: 2 ** 18 }, { sigma_s: { param: 's', default: 1, max: 2 ** 18 } }]) {
-            const s = scene(); Object.assign(s.materials.ink.medium!, invalid);
-            expect(() => compiler.compile(s, tracked)).toThrow(/spectral medium/);
+        const invalid: Array<[object, RegExp]> = [
+            [{ emission: -1 }, /medium\.emission components must be >= 0/],
+            [{ emission: { blackbody: { kelvin: 3000 } } }, /medium\.emission cannot be a blackbody value/],
+            [{ sigma_a: 2 ** 18 }, /spectral medium 'ink' property 'sigma_a' must be at most/],
+            [{ sigma_s: { param: 's', default: 1, max: 2 ** 18 } }, /spectral medium 'ink' property 'sigma_s' must be at most/],
+        ];
+        for (const [values, message] of invalid) {
+            const s = scene(); Object.assign(s.materials.ink.medium!, values);
+            expect(() => compiler.compile(s, tracked)).toThrow(message);
         }
     });
 });

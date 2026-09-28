@@ -25,9 +25,6 @@ const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex
 // Uses that stay until the step that removes them. Each keeps a diagnostic's wording or a
 // plan field unchanged while the kinds move (spec §8).
 const ALLOWED: Record<string, number> = {
-    'compiler/analyze/Validator.ts': 2,          // light emission branch; private emission predicate (step 2)
-    'compiler/analyze/spectral.ts': 3,           // plain-value domain exemptions (step 2)
-    'compiler/analyze/propertyValidation.ts': 1, // "no blackbody in a medium" message (step 2)
     'compiler/plan/Planner.ts': 3,               // ProgramDescription.blackbody (step 3)
 };
 

@@ -4,6 +4,41 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 2: one set of checks per role
+
+Every spectrum slot is now checked by one function against its role's domain, the same in RGB
+and spectral renders: reflectance, coefficients and emission are nonnegative, an index is
+positive, for constants, slider defaults and both slider bounds. The spectral model adds only
+what its lift or tracking bound needs: reflectance at most 1, and the media ceilings
+([spec](docs/claude-spectrum-spec.md) §8, step 2). Valid scenes compile exactly as before.
+
+Now rejected with a message, in both colour models (each was accepted in RGB, or crashed):
+- negative emission from a material slider, a negative medium emission, and negative
+  per-instance colors (RGB never sign-checked these);
+- an expression as a constant sky's color (RGB would have computed a NaN light-selection
+  weight);
+- a value carrying two kinds' keys, such as `blackbody` with `param`;
+- a zero-area quad light with blackbody emission: the blackbody branch skipped the light kind's
+  shape checks, and the compile then crashed on a NaN;
+- a Cauchy formula as medium emission, which passed RGB validation and then threw an internal
+  error.
+
+Clearer: media take plain values only, with one message for any named kind ("medium.ior cannot
+be a Cauchy value — media take a constant, a {param} or an expression", replacing a misleading
+"Cauchy is an index form"). Eleven spectral cases that reported the same problem twice now
+report it once. Blackbody errors on lights name the field ("Light 0 (point): emission: …").
+The four "can this emit" answers are now one (the Validator's private copy and the medium
+predicate use the shared rule). analyze/spectral.ts keeps only the spectral narrowing; the scan
+test's allow-list is down to the Planner's `blackbody` flag.
+
+Unchanged by choice: RGB reflectance above 1 stays allowed, as before. `formatSpectrum`
+(unused, with a wrong comment) is left for the owner to decide.
+
+Verification: the digest, 265 of 265 scenes identical (no suite scene newly rejected); the
+diagnostics snapshot changes in 23 of 33 cases, each reviewed and summarized above; eight older
+tests asserted the old wording or that RGB accepted a negative per-instance color, and were
+updated; typecheck; the full test run, 104 files and 3,972 tests.
+
 ## 2026-09-28 — one spectrum type, step 1: kinds behind one interface
 
 Blackbody, Cauchy, Sellmeier and plain RGB values are now **spectrum kinds**, each described

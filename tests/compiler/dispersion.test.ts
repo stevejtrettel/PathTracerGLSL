@@ -44,7 +44,7 @@ describe('Cauchy authoring and dispersion planning', () => {
         expect(() => compiler.compile(scene, spectral)).toThrow(/index form/);
         delete scene.materials.ground.albedo;
         scene.materials.ground.medium = { ior: { cauchy: [1.5, 0.01] } as never };
-        expect(() => compiler.compile(scene, spectral)).toThrow(/index form/);
+        expect(() => compiler.compile(scene, spectral)).toThrow(/medium\.ior cannot be a Cauchy value/);
     });
     for (const model of ['dielectric', 'rough_dielectric']) for (const objectDispatch of ['unrolled', 'table'] as const) {
         it(`compiles ${model}, ${objectDispatch}, with collapse before NEE`, () => {
@@ -114,7 +114,7 @@ describe('Sellmeier authoring', () => {
         expect(() => compiler.compile(scene, spectral)).toThrow(/Sellmeier is an index form/);
         delete scene.materials.ground.albedo;
         scene.materials.ground.medium = { ior: N_BK7 as never };
-        expect(() => compiler.compile(scene, spectral)).toThrow(/Sellmeier is an index form/);
+        expect(() => compiler.compile(scene, spectral)).toThrow(/medium\.ior cannot be a Sellmeier value/);
     });
     for (const model of ['dielectric', 'rough_dielectric']) for (const objectDispatch of ['unrolled', 'table'] as const) {
         it(`compiles ${model}/${objectDispatch} and includes only the used index helpers`, () => {

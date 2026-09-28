@@ -6,8 +6,7 @@
 
 import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { isBlackbody } from '../../components/color/values.js';
-import { namedKindOf } from '../../components/color/spectrumKinds.js';
+import { namedKindOf, namedKindsClaiming } from '../../components/color/spectrumKinds.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
@@ -47,20 +46,23 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         }
 
         if (mat.medium === undefined) continue;
-        for (const [prop, v] of [['sigma_a', mat.medium.sigma_a], ['sigma_s', mat.medium.sigma_s], ['emission', mat.medium.emission]] as const) {
-            if (isBlackbody(v)) {
-                bag.error('invalid-setting',
-                    `Material '${name}': medium.${prop} cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields`)
-                    .add();
+        // Media take plain values (constants, {param} or expressions): no named kind has a
+        // medium reader yet, including a wavelength-dependent GRIN index.
+        const mediumSlots = [
+            ['sigma_a', mat.medium.sigma_a, { shape: 'spectrum', role: 'coefficient' }],
+            ['sigma_s', mat.medium.sigma_s, { shape: 'spectrum', role: 'coefficient' }],
+            ['emission', mat.medium.emission, { shape: 'spectrum', role: 'emission' }],
+            ['ior', mat.medium.ior, { shape: 'scalar', role: 'index' }],
+        ] as const;
+        for (const [prop, v, contract] of mediumSlots) {
+            const label = `Material '${name}': medium.${prop}`;
+            const kind = namedKindOf(v);
+            if (kind) {
+                bag.error('invalid-setting', `${label} cannot be a ${kind.label} value — media take a constant, a {param} or an expression`).add();
+                continue;
             }
+            validatePropertyValue(v, contract, label, bag);
         }
-        validatePropertyValue(mat.medium.sigma_a, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
-            `Material '${name}': medium.sigma_a`, bag);
-        validatePropertyValue(mat.medium.sigma_s, { shape: 'spectrum', constraint: { kind: 'nonnegative' } },
-            `Material '${name}': medium.sigma_s`, bag);
-
-        validatePropertyValue(mat.medium.ior, { shape: 'scalar', constraint: { kind: 'positive' } },
-            `Material '${name}': medium.ior`, bag);
 
         const phase = VOLUME_SCATTERING_MODELS[mat.medium.model ?? 'hg'];
         for (const field of phase?.properties ?? []) {
@@ -81,6 +83,11 @@ export function validatePropertyValue(
     bag: DiagnosticBag,
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
+    const claiming = [...namedKindsClaiming(value).map((k) => k.label), ...(isValueParam(value as never) ? ['{param}'] : [])];
+    if (claiming.length > 1) {
+        bag.error('invalid-setting', `${label} carries the keys of more than one kind of value (${claiming.join(', ')})`).add();
+        return;
+    }
     // A named spectrum kind (blackbody, Cauchy, Sellmeier) belongs in slots of its roles and
     // checks its own numbers.
     const kind = namedKindOf(value);
@@ -93,8 +100,11 @@ export function validatePropertyValue(
         return;
     }
 
+    // The role's domain applies when the row declares none of its own.
+    const domain = contract.constraint ?? roleDomain(contract.role);
     let authored: unknown = value;
     let parameterMin: number | undefined;
+    let parameterMax: number | undefined;
     if (isValueParam(value as never)) {
         const param = value as { param?: unknown; default?: unknown; min?: number; max?: number };
         if (typeof param.param !== 'string' || param.param.trim() === '') {
@@ -105,11 +115,13 @@ export function validatePropertyValue(
         }
         authored = param.default;
         parameterMin = param.min;
+        parameterMax = param.max;
         if (authored === undefined) {
             // No default means no value until something sets the parameter: the uniform
             // keeps GL's 0 (an ior of 0, a black albedo) with no diagnostic anywhere.
             bag.error('invalid-setting', `${label} {param: '${String(param.param)}'} needs a default — the value the render starts with`).add();
-            validateMinimum(parameterMin, contract.constraint, `${label} parameter min`, bag);
+            validateBound(parameterMin, domain, `${label} parameter min`, bag);
+            validateBound(parameterMax, domain, `${label} parameter max`, bag);
             return;
         }
     }
@@ -124,21 +136,31 @@ export function validatePropertyValue(
         return;
     }
 
-    if (contract.constraint !== undefined) {
-        const violation = constraintViolation(authored as number | number[], contract.constraint);
+    if (domain !== undefined) {
+        const violation = constraintViolation(authored as number | number[], domain);
         if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
     }
-    validateMinimum(parameterMin, contract.constraint, `${label} parameter min`, bag);
+    validateBound(parameterMin, domain, `${label} parameter min`, bag);
+    validateBound(parameterMax, domain, `${label} parameter max`, bag);
 }
 
-function validateMinimum(
-    min: number | undefined,
+/** The domain every value in a slot of this role must lie in: the multipliers and emitted
+ *  light are nonnegative, an index is positive. The spectral model narrows reflectance to
+ *  [0,1] separately (analyze/spectral.ts), where its bounded lift requires it. */
+function roleDomain(role: PropertyValueContract['role']): RowConstraint | undefined {
+    if (role === undefined) return undefined;
+    return role === 'index' ? { kind: 'positive' } : { kind: 'nonnegative' };
+}
+
+/** A slider bound (min or max) must lie in the slot's domain too: the slider can reach it. */
+function validateBound(
+    bound: number | undefined,
     constraint: RowConstraint | undefined,
     label: string,
     bag: DiagnosticBag,
 ): void {
-    if (min === undefined || constraint === undefined || constraint.kind === 'min-length') return;
-    const violation = constraintViolation(min, constraint);
+    if (bound === undefined || constraint === undefined || constraint.kind === 'min-length') return;
+    const violation = constraintViolation(bound, constraint);
     if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
 }
 

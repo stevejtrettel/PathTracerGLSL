@@ -40,6 +40,11 @@ const NAMED_KINDS: readonly SpectrumKind[] = [blackbodyKind, cauchyKind, sellmei
 
 export const SPECTRUM_KINDS: readonly SpectrumKind[] = [rgbKind, ...NAMED_KINDS];
 
+/** Every named kind whose keys the value carries; more than one is a malformed value. */
+export function namedKindsClaiming(value: unknown): SpectrumKind[] {
+    return NAMED_KINDS.filter(k => k.is(value));
+}
+
 /** The named kind that claims the value, if any. */
 export function namedKindOf(value: unknown): SpectrumKind | undefined {
     return NAMED_KINDS.find(k => k.is(value));

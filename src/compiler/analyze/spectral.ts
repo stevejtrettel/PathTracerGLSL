@@ -1,37 +1,32 @@
 import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { spectralCeilingRange } from '../../components/color/spectral/majorant.js';
-import { isBlackbody } from '../../components/color/values.js';
+import { namedKindOf } from '../../components/color/spectrumKinds.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
-/** Supported spectral inputs; other binding and transport routes remain explicit diagnostics. */
+/** Where the spectral model narrows a role's domain. Every spectrum slot is already checked
+ *  against its role's domain in both colour models (propertyValidation.ts); the spectral lift
+ *  adds two limits on plain values: reflectance at most 1 (the bounded lift), and the media
+ *  ceilings its tracking bound is certified for (spectral README, "Tracking bound"). Named
+ *  kinds check their own numbers. */
 export function spectralLimitations(scene: SceneDescription): string[] {
     const reasons: string[] = [];
-    const constantRGB = (v: unknown, ceiling = Infinity): boolean =>
-        typeof v === 'number' ? Number.isFinite(v) && v >= 0 && v <= ceiling
-        : Array.isArray(v) && v.length === 3 && v.every(c => typeof c === 'number' && Number.isFinite(c) && c >= 0 && c <= ceiling);
-    const rgbInput = (v: unknown, ceiling = Infinity): boolean => {
-        if (!isValueParam(v)) return constantRGB(v, ceiling);
-        // Defaults and declared controls must fit the domain. Live writes carry the same
-        // author contract; slider bounds are UI metadata, not runtime clamps.
-        return constantRGB(v.default, ceiling)
-            && (v.min === undefined || (typeof v.min === 'number' && constantRGB(v.min, ceiling)))
-            && (v.max === undefined || (typeof v.max === 'number' && constantRGB(v.max, ceiling)))
-            && (v.min === undefined || v.max === undefined || v.min <= v.max);
+    // Every component of a plain constant, a slider default and both slider bounds is at most
+    // `ceiling`. Values of any other shape are reported by the shared checker.
+    const atMost = (v: unknown, ceiling: number): boolean => {
+        const components = (x: unknown): number[] => typeof x === 'number' ? [x]
+            : Array.isArray(x) ? x.filter((c): c is number => typeof c === 'number') : [];
+        const values = isValueParam(v as never) ? [(v as { default?: unknown }).default, (v as { min?: unknown }).min, (v as { max?: unknown }).max] : [v];
+        return values.every(x => components(x).every(c => c <= ceiling));
     };
     for (const [index, object] of scene.objects.entries()) {
         if (!isInstancedObject(object)) continue;
         const material = scene.materials[object.prototype.material];
-        const rows = MATERIAL_MODELS[material?.model]?.properties ?? [];
-        for (const row of rows) {
+        for (const row of MATERIAL_MODELS[material?.model]?.properties ?? []) {
             const values = object.attributes?.[row.source];
-            if (values === undefined || row.semantic !== 'radiometric') continue;
-            const ceiling = row.role === 'reflectance' ? 1 : Infinity;
-            // Nested RGB, scalar broadcasts and packed float arrays share this domain.
-            for (const value of values) {
-                if (constantRGB(value, ceiling)) continue;
-                reasons.push(`spectral object ${index} attribute '${row.source}' requires ${ceiling === 1 ? 'RGB in [0,1]' : 'nonnegative RGB'}`);
-                break;
-            }
+            if (values === undefined || row.semantic !== 'radiometric' || row.role !== 'reflectance') continue;
+            // Nested RGB, scalar broadcasts and packed float arrays share this bound.
+            if (!Array.from(values as ArrayLike<number | number[]>).every(v => atMost(v, 1)))
+                reasons.push(`spectral object ${index} attribute '${row.source}' requires RGB in [0,1]`);
         }
     }
     for (const [name, mat] of Object.entries(scene.materials)) {
@@ -43,29 +38,21 @@ export function spectralLimitations(scene: SceneDescription): string[] {
                 && med.majorant >= spectralCeilingRange[0] && med.majorant <= spectralCeilingRange[1]))
                 reasons.push(`spectral medium '${name}' requires a density ceiling in [2^-60, 2^18]`);
             const derivedTracking = !deflecting && !heterogeneous && isEmissiveMedium(med) && mediumMayScatter(med);
-            const coefficientCeiling = heterogeneous ? 2 ** 60 : derivedTracking ? spectralCeilingRange[1] / 2 : Infinity;
-            for (const field of ['sigma_a', 'sigma_s', 'emission'] as const) {
-                if (isGlslExpression(med[field])) continue;
-                const ceiling = field === 'emission' ? Infinity : coefficientCeiling;
-                if (!rgbInput(med[field] ?? 0, ceiling))
-                    reasons.push(`spectral medium '${name}' property '${field}' requires nonnegative RGB constants or parameters${Number.isFinite(ceiling) ? ` bounded by ${ceiling}` : ''}, including defaults and bounds`);
+            const ceiling = heterogeneous ? 2 ** 60 : derivedTracking ? spectralCeilingRange[1] / 2 : Infinity;
+            for (const field of ['sigma_a', 'sigma_s'] as const) {
+                if (Number.isFinite(ceiling) && !isGlslExpression(med[field]) && !atMost(med[field] ?? 0, ceiling))
+                    reasons.push(`spectral medium '${name}' property '${field}' must be at most ${ceiling}, including parameter defaults and bounds`);
             }
         }
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-            if (row.semantic !== 'radiometric') continue;
+            if (row.semantic !== 'radiometric' || row.role !== 'reflectance') continue;
             const value = mat[row.source] ?? row.default;
-            // Expressions author RGB in the row's domain at every evaluated point.
-            // Their source and live controls cannot establish that domain statically.
-            if (isGlslExpression(value) || (row.role === 'emission' && isBlackbody(value))) continue;
-            const ceiling = row.role === 'reflectance' ? 1 : Infinity;
-            if (!rgbInput(value, ceiling))
-                reasons.push(`spectral material '${name}' property '${row.source}' requires ${ceiling === 1 ? 'RGB in [0,1]' : 'nonnegative RGB'}, including parameter defaults and bounds`);
+            // Expressions author RGB in [0,1] at every evaluated point; their source and live
+            // controls cannot establish that statically.
+            if (isGlslExpression(value) || namedKindOf(value)) continue;
+            if (!atMost(value, 1))
+                reasons.push(`spectral material '${name}' property '${row.source}' requires RGB in [0,1], including parameter defaults and bounds`);
         }
     }
-    if (scene.lights.some(l => !isBlackbody(l.emission) && !rgbInput(l.emission)))
-        reasons.push('spectral lights require nonnegative RGB emission, including parameter defaults and bounds');
-    const env = scene.environment;
-    if (env?.type === 'constant' && !isBlackbody(env.color) && !rgbInput(env.color))
-        reasons.push('spectral constant environments require nonnegative RGB, including parameter defaults and bounds');
     return reasons;
 }

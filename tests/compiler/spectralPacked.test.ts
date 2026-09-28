@@ -34,17 +34,23 @@ describe('spectral packed colours', () => {
         }
         expect(compiledJson(await packSceneData(spectralOnly.sceneData))).toBe(compiledJson(await packSceneData(rgbOnly.sceneData)));
     });
-    const invalidAttributes: Array<[string, number[] | Vec3[] | Float32Array]> = [
-        ['albedo', [[0.2, 1.1, 0.4], [0, 0, 0], [0, 0, 0]]],
-        ['albedo', [-0.1, 0, 0]],
-        ['emission', [[1, -0.1, 2], [0, 0, 0], [0, 0, 0]]],
-        ['albedo', new Float32Array([0, 0, 0, 0, 2, 0, 0, 0, 0])],
-        ['emission', new Float32Array([0, 0, 0, 0, -1, 0, 0, 0, 0])],
+    // Negative values are outside every radiometric role's domain, in both colour models;
+    // reflectance above one is outside only the spectral model's bounded lift.
+    const invalidAttributes: Array<[string, number[] | Vec3[] | Float32Array, 'negative' | 'above one']> = [
+        ['albedo', [[0.2, 1.1, 0.4], [0, 0, 0], [0, 0, 0]], 'above one'],
+        ['albedo', [-0.1, 0, 0], 'negative'],
+        ['emission', [[1, -0.1, 2], [0, 0, 0], [0, 0, 0]], 'negative'],
+        ['albedo', new Float32Array([0, 0, 0, 0, 2, 0, 0, 0, 0]), 'above one'],
+        ['emission', new Float32Array([0, 0, 0, 0, -1, 0, 0, 0, 0]), 'negative'],
     ];
-    for (const [key, values] of invalidAttributes) it(`rejects invalid ${key} in ${values instanceof Float32Array ? 'packed' : 'array'} attributes`, () => {
+    for (const [key, values, why] of invalidAttributes) it(`rejects ${key} ${why} in ${values instanceof Float32Array ? 'packed' : 'array'} attributes`, () => {
         const scene = structuredClone(spectralPackedScene);
         (scene.objects[1] as InstancedObject).attributes![key] = values;
-        expect(() => compiler.compile(scene, spectral)).toThrow(new RegExp(`attribute '${key}'`));
-        expect(() => compiler.compile(scene, rgb)).not.toThrow();
+        if (why === 'negative') {
+            for (const strategy of [spectral, rgb]) expect(() => compiler.compile(scene, strategy)).toThrow(new RegExp(`attributes\\.${key}.*(>= 0|negative)`));
+        } else {
+            expect(() => compiler.compile(scene, spectral)).toThrow(new RegExp(`attribute '${key}' requires RGB in \\[0,1\\]`));
+            expect(() => compiler.compile(scene, rgb)).not.toThrow();
+        }
     });
 });

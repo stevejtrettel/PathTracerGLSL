@@ -378,7 +378,7 @@ describe('Validator — hardening pack (H1)', () => {
 
     it('rejects negative light emission and negative material emission', () => {
         expect(run(s => { s.lights[0] = { kind: 'point', position: [0, 5, 0], emission: -1 }; })
-            .getErrors().some(e => /emission must be >= 0/.test(e.message))).toBe(true);
+            .getErrors().some(e => /emission components must be >= 0/.test(e.message))).toBe(true);
         expect(run(s => { s.materials.m.emission = [-1, 0, 0]; })
             .getErrors().some(e => /emission components must be >= 0/.test(e.message))).toBe(true);
     });

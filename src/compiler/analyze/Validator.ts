@@ -3,7 +3,7 @@
 import { spectralLimitations } from './spectral.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
-import { isDrivenRadiometric, isBlackbody } from '../../components/color/values.js';
+import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
 import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
@@ -126,30 +126,19 @@ export function validate(
                 }
             }
         }
-        // emission (B2's universal radiometric word) — required, number|vec3, >= 0.
-        // Negative radiance is non-physical: pt sees negative energy on every hit while the
-        // power CDF floors at ~0 so NEE almost never samples it — the strategies diverge.
-        // Driven-lights Stage A: emission may be a {param} — validate its DEFAULT (the
-        // uniform's initial value AND the plan-time CDF bake; a driven light needs one). The
-        // reserved-path/collision checks ride collectParamPaths automatically (ValueParam-shaped).
+        // emission (the one radiometric word) — required; a constant, a {param} (whose default
+        // is the uniform's initial value and the plan-time CDF bake) or a blackbody, checked by
+        // the shared spectrum checker against the emission domain. Negative radiance is
+        // non-physical: pt sees negative energy on every hit while the power CDF floors at ~0,
+        // so NEE almost never samples it and the strategies diverge. Expressions are not light
+        // emission (lights are sampled by a constant power).
         const e = authored.emission;
-        if (isBlackbody(e)) {
-            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Light ${i} (${light.kind})`, bag);
-            continue;
-        }
-        const eDriven = isValueParam(e);
-        const eValue = eDriven ? (e as { default?: unknown }).default : e;
-        const eChannels = typeof eValue === 'number' && Number.isFinite(eValue) ? [eValue]
-            : Array.isArray(eValue) && eValue.length === 3 && eValue.every((c) => typeof c === 'number' && Number.isFinite(c)) ? eValue as number[]
-            : null;
         if (e === undefined) {
             bag.error('invalid-setting', `Light ${i} (${light.kind}): required field 'emission' is missing (Le for area kinds, radiant intensity for delta — scalar broadcasts)`).add();
-        } else if (eDriven && eValue === undefined) {
-            bag.error('invalid-setting', `Light ${i} (${light.kind}): a driven emission {param: '${(e as { param?: string }).param}'} requires a 'default' (the uniform's initial value and the CDF bake)`).add();
-        } else if (eChannels === null) {
-            bag.error('invalid-setting', `Light ${i} (${light.kind}): emission must be a finite number or vec3${eDriven ? ' default' : ''}`).add();
-        } else if (eChannels.some((c) => c < 0)) {
-            bag.error('invalid-setting', `Light ${i}: emission must be >= 0 (negative radiance diverges pt vs pt-nee)`).add();
+        } else if (isGlslExpression(e)) {
+            bag.error('invalid-setting', `Light ${i} (${light.kind}): emission cannot be a GLSL expression — a light takes a constant, a {param} or a blackbody`).add();
+        } else {
+            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Light ${i} (${light.kind}): emission`, bag);
         }
         // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
         // radius): the kind DESCRIPTOR declares its rules; the Validator emits them —
@@ -271,9 +260,11 @@ export function validate(
                 .add();
         }
         const e = mat.emission;
-        const negativeEmission = typeof e === 'number' ? e < 0 : Array.isArray(e) ? e.some((c) => c < 0) : false;
-        if (negativeEmission) {
-            bag.error('invalid-setting', `Material '${name}': emission components must be >= 0`).add();
+        // A model with an emission row checks it with its other rows (validateSceneProperties);
+        // any other model's emission is still checked against the emission domain before the
+        // rule below decides whether it is a phantom light or ignored.
+        if (e !== undefined && !(MATERIAL_MODELS[mat.model]?.properties ?? []).some((f) => f.source === EMISSION_KEY)) {
+            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Material '${name}': emission`, bag);
         }
         // Emission on a model whose emission dispatch returns zero — one rule, one diagnostic.
         // A CONSTANT nonzero emission (incl. a constant blackbody) that the light registry would
@@ -908,7 +899,11 @@ export function validate(
     // A constant sky's radiance: the same spectrum rules as material and light values (the one
     // shared checker), since it is emitted radiance and feeds the env-selection power.
     if (env?.type === 'constant') {
-        validatePropertyValue(env.color, { shape: 'spectrum', role: 'emission', constraint: { kind: 'nonnegative' } }, 'environment.color', bag);
+        if (isGlslExpression(env.color)) {
+            bag.error('invalid-setting', 'environment.color cannot be a GLSL expression — a constant sky takes a constant, a {param} or a blackbody; a formula sky is `type: \'procedural\'`').add();
+        } else {
+            validatePropertyValue(env.color, { shape: 'spectrum', role: 'emission' }, 'environment.color', bag);
+        }
     }
     if (env && env.type !== 'none') {
         const I = env.intensity;
@@ -1212,6 +1207,9 @@ export function validate(
                         if (!ok) {
                             bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a non-finite value`)
                                 .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                        } else if (row.semantic === 'radiometric' && arr.some((v) => v < 0)) {
+                            bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a negative value — ${row.role} is nonnegative`)
+                                .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                         }
                     }
                     continue;
@@ -1226,6 +1224,12 @@ export function validate(
                 if (bad !== -1) {
                     bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${bad}] must be a finite ${spectrum ? 'number or vec3' : 'number'}`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                } else if (row.semantic === 'radiometric') {
+                    const negative = (arr as Array<number | number[]>).findIndex((v) => typeof v === 'number' ? v < 0 : v.some((c) => c < 0));
+                    if (negative !== -1) {
+                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${negative}] must be >= 0 — ${row.role} is nonnegative`)
+                            .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    }
                 }
             }
             // Exclusivity: the fill for this materialId becomes element-dependent, so sharing
@@ -1688,20 +1692,6 @@ function validatePrimitiveConstraint(
 // Helpers (audit-hardening H1)
 // ============================================================================
 
-
-/** May this authored emission be nonzero at runtime? Constants by value (some channel
- *  > 0), a blackbody by its scale (constant 0 → no, driven → maybe), and any {param} or
- *  GLSL expression → maybe. Covers every value spelling of SpectrumProperty. */
-function emissionMayBeNonzero(e: unknown): boolean {
-    if (e === undefined) return false;
-    if (typeof e === 'number') return e > 0;
-    if (Array.isArray(e)) return e.some((c) => typeof c === 'number' && c > 0);
-    if (isBlackbody(e)) {
-        const s = e.blackbody.scale;
-        return s === undefined || isValueParam(s) || s !== 0;
-    }
-    return true;   // {param} or GLSL expression
-}
 
 function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');

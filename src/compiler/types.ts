@@ -1,6 +1,7 @@
 // compiler/types.ts
 
 export { isValueParam, hasConstantNonzeroEmission } from '../components/color/values.js';
+import { emissionMayBeNonzero } from '../components/color/values.js';
 
 import type { SceneDataPlan } from './sceneData.js';
 
@@ -337,13 +338,11 @@ export function isHeterogeneousMedium(med: { sigma_a?: unknown; sigma_s?: unknow
     return isGlslExpression(med.sigma_a) || isGlslExpression(med.sigma_s) || isGlslExpression(med.emission);
 }
 
-/** A medium property that may be nonzero at runtime: nonzero constant, {param}
- * (live — can become nonzero), or expression. Authored and planned shapes alike. */
+/** A medium property that may be nonzero at runtime: a positive constant, a {param} (live —
+ * can become nonzero) or an expression. The same answer as for any emission value; values
+ * are nonnegative after validation. Authored and planned shapes alike. */
 function mediumPropertyMayBeNonzero(v: unknown): boolean {
-    if (v === undefined) return false;
-    if (typeof v === 'number') return v !== 0;
-    if (Array.isArray(v)) return v.some((c) => c !== 0);
-    return true;
+    return emissionMayBeNonzero(v);
 }
 
 /** The medium emits (impl-plan-medium-emission): ε may be nonzero. */

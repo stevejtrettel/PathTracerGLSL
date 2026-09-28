@@ -71,7 +71,7 @@ describe('live spectral colours', () => {
             if (site === 'material') bad.materials.surface.emission = value;
             if (site === 'light') bad.lights[1].emission = value;
             if (site === 'sky' && bad.environment?.type === 'constant') bad.environment.color = value;
-            expect(() => compiler.compile(bad, strategy)).toThrow(/nonnegative RGB/);
+            expect(() => compiler.compile(bad, strategy)).toThrow(/parameter min components must be >= 0/);
         }
     });
     it('preserves the existing restriction against driven tree-light emission', () => {

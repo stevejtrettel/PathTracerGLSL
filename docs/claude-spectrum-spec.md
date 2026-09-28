@@ -186,8 +186,9 @@ claims a value, and `kindOf(value)` falls back to the `rgb` kind, which covers n
 `color_lift_<role>(…)` call, in an index slot the scalar index. As built in step 1, `kindOf` does
 not take the slot: the loops that pass over every light row (light-row resolution, the
 driven-emission census) keep their conditions, so a number in a geometry row is never read as a
-color, and the `rgb` kind's answers equal the old fallback branches exactly. Step 2 makes the
-`rgb` kind strict (a value no kind recognizes becomes an error) and passes the slot.
+color, and the `rgb` kind's answers equal the old fallback branches exactly. In step 2 the
+plain-value checker rejects anything that is not a number, triple, `{param}` or expression, and
+a value with two kinds' keys, so readers after validation never see an unrecognized value.
 
 What the kinds do **not** take over yet (**Reviewer**): the attribute binding, decided at three
 sites today (materials.ts:390, lighting.ts:689, sceneData.ts:171), two of which hard-code the RGB
@@ -290,15 +291,49 @@ packed bytes, slider metadata, the App and the engine.
 **Not in this step:** new kinds, validation changes, folder moves, the color-model cleanup
 (design review 3.4), binding unification.
 
-### Step 2: one set of checks per role (behavior change; own plan)
+### Step 2: one set of checks per role (behavior change; built Sep 28)
 
-The measured RGB/spectral disagreements become failing tests first. Then: one table of role
-domains, applied to every spectrum slot and every binding (constants, slider defaults and
-bounds), the same in RGB and spectral renders, narrowed by the color model only where its lift
-cannot represent a value (the spectral lift keeps reflectance ≤ 1); one "can it emit" rule;
-errors for a value no kind recognizes or one with two kinds' keys; the blackbody light's shape
-checks; medium emission checked in RGB; an expression on a constant sky rejected in RGB; the
-kelvin slider range from the kind's domain; `formatSpectrum` removed.
+**Problem (evidence):** the step-0 diagnostics snapshot. Negative emission from a slider or in a
+medium, and an expression as the constant sky's color, compile in RGB and are rejected in
+spectral; a blackbody quad light with zero area passes validation and crashes the compile; a
+Cauchy formula as medium emission passes RGB validation and throws an internal error; a value
+with blackbody and `param` keys compiles. RGB never sign-checks reflectance, medium emission or
+per-instance colors, and never checks a slider's `max`.
+
+**Rule after this step:** every spectrum slot is checked by one function
+(`validatePropertyValue`) against its role's domain, in both color models, for constants, slider
+defaults and both slider bounds: reflectance, coefficient and emission are nonnegative, index is
+positive. The spectral model then narrows only where its lift or its tracking bound cannot
+represent a value: reflectance at most 1, and the media ceilings. A value is either plain or one
+named kind; one that carries two kinds' keys is an error.
+
+**What changes:**
+1. `validatePropertyValue`: the role implies its domain; slider `max` is checked like `min`; a
+   value with two kinds' keys is an error.
+2. Lights: the light branch validates emission through `validatePropertyValue` for every kind
+   (no `continue`), so every light runs its kind's shape checks; expressions stay rejected.
+3. Materials: a model without an emission row still has its `emission` checked against the
+   emission domain; the hand-written negative-emission check goes; the Validator's private
+   "may emit" predicate is replaced by the shared one.
+4. Media: `sigma_a`/`sigma_s` get the coefficient role, `emission` is validated at all (emission
+   role), `ior` gets the index role; media accept plain values only, one message for any named
+   kind (replacing the blackbody-only message and the misleading "Cauchy is an index form" on
+   `medium.ior`). `mediumPropertyMayBeNonzero` becomes the shared predicate.
+5. Constant sky: an expression is an error (the type already excludes it; RGB would compute a
+   NaN selection weight).
+6. Instance attributes: spectrum rows are sign-checked in both models.
+7. analyze/spectral.ts keeps only the spectral narrowing (reflectance ≤ 1; media ceilings and
+   majorant range), applied to plain values; named kinds are checked by their kinds.
+8. The kelvin slider's default minimum reads the blackbody domain's constant (same value); its
+   default maximum stays 12000 K as a UI choice.
+
+**Verification:** the digest is identical for every suite scene (valid scenes compile the same;
+if any suite scene is newly rejected, that is a finding to report, not to paper over); the
+diagnostics snapshot changes, and each changed case is reviewed and listed in the CHANGELOG; the
+scan test's allow-list shrinks to the Planner's `blackbody` flag; typecheck and the full test run.
+
+**Not in this step:** `formatSpectrum` (unused, with a wrong comment) is left for the owner to
+decide; RGB reflectance above 1 stays allowed, as today.
 
 ### Step 3: folders and plan fields (own plan)
 
