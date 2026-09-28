@@ -24,13 +24,18 @@ describe('spectral surface materials', () => {
                 const scene = structuredClone(minimalScene);
                 scene.materials.sphere = { model };
                 const material = scene.materials.sphere;
-                const valid: SpectrumProperty[] = [0, [0.1, 0.4, 0.8], { param: 'color', default: [0.2, 0.5, 0.8], min: 0, max: 1 }];
+                const valid: SpectrumProperty[] = [0, [0.1, 0.4, 0.8], { param: 'color', default: [0.2, 0.5, 0.8], min: 0, max: 1 },
+                    { kind: 'glsl', source: 'mix(vec3(0.1,0.4,0.8),vec3(0.8,0.2,0.1),0.5+0.5*sin(p.x+uv.y+u_pattern_phase))',
+                        params: [{ param: 'pattern.phase', default: 0, min: -3, max: 3 }] }];
                 for (const value of valid) {
                     material[row.source] = value;
                     expect(() => compiler.compile(scene, strategy)).not.toThrow();
+                    if (typeof value === 'object' && 'kind' in value)
+                        for (const [id, shader] of compiler.compile(scene, strategy).shaders)
+                            glslangCheck(shader.fragment, 'frag', id);
                 }
                 const invalid: SpectrumProperty[] = [-0.1, [0, NaN, 0], { param: 'color', default: 0.5, min: -1 },
-                    { kind: 'glsl', source: 'vec3(0.5)' }, { blackbody: { kelvin: 3000 } },
+                    { blackbody: { kelvin: 3000 } },
                     ...(row.role === 'reflectance' ? [1.1, { param: 'color', default: 0.5, max: 2 }] : [])];
                 for (const value of invalid) {
                     material[row.source] = value;

@@ -51,6 +51,9 @@ export function spectralLimitations(scene: SceneDescription): string[] {
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
             if (row.semantic !== 'radiometric') continue;
             const value = mat[row.source] ?? row.default;
+            // Expressions author RGB in the row's domain at every evaluated point.
+            // Their source and live controls cannot establish that domain statically.
+            if (isGlslExpression(value)) continue;
             const ceiling = row.role === 'reflectance' ? 1 : Infinity;
             if (!rgbInput(value, ceiling))
                 reasons.push(`spectral material '${name}' property '${row.source}' requires ${ceiling === 1 ? 'RGB in [0,1]' : 'nonnegative RGB'}, including parameter defaults and bounds`);

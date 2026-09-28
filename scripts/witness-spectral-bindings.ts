@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { Compiler } from '../src/compiler/Compiler.js';
 import { packSceneData } from '../src/app/sceneData.js';
 import type { InstancedObject, LightDescription, SceneDescription, Vec3 } from '../src/compiler/types.js';
+import { MATERIAL_MODELS } from '../src/components/materials/index.js';
 import { LIGHT_KINDS } from '../src/components/lights/index.js';
 import { blackbodyFixture } from '../tests/helpers/blackbodyFixtures.js';
 import { spectralData } from '../src/components/color/spectral/data.js';
@@ -144,6 +145,43 @@ for (const model of ['mirror', 'ggx', 'checker', 'dielectric', 'rough_dielectric
             [lifted.map(v => v * scale)]);
     }
 }
+// Surface formulas evaluate RGB arithmetic before the role-specific nonlinear lift.
+// Distinct p/uv samples and two uniform values catch lost coordinates and stale controls.
+const expressionA: Vec3 = [0.08, 0.25, 0.65], expressionB: Vec3 = [0.8, 0.2, 0.1];
+const blend = 'p.x + uv.x + u_pattern_blend';
+const expressionSource = `mix(${literal(expressionA)},${literal(expressionB)},${blend})`;
+let expressionMutation: typeof probes[number] | undefined;
+for (const [model, descriptor] of Object.entries(MATERIAL_MODELS)) {
+    for (const row of descriptor!.properties) {
+        if (row.semantic !== 'radiometric') continue;
+        const scene = structuredClone(spectralPackedReference);
+        scene.materials.lamp0 = { model, [row.source]: {
+            kind: 'glsl', source: expressionSource,
+            params: [{ param: 'pattern.blend', default: 0, min: 0, max: 0.125 }],
+        } };
+        const id = Object.keys(scene.materials).indexOf('lamp0');
+        for (const gain of [0, 0.125]) {
+            const body = `int i=int(gl_FragCoord.x)%3;
+                vec3 p=vec3(float(i)*0.25,0.0,0.0);
+                vec2 uv=vec2(float(i+1)*0.125,0.0);
+                fragColor=scene_material_properties(${id},p,uv,-1,${carrier}).${row.name};`;
+            const values = [0,1,2].map(i => {
+                const t = i*0.25+(i+1)*0.125+gain;
+                return expected(expressionA.map((v,c) => v*(1-t)+expressionB[c]*t) as Vec3, row.role === 'emission');
+            });
+            const probe = await add(`${model}.${row.source} RGB expression, blend=${gain}`, scene, body, values,
+                { u_pattern_blend: { type: 'float', value: gain } });
+            if (model === 'lambert' && row.source === 'albedo' && gain === 0) {
+                const wrong = `fragColor=mix(color_lift_reflectance(${literal(expressionA)},${carrier}),color_lift_reflectance(${literal(expressionB)},${carrier}),${blend});`;
+                expressionMutation = { ...probe, name: 'lift incorrectly distributed through RGB blend',
+                    source: probe.source.replace(`fragColor=scene_material_properties(${id},p,uv,-1,${carrier}).${row.name};`,wrong) };
+                assert.notEqual(expressionMutation.source,probe.source);
+            }
+        }
+    }
+}
+assert(expressionMutation);
+
 // Image filtering and procedural evaluation are authored RGB operations, before lift.
 const imageScene = { ...spectralPackedReference, environment: { type: 'image' as const, url: 'probe.hdr' } };
 const imageProbe = await add('filtered image sky', imageScene,
@@ -219,11 +257,12 @@ function verify(probe: typeof probes[number], values: number[]) {
 }
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation], width, assets);
+    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation, expressionMutation], width, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(mutation, frames[probes.length]), { name: 'AssertionError' });
     assert.throws(() => verify(mediumMutation, frames[probes.length+1]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index and absorption-illuminant mutations rejected`);
+    assert.throws(() => verify(expressionMutation, frames[probes.length+2]), { name: 'AssertionError' });
+    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index, absorption-illuminant and RGB-blend-order mutations rejected`);
 } finally {
     await browser.close();
 }

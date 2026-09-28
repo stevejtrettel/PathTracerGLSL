@@ -39,7 +39,6 @@ describe('spectral foundation', () => {
     });
     const unsupported: Array<[string, (s: SceneDescription) => void]> = [
         ['emissive media', s => { s.materials.sphere.medium = { sigma_a: 0.1, emission: 0.2 }; }],
-        ['colour expression', s => { s.materials.sphere.albedo = { kind: 'glsl', source: 'vec3(0.5)' }; }],
         ['blackbody', s => { s.lights[0].emission = { blackbody: { kelvin: 3000 } }; }],
         ['gain', s => { s.materials.sphere.albedo = 2; }],
         ['negative', s => { s.materials.sphere.albedo = [-0.1, 0, 0]; }],

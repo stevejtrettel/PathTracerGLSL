@@ -729,6 +729,12 @@ exports[`scene-data textures (byte fingerprints) > spectral-direct 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-eta 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-expressions 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-expressions-constant 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-expressions-ref 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-fog 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-fog-placement 1`] = `null`;

@@ -4,6 +4,36 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral surface RGB expressions
+
+Enabled RGB-valued expressions on each surface model's radiometric rows: albedo,
+checker colours, f0, interface transmittance and Lambert emission. The existing resolver
+already evaluates the RGB formula before the role-specific lift at the hit wavelengths;
+the production behavior change is only removal of the spectral validation gate.
+World position, surface UVs and declared live float controls retain their existing bindings.
+No transport, BSDF, storage, light-selection or runtime-clamp machinery was added.
+
+The [spectral README](src/components/color/spectral/README.md#surface-rgb-expressions)
+documents the author contract: finite RGB results, reflectance components in [0,1],
+nonnegative emission, at every evaluated point and live control value. Parameter bounds
+are not colour bounds; negative phase controls may produce valid colours. Expression
+emission remains path-found. Emissive/GRIN media, non-RGB forms and reflectance gain
+above one remain outside the supported set.
+
+Validation: the full run passed 3,595 tests and exposed one obsolete foundation test
+requiring expressions to be rejected. Removed that case, now covered by positive
+per-property GLSL compilation checks; all 12 remaining foundation tests pass on rerun.
+Typecheck and production build pass. All 49 generated GPU binding/BSDF/media probes pass,
+including 16 surface-expression cases covering every radiometric row, distinct p/uv
+samples and two live control values. The new lift-before-RGB-blend mutation fails as
+intended, alongside the existing instance-index and absorption-illuminant mutations.
+
+All seven rendered checks pass: constant-expression and spatial-expression twins against
+four constant patches under PT/NEE/MIS (mean and display RMSE below 0.001%), plus the
+existing RGB expression twin. Command: `npm run witness -- spectral-expressions-constant
+spectral-expressions expr-const`. All 233 existing synchronous scene digests remain
+identical; three fixtures are added and seven async scenes remain outside the digest.
+
 ## 2026-09-27 — spectral bounds and nonemissive heterogeneous media
 
 Enabled RGB-expression absorption/scattering under the existing delta/ratio trackers for

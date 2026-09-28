@@ -212,8 +212,8 @@ How a program is assembled:
   RGB-authored scenes (all six material models), including live colour controls,
   instance colour attributes and light-tree selection; glass uses wavelength-independent
   IOR. Image/procedural skies and nonemissive homogeneous/heterogeneous media are supported
-  (PT/NEE for tracking, with a documented numerical field domain). Surface material
-  expressions, emissive/GRIN media and non-RGB forms remain gated. See
+  (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
+  use the same reflectance/emission domains. Emissive/GRIN media and non-RGB forms remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.
 

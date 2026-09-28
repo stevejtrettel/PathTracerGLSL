@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, image/procedural skies, and nonemissive homogeneous/heterogeneous media; surface material expressions, emissive/GRIN media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and nonemissive homogeneous/heterogeneous media; emissive/GRIN media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -770,8 +770,12 @@ slider bounds are checked at compilation; runtime writes retain the same author 
 session restoration are compared to constant renders, including changes to the selection
 CDF and sky/finite split. Image and procedural skies are also enabled, with the
 support/density corrections in §4.5. Homogeneous nonemissive media are admitted as described
-in §5.3; nonemissive expression media use the certified domain in §5.2. Surface material
-expressions and emissive/GRIN media remain validation-gated; homogeneous emission bounds,
+in §5.3; nonemissive expression media use the certified domain in §5.2. Surface RGB
+expressions evaluate authored arithmetic before the role-specific lift. Their finite RGB
+output domain is an author contract at every point and live control value; no runtime
+clamp is added. Expression emission remains path-found. The spectral README records the
+coordinate/control GPU probes and constant/spatial rendered twins. Emissive/GRIN media
+remain validation-gated; homogeneous emission bounds,
 non-RGB form codes and CPU constant precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 

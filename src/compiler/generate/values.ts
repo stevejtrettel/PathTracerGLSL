@@ -34,7 +34,7 @@ import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../p
 import { paramToUniform } from '../../components/glsl-format.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
- *  (heterogeneous media only — the third axis, orthogonal to the constant/driven split). */
+ *  (surface properties and medium coefficients). */
 export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue;
 
 /**

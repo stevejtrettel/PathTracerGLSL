@@ -3,10 +3,10 @@
 `measurement.color: 'spectral'` uses four wavelengths in nanometres on [360, 830],
 with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
-colour parameters, PT/NEE/MIS,
-light-tree selection and instancing with constant or per-instance RGB colours. Nonemissive homogeneous and heterogeneous media are supported. Emissive/GRIN media,
-surface material expressions and non-RGB forms remain rejected. All six existing surface models are
-supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
+colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
+instancing with constant or per-instance RGB colours. Nonemissive homogeneous and
+heterogeneous media are supported. Emissive/GRIN media and non-RGB forms remain
+rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
 
 ## Measurement and sampling
@@ -185,6 +185,35 @@ checks a mixed coloured scene's NEE/MIS agreement, grey mirror reflectance, glas
 radiance compression and rough glass's two-sided light-tree selection at the first
 surface event. The mixed
 scene is available in the lab as `spectral-materials`.
+
+## Surface RGB expressions
+
+A radiometric material property may use `{ kind: 'glsl', source, params? }`. The
+source returns a linear-sRGB `vec3`; `p` is the world shading point and `uv` is the
+surface chart. Declared parameters are live float uniforms, using the existing
+`pattern.phase` → `u_pattern_phase` naming. The expression performs all RGB arithmetic
+before the resolver lifts its result at the hit wavelengths, with the property's
+reflectance or emission role. Lifting the inputs before blending is a different field.
+
+At every evaluated point and live parameter value, the result must be finite and
+within the role's domain: each reflectance component in [0,1], emission nonnegative.
+This is an author contract; the compiler does not prove arbitrary GLSL bounds and adds
+no runtime clamp. Parameter bounds describe the controls, not the resulting colour;
+a negative phase parameter is valid when its formula still returns valid RGB.
+Expressions return RGB, not explicit wavelength-dependent spectra.
+
+Expression emission remains path-found under the existing light eligibility rules;
+it is not inserted into the finite-light sampling roster or light tree. PT, NEE and
+MIS all retain that hit-side contribution. Constant reference emitters must also set
+`sampleAsLight: false` to compare the same sampling setup.
+
+`npm run witness:spectral-bindings` checks every radiometric surface row at distinct
+world/UV coordinates and two live control values, in four unequal wavelength lanes.
+A deliberately incorrect lift-before-blend implementation must fail these probes.
+`npm run witness -- spectral-expressions-constant spectral-expressions` compares
+constant formulas and a spatial field with four independently authored constant
+patches under PT/NEE/MIS. The spatial scene has a live horizontal split control;
+its emission split follows the quad's vertical UV coordinate.
 
 ## Image and procedural skies
 
