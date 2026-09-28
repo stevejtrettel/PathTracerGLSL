@@ -33,7 +33,7 @@ function expected(rgb: Vec3, emission: boolean): number[] {
 }
 const width = 96;
 const compiler = new Compiler();
-const probes: Array<{ name: string; source: string; textures: object[]; expected: number[][] }> = [];
+const probes: Array<{ name: string; source: string; textures: object[]; expected: number[][]; tolerance?: number }> = [];
 async function add(name: string, scene: SceneDescription, body: string, values: number[][],
     uniforms: Record<string, { type: string; value: number | number[] }> = {},
     strategy: RenderStrategy = packedStrategy('mis', 'bvh')) {
@@ -46,7 +46,7 @@ async function add(name: string, scene: SceneDescription, body: string, values: 
     const textures: object[] = Object.entries(packed.channels).map(([channel, data]) => ({
         uniform: `u_data_${channel}`, width: data.width, height: data.height, data: Array.from(data.data),
     }));
-    const probe = { name, source: source.slice(0, main) + `void main() { ${body} }`, textures, uniforms, expected: values };
+    const probe: typeof probes[number] & { uniforms: typeof uniforms } = { name, source: source.slice(0, main) + `void main() { ${body} }`, textures, uniforms, expected: values };
     probes.push(probe);
     return probe;
 }
@@ -283,21 +283,80 @@ await add('RGB density scale applies to emission before lift',emittingTracked,
     `fragColor=scene_medium_properties(${mediumID},vec3(0.0),${carrier}).emission;`,[emissionLanes],
     {u_emission_gain:{type:'float',value:4}},trackedChoice);
 
+
+// GRIN uses the same spectral lanes throughout its interior walk and wall handoff.
+// A constant index gives independent Beer/source references without geometric error;
+// a quadratic n² gives a genuinely curved, analytically known trajectory.
+const grinScene: SceneDescription = {
+    id: 'spectral-grin-probe', name: 'Spectral GRIN probe', ambientSpace: { type: 'euclidean' },
+    objects: [{ type: 'box', parameters: { center: [0,0,0], halfSize: [3,3,1.01] }, material: 'lens' }],
+    materials: { lens: { model: 'none', medium: { ior: 1, sigma_a: [0.3,0.7,1.2], emission: [0.4,0.8,1.2] } } },
+    lights: [{ kind: 'quad', corner: [-1,4,-1], edge1: [2,0,0], edge2: [0,0,2], emission: 1 }],
+};
+const grinRay = `make_ray(vec3(0.0),vec3(0.0,0.0,1.0),${carrier})`;
+const grinCall = `MediumSample ms=medium_sample_grin(0,${grinRay},1.01,vec2(0.5));`;
+await add('GRIN colored Beer attenuation',grinScene,
+    grinCall + 'fragColor=log(ms.weight)/ms.exit_p.z;', [a.map(v=>-v)]);
+await add('GRIN colored source integral',grinScene,
+    grinCall + `vec4 sigma=vec4(${a.join(',')}); fragColor=ms.radiance*sigma/(1.0-exp(-sigma*ms.exit_p.z));`, [emissionLanes]);
+grinScene.materials.lens.medium!.sigma_a=0;
+let grinEmissionMutation: typeof probes[number] | undefined;
+for (const length of [0.003,1.01]) {
+    const probe = await add(`GRIN luminous vacuum, length=${length}`,grinScene,
+        `MediumSample ms=medium_sample_grin(0,${grinRay},${length},vec2(0.5));
+        fragColor=ms.radiance/${length < 0.02 ? length : 'ms.exit_p.z'};`, [emissionLanes]);
+    if (length === 1.01) {
+        grinEmissionMutation={...probe,name:'GRIN artificial absorption floor',source:probe.source.replace(
+            'medium_absorption_integral(mp.sigma_a, ds)',
+            '(SPECTRUM_ONE-spectrum_exp(-max(mp.sigma_a,Spectrum(1e-6))*ds))/max(mp.sigma_a,Spectrum(1e-6))')};
+        assert.notEqual(grinEmissionMutation.source,probe.source);
+    }
+}
+assert(grinEmissionMutation);
+grinScene.materials.lens.medium={ior:{kind:'glsl',source:'sqrt(1.0+0.2*p.y)'}};
+const curvedProbe=await add('GRIN quadratic-index trajectory',grinScene,
+    grinCall + `vec3 wall=ms.exit_p+GRIN_EXIT_PULLBACK*ms.exit_dir;
+        fragColor=vec4(wall.x,wall.y,wall.z,ms.weight.x*ms.eta_scale);`, [[0,0.05*1.01**2,1.01,1]]);
+// Verlet is exact for this constant force; finite differences and wall bisection
+// leave an O(1e-4) coordinate error at the chosen step and gradient epsilon.
+curvedProbe.tolerance=2e-4;
+grinScene.materials.lens.medium={ior:1,sigma_s:1};
+let grinZeroMutation: typeof probes[number] | undefined;
+for (const length of [0.003,1.01]) {
+    // Inject a zero lane after the real property reader: ordinary RGB lifts rarely
+    // produce an exact spectral zero, but the sampler must handle that boundary.
+    const tr=[0,1,2,3].map(v=>Math.exp(-v*length));
+    const probe=await add(`GRIN zero-rate selected channel, length=${length}`,grinScene,
+        `MediumSample ms=medium_sample_grin_scatter(0,${grinRay},${length},vec2(0.0));
+        fragColor=${length < 0.02 ? 'ms.scattered ? vec4(-99.0) : ms.weight' : 'vec4(float(ms.scattered),ms.exit_p.z+GRIN_EXIT_PULLBACK,ms.eta_scale,float(ms.deflected))'};`,
+        [length < 0.02 ? tr.map(v=>v/average(tr)) : [0,1.01,1,1]]);
+    probe.source=probe.source.replace('Spectrum sigma_t = m0.sigma_a + m0.sigma_s;',
+        'm0.sigma_a=vec4(0.0); m0.sigma_s=vec4(0.0,1.0,2.0,3.0); Spectrum sigma_t=m0.sigma_s;');
+    if (length === 1.01) {
+        probe.tolerance=2e-4;
+        grinZeroMutation={...probe,name:'GRIN artificial collision rate',source:probe.source.replace('float sc = sigma_t[c];\n    // A zero-rate','float sc = max(sigma_t[c],1e-9);\n    // A zero-rate')};
+        assert.notEqual(grinZeroMutation.source,probe.source);
+    }
+}
+assert(grinZeroMutation);
+
 function verify(probe: typeof probes[number], values: number[]) {
     for (let x = 0; x < width; x++) for (let c = 0; c < 4; c++) {
         const target = probe.expected[x % probe.expected.length][c];
-        assert(Math.abs(values[4*x+c] - target) < 2e-5, `${probe.name}, pixel ${x}, lane ${c}: ${values[4*x+c]} != ${target}`);
+        assert(Math.abs(values[4*x+c] - target) < (probe.tolerance ?? 2e-5), `${probe.name}, pixel ${x}, lane ${c}: ${values[4*x+c]} != ${target}`);
     }
 }
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
-    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation, expressionMutation, emissionMutation], width, assets);
+    const frames = await renderProbes(await browser.newPage(), [...probes, mutation, mediumMutation, expressionMutation, emissionMutation, grinEmissionMutation, grinZeroMutation], width, assets);
     probes.forEach((probe, i) => verify(probe, frames[i]));
     assert.throws(() => verify(mutation, frames[probes.length]), { name: 'AssertionError' });
     assert.throws(() => verify(mediumMutation, frames[probes.length+1]), { name: 'AssertionError' });
     assert.throws(() => verify(expressionMutation, frames[probes.length+2]), { name: 'AssertionError' });
     assert.throws(() => verify(emissionMutation, frames[probes.length+3]), { name: 'AssertionError' });
-    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index, absorption-illuminant, RGB-blend-order and luminous-vacuum mutations rejected`);
+    assert.throws(() => verify(grinEmissionMutation, frames[probes.length+4]), { name: 'AssertionError' });
+    assert.throws(() => verify(grinZeroMutation, frames[probes.length+5]), { name: 'AssertionError' });
+    console.log(`PASS: ${probes.length} generated spectral binding/BSDF/media probes, all four lanes; instance-index, absorption-illuminant, RGB-blend-order, luminous-vacuum, GRIN-source and GRIN-zero-rate mutations rejected`);
 } finally {
     await browser.close();
 }

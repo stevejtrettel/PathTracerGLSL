@@ -193,12 +193,11 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
     // micro-segment rides the E1.5 closed form (n change is sub-resolution — factor 1).
     if (t_max <= min(n0 * GRIN_STEP, GRIN_DS_MAX)) {
         MediumProperties mg = scene_medium_properties(med, ray.origin, ray.wl);
-        Spectrum sag = max(mg.sigma_a, Spectrum(1e-6));
         ms.deflected = false;
         ms.eta_scale = 1.0;
         ms.t = t_max;
-        ms.weight = spectrum_exp(-sag * t_max);
-        ms.radiance = medium_emission(mg) * (SPECTRUM_ONE - ms.weight) / sag;
+        ms.weight = spectrum_exp(-mg.sigma_a * t_max);
+        ms.radiance = medium_emission(mg) * medium_absorption_integral(mg.sigma_a, t_max);
         return ms;
     }
 
@@ -254,9 +253,9 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
             float t_cross = hi * h * n_exit;                       // world distance from r to the crossing
             float t_exit  = t_cross - GRIN_EXIT_PULLBACK;          // may rewind past r at grazing — by design
             MediumProperties me = scene_medium_properties(med, r, ray.wl);
-            Spectrum sae = max(me.sigma_a, Spectrum(1e-6));
-            Spectrum tre = spectrum_exp(-sae * max(t_exit, 0.0));
-            ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(me) * (SPECTRUM_ONE - tre) / sae;
+            float ds_exit = max(t_exit, 0.0);
+            Spectrum tre = spectrum_exp(-me.sigma_a * ds_exit);
+            ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(me) * medium_absorption_integral(me.sigma_a, ds_exit);
             absorb *= tre;
             ms.exit_dir = normalize(T_half);
             ms.exit_p   = r + t_exit * ms.exit_dir;
@@ -264,15 +263,13 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
             return ms;
         }
 
-        // Per-step source + attenuation over ds = |Δr| = |T_half|·h — the E1.5 closed form
-        // per step (σ_a floored 1e-6 for pair consistency; for CONSTANT coefficients the sum
-        // TELESCOPES to the inline arm's exact result). Emitted radiance at index n reaches
-        // the segment start (index n₀) scaled by (n₀/n)² — basic radiance L/n² invariance,
-        // paid by the carried |T| = n (impl-plan-grin-media batch 1).
+        // Source and attenuation over ds = |T_half|·h, including exact vacuum.
+        // The source integral telescopes for constant coefficients at constant n.
+        // Radiance emitted at index n reaches the segment start scaled by (n₀/n)².
         MediumProperties mp = scene_medium_properties(med, r, ray.wl);
-        Spectrum sa = max(mp.sigma_a, Spectrum(1e-6));
-        Spectrum step_tr = spectrum_exp(-sa * (length(T_half) * h));
-        ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(mp) * (SPECTRUM_ONE - step_tr) / sa;
+        float ds = length(T_half) * h;
+        Spectrum step_tr = spectrum_exp(-mp.sigma_a * ds);
+        ms.radiance += round_comp * absorb * ((n0 * n0) / (n * n)) * medium_emission(mp) * medium_absorption_integral(mp.sigma_a, ds);
         absorb *= step_tr;
 
         vec3 F_next = grin_force(med, r_next, ray.wl);   // THE one force evaluation per step (reused next)
@@ -306,15 +303,17 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
 
     // Channel-MIS draw, up front: uniform channel, exponential target arc s*.
     int   c  = spectrum_sample_channel(xi.x);
-    float sc = max(sigma_t[c], 1e-9);
-    float s_star = -log(1.0 - xi.y) / sc;
+    float sc = sigma_t[c];
+    // A zero-rate channel has no finite collision. Its placeholder arc is never
+    // consumed by either event branch, including when xi.y is exactly zero.
+    float s_star = sc > 0.0 ? -log(1.0 - xi.y) / sc : 0.0;
 
     // t_max guard (the near-wall handoff terminator, as in the deterministic arm): resolve
     // the analytic decision directly on the straight micro-segment.
     if (t_max <= min(n0 * GRIN_STEP, GRIN_DS_MAX)) {
         ms.deflected = false;
         ms.eta_scale = 1.0;
-        if (s_star < t_max) {
+        if (sc > 0.0 && s_star < t_max) {
             Spectrum tr  = spectrum_exp(-sigma_t * s_star);
             float    pdf = spectrum_average(sigma_t * tr);
             ms.scattered = true;
@@ -366,7 +365,7 @@ MediumSample medium_sample_grin_scatter(int med, Ray ray, float t_max, vec2 xi) 
 
         // The tentative event lands in this step AND before the wall → scatter.
         float ds_event = s_star - s_acc;
-        if (ds_event <= ds && ds_event <= ds_wall) {
+        if (sc > 0.0 && ds_event <= ds && ds_event <= ds_wall) {
             Spectrum tr  = spectrum_exp(-sigma_t * s_star);
             float    pdf = spectrum_average(sigma_t * tr);
             float er = n_half / n0;

@@ -16,7 +16,7 @@ dT/dt = n·∇n        arc length ds = n·dt
 ```
 
 Rays bend toward higher `n` (a mirage bends light toward the cooler, denser air). `∇n` is
-central finite differences of `ior_at(med, p)` — the same trick the SDF
+central finite differences of `ior_at(med, p, wl)` — the same trick the SDF
 marcher uses for normals. `|T| = n` is a conserved sanity check; for a spherically-symmetric
 `n(r)`, **Bouguer's invariant** `|r × T| = n·r·sin φ` is conserved (the GRIN analog of angular
 momentum) — `grin.test.ts` verifies it (the reference-free correctness gate) and that a
@@ -60,11 +60,11 @@ Verlet truncation bounded by `GRIN_STEP` — except that a traversal longer than
 
 Since the hard-interface batch there is ONE authored index — the medium's `ior` formula — with
 two generated projections, consumed differently:
-- **At the wall** — `ior_of(region, p)` (region table, point-evaluated), read by VALUE for
+- **At the wall** — `ior_of(region, p, wl)` (region table, point-evaluated), read by VALUE for
   Snell + Fresnel in `dielectric.glsl`: a deflecting region's row is the medium formula at p;
   a constant dielectric's row ignores p. One truth — authoring BOTH a surface `ior` row and
   `medium.ior` is Validator-rejected.
-- **Inside** — `ior_at(med, p)` (this occupant's accessor), read by GRADIENT (the ray bends by
+- **Inside** — `ior_at(med, p, wl)` (this occupant's accessor), read by GRADIENT (the ray bends by
   `∇n`, sampled at many nearby points per step). It is NOT a `MediumProperties` field (that
   struct bundles the value-consumed σ_a/σ_s/ε) — a gradient-consumed field earns its own cheap
   accessor.
@@ -77,13 +77,17 @@ two generated projections, consumed differently:
 - **Emission** (impl-plan-grin-media batch 1): collected PER STEP in the Verlet loop — the
   E1.5 closed form each step (telescopes exactly for constants) × the **(n₀/n)² source
   factor** (radiance inside index n is n²·L — Kirchhoff; `grin-furnace-emit` pins it).
+  `medium_absorption_integral` supplies the source integral for full steps, exit partials
+  and the near-wall guard: its exact zero-absorption limit is ds, with a small-optical-depth
+  polynomial avoiding cancellation. Attenuation uses actual σ_a, without a floor.
   Expression ε needs no majorant here (the walker paces by the ODE, not σ̄).
 - **Scattering** (batch 2, CONSTANT coefficients): `medium_sample_grin_scatter` — the analytic
   arm's channel-MIS with t → ARC LENGTH (draw up front, the walk finds where the arc lands;
   survive weight at the discovered exit; every outcome × the interior (n₀/n)² factor). The
   scatter event's position + incident direction ride `exit_p`/`exit_dir` (the EVENT RAY —
   every scattering arm fills them; the walk no longer recomputes a straight-line point).
-  Emissive scattering in one region and expression σ under bending stay rejected (declared).
+  A zero-rate selected channel survives to the wall, including an exact zero random draw.
+  Emissive scattering in one region and expression σ with scattering stay rejected.
 - **Geometry-free interior** (a bent ray hitting embedded surfaces is the deferred
   curved-ray-intersection problem).
 - **THE GLASS RULE** (estimator policy): the region is a specular refractor — the walk records
@@ -115,5 +119,8 @@ two generated projections, consumed differently:
   strong-field limiters), `GRIN_CAPTURE`, `GRIN_BISECT_ITERS` (exit refinement depth), and the
   three roulette constants above. All `#ifndef`-guarded; per-region scale-DERIVED defaults are
   the remaining plan-time polish.
-- **Spectral-ready:** the `ior` formula gains a wavelength `λ` when the spectral axis lands
-  (dispersion `n(λ)`), with nothing to change here now.
+- **Spectral:** four lanes share a curved path through a wavelength-independent index.
+  Index/gradient queries receive `ray.wl`, held fixed over the spatial stencil. Absorption
+  and emission resolve at those wavelengths. Dispersion is deferred: it requires a spectral
+  index form and collapse before the first wavelength-dependent advance, including when
+  the camera starts inside the medium. The integrator itself remains scalar-index.

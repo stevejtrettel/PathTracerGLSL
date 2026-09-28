@@ -1,5 +1,13 @@
 # fable-variable-ior.md — variable-IOR (gradient-index) media
 
+**Spectral status (Sep 27, 2026):** the walker supports four spectral lanes along a shared
+path through a wavelength-independent index. Both index accessors now take `Wavelengths`;
+absorption/emission and constant-coefficient scattering resolve at those wavelengths.
+Dispersion and collapse remain planned. Current contracts and limitations are in the
+[GRIN component note](../src/components/transport/volume/grin/grin.md) and
+[spectral model](../src/components/color/spectral/README.md#wavelength-independent-grin).
+The dated build records below describe earlier stages.
+
 **STATUS: BUILT & GPU-verified Jul 21 2026** — the tracer's first curved-space feature.
 **HARD-INTERFACE BATCH BUILT Jul 22 2026** (`docs/impl-plan-grin-interface.md`):
 the §7 "hard refractive interface" item is now built — `ior_of(int region, Point p)` (one ior

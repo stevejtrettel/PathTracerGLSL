@@ -21,10 +21,13 @@ channel-MIS (fable-volumetric-component §4) transcribed to ARC LENGTH.
 **Physics.** Basic radiance L/n² is invariant, so radiance emitted at a point x with index
 n(x) arrives at the segment start (index n₀) scaled by (n₀/n(x))² — the same |T| = n carried
 invariant pays for it. Per Verlet step of coordinate length ds, the exact per-step closed form
-(E1.5's shape, σ_a constant over the step, floored 1e-6 for pair consistency):
+(E1.5's shape, σ_a constant over the step):
 
     ms.radiance += absorb · (n₀/n)² · ε(r) · (1 − e^{−σ_a·ds}) / σ_a
     absorb      *= e^{−σ_a·ds}
+
+As of Sep 27, the quotient uses `medium_absorption_integral`: its σ_a=0 limit is ds,
+and a small-optical-depth polynomial avoids cancellation. Attenuation uses actual σ_a.
 
 Collection happens in the capture spiral too (a ray plunging through glowing gas radiates its
 sightline before dying), in the exit partial step, and in the t_max guard's micro-segment.

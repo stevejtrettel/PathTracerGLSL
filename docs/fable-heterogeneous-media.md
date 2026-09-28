@@ -77,7 +77,9 @@ separately. The colour model supplies an outward-rounded spectral bound; both pa
 shadow trackers use it. The [spectral component's numerical certificate](../src/components/color/spectral/README.md#tracking-bound)
 states the finite input domain and rounding allowance. The real-arithmetic D1 equations
 alone do not certify a float32 bound. Spectral tracking supports PT/NEE;
-GRIN remains gated; volume emission uses the same RGB field scale before its emission-role lift.
+volume emission uses the same RGB field scale before its emission-role lift. Spectral
+GRIN instead uses its ODE walk without a density ceiling or field clamp; its index must
+remain wavelength-independent. Curved tracking is not implemented.
 
 ## 1. Pinned decisions (owner, July 17 2026)
 

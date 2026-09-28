@@ -61,9 +61,9 @@ describe('spectral surface materials', () => {
         expect(compiledJson(forward.sceneData)).toBe(compiledJson(reversed.sceneData));
         for (const r of forward.renderers) expect(compiledJson(r)).toBe(compiledJson(reversed.renderers.find(v => v.id === r.id)));
     });
-    it('keeps GRIN media gated even on an admitted glass surface', () => {
+    it('rejects emissive scattering GRIN on an admitted glass surface', () => {
         const scene = structuredClone(spectralMaterials);
-        scene.materials.glass.medium = { sigma_a: 0.1, ior: 1.5 };
-        expect(() => compiler.compile(scene, spectralMaterialStrategies[0])).toThrow(/spectral medium/);
+        scene.materials.glass.medium = { sigma_s: 0.1, emission: 1, ior: 1.5 };
+        expect(() => compiler.compile(scene, spectralMaterialStrategies[0])).toThrow(/scatter AND emit/);
     });
 });

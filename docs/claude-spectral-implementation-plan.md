@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission; GRIN media, blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission, and wavelength-independent GRIN; blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -503,8 +503,8 @@ model supplies distinct float32 field and sampling ceilings. Main and shadow tra
 share the generated rate. Asset-premise checks and GPU margins supplement the proof;
 they are not substituted for it. Volume emission now uses the same clamp and tracking
 rate. Homogeneous emissive scattering derives a rate from live RGB extinction using
-the same envelope; the README gives its input domain and rounding argument. GRIN and
-non-RGB coefficients remain outside the supported set.
+the same envelope; the README gives its input domain and rounding argument. GRIN uses its
+ODE route without this bound. Non-RGB coefficients remain outside the supported set.
 
 Analytic channel selection uses `SPECTRUM_N` and its actual mixture density. After collapse,
 the first implementation may still choose uniformly among all four coefficient channels and
@@ -520,8 +520,8 @@ and scattering, lifted separately with the coefficient role (no D65 multiplier).
 bounded regions and ambient media, HG and Rayleigh phases, and the existing analytic
 PT/NEE/MIS and delta-light equiangular routes. No transport-loop or interface change is needed.
 Volume emission is implemented in the subsequent stage described in the spectral README;
-GRIN remains validation-rejected. Expression coefficients use the
-separate tracking stage in §5.2.
+wavelength-independent GRIN uses its separate ODE route. Straight-path expression coefficients
+use the tracking stage in §5.2.
 
 This stage requires no spectral majorant: for a fixed wavelength packet, each coefficient
 is constant over the segment. Choose one of N lanes uniformly; conditional on lane c,
@@ -778,8 +778,13 @@ expressions evaluate authored arithmetic before the role-specific lift. Their fi
 output domain is an author contract at every point and live control value; no runtime
 clamp is added. Expression emission remains path-found. The spectral README records the
 coordinate/control GPU probes and constant/spatial rendered twins. Volume emission is now supported through the existing analytic/tracking routes, with a
-stable vacuum-limit integral and model-aware live homogeneous bounds. GRIN media remain
-validation-gated; non-RGB form codes and CPU constant precomputation remain unimplemented. Reflectance inputs above
+stable vacuum-limit integral and model-aware live homogeneous bounds. Wavelength-independent
+GRIN is also supported: absorbing/emitting spatial fields use the same stable source integral
+at each step, while constant/live scattering uses four-channel arc-length sampling.
+Zero-rate channels have no finite collision. Existing curved-scattering restrictions and
+opaque shadows remain in place; no loop/interface change is needed. The spectral README
+records the GPU probes and rendered witnesses. Non-RGB form codes and CPU constant
+precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 
 Add role-aware validation: finite nonnegative coefficients/emission, the proposed extended

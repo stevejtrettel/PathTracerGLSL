@@ -34,7 +34,8 @@ emission coefficient. At zero extinction the result is exactly `len`, while path
 attenuation remains exactly one. For optical depth `tau < 0.1`, a fourth-degree
 Taylor polynomial evaluates `(1-exp(-tau))/tau` without cancellation; its omitted
 term is at most `tau^5/720`. Larger depths use `(1-exp(-tau))/sigma` directly.
-The helper is included only when an analytic emitting arm calls it. Emissive
+The helper is included for analytic emitting arms and the GRIN walker, which calls it
+for per-step and boundary source collection. Emissive
 scattering media use the tracking bodies, whose per-collision source collection
 already fits the same `MediumSample.radiance` contract.
 

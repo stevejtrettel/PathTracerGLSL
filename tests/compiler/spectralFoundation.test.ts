@@ -38,7 +38,7 @@ describe('spectral foundation', () => {
         expect(() => compiler.compile(minimalScene, { ...minimalStrategy, estimator: { ...minimalStrategy.estimator, wavelengths: 'visible' } })).toThrow(/wavelengths/);
     });
     const unsupported: Array<[string, (s: SceneDescription) => void]> = [
-        ['GRIN media', s => { s.materials.sphere.medium = { sigma_a: 0.1, ior: 1.5 }; }],
+        ['emissive scattering GRIN', s => { s.materials.sphere.medium = { sigma_s: 0.1, emission: 1, ior: 1.5 }; }],
         ['blackbody', s => { s.lights[0].emission = { blackbody: { kelvin: 3000 } }; }],
         ['gain', s => { s.materials.sphere.albedo = 2; }],
         ['negative', s => { s.materials.sphere.albedo = [-0.1, 0, 0]; }],

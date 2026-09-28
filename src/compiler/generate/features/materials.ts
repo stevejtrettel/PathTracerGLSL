@@ -136,7 +136,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (scatteringLive || wantsShadowMedia) {
             blocks.push({ origin: 'components/transport/volume/analytic/analytic.glsl', source: mediumAnalyticGLSL });
         }
-        if (plan.materials.some(m => m.medium !== null && isEmissiveMedium(m.medium)
+        if (media.deflecting || plan.materials.some(m => m.medium !== null && isEmissiveMedium(m.medium)
             && !mediumIsDeflecting(m.medium)
             && !mediumRoutesToTracking(m.medium, media.scatteringMedia.includes(m.id)))) {
             blocks.push({ origin: 'components/transport/volume/analytic/emission.glsl', source: mediumEmissionGLSL });

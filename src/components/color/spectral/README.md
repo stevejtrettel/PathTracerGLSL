@@ -5,7 +5,7 @@ with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
 instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
-GRIN media and non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
+Wavelength-independent GRIN is supported; non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass uses
 a wavelength-independent scalar IOR; dispersion is not implemented.
 
 ## Measurement and sampling
@@ -245,7 +245,7 @@ existing transport seams. `scattering: 'ignored'` removes scattering from both m
 shadow extinction. Zero selected extinction means survival to the segment boundary.
 
 Nonemissive analytic sampling needs no all-wavelength majorant. Expression coefficients
-and emissive scattering media use the tracking bound below; GRIN remains gated. Existing
+and emissive scattering media on straight paths use the tracking bound below. Existing
 small-PDF normalization floors are unchanged, so these checks do not certify extreme
 optical depths.
 
@@ -255,6 +255,35 @@ live coefficients, shadow transmission and all four analytic sampling lanes on t
 The `spectral-slab`, `spectral-shadow-slab`, `spectral-scatter-furnace`,
 `spectral-rayleigh-furnace`, `spectral-fog` and `spectral-fog-placement` scenes provide the
 rendered checks and gallery examples.
+
+## Wavelength-independent GRIN
+
+All four wavelengths follow one curved path through a scalar index field. Index constants,
+live controls and spatial GLSL expressions are supported. The authored index must be
+wavelength-independent; this is an author contract for raw GLSL, not a property the compiler
+proves. `ior_at(material,p,wl)` and `ior_of(region,p,wl)` already receive the carrier.
+Finite-difference gradient queries hold it fixed, and event/exit rays preserve it.
+
+Absorption and emission use their respective spectral lifts at each step. Spatial RGB
+fields need no density ceiling and undergo no tracking field clamp: the ODE controls the
+step. The finite, nonnegative lift domains still apply. Scattering uses constant or live
+coefficients, with uniform selection among four lanes and the full mixture density in arc
+length. A zero-rate selected lane has no finite collision, even at a zero random draw.
+Expression coefficients with scattering, and emission plus scattering in one GRIN region,
+remain rejected by the existing curved-transport restrictions.
+
+PT, NEE and MIS retain the existing opaque-shadow policy for deflecting media. The walker
+owns interior propagation; the wall material owns Snell/Fresnel. The geometry-free interior,
+step and boundary errors, traversal event budget, capture and long-walk limits are unchanged;
+see [the GRIN model](../../transport/volume/grin/grin.md). GPU probes check four unequal
+attenuation/source lanes, exact vacuum, zero-rate sampling and a curved trajectory with
+`n²=1+0.2y`. Spectral slab, source, hard-interface/scattering furnaces, an analytic scattering
+twin and a Luneburg NEE/MIS comparison exercise complete renders.
+
+Dispersion is a separate planned stage: collapse to one contributing wavelength before the
+first wavelength-dependent refraction or interior advance, then evaluate the scalar index
+at that wavelength. The existing walker and source/attenuation math remain in use. Cameras
+starting inside dispersive media need collapse before their first interior step too.
 
 ## Volume emission
 
@@ -271,15 +300,15 @@ including exact zero. The integral returns `len` in vacuum. For optical depth be
 0.1, it evaluates the fourth-degree Taylor polynomial of `(1-exp(-tau))/tau`; the
 omitted term is bounded by `0.1^5/720 < 1.4e-8`. Larger depths use the exponential
 formula. This avoids cancellation without inventing extinction, and applies to RGB too.
-The GRIN walker still uses its older per-step formula; its correction belongs to the
-GRIN stage, which remains gated here.
+The GRIN walker uses the same integral for full steps, the exit partial step and the
+near-wall straight segment, with its existing basic-radiance source factor.
 
-Expression media and homogeneous emissive scattering media use the existing tracking
+On straight paths, expression media and homogeneous emissive scattering media use the existing tracking
 arms. They collect `weight * epsilon / M` at every tentative collision, **before**
 the absorption/scattering/null lottery or ratio-weight update. Emission is path-found;
 there is no volume light sampler. Shadow queries return transmittance only. Ignoring
 scattering retains volume emission, integrating it against absorption alone. PT and NEE
-support tracking; MIS remains available only for the analytic absorbing-emission route.
+support tracking; MIS supports analytic absorbing emission and the GRIN route described below.
 
 For expression media, the common authored RGB field scale multiplies emission as well
 as absorption and scattering before any lift. This preserves the source-function
@@ -316,7 +345,7 @@ Nonemissive RGB-expression media use the existing delta/ratio trackers under PT 
 The authored `majorant` is a **field ceiling**, A. The colour descriptor returns its
 nominal float32 value and a separate, outward-rounded **sampling majorant**, M. Both path and
 shadow dispatch consume the same planned sampling rate. Raising M does not change the
-field clamp. MIS with tracking, equiangular heterogeneous lighting and GRIN remain gated.
+field clamp. MIS with tracking and equiangular heterogeneous lighting remain gated.
 
 Numerical author contract for this stage:
 

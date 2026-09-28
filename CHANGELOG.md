@@ -4,6 +4,49 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — spectral GRIN with wavelength-independent index
+
+Enabled four-wavelength transport through the existing GRIN walker: spatial absorption
+and emission fields, constant/live scattering coefficients, and constant/live/spatial
+scalar index fields. All wavelengths share the trajectory; raw index GLSL is authored
+wavelength-independent. Dispersion and packet collapse remain planned. The existing
+index accessors already receive the carrier, and no loop, interface or sensor change
+was needed. Deflecting fields remain exempt from straight tracking's ceiling and clamp.
+Emissive scattering and expression coefficients with scattering in one GRIN region
+remain rejected; opaque shadows and geometric/step/budget limits are unchanged.
+
+Reused the analytic source-integral helper for full GRIN steps, exit partials and the
+near-wall segment. Absorption now uses the actual coefficient, with exact vacuum and
+stable small-optical-depth emission in both colour modes. A selected zero-extinction
+channel has no finite scattering event, including an exact zero random draw; the sampler
+no longer invents a small collision rate.
+
+Added eight spectral GRIN fixtures (seven witnesses and a reference), including a
+Luneburg gallery scene. Generated GPU probes check four unequal absorption/source lanes,
+zero-absorption emission, a known curved trajectory, and zero-rate sampling in both the
+full walk and the near-wall segment. All 69 binding/BSDF/media probes pass and reject
+six intentional defects, including the old GRIN source floor and artificial collision
+rate. The first mutation run exposed an incorrectly targeted test mutation (it altered
+the straight analytic sampler); restricting it to the GRIN function makes the check
+reject the intended defect.
+
+Static checks: 3,712 of 3,714 tests passed in the full run; two shader tests timed out
+under concurrent load. The complete 950-test static shader file passes on its separate
+rerun, as do all 11 new GRIN compiler tests. Typecheck and production build pass.
+Snapshot additions are only the eight scene-data records and nine program descriptions.
+Compiled-output digests leave 229 existing scenes identical. The 15 existing GRIN scenes
+change shader/source-map output; scene data, read contracts and warnings are unchanged.
+Eight spectral scenes are added, and the same seven asynchronous scenes are skipped.
+
+Rendered validation: all 12 checks pass across 16 renders (seven spectral checks and five
+RGB regressions). The spectral slab reads (0.7256, 0.4958, 0.2963) against independent
+quadrature (0.7252, 0.4955, 0.2959); luminous vacuum reads about 1.4997 against 1.5.
+Hard-interface, emitting and scattering spectral furnaces retain 0.4/channel within the
+specified tolerances. Spectral scattering agrees with the straight analytic reference
+(0.11% mean difference, 2.35% display RMSE), and Luneburg NEE/MIS agree (0.15% mean
+difference, reduced chi-square 0.17). RGB source/scattering twins and all three RGB
+furnaces pass. These are targeted checks, not a new full witness sweep.
+
 ## 2026-09-27 — spectral volume emission
 
 Enabled RGB constant, live and expression volume emission through the existing absorbing

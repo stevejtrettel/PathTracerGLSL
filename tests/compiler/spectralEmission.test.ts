@@ -35,10 +35,10 @@ describe('spectral volume emission', () => {
                 estimator: { ...tracked.estimator, volumeSampling: expression || scattering === 'full' ? 'delta-tracking' as const : 'analytic' as const } };
             for (const [id, shader] of compiler.compile(s, choice).shaders) glslangCheck(shader.fragment, 'frag', id);
         });
-    it('keeps tracking MIS and GRIN gated, and checks emission and derived-rate domains', () => {
+    it('keeps tracking MIS gated and checks emission and derived-rate domains', () => {
         expect(() => compiler.compile(scene(), { ...tracked, estimator: { ...tracked.estimator, directLighting: 'mis' } })).toThrow();
         for (const invalid of [{ emission: -1 }, { emission: { blackbody: { kelvin: 3000 } } },
-            { sigma_a: 2 ** 18 }, { sigma_s: { param: 's', default: 1, max: 2 ** 18 } }, { ior: 1.5 }]) {
+            { sigma_a: 2 ** 18 }, { sigma_s: { param: 's', default: 1, max: 2 ** 18 } }]) {
             const s = scene(); Object.assign(s.materials.ink.medium!, invalid);
             expect(() => compiler.compile(s, tracked)).toThrow(/spectral medium/);
         }

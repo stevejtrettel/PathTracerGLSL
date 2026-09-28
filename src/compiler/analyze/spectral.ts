@@ -36,13 +36,12 @@ export function spectralLimitations(scene: SceneDescription): string[] {
     for (const [name, mat] of Object.entries(scene.materials)) {
         const med = mat.medium;
         if (med !== undefined) {
-            if (mediumIsDeflecting(med))
-                reasons.push(`spectral medium '${name}' does not support GRIN yet`);
-            const heterogeneous = isHeterogeneousMedium(med);
+            const deflecting = mediumIsDeflecting(med);
+            const heterogeneous = !deflecting && isHeterogeneousMedium(med);
             if (heterogeneous && !(typeof med.majorant === 'number' && Number.isFinite(med.majorant)
                 && med.majorant >= spectralCeilingRange[0] && med.majorant <= spectralCeilingRange[1]))
                 reasons.push(`spectral medium '${name}' requires a density ceiling in [2^-60, 2^18]`);
-            const derivedTracking = !heterogeneous && isEmissiveMedium(med) && mediumMayScatter(med);
+            const derivedTracking = !deflecting && !heterogeneous && isEmissiveMedium(med) && mediumMayScatter(med);
             const coefficientCeiling = heterogeneous ? 2 ** 60 : derivedTracking ? spectralCeilingRange[1] / 2 : Infinity;
             for (const field of ['sigma_a', 'sigma_s', 'emission'] as const) {
                 if (isGlslExpression(med[field])) continue;
