@@ -6,7 +6,8 @@
 
 import { isGlslExpression, isValueParam, isBlackbody, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RowConstraint } from '../../components/descriptors.js';
+import { blackbodyTemperatureRange } from '../../components/color/blackbody/blackbody.js';
+import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 
@@ -22,6 +23,7 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
 
 export interface PropertyValueContract {
     shape: 'scalar' | 'spectrum';
+    role?: RadiometricRole;
     /** Only domains required by current transport mathematics, not artistic policy —
      *  the shared RowConstraint vocabulary (descriptor-unification D1). */
     constraint?: RowConstraint;
@@ -36,7 +38,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
                 validatePropertyValue(
                     (mat as unknown as Record<string, unknown>)[field.source],
-                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint },
+                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : undefined },
                     `Material '${name}': ${field.source}`,
                     bag,
                 );
@@ -60,7 +62,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         for (const field of phase?.properties ?? []) {
             validatePropertyValue(
                 (mat.medium as unknown as Record<string, unknown>)[field.source],
-                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint },
+                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : undefined },
                 `Material '${name}': medium.${field.source}`,
                 bag,
             );
@@ -76,17 +78,21 @@ export function validatePropertyValue(
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
     if (isBlackbody(value)) {
-        // The blackbody spelling: dials validated here; the chroma is derived (>= 0 by
-        // construction), so the generic spectrum checks below do not apply.
-        const { kelvin, scale } = value.blackbody;
-        const kVal = isValueParam(kelvin as never) ? (kelvin as { default?: unknown }).default : kelvin;
-        if (typeof kVal !== 'number' || !Number.isFinite(kVal) || kVal <= 0) {
-            bag.error('invalid-setting', `${label}: blackbody kelvin must be a finite number > 0 (constant, or a {param} with a finite default)`).add();
+        if (contract.role !== 'emission') {
+            bag.error('invalid-setting', `${label}: blackbody is an emission form`).add();
+            return;
         }
-        const sRaw = scale === undefined ? 1 : isValueParam(scale as never) ? ((scale as { default?: unknown }).default ?? 1) : scale;
-        if (typeof sRaw !== 'number' || !Number.isFinite(sRaw) || sRaw < 0) {
-            bag.error('invalid-setting', `${label}: blackbody scale must be a finite number >= 0`).add();
-        }
+        const { kelvin, scale = 1 } = value.blackbody;
+        const checkDial = (dial: unknown, name: string, min: number, max: number) => {
+            const parameter = isValueParam(dial as never) ? dial as { param: string; default?: number; min?: number; max?: number } : null;
+            const values = parameter ? [parameter.default, ...[parameter.min, parameter.max].filter(v => v !== undefined)] : [dial];
+            if (values.some(v => typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
+                || (parameter?.min !== undefined && parameter.max !== undefined && parameter.min > parameter.max)) {
+                bag.error('invalid-setting', `${label}: blackbody ${name} requires finite values in [${min}, ${max}], including defaults and bounds`).add();
+            }
+        };
+        checkDial(kelvin, 'kelvin', ...blackbodyTemperatureRange);
+        checkDial(scale, 'scale', 0, Infinity);
         return;
     }
 

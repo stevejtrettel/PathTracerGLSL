@@ -1,6 +1,7 @@
+// Historical Kim projection, retained only for the migration audit.
 // Kim et al. (2002) Planckian locus approximation, xy → XYZ → linear sRGB.
 // Clamp negative channels and normalize by the maximum: scale carries the magnitude.
-import type { Vec3 } from '../../../compiler/types.js';
+import type { Vec3 } from '../../src/compiler/types.js';
 
 /** Normalized (max channel = 1) linear-sRGB chroma of a blackbody at `kelvin`. */
 export function kelvinToRGB(kelvin: number): Vec3 {

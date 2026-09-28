@@ -1,0 +1,94 @@
+# Planck emission
+
+`{ blackbody: { kelvin, scale? } }` authors one emission spectrum in both colour modes.
+`kelvin` and `scale` may be constants or scalar parameters with defaults. Temperature and
+all declared slider bounds must lie in **1000–40000 K**; scale and its declared bounds
+must be finite and nonnegative. Live writes carry the same contract, as with other
+radiometric parameters. There is no temperature clamp. Scale defaults to one when absent;
+a parameter without a default is invalid. Magnitudes must remain finite in GPU float32.
+
+Blackbody is an **emission form**. It is accepted on emitting surfaces, authored lights,
+mesh and constant batch emitters, and constant-type skies. It is rejected on reflectance,
+index and medium fields. Existing driven-emitter/tree restrictions still apply: this
+feature does not introduce dynamic mesh/instance light-tree updates.
+
+## Definition and ownership
+
+With wavelengths in nm and temperature in K, the dimensionless relative Planck spectrum is
+
+```
+b(lambda,T) = (550/lambda)^5 * expm1(c2/(550*T)) / expm1(c2/(lambda*T))
+c2 = h*c/k = 14387768.775039338 nm K
+K(T) = max(P_CIE[b])
+E(lambda,T,scale) = scale * b(lambda,T) / K(T)
+```
+
+`P_CIE` is the fixed reference CIE 1931 → linear-sRGB projection on 360–830 nm, using the
+same float32 piecewise-linear curves and matrix as the shipped spectral sensor. Its
+normalization is an authoring convention: the largest reference RGB channel equals
+`scale`. It is independent of the active camera sensor. Total radiant power/luminance
+can vary with temperature at fixed scale; this is not absolute thermal-power authoring.
+Planck has no D65 multiplier and does not pass through the RGB emission lift.
+
+`blackbody.ts` integrates the reference projection on the CPU with 0.5 nm Simpson
+quadrature within each 5 nm observer interval. The generated observer data belongs to
+`sensor/cie1931/curves.ts`; `tools/spectral/generate.py` emits it from exactly the same
+float32 CMFs as the GPU texture. The spectral math uses the relative spectrum above;
+its arbitrary 550 nm reference cancels in normalization. RGB uses the signed projection
+of this spectrum. Negative RGB is a gamut effect, not negative spectral emission.
+
+`blackbody.glsl` evaluates four wavelengths, given temperature and CPU normalization.
+On the supported domain, the exponential argument is between 0.433 and 39.966; neither
+exponential overflow nor a near-zero `exp(x)-1` occurs. No small-x branch, artificial
+floor, clamped temperature or fallback colour is needed.
+
+Physics: [Planck law in PBRT](https://www.pbr-book.org/4ed/Radiometry%2C_Spectra%2C_and_Color/Light_Emission).
+Constants: [NIST exact SI h, c and k](https://physics.nist.gov/cuu/Constants/Table/allascii.txt).
+The [migration comparison](../../../../docs/claude-blackbody-comparison.md) records the
+intentional old/new RGB differences and the separate temperature-range change.
+
+## Constants, uniforms and packed data
+
+The scene plan retains the authored form. `generate/values.ts` owns its constant/live
+split. Constant temperature folds the normalization/RGB projection. A live temperature
+mints one temperature-derived binding: RGB gets normalized `vec3`; spectral gets
+`vec2(temperature, normalization)`. Only the temperature parameter is a dependency.
+Scale is a separate literal or ordinary float uniform at every use site. Two emitters
+sharing a temperature therefore retain independent intensities; sharing only an intensity
+also leaves their temperatures independent. Hit and sampled-light readers use the same
+`emitSpectrum` path, with the incoming wavelength carrier in spectral mode.
+
+`ProgramDescription.blackbody` records whether the spectral program uses original Planck
+forms, linking the static GLSL evaluator and the corresponding packed readers.
+Ordinary light rows retain their RGB payload for RGB readers and CPU selection power.
+The existing header is owned by `lights/table.ts`:
+
+| Component | Meaning |
+|---|---|
+| x | Light kind code |
+| y | Emission form: 0 = RGB payload; 1 = Planck |
+| z | Planck temperature in K (zero for RGB) |
+| w | `scale / K(T)` (zero for RGB) |
+
+The tag identifies a representation, not an index into another registry. The first
+non-RGB form fits entirely in the existing header; no form registry, new texture or
+stride change is needed. Packing is independent of renderer order and colour mode.
+Future forms must extend this declared representation rather than consume padding
+implicitly. Instanced emitters use one original-form expression per batch; their
+per-instance RGB attributes continue through the existing attribute path.
+
+## Verification
+
+`tests/helpers/planckReference.ts` evaluates SI Planck directly and integrates the serialized
+GPU observer at 0.25 nm. Unit/compiler checks compare this independent reference, enforce
+role/domain rules, inspect specified packed bytes, and compile all six binding sites under
+both modes and power/tree selection. Mixed renderer orders and singleton compilation
+preserve shared data.
+
+`npm run witness:blackbody` executes real generated readers and the actual App packer.
+It tests low/high temperatures, signed RGB, four spectral lanes, live temperature/scale,
+shared controls, sky intensity and sampled instances. A deliberate discarded-form
+mutation must fail. `spectral-blackbody-*` witnesses cover true 1000 K direct emission,
+a selective receiver with an independently integrated target, live/constant comparisons,
+and power/tree NEE/MIS equality. The old Kim fit exists only in the historical audit
+helper; no renderer imports it.

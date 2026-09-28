@@ -1,6 +1,6 @@
 // Authored radiometric forms: classification is independent of the transport representation.
 import type { Value, ValueParam, BlackbodyValue, Vec3 } from '../../compiler/types.js';
-import { blackbodyRGB } from './rgb/blackbody.js';
+import { blackbodyRGB } from './blackbody/blackbody.js';
 
 export function isValueParam<T>(v: Value<T>): v is ValueParam<T> {
     return typeof v === 'object' && v !== null && !Array.isArray(v) && 'param' in v;
@@ -52,8 +52,8 @@ export function projectRGB(v: number | number[] | ValueParam<number | number[]> 
     if (isBlackbody(v)) {
         const { kelvin, scale } = v.blackbody;
         return blackbodyRGB(
-            isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default ?? 6500) : kelvin,
-            scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default ?? 1) : scale,
+            isValueParam(kelvin) ? ((params[kelvin.param] as number) ?? kelvin.default!) : kelvin,
+            scale === undefined ? 1 : isValueParam(scale) ? ((params[scale.param] as number) ?? scale.default!) : scale,
         );
     }
     const raw = isValueParam(v) ? params[v.param] ?? v.default : v;

@@ -1,5 +1,10 @@
 # impl-plan-blackbody-uv — the blackbody lamp + the first Hit.uv reader
 
+**Historical plan.** The blackbody implementation below is superseded by the
+[shared Planck emission contract](../src/components/color/blackbody/README.md).
+Original forms now survive planning, temperature and scale have separate bindings,
+and both colour modes use normalized Planck rather than the Kim fit.
+
 Owner-directed Jul 19 2026. Two small builds through existing doors; owner's framing
 pinned: **blackbody is a PARAMETERIZATION** — kelvin → chroma is a pure function, so it
 is a DERIVED value in the compiler's rail (u_tanFov/u_majorant pattern), never an

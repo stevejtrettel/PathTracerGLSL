@@ -1,3 +1,4 @@
+import { spectralBlackbodySuite } from './scenes/spectralBlackbody.js';
 // witnesses/index.ts — the GPU witness registry: the executable form of
 // docs/fable-validation-scenes.md.
 //
@@ -146,6 +147,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralExpressionsSuite,
     ...spectralEmissionSuite,
     ...spectralGrinSuite,
+    ...spectralBlackbodySuite,
     ...spectralMaterialsSuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,

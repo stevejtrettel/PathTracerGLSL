@@ -150,7 +150,10 @@ export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): Sce
     }
 
     if (layout.lightTree !== undefined) {
-        const resolved = plan.lights.map((l) => ({ kind: l.kind, values: resolveLightValues(l) }));
+        const resolved = plan.lights.map(l => {
+            const emissionRow = LIGHT_KINDS[l.kind].params.find(row => row.semantic === 'radiometric' && row.role === 'emission')!;
+            return { kind: l.kind, values: resolveLightValues(l), emission: l.values[emissionRow.name] as SpectrumValue };
+        });
         const table = resolved.length > 0 ? packLightTable(resolved, lightTableLayout(resolved.map((l) => l.kind))) : new Float32Array(0);
         const lights = resolved.map((l, i) => {
             const d = LIGHT_KINDS[l.kind];

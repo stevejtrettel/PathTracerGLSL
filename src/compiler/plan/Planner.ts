@@ -556,6 +556,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
         ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
 
     return {
+        blackbody: measurement.color === 'spectral' && (
+            scenePlan.materials.some(m => Object.values(m.values).some(isBlackbody))
+            || scenePlan.lights.some(l => Object.values(l.values).some(isBlackbody))
+            || (scene.environment?.type === 'constant' && isBlackbody(scene.environment.color))),
         measurement,
         estimator: {
             wavelengths: resolveWavelengthSampler(COLOR_MODELS[measurement.color], strategy.estimator.wavelengths),

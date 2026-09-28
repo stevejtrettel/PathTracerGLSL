@@ -1,4 +1,4 @@
-import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
+import { isBlackbody, isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { spectralCeilingRange } from '../../components/color/spectral/majorant.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
@@ -55,16 +55,16 @@ export function spectralLimitations(scene: SceneDescription): string[] {
             const value = mat[row.source] ?? row.default;
             // Expressions author RGB in the row's domain at every evaluated point.
             // Their source and live controls cannot establish that domain statically.
-            if (isGlslExpression(value)) continue;
+            if (isGlslExpression(value) || (row.role === 'emission' && isBlackbody(value))) continue;
             const ceiling = row.role === 'reflectance' ? 1 : Infinity;
             if (!rgbInput(value, ceiling))
                 reasons.push(`spectral material '${name}' property '${row.source}' requires ${ceiling === 1 ? 'RGB in [0,1]' : 'nonnegative RGB'}, including parameter defaults and bounds`);
         }
     }
-    if (scene.lights.some(l => !rgbInput(l.emission)))
+    if (scene.lights.some(l => !isBlackbody(l.emission) && !rgbInput(l.emission)))
         reasons.push('spectral lights require nonnegative RGB emission, including parameter defaults and bounds');
     const env = scene.environment;
-    if (env?.type === 'constant' && !rgbInput(env.color))
+    if (env?.type === 'constant' && !isBlackbody(env.color) && !rgbInput(env.color))
         reasons.push('spectral constant environments require nonnegative RGB, including parameter defaults and bounds');
     return reasons;
 }

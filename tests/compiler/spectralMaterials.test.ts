@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import type { SpectrumProperty } from '../../src/compiler/types.js';
+import type { SpectrumProperty, SceneDescription } from '../../src/compiler/types.js';
 import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import { spectralMaterials, spectralMaterialStrategies } from '../witnesses/scenes/spectralMaterials.js';
@@ -35,7 +35,7 @@ describe('spectral surface materials', () => {
                             glslangCheck(shader.fragment, 'frag', id);
                 }
                 const invalid: SpectrumProperty[] = [-0.1, [0, NaN, 0], { param: 'color', default: 0.5, min: -1 },
-                    { blackbody: { kelvin: 3000 } },
+                    { blackbody: { kelvin: row.role === 'emission' ? 500 : 3000 } },
                     ...(row.role === 'reflectance' ? [1.1, { param: 'color', default: 0.5, max: 2 }] : [])];
                 for (const value of invalid) {
                     material[row.source] = value;
@@ -52,6 +52,18 @@ describe('spectral surface materials', () => {
             }
         });
     }
+    for (const color of ['rgb', 'spectral'] as const) it(`preserves scalar instance attributes in ${color}`, () => {
+        const scene: SceneDescription = {
+            ...minimalScene,
+            materials: { tiles: { model: 'checker' } },
+            objects: [{ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'tiles' },
+                placements: [{ position: [-1, 0, 0] }, { position: [1, 0, 0] }],
+                attributes: { uv_scale: [2, 12] } }],
+        };
+        for (const [id, shader] of compiler.compile(scene, {
+            ...minimalStrategy, measurement: { ...minimalStrategy.measurement, color },
+        }).shaders) glslangCheck(shader.fragment, 'frag', id);
+    });
     it('preserves mixed RGB/spectral renderer order and shared data', () => {
         const spectral = spectralMaterialStrategies[0];
         const rgb = { ...spectral, id: 'rgb', measurement: { ...spectral.measurement, color: 'rgb' as const },

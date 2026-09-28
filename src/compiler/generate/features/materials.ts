@@ -5,7 +5,7 @@
 
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
-import { emitColor } from '../color.js';
+import { emitColor, emitSpectrum } from '../color.js';
 import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
@@ -66,7 +66,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         if (specs.length > 0) derivedByMat.set(mat.id, specs.map((s) => materialDerivedExpr(mat, s)));
     }
     const blocks: ShaderBlock[] = [
-        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields, derivedByMat) },
+        { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields, derivedByMat, plan.program.measurement.color) },
     ];
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
@@ -208,7 +208,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
                 f.semantic === 'radiometric' ? 'color' : 'float',
                 uniforms, parameters, seen,
-                f.source === EMISSION_KEY,   // E2: emission is HDR; albedo/f0 stay swatches
+                f.source === EMISSION_KEY, plan.program.measurement.color,
             );
         }
         if (mat.medium !== null) {
@@ -359,7 +359,7 @@ function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): Deri
     };
 }
 
-function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[], derivedByMat: Map<number, DerivedExpr[]>): string {
+function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySchema[], derivedByMat: Map<number, DerivedExpr[]>, color: 'rgb' | 'spectral'): string {
     const lines: string[] = [];
     lines.push('// Generated material properties lookup — assignments follow the models\' schemas (§3.4):');
     lines.push('// a material sets exactly the fields its model reads, nothing else. `p` (shading point)');
@@ -386,10 +386,15 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             // emission-presence predicate. Potentially nonzero values read their binding.
             if (f.name === 'emission' && !emissionMayBeNonzero(raw)) continue;
             const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
-            const expr = isAttributeValue(raw)
-                ? emitAttributeValue(raw)
-                : emitValue(raw as ParamValue, fmt);
-            const resolved = f.semantic === 'radiometric' ? emitColor(expr, f.role, 'wl') : expr;
+            let resolved: string;
+            if (isAttributeValue(raw)) {
+                const value = emitAttributeValue(raw);
+                resolved = f.semantic === 'radiometric' ? emitColor(value, f.role, 'wl') : value;
+            } else {
+                resolved = f.semantic === 'radiometric'
+                    ? emitSpectrum(raw as ParamValue, f.role, 'wl', color)
+                    : emitValue(raw as ParamValue, fmt);
+            }
             body.push(`${target} = ${resolved};`);
         }
         // DERIVED fields (D4): assigned after the rows they derive from.

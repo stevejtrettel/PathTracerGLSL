@@ -1,10 +1,12 @@
 # Spectral rendering — design
 
-**Author:** Claude, Sep 26 2026. **Status:** design with implementation begun. The RGB
-colour/film foundation is built; spectral rendering remains planned. D3 is decided:
-wavelengths belong on the ray. D7 is decided: the sensor owns spectral response. The remaining
-decisions in §11 and the review items in §13 must be resolved before their implementation stages.
-§3 (the colour-model system) is the structure the rest hangs on.
+**Author:** Claude, Sep 26 2026. **Status (Sep 27):** four-wavelength spectral rendering
+is built for the capability set documented in the
+[spectral component](../src/components/color/spectral/README.md), including Planck emission.
+Wavelengths belong on the ray; the sensor owns spectral response. Dispersion, other
+non-RGB forms and full public-release verification remain planned. The original analysis
+below records the design's starting point; the implementation plan identifies accepted
+choices and the current verification evidence.
 
 The [implementation plan](claude-spectral-implementation-plan.md) turns this design into
 reviewable interfaces, stages and verification gates. It marks accepted decisions and built
@@ -1009,9 +1011,8 @@ sky:    { medium: { sigma_s: { glsl: '2.0e9 / pow(lambda, 4.0)', lambda: true },
 **Rules:**
 - **Roles gate forms.** An index row takes numbers and index forms, never RGB. A reflectance
   row takes RGB, grey, tabulated and λ-formulas. The Validator enforces this from the row's
-  role. Today a blackbody is accepted on any surface spectrum row, even albedo. A search of
-  src, tests, demos, pages and tools for blackbody rejections found only the medium-coefficient
-  rule (propertyValidation.ts:48-50) and the dial checks (*read*). Role gating closes that.
+  role. Blackbody is now restricted to emission rows; reflectance, index and medium fields
+  reject it. The named/tabulated/index forms below remain proposals.
 - **The colour space of authored RGB is pinned: linear sRGB (Rec.709 primaries, D65).** No
   document or type states it today; it is only implied by the Rec.709 luminance in
   importance.ts:48 and the display's sRGB transfer (*read*). Spectral needs it stated, because
@@ -1067,24 +1068,29 @@ A shared "spectra table" in the data rail becomes necessary only when spectra va
 instance or per texel. Nothing does that yet, and the rule is never to build data nothing
 reads (claude-data-exact-linkage.md).
 
-### 5.4 Blackbody
+### 5.4 Blackbody — built
 
-- **Today:** kelvin → Kim et al. locus fit → xy → XYZ → linear sRGB, with negatives clamped
-  and the largest channel normalised to 1 (blackbody.ts:21-49 — *read*). A constant folds to a
-  literal; a driven kelvin becomes a vec3 uniform (values.ts:125-166 — *read*).
-- **Spectral:** Planck's law is exact, so the right definition of the input is a spectrum:
+Both renderers use one Planck emission definition:
 
-  ```
-  emission(λ) = scale · B(λ, T) / K(T)
-  ```
+```
+emission(λ) = scale · B(λ, T) / K(T)
+```
 
-  K(T) is chosen so that the largest channel of P_L of the spectrum is 1. That keeps today's
-  meaning of `scale`: all magnitude, no colour.
-- **The RGB renderer then uses the exact projection** of that spectrum instead of the Kim fit.
-  This changes RGB renders of blackbody lights slightly (*prediction*: well under 1%;
-  measurable before deciding). D5: accept that change, so there is one definition of a
-  blackbody, or keep Kim for RGB and have the two renderers disagree on what a 3000 K lamp is.
-  The recommendation is one definition.
+K(T) makes the largest **fixed reference** CIE 1931 → linear-sRGB channel equal to one.
+It does not depend on the active sensor; that sensor owns the measurement response.
+RGB uses the signed projection of this same spectrum. Spectral readers evaluate Planck
+at the ray's wavelengths, without an RGB lift or D65 multiplier. Temperature-derived
+chroma/normalization and intensity have separate bindings, so shared temperature controls
+do not accidentally share intensities. The supported temperature domain is 1000–40000 K.
+
+The [Sep 27 comparison](claude-blackbody-comparison.md) measures the intentional migration:
+on the old 1667–25000 K integer grid, maximum signed linear-channel difference is
+1.392% of the unit peak (negative blue clipped by the old implementation); after
+display-only clipping it is 0.189%. These are direct-emission comparisons, not bounds
+on rendered scenes. True 1000 K emission also replaces the old low-temperature clamp.
+The owner accepted D5's single definition. See the
+[implemented contract](../src/components/color/blackbody/README.md) for normalization,
+quadrature, supported binding sites and verification.
 
 ### 5.5 Media
 
@@ -1194,26 +1200,17 @@ laid out today.
   pbrt's.
 - It is worth revisiting only if the bench shows table lookups mattering.
 
-**Authored forms that are not RGB, in shared rows.** A constant blackbody or named-spectrum
-light in tree mode has a table row, and today that row holds its RGB fold
-(compiler/sceneData.ts:152-153 packs `resolveLightValues` — *read*). A spectral renderer would lift that RGB and
-get a different spectrum from the one the author named, which breaks "one meaning per form".
+**Authored forms that are not RGB, in shared rows — Planck built.**
+A packed light retains its RGB projection for RGB rendering and CPU selection, plus its
+original Planck definition for spectral rendering. The existing header, owned by
+`components/lights/table.ts`, carries `(kind, emissionForm, temperature, scale/K)`.
+Form 0 reads the RGB payload; form 1 evaluates Planck. Metadata is authored independently
+of renderer order or colour mode. The payload and row stride are unchanged.
 
-The rule:
-- The row holds the RGB projection P, which the RGB model and the estimator heuristics read.
-- When the form is not RGB, the row also holds a form index.
-- Each spectral program is compiled with a generated `Spectrum color_form(int index,
-  Wavelengths wl)`, one arm per distinct non-RGB form in the scene (a temperature, a named
-  spectrum).
-- Form-reference storage is populated only when some renderer reads it, through the existing
-  reader-union mechanism (`DataReads`, claude-data-exact-linkage.md). Authored RGB payloads and
-  form identities do not depend on renderer order. The implementation plan §4.3 proposes a
-  named `emissionFormCode` in the existing row header, leaving the stride unchanged, rather
-  than a separately allocated column. This is an explicit layout amendment to review.
-- Instanced tree leaves use batch emission arms and placement records rather than ordinary
-  light rows; a constant non-RGB batch arm references the same scene form registry.
-- This is needed for S1's blackbody lights under the light tree (or the Validator rejects that
-  case until it is built).
+This replaces the proposed scene form registry: Planck fits directly in the header, so no
+registry or additional texture is needed. Constant batch emitters retain their original
+form in the generated batch arm. Future spectral forms must explicitly extend this layout
+when their readers are implemented; they are not supported by the Planck tag.
 
 ---
 
@@ -1292,7 +1289,7 @@ None of these is designed here; each needs the machinery above.
 | **W4** | the existing estimator pairs, in spectral programs | pt ≡ pt-nee ≡ pt-mis; `wavelengths: uniform` ≡ `visible` | carrier plumbing; CPU and GPU lifts are one function (instanced-light and tree scenes) |
 | **W5** | chromatic homogeneous slab; heterogeneous medium with an authored ceiling | P of exp(−σ_t(λ) d), computed on the CPU | channel MIS at N = 4; the clamp on the authored value |
 | **W6** | (with dispersion) dielectric slab at normal incidence with a Cauchy n(λ) | P of (1 − F(n(λ)))² only for the isolated two-transmission measurement; pin the event budget and add an oblique direction witness (§13 item 2) | index forms, one-time collapse and chromatic direction |
-| **W7** | a blackbody emitter seen directly, alone and under the light tree | P of the normalised Planck spectrum | the blackbody definition; the form index in shared rows (§6) |
+| **W7** | a blackbody emitter seen directly, alone and under the light tree | P of the normalised Planck spectrum | the blackbody definition; the original-form header in shared rows (§6) |
 
 ### 9.3 TypeScript twins (vitest)
 
@@ -1331,7 +1328,7 @@ feature work, as CLAUDE.md requires.
   - The table and its CPU twin.
   - `cie.ts`, the film, and wavelength sampling (`estimator.wavelengths`).
   - The runtime lift.
-  - Planck blackbody with the form index in shared rows.
+  - Planck blackbody with its original definition in shared row headers (built).
   - Majorants through `bound`/`runtimeBoundFactor`.
   - Witnesses W1–W5 and W7.
   - Every existing scene renders spectrally with no authoring change.
@@ -1390,10 +1387,9 @@ feature work, as CLAUDE.md requires.
   The HDR loader would then also need to read the FORMAT line, which it ignores today
   (engine/loaders/hdr-loader.ts:49-66 — *read*).
 
-**D5. Blackbody.**
-- One spectral definition, with the RGB renderer using its exact projection (recommended; RGB
-  blackbody renders shift slightly).
-- Or keep the Kim fit for RGB.
+**D5. Blackbody — decided and built (owner, Sep 27).**
+One normalized Planck definition, with RGB using its signed reference projection.
+The old Kim fit has been removed from production. See §5.4.
 
 **D6. Formulas in λ under an RGB renderer.**
 - Project them with a fixed quadrature and declare it part of the `'rgb'` truncation

@@ -11,7 +11,8 @@
 //              engine registry; the executor binds it like any pass input (§2.10).
 //   procedural → direct formula evaluation; the bake guides sampling only.
 
-import { emitColor } from '../color.js';
+import { isBlackbody } from '../../../components/color/values.js';
+import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
@@ -79,7 +80,7 @@ LightSample environment_sample(Point p, vec2 xi, Wavelengths wl) {
     float phi = TWO_PI * xi.y;
     ls.wi = vec3(r * cos(phi), z, r * sin(phi));
     ls.distance = MAX_DIST;                                        // the far clip — where a missed BSDF ray finds the sky
-    ls.radiance = ${emitColor(`${colorExpr} * u_envIntensity`, 'emission', 'wl')};         // without visibility
+    ls.radiance = ${colorExpr};         // without visibility
     ls.pdf = 1.0 / (4.0 * PI);                                     // per-light; selection applied by lighting_sample
     ls.flags = 0u;                                                 // not delta — BSDF paths see the env on miss
     ls.light_id = -1;
@@ -118,15 +119,17 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitValue(env.color as ParamValue, formatVec3 as (x: never) => string);
+        const colorExpr = isBlackbody(env.color)
+            ? `${emitSpectrum(env.color, 'emission', 'wl', plan.program.measurement.color)} * u_envIntensity`
+            : emitColor(`${emitValue(env.color as ParamValue, formatVec3)} * u_envIntensity`, 'emission', 'wl');
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];
         const parameters: Record<string, ParameterMetadata> = {
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
-        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true);   // no-op if constant; sky radiance is HDR (E2)
-        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${emitColor(`${colorExpr} * u_envIntensity`, 'emission', 'wl')};`) }];
+        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true, plan.program.measurement.color);   // no-op if constant; sky radiance is HDR (E2)
+        const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr};`) }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
         return {

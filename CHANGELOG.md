@@ -4,6 +4,55 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-27 — one normalized Planck emission definition
+
+Replaced the production Kim RGB approximation with normalized Planck in both colour modes.
+Spectral readers evaluate the original spectrum at the ray wavelengths; RGB uses its signed
+fixed-reference CIE projection. The active camera sensor does not define emitter normalization.
+The largest reference RGB channel equals `scale`, with a supported domain of 1000–40000 K.
+Blackbody is now explicitly emission-only; invalid authored dials are diagnosed, with no
+runtime temperature clamp or fallback colour. True 1000 K replaces the old 1667 K clamp.
+
+Temperature-derived chroma/normalization is separate from scale. This fixes shared-temperature
+emitters accidentally sharing their intensity, and shared-intensity emitters sharing their
+colour. Constants, live surfaces/lights, constant skies, mesh emitters and batch emitters use
+the same definition. Light-table headers retain a Planck tag, temperature and gain beside the
+RGB payload; no new texture, registry, stride, transport interface or engine capability.
+Original-form packing is independent of renderer order. The old fit remains only as a
+historical audit helper. Component and design docs describe the implemented contract.
+
+Verification: independent SI quadrature; 44 generated Planck GPU probes with a rejected
+original-form-loss mutation; all 69 existing spectral binding probes and their mutations;
+full Vitest suite (3,831 tests), followed by 66 targeted checks including two added scalar
+instance-attribute regressions that failed before their fix; typecheck and production build.
+The final scalar-attribute correction leaves all 259 compiled scene digests identical to the
+first implementation. Against the pre-migration baseline, all 251 existing scenes other than
+Hearth are byte-identical; Hearth changes intentionally, and seven Planck fixtures are new.
+Snapshot additions are the explicit Planck feature flag and the new fixture records.
+
+All nine new rendered checks pass across the targeted runs: true 1000 K RGB/spectral
+emission, the selective receiver under PT/NEE/MIS, live/constant equality at default and
+changed settings, and power/tree NEE/MIS equality. The receiver's initial 24×24 run narrowly
+missed the blue-channel tolerance under NEE; increasing to 48×48 at the same 1024 spp
+passed all three estimators without changing the 0.002 tolerance. PT/MIS blue errors fell
+to 0.0003/0.0001. These are targeted gates; the full historical GPU sweep was not rerun.
+
+## 2026-09-27 — blackbody migration comparison (audit only)
+
+Added `scripts/audit-blackbody.ts` and its measured comparison report. The audit integrates
+Planck through the shipped CIE sensor, compares the existing RGB approximation at every
+integer temperature from 1667 to 25000 K, and checks 0.5/0.25 nm quadrature refinement.
+Maximum signed channel change is 1.392% of the unit peak at 1667 K (negative blue formerly
+clipped); after display-only clipping the maximum is 0.189% at 2759 K. At Hearth's 2900 K
+default it is 0.180%. True 1000 K is measured separately from the old 1667 K clamp.
+
+The script writes JSON and a standalone HTML swatch comparison; the page was rendered and
+visually checked in Chromium. A selective receiver distinguishes the Planck spectrum from
+an RGB reconstruction with nearly equal direct colour. Quadrature refinement discrepancy
+is at most 3.913e-12 in the existing range; the ratio formula matches direct SI evaluation
+within 7.106e-15 at the checked temperatures/wavelengths. Production code and rendered
+scenes are unchanged. D5 migration and its temperature-domain contract remain proposed.
+
 ## 2026-09-27 — spectral GRIN with wavelength-independent index
 
 Enabled four-wavelength transport through the existing GRIN walker: spatial absorption

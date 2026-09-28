@@ -1,14 +1,4 @@
-// demos/hearthScene.ts — DEMO showcase for the blackbody lamp + the checker material
-// (impl-plan-blackbody-uv, July 19 2026): a checkered floor under a DRIVEN blackbody
-// quad lamp. TWO firsts in one card:
-//   · the lamp's emission is `{ blackbody: { kelvin: {param}, scale: {param} } }` —
-//     drag `lamp.kelvin` (1000–12000 K) and the light re-colors LIVE with zero
-//     recompiles (the derived u_lamp_kelvin_rgb closure; the power CDF re-weights too);
-//   · the floor is the FIRST Hit.uv reader — `checker` mixes two albedos in the
-//     surface parameterization. The visible chart is the PLACEHOLDER planar xz map
-//     (UV_PLANAR_SCALE): tiles run in world xz on every surface, which is exactly the
-//     fact this demo exists to make visible (per-primitive uv charts are the ledgered
-//     follow-up).
+// Live Planck illumination over a checker floor; temperature and intensity are independent.
 
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 
@@ -31,8 +21,7 @@ export const hearthScene: SceneDescription = {
         clay: { model: 'lambert', albedo: [0.55, 0.30, 0.22] },
     },
     lights: [
-        // THE blackbody lamp: temperature and power are the two physical dials, both
-        // driven. kelvin → chroma folds on the CPU (Planck locus), never on the GPU.
+        // Temperature normalization is CPU-derived; scale multiplies it at the read site.
         {
             kind: 'quad',
             corner: [-0.9, 2.6, -0.9],

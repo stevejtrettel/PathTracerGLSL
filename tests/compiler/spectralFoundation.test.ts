@@ -39,7 +39,7 @@ describe('spectral foundation', () => {
     });
     const unsupported: Array<[string, (s: SceneDescription) => void]> = [
         ['emissive scattering GRIN', s => { s.materials.sphere.medium = { sigma_s: 0.1, emission: 1, ior: 1.5 }; }],
-        ['blackbody', s => { s.lights[0].emission = { blackbody: { kelvin: 3000 } }; }],
+        ['blackbody reflectance', s => { s.materials.sphere.albedo = { blackbody: { kelvin: 3000 } }; }],
         ['gain', s => { s.materials.sphere.albedo = 2; }],
         ['negative', s => { s.materials.sphere.albedo = [-0.1, 0, 0]; }],
     ];

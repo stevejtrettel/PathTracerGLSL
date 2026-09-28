@@ -31,7 +31,8 @@
 import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
 import { projectRGB, isDrivenRadiometric } from '../../components/color/values.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
-import { paramToUniform } from '../../components/glsl-format.js';
+import { paramToUniform, formatFloat, formatVec3 } from '../../components/glsl-format.js';
+import { blackbodyColor } from '../../components/color/blackbody/blackbody.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (surface properties and medium coefficients). */
@@ -56,7 +57,7 @@ export function emitValue(
         throw new Error('emitValue: AttributeValue reached a non-attribute site — attribute rows are legal only in the material-properties fill');
     }
     if (isBlackbody(v)) {
-        return isDrivenRadiometric(v) ? blackbodyUniformName(v) : format(projectRGB(v) as never);
+        return isDrivenRadiometric(v) ? emitBlackbody(v, 'rgb') : format(projectRGB(v) as never);
     }
     if (isValueParam(v)) return paramToUniform(v.param);
     if (isGlslExpression(v)) return exprFormat(v);
@@ -74,14 +75,25 @@ export function emitAttributeValue(a: AttributeValue): string {
     return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
 }
 
-/** The derived vec3 uniform's name — from the driven dial's path (kelvin wins), so a
- *  hittable lamp's sampler and its surface emission mint THE SAME uniform (dedup by
- *  name at merge + by `seen` here — the Stage-A discipline). */
-function blackbodyUniformName(v: BlackbodyValue): string {
-    const { kelvin, scale } = v.blackbody;
-    const driven = isValueParam(kelvin) ? kelvin : (scale !== undefined && isValueParam(scale) ? scale : null);
-    if (driven === null) throw new Error('blackbodyUniformName: both dials constant (should have folded)');
-    return `${paramToUniform(driven.param)}_rgb`;
+/** The temperature-derived binding excludes scale, so emitters sharing a temperature
+ * share only their chroma/normalization. Each use retains its own intensity. */
+function blackbodyUniformName(kelvin: ValueParam<number>): string {
+    return `${paramToUniform(kelvin.param)}_blackbody`;
+}
+
+export function emitBlackbody(v: BlackbodyValue, color: 'rgb' | 'spectral', wl = 'wl'): string {
+    const { kelvin, scale = 1 } = v.blackbody;
+    const intensity = emitValue(scale, formatFloat);
+    if (isValueParam(kelvin)) {
+        const name = blackbodyUniformName(kelvin);
+        return color === 'spectral'
+            ? `(${intensity} * blackbody_emission(${name}.x, ${name}.y, ${wl}))`
+            : `(${intensity} * ${name})`;
+    }
+    const normalized = blackbodyColor(kelvin);
+    return color === 'spectral'
+        ? `(${intensity} * blackbody_emission(${formatFloat(kelvin)}, ${formatFloat(normalized.normalization)}, ${wl}))`
+        : `(${intensity} * ${formatVec3(normalized.rgb)})`;
 }
 
 /**
@@ -100,6 +112,7 @@ export function mintValueUniform(
     /** E2: radiometric-magnitude marker — callers pass true for emission/σ/ε-class
      *  quantities so the panel renders chroma × intensity, never an LDR swatch. */
     hdr = false,
+    color: 'rgb' | 'spectral' = 'rgb',
 ): void {
     // Expression-declared params (heterogeneous D4): each declared slider becomes a live FLOAT
     // uniform named from its path, exactly like a ValueParam — the expression source references
@@ -119,40 +132,30 @@ export function mintValueUniform(
         return;
     }
     if (isBlackbody(prop)) {
-        // Each driven dial gets a slider; one computed RGB uniform carries the projection.
-        if (!isDrivenRadiometric(prop)) return;
-        const { kelvin, scale } = prop.blackbody;
-        const name = blackbodyUniformName(prop);
-        if (seen.has(name)) return;
-        seen.add(name);
-        const kDefault = isValueParam(kelvin) ? (kelvin.default ?? 6500) : kelvin;
-        const sDefault = scale === undefined ? 1 : isValueParam(scale) ? (scale.default ?? 1) : scale;
-        const deps: string[] = [];
+        const { kelvin, scale = 1 } = prop.blackbody;
         if (isValueParam(kelvin)) {
-            deps.push(kelvin.param);
-            const seg = kelvin.param.split('.');
-            parameters[kelvin.param] = {
-                type: 'float', default: kDefault, name: 'Kelvin', unit: 'K',
-                group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
-                range: [kelvin.min ?? 1000, kelvin.max ?? 12000],
-            };
+            const name = blackbodyUniformName(kelvin);
+            if (!seen.has(name)) {
+                seen.add(name);
+                const project = (temperature: number) => {
+                    const normalized = blackbodyColor(temperature);
+                    return color === 'spectral' ? [temperature, normalized.normalization] : normalized.rgb;
+                };
+                uniforms.push({
+                    name, type: color === 'spectral' ? 'vec2' : 'vec3',
+                    parameterPath: kelvin.param,
+                    default: project(kelvin.default!),
+                    compute: p => project((p[kelvin.param] as number) ?? kelvin.default!),
+                });
+                const seg = kelvin.param.split('.');
+                parameters[kelvin.param] = {
+                    type: 'float', default: kelvin.default, name: 'Kelvin', unit: 'K',
+                    group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
+                    range: [kelvin.min ?? 1000, kelvin.max ?? 12000],
+                };
+            }
         }
-        if (scale !== undefined && isValueParam(scale)) {
-            deps.push(scale.param);
-            const seg = scale.param.split('.');
-            parameters[scale.param] = {
-                type: 'float', default: sDefault, name: capitalize(seg[seg.length - 1]),
-                group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
-                range: [scale.min ?? 0, scale.max ?? Math.max(4 * sDefault, 1)],
-            };
-        }
-        uniforms.push({
-            name, type: 'vec3',
-            parameterPath: deps[0],
-            ...(deps.length > 1 ? { parameterPaths: deps } : {}),
-            default: projectRGB(prop),
-            compute: (p) => projectRGB(prop, p),
-        });
+        mintValueUniform(scale, 'float', 'float', uniforms, parameters, seen, true);
         return;
     }
     if (!isValueParam(prop)) return;

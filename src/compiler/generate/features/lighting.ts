@@ -4,7 +4,7 @@
 // Mirrors the material pattern: fixed per-kind GLSL (light_point/quad/sphere.glsl) + a
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
-import { emitColor } from '../color.js';
+import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
 import { isValueParam, isBlackbody, type Vec3, type BlackbodyValue } from '../../types.js';
@@ -22,7 +22,7 @@ import { structFromRows } from '../schema.js';
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque/opaque.glsl?raw';
 import shadowMediaGLSL from '../../../components/transport/shadow/media/media.glsl?raw';
 import lightTreeGLSL from '../../../components/accel/light_tree/light_tree.glsl?raw';
-import { lightTableLayout, type LightTableLayout } from '../../../components/lights/table.js';
+import { lightTableLayout, LIGHT_EMISSION_BLACKBODY, type LightTableLayout } from '../../../components/lights/table.js';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.estimator.lighting === null) {
@@ -130,12 +130,12 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // driven rows reading their uniforms (Model B). Table-resident (bvh) programs read
     // records rows through the generated loaders instead — no accessors emitted.
     if (plan.lights.length > 0 && !bvh) {
-        blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights) });
+        blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights, plan.program.measurement.color) });
     }
     if (bvh && layout !== null && plan.lightTree !== undefined) {
         blocks.push({ origin: 'components/accel/light_tree/light_tree.glsl', source: lightTreeGLSL });
         if (plan.lights.length > 0) {
-            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree) });
+            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree, plan.program.blackbody) });
         }
         blocks.push({ origin: 'generated:light-tree-walks', source: generateLightTreeWalks(plan.lightTree) });
     }
@@ -160,7 +160,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
                 // (e.g. a future driven cone angle) mints a float, not a mistyped vec3.
                 const spec = LIGHT_KINDS[l.kind]?.params.find((p) => p.name === row);
                 const isVec3 = (spec?.shape ?? 'vec3') === 'vec3';
-                mintValueUniform(v as ParamValue, isVec3 ? 'vec3' : 'float', isVec3 ? 'color' : 'float', uniforms, parameters, seen, isVec3);   // E2: light radiometrics are HDR
+                mintValueUniform(v as ParamValue, isVec3 ? 'vec3' : 'float', isVec3 ? 'color' : 'float', uniforms, parameters, seen, isVec3, plan.program.measurement.color);   // E2: light radiometrics are HDR
             }
         }
         // Selection CDF + per-light select-pdf as CPU-computed float arrays (>1 light only;
@@ -187,7 +187,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     blocks.push({
         origin: 'generated:light-sampling',
         source: bvh && layout !== null && plan.lightTree !== undefined
-            ? generateLightSamplingBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms, plan.lights.filter((l) => l.mesh !== undefined))
+            ? generateLightSamplingBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms, plan.lights.filter((l) => l.mesh !== undefined), plan.program.measurement.color)
             : generateLightSampling(plan.lights, selectPdf, envSamplable, plan.program.environmentSelectionLive, driven),
     });
 
@@ -195,7 +195,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // solid-angle-from-p sampler cannot answer (impl-plan-equiangular). Emitted only under
     // the knob; the Validator has already guaranteed every light is delta (v1 pin 1).
     if (plan.program.estimator.mediumLightSampling === 'equiangular') {
-        blocks.push({ origin: 'generated:lighting-query-delta', source: generateLightingQueryDelta(plan.lights, selectPdf, driven) });
+        blocks.push({ origin: 'generated:lighting-query-delta', source: generateLightingQueryDelta(plan.lights, selectPdf, driven, plan.program.measurement.color) });
     }
 
     // §6.2 registry table + the transport emission-bookkeeping gate: only when a samplable
@@ -209,7 +209,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
             blocks.push({
                 origin: 'generated:lighting-pdf',
                 source: bvh && layout !== null && plan.lightTree !== undefined
-                    ? generateLightingPdfBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms)
+                    ? generateLightingPdfBvh(layout, plan.lightTree, plan.program.environmentSelectionLive, batchArms, plan.program.measurement.color)
                     : generateLightingPdf(plan.lights, selectPdf, plan.program.environmentSelectionLive, driven),
                 // (mesh pdf arms need no per-light bases — the mesh pdf is identity-free)
             });
@@ -300,7 +300,7 @@ function generateLightOf(samplable: PlannedLight[], batchArms: BatchLightArm[]):
  *  (the spot lesson: an anisotropic delta's on-axis intensity would BIAS the
  *  equiangular estimate, so such kinds declare no fact and the Validator rejects
  *  them under 'equiangular'; every light reaching here is delta AND isotropic). */
-function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[], driven: boolean): string {
+function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[], driven: boolean, color: 'rgb' | 'spectral'): string {
     const lines = [
         '// Generated delta-light query (equiangular placement): position + intensity + select pdf.',
         'float lighting_query_delta(float uc, out Point pos, out Spectrum intensity, Wavelengths wl) {',
@@ -312,10 +312,10 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
     const arm = (l: PlannedLight, i: number) => {
         const q = lightKind(l).deltaQuery!;   // Validator-guaranteed (the isotropy pin)
         // Position is geometry (constant in v1); intensity routes through the shared split.
-        const intensityE = emitValue(l.values[q.intensityRow] as ParamValue, formatVec3 as (x: never) => string);
+        const intensityE = emitSpectrum(l.values[q.intensityRow] as ParamValue, 'emission', 'wl', color);
         return [
             `pos = ${formatVec3(l.values[q.positionRow] as number[])};`,
-            `intensity = ${emitColor(intensityE, 'emission', 'wl')};`,
+            `intensity = ${intensityE};`,
             `return ${sel.selpdf(i)};`,
         ];
     };
@@ -398,7 +398,7 @@ function lightRef(l: PlannedLight, wl: string): string {
     return `light_get_${l.id}(${wl})`;
 }
 
-function lightCtor(l: PlannedLight): string {
+function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral'): string {
     const d = lightKind(l);
     const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
     const args = d.params.map((row) => {
@@ -407,8 +407,9 @@ function lightCtor(l: PlannedLight): string {
         // a constant row bakes its literal via the row's formatter.
         const fmt = (row.shape === 'number' ? formatFloat
             : formatVec3) as (x: never) => string;
-        const expr = emitValue(l.values[row.name] as ParamValue, fmt);
-        return row.semantic === 'radiometric' ? emitColor(expr, row.role, 'wl') : expr;
+        return row.semantic === 'radiometric'
+            ? emitSpectrum(l.values[row.name] as ParamValue, row.role, 'wl', color)
+            : emitValue(l.values[row.name] as ParamValue, fmt);
     });
     // Derived fields (quad normal/area) read GEOMETRY rows, constant in v1 — pass RESOLVED
     // values so the signature stays on concrete numbers (the driven-row substitution is inert
@@ -421,12 +422,12 @@ function lightCtor(l: PlannedLight): string {
 /** One wavelength-indexed accessor per light (§6.1), `light_get_<id>(wl)` — the uniform structural shape.
  *  A constant light bakes its literals inside; a driven light reads its uniforms. The GPU
  *  inlines a constant accessor to nothing, so this costs nothing and unifies the readers. */
-function generateLightAccessors(lights: PlannedLight[]): string {
+function generateLightAccessors(lights: PlannedLight[], color: 'rgb' | 'spectral'): string {
     const lines = ['// Generated light accessors (§6.1) — constants baked inline, driven read u_'];
     for (const l of lights) {
         const d = lightKind(l);
         const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
-        lines.push(`${structName} light_get_${l.id}(Wavelengths wl) { return ${lightCtor(l)}; }`);
+        lines.push(`${structName} light_get_${l.id}(Wavelengths wl) { return ${lightCtor(l, color)}; }`);
     }
     return lines.join('\n');
 }
@@ -684,13 +685,13 @@ interface BatchLightArm { base: number; count: number; region: number; placement
 
 /** The batch instance's SphereLight ctor from its placement record (params tier);
  *  attribute Le fetches the SAME records texel the hit-side fill reads (one truth). */
-function batchSphereExpr(a: BatchLightArm, indexExpr: string, wl: string): { fetch: string; ctor: string } {
+function batchSphereExpr(a: BatchLightArm, indexExpr: string, wl: string, color: 'rgb' | 'spectral'): { fetch: string; ctor: string } {
     const leExpr = isAttributeValue(a.le)
-        ? `texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`
-        : emitValue(a.le, formatVec3);
+        ? emitColor(`texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`, 'emission', wl)
+        : emitSpectrum(a.le, 'emission', wl, color);
     return {
         fetch: `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${a.placementsBase} + (${indexExpr}))), 0);`,
-        ctor: `SphereLight(rec.xyz, rec.w, ${emitColor(leExpr, 'emission', wl)})`,
+        ctor: `SphereLight(rec.xyz, rec.w, ${leExpr})`,
     };
 }
 
@@ -716,7 +717,7 @@ function fieldExpr(f: number, vec3: boolean): string {
 /** One loader per present kind: `<Kind>Light <kind>_light_row(int li, Wavelengths wl)` — positional
  *  float reads in ctor order (rows then derived), mirroring packLightTable exactly
  *  (the ONE layout truth on both sides). */
-function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked): string {
+function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, blackbody: boolean): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
@@ -728,8 +729,17 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
         for (let t = 0; t < texels; t++) {
             lines.push(`    vec4 t${t} = texelFetch(u_data_records, data_texel1d(uint(rb + ${t})), 0);`);
         }
+        if (blackbody) lines.push('    vec4 emissionHeader = texelFetch(u_data_records, data_texel1d(uint(rb - 1)), 0);');
         let f = 0;
-        const args = rows.map((r) => { const e = fieldExpr(f, r.vec3); f += r.vec3 ? 3 : 1; return r.role === undefined ? e : emitColor(e, r.role, 'wl'); });
+        const args = rows.map(r => {
+            const e = fieldExpr(f, r.vec3);
+            f += r.vec3 ? 3 : 1;
+            if (r.role === undefined) return e;
+            const rgb = emitColor(e, r.role, 'wl');
+            return blackbody && r.role === 'emission'
+                ? `(int(emissionHeader.y) == ${LIGHT_EMISSION_BLACKBODY} ? blackbody_emission(emissionHeader.z, emissionHeader.w, wl) : ${rgb})`
+                : rgb;
+        });
         lines.push(`    return ${lightStructName(kind)}(${args.join(', ')});`);
         lines.push('}');
     }
@@ -805,7 +815,7 @@ function lightKindHeaderExpr(slot: LightTreeSlotBaked): string {
     return `int(texelFetch(u_data_records, data_texel1d(uint(${slot.tableBase} + light_id * ${slot.strideTexels})), 0).x)`;
 }
 
-function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[], meshLights: PlannedLight[]): string {
+function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[], meshLights: PlannedLight[], color: 'rgb' | 'spectral'): string {
     const finiteName = selectionLive ? 'lighting_sample_finite' : 'lighting_sample';
     const R = slot.registryCount;
     const lines: string[] = ['// Generated light selection dispatcher (fable-light-bvh §3/§7): tree descent over'];
@@ -847,7 +857,7 @@ function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotB
     for (const a of batchArms) {
         const kw = opened ? 'else if' : 'if';
         lines.push(`    ${kw} (light_id < ${a.base + a.count}) {   // batch (region ${a.region}) instances`);
-        const e = batchSphereExpr(a, `light_id - ${a.base}`, 'wl');
+        const e = batchSphereExpr(a, `light_id - ${a.base}`, 'wl', color);
         lines.push(`        ${e.fetch}`);
         lines.push(`        ls = sphere_light_sample(${e.ctor}, q.p, light_xi);`);
         lines.push('    }');
@@ -878,7 +888,7 @@ function generateLightSamplingBvh(layout: LightTableLayout, slot: LightTreeSlotB
     return lines.join('\n');
 }
 
-function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[]): string {
+function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBaked, selectionLive: boolean, batchArms: BatchLightArm[], color: 'rgb' | 'spectral'): string {
     // Registry arms exist only for HITTABLE kinds present; delta kinds are never
     // queried, so the header check runs BEFORE the pmf walk (no wasted descent).
     // Batch arms replay the instance's trail and recompute the sphere pdf from its
@@ -907,7 +917,7 @@ function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBak
     }
     for (const a of batchArms) {
         lines.push(`    if (light_id < ${a.base + a.count}) {   // batch (region ${a.region}) instances`);
-        const e = batchSphereExpr(a, `light_id - ${a.base}`, 'light_hit.wl');
+        const e = batchSphereExpr(a, `light_id - ${a.base}`, 'light_hit.wl', color);
         lines.push(`        ${e.fetch}`);
         lines.push(`        return light_tree_pmf(q, light_id)${stage0} * sphere_light_pdf(${e.ctor}, q.p, light_hit.p, wi);`);
         lines.push('    }');

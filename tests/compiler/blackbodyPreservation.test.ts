@@ -5,26 +5,12 @@ import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import { describe, expect, it } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
-import { blackbodyRGB } from '../../src/components/color/rgb/blackbody.js';
-import { packSceneData } from '../../src/app/sceneData.js';
+import { blackbodyRGB } from '../../src/components/color/blackbody/blackbody.js';
 import { minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import { compiledJson } from '../helpers/compiledJson.js';
 import { blackbodyFixture, blackbodySites } from '../helpers/blackbodyFixtures.js';
 
 const compiler = new Compiler();
-describe('blackbody RGB equivalence at every accepted binding site', () => {
-    for (const site of blackbodySites) for (const scale of [0, 5]) {
-        it(`${site}, scale ${scale}`, async () => {
-            const strategy = structuredClone(minimalStrategy);
-            strategy.estimator.lightSelection = 'bvh';
-            const forms = compiler.compileScene(blackbodyFixture(site, { blackbody: { kelvin: 3200, scale } }), [strategy]);
-            const triples = compiler.compileScene(blackbodyFixture(site, blackbodyRGB(3200, scale)), [strategy]);
-            expect(compiledJson(forms)).toBe(compiledJson(triples));
-            expect(compiledJson(await packSceneData(forms.sceneData))).toBe(compiledJson(await packSceneData(triples.sceneData)));
-        });
-    }
-});
-
 describe('blackbody forms survive planning', () => {
     for (const site of blackbodySites) {
         it(site, () => {
@@ -72,11 +58,12 @@ describe('driven blackbody bindings and selection update together', () => {
             } };
             const scene = blackbodyFixture(site, form);
             const renderer = compiler.compile(scene, minimalStrategy);
-            const rgb = renderer.uniforms.find(u => u.uniform === 'u_lamp_kelvin_rgb')!;
-            expect(rgb.compute({})).toEqual(blackbodyRGB(3200, 5));
+            const rgb = renderer.uniforms.find(u => u.uniform === 'u_lamp_kelvin_blackbody')!;
+            expect(rgb.compute({})).toEqual(blackbodyRGB(3200));
             for (const [kelvin, scale] of [[6500, 2], [2100, 0], [10000, 8]]) {
                 const params = { 'lamp.kelvin': kelvin, 'lamp.scale': scale };
-                expect(rgb.compute!(params)).toEqual(blackbodyRGB(kelvin, scale));
+                expect(rgb.compute!(params)).toEqual(blackbodyRGB(kelvin));
+                expect(renderer.uniforms.find(u => u.uniform === 'u_lamp_scale')!.parameters).toEqual(['lamp.scale']);
                 const constantScene = blackbodyFixture(site, blackbodyRGB(kelvin, scale));
                 const plan = planRenderers(analyze(constantScene), constantScene, [minimalStrategy], new DiagnosticBag('test')).plans[0];
                 const select = renderer.uniforms.find(u => u.uniform === 'u_light_selpdf');

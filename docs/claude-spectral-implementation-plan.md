@@ -1,6 +1,6 @@
 # Spectral implementation plan — draft for adversarial review
 
-**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission, and wavelength-independent GRIN; blackbody migration/public release (S1c), and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
+**Status:** S0a–S0c and the restricted S1a spectral foundation are implemented, Sep 27, 2026. Four-wavelength rendering works on RGB-authored scenes with the CIE 1931 sensor. S1b now covers all six existing surface models (wavelength-independent IOR), packed RGB lights, instance colour attributes, live RGB uniforms, surface RGB expressions, image/procedural skies, and homogeneous/heterogeneous media with volume emission, and wavelength-independent GRIN; Planck blackbody migration is implemented; public release verification (S1c) and dispersion (S2) remain planned. See the S1a evidence below and the [implemented model](../src/components/color/spectral/README.md).
 **Baseline inspected:** `1ed553b`, plus the working-tree spectral design and its review edits.
 **Audience:** the implementing agent and an independent reviewer familiar with this tracer.
 
@@ -45,7 +45,7 @@ owner-pinned contract. Where it proposes an interface amendment, it identifies i
 | Colour-model family with RGB and spectral occupants (D0) | **Accepted** (owner, Sep 26) | Own representation, lift, projection and model-specific bounds |
 | Four wavelengths, Jakob–Hanika lift (D2) | Proposed | Float32 coefficient table; separate reflectance/coefficient/emission roles |
 | Linear-sRGB float film (D4) | Proposed | Preserve negative channels until display; disclose RGBE export clipping |
-| One Planck definition for blackbody in both modes (D5) | Proposed, deliberate RGB change after S0 | Compare and document old/new blackbody results |
+| One Planck definition for blackbody in both modes (D5) | **Accepted** (owner, Sep 27), implemented | Shared Planck definition; 1000–40000 K; signed RGB and separate scale |
 | Sensor owns the spectral response (D7) | **Decided** (owner, Sep 26) | The sensor family is the measurement response: `ideal` (identity) in RGB programs; a spectral sensor with response curves (CIE 1931 → linear sRGB now, camera curves later) in spectral programs, selected per program by `measurement.sensor`; sensors declare the colour models they support and the Validator rejects mismatches. The colour model's projection only estimates the wavelength integral, calling the sensor's response at each sampled wavelength. |
 | Lift absorption and scattering separately (D8) | Proposed | Conservative sum of individual spectral bounds |
 | Arbitrary wavelength GLSL expressions under RGB (D6) | Unresolved; narrow first release below | No fixed-quadrature promise without an expression contract |
@@ -297,41 +297,27 @@ driven predicates, emission-zero predicates, instanced emission and packed tree 
 Predicates read authored facts, including a constant zero scale; an arbitrary expression is
 not proven black merely because one sample/default is zero.
 
-The form registry and GPU references below are implemented with their first spectral readers
-in S1b. S0c retains the descriptions in planned values and keeps the existing RGB packing.
+**Implemented Planck storage (Sep 27):** the original spectrum fits directly in the
+ordinary light row's existing header. `components/lights/table.ts` owns
+`(kindCode, emissionForm, kelvin, normalization)`: form 0 is the RGB payload, form 1
+is Planck, and normalization is `scale/K(T)`. RGB rows leave y/z/w zero. The payload
+retains the strategy-independent RGB projection for RGB readers and selection power.
+No form registry, new tenant or changed stride is needed for this form. The earlier
+proposal for a scene-wide form-ID registry is superseded for blackbody; table-backed
+future forms must specify their own reference storage when implemented.
 
-For a shared non-RGB light, retain its strategy-independent RGB projection plus a stable form
-reference. Spectral GLSL dispatches the reference to the original form. **Proposed concrete
-layout amendment:** declare header.y of the ordinary light row as `emissionFormCode` in
-`components/lights/table.ts`, alongside header.x's kind code. Zero means authored RGB;
-`formId + 1` names an original non-RGB form. Validate the encoded integer is below 2^24.
-The existing header is `(kindCode,0,0,0)`: this proposal names and owns a formerly reserved
-slot rather than secretly consuming padding. Payload offsets and stride need not change.
-Assert that each supported kind has one emission field; multiple such fields require an
-explicit schema/layout extension, not reuse of one ambiguous code.
+`ProgramDescription.blackbody` records the original-form spectral reader. Packed tags
+and Planck parameters are authored scene data and are present irrespective of renderer
+order or whether RGB alone is compiled. RGB programs ignore that header metadata;
+spectral programs with Planck forms read it. `lightTableLayout` remains the shared
+layout owner for the packer, offsets and loaders. Exactly one emission field per
+supported table kind is the present contract.
 
-The scene plan owns the form registry. Walk material, light, medium and environment fields
-in a documented, fixed order over the authored scene, independent of renderer traversal.
-Deduplicate exactly equal canonical descriptions, including role, units, temperature/table
-identity and scale; never deduplicate by approximate RGB projection or fitted coefficients.
-IDs can remain sparse in a program that only emits the forms it reads. Driven values remain
-subject to the existing tree restrictions.
-
-Record the actual form-code reader in ProgramDescription and the union of DataReads: the
-program needs original-form evaluation, registry table access, and non-RGB entries. The shared
-layout/packing decision consumes that union; generator and App must not decide independently.
-When nobody reads the codes, header.y stays zero, preserving S0's RGB bytes. There is no new
-data tenant for the proposed header field. `lightTableLayout` remains the single owner used
-by `dataTenantsOf`, the packer and the generated loaders; trails/tree/region bases continue to
-come from the ledger. If review chooses separate storage instead, revise all three consumers
-and its ledger allocation together before implementing it.
-
-Instanced tree leaves do **not** have ordinary light rows: they read placement records and
-a batch emission arm. A constant non-RGB batch emission refers to the same scene form registry
-from that arm; it needs no form code duplicated per instance. Existing RGB attributes retain
-their attribute route and lift at evaluation. CPU tree power uses the form's RGB projection.
-No branch may silently turn a retained form into `[0,0,0]`. Supporting constant blackbody
-forms does not authorize a new dynamically updated light-tree design.
+Instanced tree leaves have no ordinary light row. Their batch arm retains the original
+constant blackbody expression; the same generated value path handles hit emission and
+sampling. Nothing is duplicated per instance. RGB attributes retain their own lift path.
+CPU tree power uses the fixed reference RGB projection. Existing driven-tree restrictions
+remain; this stage does not implement dynamic mesh or instance light-tree updates.
 
 Recompile the same scene with `[rgb,spectral]`, `[spectral,rgb]`, singletons and duplicates.
 Shared form identities and authored payloads must agree where present. Optional allocations
@@ -373,13 +359,12 @@ another. Every reference still needs an accountable provisioning source and a na
 if absent. Do not describe the existing scene-origin validation as implemented when it is not.
 Validate actual sampler counts with the existing assembled-program check.
 
-Blackbody's later Planck implementation must state nm-to-SI conversion, stable exponential
-evaluation, temperature limits and normalization. For each T, let `K(T)` be the maximum RGB
-channel of the projected Planck spectrum; evaluate `scale*B(lambda,T)/K(T)` in spectral mode
-and its same projection in RGB. Driven T can use CPU-derived normalization with a temperature
-uniform; there is no need to integrate the CMFs per fragment. Preserve finite negative RGB
-projection channels where appropriate. The existing temperature clamp and Kim approximation
-are retained in S0; any range/appearance change belongs to the explicit S1 migration.
+Blackbody's Planck implementation uses nm throughout its relative spectrum, with the SI
+constant `hc/k` converted to nm K. The [implemented contract](../src/components/color/blackbody/README.md)
+states the 1000–40000 K domain, exponential bounds and fixed-reference normalization.
+Driven temperature uses CPU-derived normalization; no fragment integrates the CMFs.
+RGB keeps the signed projection. S0 retained the Kim approximation; the owner-approved
+S1 migration replaces it in both modes.
 
 ### 4.5 Environment proposal support and density
 
@@ -783,8 +768,8 @@ GRIN is also supported: absorbing/emitting spatial fields use the same stable so
 at each step, while constant/live scattering uses four-channel arc-length sampling.
 Zero-rate channels have no finite collision. Existing curved-scattering restrictions and
 opaque shadows remain in place; no loop/interface change is needed. The spectral README
-records the GPU probes and rendered witnesses. Non-RGB form codes and CPU constant
-precomputation remain unimplemented. Reflectance inputs above
+records the GPU probes and rendered witnesses. Planck form tags and CPU temperature normalization are now implemented; other non-RGB
+forms and RGB-lift constant precomputation remain unimplemented. Reflectance inputs above
 one still have a diagnostic while the proposed gain policy is unresolved.
 
 Add role-aware validation: finite nonnegative coefficients/emission, the proposed extended
@@ -805,7 +790,15 @@ with its own before/after evidence; an inherited RGB bug is not a spectral accep
 
 ### S1c — blackbody migration and public spectral release
 
-Replace Kim RGB projection with the shared Planck definition after explicit acceptance of D5.
+**Blackbody migration implemented after owner acceptance of D5 (Sep 27).** The shared
+Planck definition replaces Kim, with an explicit 1000–40000 K authoring domain, signed
+reference RGB projection, and separate intensity controls. Verification: 44 original-form
+GPU probes, the 69 existing binding probes, and nine targeted rendered checks pass;
+full Vitest, typecheck and production build pass (details in CHANGELOG.md).
+The full historical GPU sweep remains a separate release gate. See the
+[implemented contract](../src/components/color/blackbody/README.md).
+The [comparison report](claude-blackbody-comparison.md) records the measured signed/display
+differences and separates the existing temperature clamp from any domain extension.
 Cover constant/driven temperatures and scales, zero scale, the temperature domain, tree rows,
 instanced emitters and skies wherever those forms are currently accepted. Report the actual
 old/new RGB differences; there is no assumed sub-percent bound.
@@ -949,7 +942,7 @@ permanent alternative implementations:
 
 - Drop the carrier at a medium continuation, shadow null crossing, GRIN handoff or local ray.
 - Ignore the fourth channel; divide film lanes by the hero PDF; consume a random draw in RGB.
-- Bypass the spectral lift on a table/sky read; discard a blackbody form ID.
+- Bypass the spectral lift on a table/sky read; discard a blackbody form tag.
 - Disable the independent environment-support component; evaluate only the selected component
   PDF; use the old equirect midpoint area or UV subcell sampler with the new area.
 - Apply the medium ceiling to the sampled packet; keep a stale majorant after a slider update.

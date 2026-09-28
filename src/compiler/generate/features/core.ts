@@ -9,6 +9,7 @@ import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/
 import { SAMPLERS } from '../../../components/sampler/index.js';
 import { SENSORS } from '../../../components/sensor/index.js';
 import { COLOR_MODELS } from '../../../components/color/index.js';
+import blackbodyGLSL from '../../../components/color/blackbody/blackbody.glsl?raw';
 import spectrumGLSL from '../../../components/color/spectrum.glsl?raw';
 
 import structsGLSL from '../../../glsl/core/structs.glsl?raw';
@@ -98,6 +99,7 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ambientBlock(plan.program.measurement.ambient),
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
+    if (plan.program.blackbody) blocks.push({ origin: 'components/color/blackbody/blackbody.glsl', source: blackbodyGLSL });
     // Microfacet stdlib (fable-rough-dielectric §4): D / Smith G₁ / VNDF / the frame maps,
     // shared by every microfacet MODEL. Gated on the descriptors' declared fact — a
     // program with no microfacet occupant carries none of it, and one with several

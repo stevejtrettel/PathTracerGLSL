@@ -133,19 +133,9 @@ export function validate(
         // uniform's initial value AND the plan-time CDF bake; a driven light needs one). The
         // reserved-path/collision checks ride collectParamPaths automatically (ValueParam-shaped).
         const e = authored.emission;
-        // Blackbody spelling (impl-plan-blackbody-uv): validate the DIALS — kelvin
-        // (finite, > 0; constant or {param} default) and scale (finite, >= 0).
         if (isBlackbody(e)) {
-            const { kelvin, scale } = e.blackbody;
-            const kVal = isValueParam(kelvin) ? kelvin.default : kelvin;
-            if (typeof kVal !== 'number' || !Number.isFinite(kVal) || kVal <= 0) {
-                bag.error('invalid-setting', `Light ${i} (${light.kind}): blackbody kelvin must be a finite number > 0 (constant, or a {param} with a finite default)`).add();
-            }
-            const sVal = scale === undefined ? 1 : isValueParam(scale) ? (scale.default ?? 1) : scale;
-            if (typeof sVal !== 'number' || !Number.isFinite(sVal) || sVal < 0) {
-                bag.error('invalid-setting', `Light ${i} (${light.kind}): blackbody scale must be a finite number >= 0`).add();
-            }
-            continue;   // the generic shape/negativity checks below are for plain spectra
+            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Light ${i} (${light.kind})`, bag);
+            continue;
         }
         const eDriven = isValueParam(e);
         const eValue = eDriven ? (e as { default?: unknown }).default : e;
@@ -918,7 +908,7 @@ export function validate(
     // A constant sky's radiance: the same spectrum rules as material and light values (the one
     // shared checker), since it is emitted radiance and feeds the env-selection power.
     if (env?.type === 'constant') {
-        validatePropertyValue(env.color, { shape: 'spectrum', constraint: { kind: 'nonnegative' } }, 'environment.color', bag);
+        validatePropertyValue(env.color, { shape: 'spectrum', role: 'emission', constraint: { kind: 'nonnegative' } }, 'environment.color', bag);
     }
     if (env && env.type !== 'none') {
         const I = env.intensity;

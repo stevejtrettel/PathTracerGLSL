@@ -37,6 +37,8 @@ import type { AABB } from '../../components/accel/bvh/bvh.js';
  * structural snapshot test).
  */
 export interface ProgramDescription {
+    /** Original Planck evaluation is read by this spectral program. */
+    blackbody: boolean;
     /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations
      *  (the bias ledger, each with a declared exact limit — taxonomy §4). */
     measurement: {

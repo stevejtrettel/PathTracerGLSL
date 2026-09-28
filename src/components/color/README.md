@@ -7,7 +7,7 @@
 RGB-authored capability set (all six existing material models), including live
 colour parameters, packed light rows and per-instance colours, image/procedural skies,
 surface RGB expressions, homogeneous/heterogeneous media with volume emission, and
-wavelength-independent GRIN. Non-RGB forms and dispersion remain unimplemented. Tracking uses the colour model’s
+wavelength-independent GRIN. [Planck blackbody emission](blackbody/README.md) is supported; other non-RGB forms and dispersion remain unimplemented. Tracking uses the colour model’s
 separate field ceiling and spectral majorant; see the spectral README for its numerical domain.
 
 An occupant supplies `types.glsl` and `<id>.glsl`:
@@ -33,12 +33,13 @@ stays with the accumulator for sensor integration.
 
 `color_lift_reflectance`, `color_lift_coefficient` and `color_lift_emission` evaluate authored
 RGB at an explicit carrier. Radiometric descriptor rows declare their role. All three are
-identities in RGB. Uniforms and packed rows stay authored RGB; filtering, expression evaluation
-and medium clamps happen before conversion. Blackbody temperature and scale survive scene planning. `values.ts` owns authored-form
-predicates and the shared `projectRGB` used by shader constants, live bindings, and light
-packing/power selection. `rgb/blackbody.ts` owns the existing RGB approximation. A zero fixed
-scale is black even when temperature is driven; a driven scale is potentially emissive.
-Original-form IDs and their spectral readers are not implemented yet.
+identities in RGB. RGB-authored uniforms and packed payloads stay RGB; filtering, expression
+evaluation and medium clamps happen before conversion. Blackbody temperature and scale
+survive scene planning. `values.ts` owns authored-form predicates and the shared `projectRGB`
+used by RGB shader constants, live bindings, and light packing/power selection. `blackbody/`
+owns the shared Planck definition and its fixed-reference RGB projection. Packed Planck
+emitters retain their original definition in the light header. A zero fixed scale is black
+even when temperature is driven; a driven scale is potentially emissive.
 
 To add an occupant, define its descriptor and GLSL inside its own folder and register it in
 `index.ts`. Enable authoring/validation only when its supported paths are implemented. The
