@@ -1,9 +1,10 @@
 // compiler/plan/Planner.ts
 
-import { isSpectralIndex, indexIsDispersive, indexForm, isDrivenRadiometric, type IndexForm } from '../../components/color/values.js';
+import { isDrivenRadiometric, isBlackbody, type IndexForm } from '../../components/color/values.js';
+import { namedKindOf } from '../../components/color/spectrumKinds.js';
 import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/index.js';
-import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads } from '../types.js';
-import { isValueParam, isBlackbody, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
+import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads, SpectralIndex } from '../types.js';
+import { isValueParam, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
@@ -921,7 +922,7 @@ export function resolveMaterialValues(
     if (model === 'none') return values;
     for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
         const v = authored[row.source];
-        values[row.source] = row.semantic === 'index' && isSpectralIndex(v) ? v : row.glslType === 'Spectrum'
+        values[row.source] = row.semantic === 'index' && namedKindOf(v)?.roles.includes('index') === true ? v as SpectralIndex : row.glslType === 'Spectrum'
             ? resolveColorProperty(v, [row.default, row.default, row.default])
             : resolveScalarProperty(v, row.default);
     }
@@ -938,11 +939,11 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
         values[row.source] = resolveScalarProperty(
             (med as unknown as Record<string, MaterialProperty | undefined>)[row.source], row.default);
     }
-    // Media coefficients are NOT blackbody surfaces (σ is extinction, not radiance);
-    // the narrowing below is honest — isBlackbody σ is Validator-rejected upstream.
+    // Media coefficients and emission accept plain values only; the Validator rejects a named
+    // spectrum kind (blackbody) here, so the narrowing below is honest.
     const noBB = (v: ReturnType<typeof resolveColorProperty>): Vec3 | GlslExpression | ValueParam<Vec3> => {
-        if (isBlackbody(v)) throw new Error('blackbody spelling on a medium coefficient (Validator should have rejected it)');
-        return v;
+        if (namedKindOf(v)) throw new Error('blackbody spelling on a medium coefficient (Validator should have rejected it)');
+        return v as Vec3 | GlslExpression | ValueParam<Vec3>;
     };
     return {
         sigma_a: noBB(resolveColorProperty(med.sigma_a, [0.0, 0.0, 0.0])),
@@ -1008,8 +1009,9 @@ function planDispersion(scene: ScenePlan): ProgramDescription['dispersion'] {
     const dispersiveMaterials = new Set(scene.materials.filter(m => {
         const row = modelIndexRow(m.model);
         const value = row !== undefined ? m.values[row.source] : undefined;
-        if (m.medium?.ior !== undefined || !isSpectralIndex(value) || !indexIsDispersive(value)) return false;
-        forms.add(indexForm(value));
+        const kind = namedKindOf(value);
+        if (m.medium?.ior !== undefined || kind === undefined || !kind.dispersive(value)) return false;
+        forms.add(kind.id as IndexForm);
         return true;
     }).map(m => m.id));
     const regions = [...scene.objects, ...scene.meshes.filter(m => m.closed),

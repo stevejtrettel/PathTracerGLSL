@@ -11,15 +11,13 @@
 //              engine registry; the executor binds it like any pass input (§2.10).
 //   procedural → direct formula evaluation; the bake guides sampling only.
 
-import { isBlackbody } from '../../../components/color/values.js';
 import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { formatVec3 } from '../../../components/glsl-format.js';
-import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
+import { mintValueUniform, type ParamValue } from '../values.js';
 import { ENV_CHARTS, EQUIRECT_MAP } from '../../../components/env/index.js';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
 
@@ -119,9 +117,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = isBlackbody(env.color)
-            ? `${emitSpectrum(env.color, 'emission', 'wl', plan.program.measurement.color)} * u_envIntensity`
-            : emitColor(`${emitValue(env.color as ParamValue, formatVec3)} * u_envIntensity`, 'emission', 'wl');
+        const colorExpr = emitSpectrum(env.color as ParamValue, 'emission', 'wl', plan.program.measurement.color, 'u_envIntensity');
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];

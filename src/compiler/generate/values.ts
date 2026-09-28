@@ -28,12 +28,11 @@
 // keeps its own idiom because it is not a name swap: the light selection CDF (a float[] fed by
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
-import { isValueParam, isGlslExpression, isBlackbody, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata, type IndexProperty } from '../types.js';
-import { projectRGB, isDrivenRadiometric, isSpectralIndex, evaluateIndex, indexReferenceNM, indexIsDispersive } from '../../components/color/values.js';
+import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata, type IndexProperty } from '../types.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
-import { paramToUniform, formatFloat, formatVec3 } from '../../components/glsl-format.js';
-import { isCauchyIndex } from '../../components/color/cauchy/cauchy.js';
-import { blackbodyColor } from '../../components/color/blackbody/blackbody.js';
+import { paramToUniform } from '../../components/glsl-format.js';
+import { kindOf, namedKindOf } from '../../components/color/spectrumKinds.js';
+import { spectrumContext } from './color.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (surface properties and medium coefficients). */
@@ -57,8 +56,10 @@ export function emitValue(
         // (emitAttributeValue). Reaching any other emitValue site is a Planner bug.
         throw new Error('emitValue: AttributeValue reached a non-attribute site — attribute rows are legal only in the material-properties fill');
     }
-    if (isBlackbody(v)) {
-        return isDrivenRadiometric(v) ? emitBlackbody(v, 'rgb') : format(projectRGB(v) as never);
+    if (namedKindOf(v)) {
+        // Backstop: named spectrum kinds (blackbody, index formulas) are emitted by their
+        // kind, through emitSpectrum or emitIndex. Reaching a plain-value site is a bug.
+        throw new Error(`emitValue: a ${namedKindOf(v)!.label} value reached a plain-value site — spectrum slots emit through their kind`);
     }
     if (isValueParam(v)) return paramToUniform(v.param);
     if (isGlslExpression(v)) return exprFormat(v);
@@ -74,27 +75,6 @@ export function emitAttributeValue(a: AttributeValue): string {
     const { base, slot, count, shape } = a.attribute;
     const fetch = `texelFetch(u_data_records, data_texel1d(uint(${base} + element * ${count} + ${slot})), 0)`;
     return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
-}
-
-/** The temperature-derived binding excludes scale, so emitters sharing a temperature
- * share only their chroma/normalization. Each use retains its own intensity. */
-function blackbodyUniformName(kelvin: ValueParam<number>): string {
-    return `${paramToUniform(kelvin.param)}_blackbody`;
-}
-
-export function emitBlackbody(v: BlackbodyValue, color: 'rgb' | 'spectral', wl = 'wl'): string {
-    const { kelvin, scale = 1 } = v.blackbody;
-    const intensity = emitValue(scale, formatFloat);
-    if (isValueParam(kelvin)) {
-        const name = blackbodyUniformName(kelvin);
-        return color === 'spectral'
-            ? `(${intensity} * blackbody_emission(${name}.x, ${name}.y, ${wl}))`
-            : `(${intensity} * ${name})`;
-    }
-    const normalized = blackbodyColor(kelvin);
-    return color === 'spectral'
-        ? `(${intensity} * blackbody_emission(${formatFloat(kelvin)}, ${formatFloat(normalized.normalization)}, ${wl}))`
-        : `(${intensity} * ${formatVec3(normalized.rgb)})`;
 }
 
 /**
@@ -132,31 +112,14 @@ export function mintValueUniform(
         }
         return;
     }
-    if (isBlackbody(prop)) {
-        const { kelvin, scale = 1 } = prop.blackbody;
-        if (isValueParam(kelvin)) {
-            const name = blackbodyUniformName(kelvin);
-            if (!seen.has(name)) {
-                seen.add(name);
-                const project = (temperature: number) => {
-                    const normalized = blackbodyColor(temperature);
-                    return color === 'spectral' ? [temperature, normalized.normalization] : normalized.rgb;
-                };
-                uniforms.push({
-                    name, type: color === 'spectral' ? 'vec2' : 'vec3',
-                    parameterPath: kelvin.param,
-                    default: project(kelvin.default!),
-                    compute: p => project((p[kelvin.param] as number) ?? kelvin.default!),
-                });
-                const seg = kelvin.param.split('.');
-                parameters[kelvin.param] = {
-                    type: 'float', default: kelvin.default, name: 'Kelvin', unit: 'K',
-                    group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
-                    range: [kelvin.min ?? 1000, kelvin.max ?? 12000],
-                };
-            }
-        }
-        mintValueUniform(scale, 'float', 'float', uniforms, parameters, seen, true);
+    const kind = namedKindOf(prop);
+    if (kind) {
+        // A named kind mints what it derives from its own sliders (blackbody: the temperature
+        // uniform); its plain numbers come back here through ctx.mint.
+        kind.mint?.(prop, {
+            spectral: color === 'spectral', uniforms, parameters, seen,
+            mint: (value, t, m, h) => mintValueUniform(value as ParamValue, t, m, uniforms, parameters, seen, h),
+        });
         return;
     }
     if (!isValueParam(prop)) return;
@@ -195,16 +158,8 @@ function capitalize(s: string): string {
     return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
-/** Index reads keep the surface formula separate from radiometric RGB lifting. */
+/** Index reads keep the surface formula separate from radiometric RGB lifting: the value's
+ *  kind emits the index at the hero wavelength, or its d-line value in RGB programs. */
 export function emitIndex(value: IndexProperty, color: 'rgb' | 'spectral'): string {
-    if (isSpectralIndex(value)) {
-        if (color === 'rgb' || !indexIsDispersive(value)) return formatFloat(evaluateIndex(value, indexReferenceNM));
-        if (isCauchyIndex(value)) {
-            const [a, b, c = 0] = value.cauchy;
-            return `cauchy_index(${formatVec3([a, b, c])}, wl.lambda.x)`;
-        }
-        const { B, C } = value.sellmeier;
-        return `sellmeier_index(${formatVec3(B)}, ${formatVec3(C)}, wl.lambda.x)`;
-    }
-    return emitValue(value, formatFloat);
+    return kindOf(value).emit(value, spectrumContext('index', 'wl', color));
 }

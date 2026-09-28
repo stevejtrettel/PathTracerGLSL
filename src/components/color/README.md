@@ -34,12 +34,26 @@ stays with the accumulator for sensor integration.
 `color_lift_reflectance`, `color_lift_coefficient` and `color_lift_emission` evaluate authored
 RGB at an explicit carrier. Radiometric descriptor rows declare their role. All three are
 identities in RGB. RGB-authored uniforms and packed payloads stay RGB; filtering, expression
-evaluation and medium clamps happen before conversion. Blackbody temperature and scale
-survive scene planning. `values.ts` owns authored-form predicates and the shared `projectRGB`
-used by RGB shader constants, live bindings, and light packing/power selection. `blackbody/`
-owns the shared Planck definition, unit-reference-CIE-Y normalization and signed RGB projection. Packed Planck
-emitters retain their original definition in the light header. A zero fixed scale is black
-even when temperature is driven; a driven scale is potentially emissive.
+evaluation and medium clamps happen before conversion.
+
+## Spectrum kinds
+
+An authored spectrum value has one **kind**, the way it was produced
+([spec](../../../docs/claude-spectrum-spec.md)): `rgb` (numbers, triples, `{param}`,
+expressions and attributes), `blackbody`, `cauchy` or `sellmeier`. `spectrumKind.ts` is the
+contract; `spectrumKinds.ts` is the registry (`kindOf`, `namedKindOf`). A kind answers every
+question the compiler asks about its values: the roles of the slots that may hold it, its live
+sliders, its own domain checks, its RGB stand-in (`toRGB`), whether it can emit, whether it
+disperses as an index, its GLSL, the sliders it derives, and, for blackbody, how a light-table
+row keeps it whole. The slot supplies the role (reflectance, coefficient, emission or index).
+The compiler reaches the kinds through `values.ts` helpers and the two lookups; outside this
+folder it does not test for a particular kind (tests/components/spectrumKinds.test.ts lists
+the remaining uses and the step that removes each).
+
+`blackbody/` owns the shared Planck definition, unit-reference-CIE-Y normalization and signed
+RGB projection. Packed Planck emitters retain their original definition in the light header.
+A zero fixed scale is black even when temperature is driven; a driven scale is potentially
+emissive.
 
 To add an occupant, define its descriptor and GLSL inside its own folder and register it in
 `index.ts`. Enable authoring/validation only when its supported paths are implemented. The

@@ -3,10 +3,10 @@
 import { spectralLimitations } from './spectral.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
-import { isDrivenRadiometric } from '../../components/color/values.js';
+import { isDrivenRadiometric, isBlackbody } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, isBlackbody, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';

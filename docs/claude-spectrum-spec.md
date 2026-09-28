@@ -143,45 +143,51 @@ None of this is an estimator error.
 
 ## 7. The code interface
 
-Each way of producing a spectrum is a *kind*, described once:
+Each way of producing a spectrum is a *kind*, described once. As built in step 1
+(`src/components/color/spectrumKind.ts`):
 
 ```ts
-type Role = 'reflectance' | 'coefficient' | 'emission' | 'index';
+type SpectrumRole = 'reflectance' | 'coefficient' | 'emission' | 'index';
 
 interface SpectrumKind<V> {
     id: string;                                  // 'rgb', 'blackbody', 'cauchy', 'sellmeier'
+    label: string;                               // its name in diagnostics
     is(value: unknown): value is V;              // recognizes its own authored data
-    roles: readonly Role[];                      // slots it may go in
-    dials(value: V): Dial[];                     // its numbers (channels, kelvin, …) and their bindings
-    validate(value: V, role: Role, label: string, bag: DiagnosticBag): void;
-    /** RGB stand-in in this role (§2): a triple for radiometric roles, the 587.6 nm index for
-     *  the index role. Defined for constant and live numbers; expressions and attributes
-     *  have no CPU value, and callers never ask for one. */
-    toRGB(value: V, role: Role, params: ParamValues): Vec3 | number;
+    roles: readonly SpectrumRole[];              // slots it may go in
+    liveParams(value: V): string[];              // parameter paths of its live sliders
+    validate?(value: V, label: string, report: (message: string) => void): void;
+    toRGB(value: V, role: SpectrumRole, params): Vec3 | number;   // RGB stand-in (§2)
+    constantNonzero(value: V): boolean;          // the light census's question
+    mayBeNonzero(value: V): boolean;             // can its emission be nonzero at run time
     dispersive(value: V): boolean;               // varies with wavelength as an index (collapse)
-    glsl?: string;                               // helpers, linked when a program evaluates
-                                                 //   this kind spectrally or dispersively
     emit(value: V, ctx: EmitContext): string;    // GLSL: Spectrum for radiometric roles, float for index
-    uniforms?(value: V, ctx: MintContext): void; // derived uniforms and sliders (blackbody's T)
-    packed?: {                                   // light-table header for kinds kept whole
-        header(value: V): [number, number, number];
-        read(header: string, wl: string): string;
-    };
+    mint?(value: V, ctx: MintContext): void;     // uniforms and sliders it derives (blackbody's T)
+    packed?: { code: number; header(value: V): [number, number]; read(header: string, wl: string): string };
 }
 
 interface EmitContext {
-    role: Role;
+    role: SpectrumRole;
     wl: string;          // GLSL expression of the wavelength carrier
-    spectral: boolean;   // a fact of the color model, never a test of its name
+    spectral: boolean;   // true when the program evaluates spectra at wavelengths
     factor?: string;     // a scalar strength (the sky's u_envIntensity); rgb applies it before
-                         //   the lift and blackbody after, exactly as today
+                         //   the lift and blackbody after, exactly as before
+    bind(value, format): string;   // the compiler's literal / uniform / expression binding
+    lift(rgb: string): string;     // the color model's RGB lift in this role
 }
+// MintContext carries the uniform and parameter lists and the compiler's `mint` for plain sliders.
 ```
 
-`SPECTRUM_KINDS` is one ordered registry, and `kindOf(value, slot)` returns exactly one kind. It
-takes the slot, so it is only asked about spectrum slots, never about plain-number slots. The
-`rgb` kind covers numbers, triples, `{param}`, expressions and attributes; in a radiometric slot
-its `emit` is today's `color_lift_<role>(…)` call, in an index slot today's scalar index.
+Kinds import only types from the compiler (the components purity rule); the compiler's own
+operations (binding, lifting, minting a slider) reach them through the two contexts.
+
+`SPECTRUM_KINDS` is one ordered registry. `namedKindOf(value)` returns the named kind that
+claims a value, and `kindOf(value)` falls back to the `rgb` kind, which covers numbers, triples,
+`{param}`, expressions and attributes; in a radiometric slot its `emit` is the
+`color_lift_<role>(…)` call, in an index slot the scalar index. As built in step 1, `kindOf` does
+not take the slot: the loops that pass over every light row (light-row resolution, the
+driven-emission census) keep their conditions, so a number in a geometry row is never read as a
+color, and the `rgb` kind's answers equal the old fallback branches exactly. Step 2 makes the
+`rgb` kind strict (a value no kind recognizes becomes an error) and passes the slot.
 
 What the kinds do **not** take over yet (**Reviewer**): the attribute binding, decided at three
 sites today (materials.ts:390, lighting.ts:689, sceneData.ts:171), two of which hard-code the RGB
@@ -226,15 +232,16 @@ render, or a blackbody light under equiangular sampling; and it compiles only va
 
 No production code changes. The new snapshots are reviewed once, then frozen for step 1.
 
-### Step 1: kinds behind the interface, output unchanged
+### Step 1: kinds behind the interface, output unchanged (built Sep 28)
 
 **Rule after this step:** every spectrum value is recognized by exactly one registered kind, and
 no code outside `components/color/` names a kind's predicate or compares a kind's id, except the
 named allow-list below.
 
 **What changes:**
-1. `components/color/spectrumKinds.ts` (new): the interface, the registry, `kindOf`, the `rgb`
-   kind.
+1. `components/color/spectrumKind.ts` (new, the contract), `components/color/spectrumKinds.ts`
+   (new: the registry, the lookups, the `rgb` kind) and `components/param.ts` (new: the
+   `{param}` recognizer, moved out of the color folder so the kinds can share it).
 2. `blackbody/`, `cauchy/`, `sellmeier/`: each exports its kind. No `.glsl` file changes.
 3. `color/values.ts`: its helpers dispatch through the registry, with **today's semantics kept
    exactly**, including their disagreement on negative values.
@@ -250,10 +257,12 @@ named allow-list below.
    branch, material checks, analyze/spectral.ts with its current exemption), so every diagnostic
    is unchanged.
 
-**Named allow-list** (in the scan test, each removed in the step shown): the Validator's private
-emission predicate (Validator.ts:1695; it differs from the shared one on negative or NaN
-blackbody scales and on arrays with non-number entries; step 2); analyze/spectral.ts's blackbody
-exemption (step 2); the Planner's `blackbody` flag and `dispersion.forms` (step 3).
+**Named allow-list** (in the scan test, each removed in the step shown): the Validator's light
+emission branch and its private emission predicate (Validator.ts:136 and :1699; the predicate
+differs from the shared one on negative or NaN blackbody scales and on arrays with non-number
+entries; step 2); analyze/spectral.ts's three plain-value exemptions (step 2); the "no
+blackbody in a medium" message in propertyValidation.ts (step 2); the Planner's `blackbody`
+flag (step 3). `dispersion.forms` needed no entry: it now records the kind's id.
 
 **Known behavior change:** a malformed value with two kinds' keys is classified by one registry
 order everywhere, instead of each reader's own. No suite scene has one; step 2 rejects it.

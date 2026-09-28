@@ -1,5 +1,6 @@
-import { isBlackbody, isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isInstancedObject, isValueParam, isEmissiveMedium, mediumMayScatter, mediumIsDeflecting, type SceneDescription } from '../types.js';
 import { spectralCeilingRange } from '../../components/color/spectral/majorant.js';
+import { isBlackbody } from '../../components/color/values.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
 /** Supported spectral inputs; other binding and transport routes remain explicit diagnostics. */

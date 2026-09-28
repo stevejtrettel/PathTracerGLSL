@@ -6,7 +6,8 @@
 // (bytes), and the Generator's per-kind loaders (float offsets) — stride, codes, and
 // field positions cannot drift.
 //
-// Row = 1 HEADER texel (kindCode, emissionForm, kelvin, normalization) + payload texels: the kind's schema rows
+// Row = 1 HEADER texel (light-kind code, packed spectrum-kind code, and that spectrum kind's two
+// header numbers — zero for a plain RGB payload) + payload texels: the light kind's schema rows
 // in declared order followed by its derived ctor fields — exactly the generated
 // struct's ctor order, so a loader fills the struct by positional float reads (a vec3
 // may span texel boundaries; the generator emits the gather). Stride = the max over
@@ -14,12 +15,8 @@
 // codes = registry order over present kinds (the scene-table precedent).
 
 import { LIGHT_KINDS } from './index.js';
-import { isBlackbody, isValueParam } from '../color/values.js';
-import { blackbodyColor } from '../color/blackbody/blackbody.js';
+import { packedEmissionHeader } from '../color/values.js';
 import type { SpectrumValue } from '../../compiler/types.js';
-
-// Header.y tags the emission; z/w retain Planck parameters beside the RGB payload.
-export const LIGHT_EMISSION_BLACKBODY = 1;
 
 export interface LightTableLayout {
     /** Texels per light row (header + widest present kind's payload). */
@@ -67,12 +64,13 @@ export function packLightTable(lights: readonly LightTableEntry[], layout: Light
         if (code === undefined) throw new Error(`light table: kind '${l.kind}' missing from the layout's present set`);
         const base = li * layout.strideTexels * 4;
         out[base] = code;
-        if (isBlackbody(l.emission)) {
-            const { kelvin, scale = 1 } = l.emission.blackbody;
-            if (isValueParam(kelvin) || isValueParam(scale)) throw new Error('light table requires constant blackbody dials');
-            out[base + 1] = LIGHT_EMISSION_BLACKBODY;
-            out[base + 2] = kelvin;
-            out[base + 3] = scale * blackbodyColor(kelvin).normalization;
+        // A spectrum kind kept whole (blackbody) stores its own numbers in the header; the
+        // payload below still carries its RGB projection.
+        const header = packedEmissionHeader(l.emission);
+        if (header !== null) {
+            out[base + 1] = header[0];
+            out[base + 2] = header[1];
+            out[base + 3] = header[2];
         }
         let f = base + 4;   // payload floats start at the second texel
         const put = (v: number | number[], vec3: boolean): void => {

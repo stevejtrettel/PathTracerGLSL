@@ -7,7 +7,8 @@
 import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
-import { isValueParam, isBlackbody, type Vec3, type BlackbodyValue } from '../../types.js';
+import { isValueParam, type Vec3, type BlackbodyValue } from '../../types.js';
+import { namedKindOf, SPECTRUM_KINDS } from '../../../components/color/spectrumKinds.js';
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -22,7 +23,7 @@ import { structFromRows } from '../schema.js';
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque/opaque.glsl?raw';
 import shadowMediaGLSL from '../../../components/transport/shadow/media/media.glsl?raw';
 import lightTreeGLSL from '../../../components/accel/light_tree/light_tree.glsl?raw';
-import { lightTableLayout, LIGHT_EMISSION_BLACKBODY, type LightTableLayout } from '../../../components/lights/table.js';
+import { lightTableLayout, type LightTableLayout } from '../../../components/lights/table.js';
 
 export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (plan.program.estimator.lighting === null) {
@@ -96,8 +97,8 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         const b = plan.instanceBatches.find((x) => x.ordinal === il.ordinal);
         if (b === undefined) throw new Error(`lighting: instanceLights ordinal ${il.ordinal} has no planned batch`);
         const le = plan.materials[b.materialId]?.values[EMISSION_KEY];
-        if (!Array.isArray(le) && !isBlackbody(le) && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
-        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le };
+        if (!Array.isArray(le) && namedKindOf(le)?.roles.includes('emission') !== true && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
+        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le as BlackbodyValue | AttributeValue };
     });
 
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
@@ -338,7 +339,7 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
  * constant by contract and pass through; parameter bindings occur only on emission. */
 export function resolveLightValues(l: Pick<PlannedLight, 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
     const out: Record<string, number | number[]> = {};
-    for (const [k, v] of Object.entries(l.values)) out[k] = isValueParam(v) || isBlackbody(v) ? projectRGB(v, params) : v;
+    for (const [k, v] of Object.entries(l.values)) out[k] = isValueParam(v) || namedKindOf(v)?.roles.includes('emission') ? projectRGB(v, params) : v as number | number[];
     return out;
 }
 
@@ -719,6 +720,10 @@ function fieldExpr(f: number, vec3: boolean): string {
  *  (the ONE layout truth on both sides). */
 function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, blackbody: boolean): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
+    // Kinds that pack their own numbers into the row header. The plan's `blackbody` flag says
+    // whether any are read; blackbody is the only such kind until the plan lists the kinds a
+    // program uses (docs/claude-spectrum-spec.md, step 3).
+    const packedKinds = blackbody ? SPECTRUM_KINDS.filter((k) => k.packed !== undefined) : [];
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
         const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.semantic === 'radiometric' ? r.role : undefined })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];
@@ -729,16 +734,17 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
         for (let t = 0; t < texels; t++) {
             lines.push(`    vec4 t${t} = texelFetch(u_data_records, data_texel1d(uint(rb + ${t})), 0);`);
         }
-        if (blackbody) lines.push('    vec4 emissionHeader = texelFetch(u_data_records, data_texel1d(uint(rb - 1)), 0);');
+        if (packedKinds.length > 0) lines.push('    vec4 emissionHeader = texelFetch(u_data_records, data_texel1d(uint(rb - 1)), 0);');
         let f = 0;
         const args = rows.map(r => {
             const e = fieldExpr(f, r.vec3);
             f += r.vec3 ? 3 : 1;
             if (r.role === undefined) return e;
             const rgb = emitColor(e, r.role, 'wl');
-            return blackbody && r.role === 'emission'
-                ? `(int(emissionHeader.y) == ${LIGHT_EMISSION_BLACKBODY} ? blackbody_emission(emissionHeader.z, emissionHeader.w, wl) : ${rgb})`
-                : rgb;
+            if (r.role !== 'emission') return rgb;
+            // A kind kept whole in the row header is read from it; otherwise the RGB payload.
+            return packedKinds.reduceRight((inner, k) =>
+                `(int(emissionHeader.y) == ${k.packed!.code} ? ${k.packed!.read('emissionHeader', 'wl')} : ${inner})`, rgb);
         });
         lines.push(`    return ${lightStructName(kind)}(${args.join(', ')});`);
         lines.push('}');

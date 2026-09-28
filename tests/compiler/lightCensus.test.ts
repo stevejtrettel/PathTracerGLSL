@@ -22,7 +22,8 @@ import { envSelectionProbability } from '../../src/compiler/generate/features/li
 import type { SceneDescription, RenderStrategy, SpectrumProperty } from '../../src/compiler/types.js';
 import type { RenderPlan } from '../../src/compiler/plan/types.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
-import { isBlackbody, type BlackbodyValue } from '../../src/compiler/types.js';
+import type { BlackbodyValue } from '../../src/compiler/types.js';
+import { isBlackbody } from '../../src/components/color/values.js';
 
 const BLACKBODY: BlackbodyValue = { blackbody: { kelvin: 3000, scale: 5 } };
 

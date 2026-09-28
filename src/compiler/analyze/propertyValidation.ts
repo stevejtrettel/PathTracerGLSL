@@ -4,12 +4,10 @@
 // migration can later carry the same shape/domain data and call this function directly; the
 // validation behavior and diagnostics do not need to be rewritten when ownership moves.
 
-import { isGlslExpression, isValueParam, isBlackbody, type SceneDescription } from '../types.js';
+import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { isCauchyIndex } from '../../components/color/cauchy/cauchy.js';
-import { isSellmeierIndex, sellmeierIndex } from '../../components/color/sellmeier/sellmeier.js';
-import { spectralData } from '../../components/color/spectral/data.js';
-import { blackbodyTemperatureRange } from '../../components/color/blackbody/blackbody.js';
+import { isBlackbody } from '../../components/color/values.js';
+import { namedKindOf } from '../../components/color/spectrumKinds.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
@@ -83,59 +81,15 @@ export function validatePropertyValue(
     bag: DiagnosticBag,
 ): void {
     if (value === undefined || isGlslExpression(value)) return;
-    if (isSellmeierIndex(value)) {
-        if (contract.role !== 'index') {
-            bag.error('invalid-setting', `${label}: Sellmeier is an index form`).add();
+    // A named spectrum kind (blackbody, Cauchy, Sellmeier) belongs in slots of its roles and
+    // checks its own numbers.
+    const kind = namedKindOf(value);
+    if (kind) {
+        if (contract.role === undefined || !kind.roles.includes(contract.role)) {
+            bag.error('invalid-setting', `${label}: ${kind.label} is an ${kind.roles[0]} form`).add();
             return;
         }
-        const coefficients = value.sellmeier;
-        const validTriplet = (v: unknown): v is [number, number, number] => Array.isArray(v)
-            && v.length === 3 && v.every(x => typeof x === 'number' && Number.isFinite(x) && x >= 0);
-        if (!coefficients || !validTriplet(coefficients.B) || !validTriplet(coefficients.C)) {
-            bag.error('invalid-setting', `${label}: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)`).add();
-            return;
-        }
-        const min2 = (spectralData.lambdaMin / 1000) ** 2;
-        const max2 = (spectralData.lambdaMax / 1000) ** 2;
-        if (coefficients.C.some(c => c >= min2 && c <= max2)) {
-            bag.error('invalid-setting', `${label}: Sellmeier poles must lie outside ${spectralData.lambdaMin}–${spectralData.lambdaMax} nm`).add();
-        } else {
-            // With B,C >= 0 and no poles, d(n²)/d(lambda²) = -sum(B*C/(lambda²-C)²) <= 0.
-            // The red endpoint is therefore the minimum across the whole interval.
-            const minIndex = sellmeierIndex(value, spectralData.lambdaMax);
-            const maxIndex = sellmeierIndex(value, spectralData.lambdaMin);
-            if (!(minIndex > 0) || !Number.isFinite(maxIndex))
-                bag.error('invalid-setting', `${label}: Sellmeier must give finite positive n² throughout the spectral interval`).add();
-        }
-        return;
-    }
-    if (isCauchyIndex(value)) {
-        const coefficients = value.cauchy;
-        if (contract.role !== 'index') {
-            bag.error('invalid-setting', `${label}: Cauchy is an index form`).add();
-        } else if (!Array.isArray(coefficients) || coefficients.length < 2 || coefficients.length > 3
-            || coefficients.some(v => typeof v !== 'number' || !Number.isFinite(v))
-            || !(coefficients[0] > 0) || coefficients.slice(1).some(v => v! < 0)) {
-            bag.error('invalid-setting', `${label}: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)`).add();
-        }
-        return;
-    }
-    if (isBlackbody(value)) {
-        if (contract.role !== 'emission') {
-            bag.error('invalid-setting', `${label}: blackbody is an emission form`).add();
-            return;
-        }
-        const { kelvin, scale = 1 } = value.blackbody;
-        const checkDial = (dial: unknown, name: string, min: number, max: number) => {
-            const parameter = isValueParam(dial as never) ? dial as { param: string; default?: number; min?: number; max?: number } : null;
-            const values = parameter ? [parameter.default, ...[parameter.min, parameter.max].filter(v => v !== undefined)] : [dial];
-            if (values.some(v => typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max)
-                || (parameter?.min !== undefined && parameter.max !== undefined && parameter.min > parameter.max)) {
-                bag.error('invalid-setting', `${label}: blackbody ${name} requires finite values in [${min}, ${max}], including defaults and bounds`).add();
-            }
-        };
-        checkDial(kelvin, 'kelvin', ...blackbodyTemperatureRange);
-        checkDial(scale, 'scale', 0, Infinity);
+        kind.validate?.(value, label, (message) => bag.error('invalid-setting', message).add());
         return;
     }
 

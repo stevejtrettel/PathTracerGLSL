@@ -1,6 +1,6 @@
 // compiler/types.ts
 
-export { isValueParam, isBlackbody, hasConstantNonzeroEmission } from '../components/color/values.js';
+export { isValueParam, hasConstantNonzeroEmission } from '../components/color/values.js';
 
 import type { SceneDataPlan } from './sceneData.js';
 

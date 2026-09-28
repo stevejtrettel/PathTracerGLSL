@@ -4,6 +4,38 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 1: kinds behind one interface
+
+Blackbody, Cauchy, Sellmeier and plain RGB values are now **spectrum kinds**, each described
+once ([spec](docs/claude-spectrum-spec.md) §7; `components/color/spectrumKind.ts` is the
+contract, `spectrumKinds.ts` the registry). A kind answers every question the compiler asks
+about its values: which slots may hold it, its live sliders, its own domain checks, its RGB
+stand-in, whether it can emit, whether it disperses as an index, its GLSL, the sliders it
+derives, and how a light-table row keeps it. The compiler asks the kind instead of testing for
+a particular one: 28 such tests outside the color folder became 9, each kept on purpose until
+a later step (listed in `tests/components/spectrumKinds.test.ts`). A refactor: no compiled
+output changed.
+
+- Moved into the kinds: blackbody emission and its temperature slider (from
+  generate/values.ts), the index emission and Cauchy/Sellmeier evaluation, the named-kind
+  validation blocks (propertyValidation.ts, same messages), the light-table header, the
+  packed-row reader, the constant sky (its intensity now passes to the kind as a factor), batch
+  light arms, light-row resolution, index-row resolution and the dispersion plan.
+- `isValueParam` moved to `components/param.ts`; `color/values.ts` keeps its helpers, now
+  answered by the kinds.
+- `emitValue` now throws if a named kind reaches it; every such value is emitted by its kind.
+  No compile path reached that branch after the move (the full test run and the digest).
+- Known difference, malformed input only: a value carrying two kinds' keys (for example
+  `blackbody` and `param`) is classified by one registry order everywhere, instead of by each
+  reader's own order. No suite scene has one; the diagnostics snapshot is unchanged.
+
+Verification: the step-0 digest compare, 265 of 265 scenes identical (shaders, uniforms,
+compute-closure results, parameters, source maps, packed data, warnings), with a one-character
+edit to `blackbody.glsl` shown to be caught (9 scenes flagged); the step-0 diagnostics snapshot
+unchanged; the new scan test fails on the previous commit and passes now; typecheck; the full
+test run (104 files, one structure-test failure for the two new shared files, fixed by listing
+them; 3,971 other tests passed).
+
 ## 2026-09-28 — one spectrum type, step 0: make the refactor checkable
 
 Preparation for moving blackbody, Cauchy and Sellmeier behind one spectrum interface
