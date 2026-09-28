@@ -1,0 +1,967 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > albedo 1.5 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody and param keys together 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo: blackbody is an emission form
+  - spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: blackbody is an emission form",
+        "spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as medium emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.emission cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.emission cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'fog': medium.emission cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields
+  - spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.emission cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields",
+        "spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as medium sigma_a 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'fog': medium.sigma_a cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields
+  - Material 'fog': medium.sigma_a: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.sigma_a cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields",
+        "Material 'fog': medium.sigma_a: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (3 errors):
+  - Material 'fog': medium.sigma_a cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields
+  - Material 'fog': medium.sigma_a: blackbody is an emission form
+  - spectral medium 'fog' property 'sigma_a' requires nonnegative RGB constants or parameters, including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.sigma_a cannot be a blackbody spelling — kelvin parameterizes SURFACE/LIGHT emission chroma; medium coefficients are extinction/ε fields",
+        "Material 'fog': medium.sigma_a: blackbody is an emission form",
+        "spectral medium 'fog' property 'sigma_a' requires nonnegative RGB constants or parameters, including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody as surface ior 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin below range 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin slider default above range 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody kelvin slider min above max 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody negative scale 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > blackbody negative scale on a non-emitting model 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': model 'dielectric' carries emission but its emission dispatch returns zero — as a samplable light this adds NEE energy BSDF paths never see (pt/pt-nee diverge). Use an emissive-capable model (lambert) or set sampleAsLight: false",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo: Cauchy is an index form
+  - spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Cauchy is an index form",
+        "spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as light emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission must be a finite number or vec3",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission must be a finite number or vec3",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Light 0 (point): emission must be a finite number or vec3
+  - spectral lights require nonnegative RGB emission, including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission must be a finite number or vec3",
+        "spectral lights require nonnegative RGB emission, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as material emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': emission: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': emission: Cauchy is an index form
+  - spectral material 'm' property 'emission' requires nonnegative RGB, including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission: Cauchy is an index form",
+        "spectral material 'm' property 'emission' requires nonnegative RGB, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as medium emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "Error: Spectral index reached a non-index property",
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as medium ior 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.ior: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.ior: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.ior: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.ior: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy as sky color 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - environment.color: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "environment.color: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - spectral constant environments require nonnegative RGB, including parameter defaults and bounds
+  - environment.color: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "environment.color: Cauchy is an index form",
+        "spectral constant environments require nonnegative RGB, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy negative B 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy nonpositive A 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > cauchy too few coefficients 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Cauchy requires constant [A, B, C?], with finite A > 0 and B, C >= 0 (micrometre units)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > expression as sky color 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral constant environments require nonnegative RGB, including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "spectral constant environments require nonnegative RGB, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > material emission slider default -1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral material 'm' property 'emission' requires nonnegative RGB, including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "spectral material 'm' property 'emission' requires nonnegative RGB, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > medium emission -1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "spectral medium 'fog' property 'emission' requires nonnegative RGB constants or parameters, including defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Sellmeier is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Sellmeier is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo: Sellmeier is an index form
+  - spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Sellmeier is an index form",
+        "spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier as medium ior 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.ior: Sellmeier is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.ior: Sellmeier is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.ior: Sellmeier is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.ior: Sellmeier is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier negative B 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier pole inside the visible range 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier poles must lie outside 360–830 nm",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier poles must lie outside 360–830 nm",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier poles must lie outside 360–830 nm",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier poles must lie outside 360–830 nm",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > sellmeier wrong length 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo must be a finite number or vec3",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo must be a finite number or vec3",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo must be a finite number or vec3
+  - spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo must be a finite number or vec3",
+        "spectral material 'm' property 'albedo' requires RGB in [0,1], including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as light emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission must be a finite number or vec3",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission must be a finite number or vec3",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Light 0 (point): emission must be a finite number or vec3
+  - spectral lights require nonnegative RGB emission, including parameter defaults and bounds",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission must be a finite number or vec3",
+        "spectral lights require nonnegative RGB emission, including parameter defaults and bounds",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > unknown object as surface ior 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior must be a finite number",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior must be a finite number",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior must be a finite number",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior must be a finite number",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > zero-area quad light, RGB emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 1: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8",
+    },
+    "validator": {
+      "errors": [
+        "Light 1: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 1: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8",
+    },
+    "validator": {
+      "errors": [
+        "Light 1: quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics (pinned before the spectrum-kind refactor) > zero-area quad light, blackbody emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "Error: GLSL format: cannot format non-finite number: NaN",
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "Error: GLSL format: cannot format non-finite number: NaN",
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;

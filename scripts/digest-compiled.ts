@@ -4,15 +4,16 @@
 //   npm run digest -- --compare <a.json> <b.json>   # which scenes, and which parts, differ
 //
 // Each scene is compiled with its declared strategies (Compiler.compileScene). The digest covers
-// every renderer's shaders, uniforms (without their compute closures), defaults, parameters,
-// pipeline, export targets and source maps; the scene-data plan, including the contents of its
-// packed arrays; and the warnings. Text comes from tests/helpers/compiledJson.ts. Each part is
+// every renderer's shaders, uniforms, what their compute closures return (at the parameter
+// defaults and at one moved parameter set), defaults, parameters, pipeline, export targets and
+// source maps; the scene-data plan, including the contents of its packed arrays; and the
+// warnings. Text comes from tests/helpers/compiledJson.ts. Each part is
 // hashed on its own, keyed by renderer id, so a comparison says where a difference is.
 // Runs through vite-node so the GLSL `?raw` imports resolve as in the app.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Compiler } from '../src/compiler/Compiler.js';
-import type { CompiledScene } from '../src/compiler/types.js';
+import type { CompiledScene, ParameterMetadata } from '../src/compiler/types.js';
 import { sceneSuite, isAsyncSceneEntry } from '../pages/registry.js';
 import { compiledJson, hashText } from '../tests/helpers/compiledJson.js';
 
@@ -24,6 +25,32 @@ interface Digest {
     skipped: string[];
 }
 
+/** A parameter value moved partway across its declared range: numbers go 37% of the way from
+ *  the default toward the far end of the range (or grow by a quarter without one); colors and
+ *  vectors are scaled by 0.8 and offset by 0.05 per channel. Other values keep their default. */
+function movedValue(meta: ParameterMetadata): unknown {
+    const d = meta.default;
+    if (typeof d === 'number') {
+        if (meta.range === undefined) return d * 1.25 + 0.1;
+        const [lo, hi] = meta.range;
+        return hi > d ? d + 0.37 * (hi - d) : d - 0.37 * (d - lo);
+    }
+    if (Array.isArray(d) && d.every((c) => typeof c === 'number')) return d.map((c: number) => c * 0.8 + 0.05);
+    return d;
+}
+
+/** Every uniform's compute closure, evaluated at the parameter defaults and at the moved set.
+ *  A closure that throws for lack of an engine-supplied parameter records that it threw. */
+function closureResults(r: CompiledScene['renderers'][number]): unknown {
+    const meta = Object.entries(r.parameters ?? {});
+    const defaults = Object.fromEntries(meta.map(([path, m]) => [path, m.default]));
+    const moved = Object.fromEntries(meta.map(([path, m]) => [path, movedValue(m)]));
+    const at = (compute: (p: Record<string, unknown>) => unknown, params: Record<string, unknown>) => {
+        try { return compute(params); } catch { return '[throws]'; }
+    };
+    return r.uniforms.map((u) => [u.uniform, at(u.compute, defaults), at(u.compute, moved)]);
+}
+
 function digestScene(compiled: CompiledScene): Record<string, string> {
     const parts: Record<string, string> = {};
     for (const r of compiled.renderers) {
@@ -33,6 +60,8 @@ function digestScene(compiled: CompiledScene): Record<string, string> {
         if (!text.includes('void main')) throw new Error(`digest: renderer '${r.id}' serialized without shader text`);
         parts[`${r.id}.shaders`] = hashText(text);
         parts[`${r.id}.rest`] = hashText(compiledJson(rest));
+        // `rest` writes each compute closure as '[fn]'; this part records what they compute.
+        parts[`${r.id}.closures`] = hashText(compiledJson(closureResults(r)));
     }
     parts.sceneData = hashText(compiledJson(compiled.sceneData));
     parts.dataReads = hashText(compiledJson(compiled.dataReads));

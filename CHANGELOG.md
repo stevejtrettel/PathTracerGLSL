@@ -4,6 +4,37 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 0: make the refactor checkable
+
+Preparation for moving blackbody, Cauchy and Sellmeier behind one spectrum interface
+([spec](docs/claude-spectrum-spec.md), §8). Tests, fixtures and the digest tool only; no
+production code changed.
+
+- **Two compile-only fixtures**, `blackbody-lamp-batch` and `blackbody-equiangular`, bring three
+  blackbody routes into the digest and the static GLSL compile: instanced sphere lights under the
+  light tree (with packed blackbody rows), a blackbody sky in an RGB render, and a blackbody
+  point light under equiangular sampling. No suite scene compiled them before.
+- **`npm run digest` now records what every uniform's compute closure returns**, at the parameter
+  defaults and at one moved parameter set (part `<renderer>.closures`). Before, closures were
+  written as `[fn]`, so live sliders were invisible to it. Two runs agree on all 265 scenes;
+  changing only the kelvin slider's closure is reported as "closures differ" in exactly the
+  three scenes with a live kelvin, and nowhere else.
+- **`tests/compiler/spectrumDiagnostics.test.ts`** snapshots, in RGB and spectral renders, the
+  validator's messages and the compile outcome for 33 invalid spectrum values. It pins today's
+  behavior, including gaps step 2 will fix: a zero-area quad light with blackbody emission
+  passes validation and then crashes the compile on a NaN; Cauchy as medium emission passes RGB
+  validation and then throws an internal error; a value with both blackbody and `param` keys
+  compiles; negative material or medium emission and an expression sky color compile in RGB and
+  are rejected in spectral.
+
+Verification: typecheck (including the digest script under the strict settings); the full test
+run, 103 files and 3,965 tests; the existing snapshots change by additions only (441 lines for
+the two fixtures); the fixtures' 8 shader programs pass glslang.
+
+Found in passing, not addressed: 221 of the 265 synchronous suite scenes warn that the
+transport feature provides `light_query_medium` with nothing requiring it, a pre-existing
+exact-linkage gap.
+
 ## 2026-09-28 — spectrum-authoring design checkpoint
 
 Paused further authoring implementation for the owner's architecture review. Audited

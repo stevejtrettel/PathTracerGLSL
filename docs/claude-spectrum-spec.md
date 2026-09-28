@@ -211,7 +211,7 @@ How the readers change:
 
 Each step is approved separately. Step 1 is written out in full; the others get their own plans.
 
-### Step 0: make the refactor checkable (tests and fixtures only)
+### Step 0: make the refactor checkable (tests and fixtures only; built Sep 28)
 
 The compiled-output digest cannot yet see everything step 1 touches (**Reviewer**, **Checked**):
 it writes uniform compute closures as `[fn]` (tests/helpers/compiledJson.ts:16), so live sliders

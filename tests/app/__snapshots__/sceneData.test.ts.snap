@@ -43,6 +43,15 @@ exports[`scene-data textures (byte fingerprints) > beam-slab 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > beam-wall 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > blackbody-equiangular 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > blackbody-lamp-batch 1`] = `
+{
+  "nodes": "4096x1 5ad43830ad613e43",
+  "records": "4096x1 56cabcb6830e7ad4",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > blackhole 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
