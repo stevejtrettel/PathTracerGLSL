@@ -5,7 +5,7 @@ import { spectralData as data } from './data.js';
 export function spectralCoefficients(rgb: Vec3, atlas: Float32Array): Vec3 {
     const channel = rgb[0] >= rgb[1] && rgb[0] >= rgb[2] ? 0 : rgb[1] >= rgb[2] ? 1 : 2;
     const z = rgb[channel];
-    const x = rgb[(channel + 1) % 3] * (63 / z), y = rgb[(channel + 2) % 3] * (63 / z);
+    const x = rgb[(channel + 1) % 3] / z * 63, y = rgb[(channel + 2) % 3] / z * 63;
     const ix = Math.min(Math.floor(x), 62), iy = Math.min(Math.floor(y), 62);
     const fx = x - ix, fy = y - iy;
     let lo = 0, hi = 63;

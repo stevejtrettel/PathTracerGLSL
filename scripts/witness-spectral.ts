@@ -43,6 +43,13 @@ for (let i = 0; i < 40; ++i)
 const literal = (v: number[]) => `vec${v.length}(${v.map(x => x.toFixed(9)).join(',')})`;
 const lookupBody = `Wavelengths wl = Wavelengths(${literal(lambdas)}); int i = int(gl_FragCoord.x);\n` + colours.map((rgb, i) => `if (i == ${i}) { result = spectral_bounded(${literal(rgb)}, wl); return; }`).join('\n') + '\nresult = vec4(0.0);';
 const expectedLookup = colours.map(rgb => rgb.every(c => c === rgb[0]) ? lambdas.map(() => rgb[0]) : lambdas.map(l => evaluatePolynomial(spectralCoefficients(rgb, atlas), l)));
+// Largest channels so small that 63/z overflows float32 (z below about 1.85e-37); the table
+// coordinates must stay finite. `one` is 1.0 at run time, so the compiler cannot fold the values.
+const tinyColours: Vec3[] = [[1e-37, 5e-38, 0], [1e-37, 0, 0]];
+const tinyBody = 'float one = step(0.0, gl_FragCoord.x); int i = int(gl_FragCoord.x);\n'
+    + tinyColours.map((rgb, i) => `if (i == ${i}) { result = vec4(spectral_coefficients(vec3(${rgb.map(c => c === 0 ? '0.0' : c.toExponential()).join(', ')}) * one), 0.0); return; }`).join('\n')
+    + '\nresult = vec4(0.0);';
+const expectedTiny = tinyColours.map(rgb => spectralCoefficients(rgb.map(Math.fround) as Vec3, atlas));
 const filmBody = `WavelengthSample s = WavelengthSample(Wavelengths(vec4(410.0, 480.0, 555.0, 660.0)), vec4(0.001,0.002,0.004,0.008)); result = vec4(color_to_pixel(vec2(0.0), vec3(0.0,0.0,1.0), vec4(2.0,0.02,0.03,0.04), s), 1.0);`;
 const sensor = (lambda: number) => data.xyzToRGB.map(row => row.reduce((s, x, j) => s + x * spectralCurves(lambda, curves)[j], 0) / data.cieYIntegral);
 const expectedFilm = [410, 480, 555, 660].map(sensor).reduce((out, s, lane) => out.map((x, i) => x + ([2, .02, .03, .04][lane] / [.001, .002, .004, .008][lane] / 4) * s[i]), [0, 0, 0]);
@@ -62,6 +69,7 @@ const probes = [
     ]),
 ];
 probes.push({ name: 'coefficient role', source: shader(roleBody('coefficient')) }, { name: 'emission role', source: shader(roleBody('emission')) });
+probes.push({ name: 'tiny largest channel', source: shader(tinyBody) });
 const mutations = [
     { name: 'common PDF', source: shader(filmBody, 'visible', spectral.glsl.replace('L[i] / camera_sample.pdf[i]', 'L[i] / camera_sample.pdf[0]')) },
     { name: 'fourth lane omitted', source: shader(filmBody, 'visible', spectral.glsl.replaceAll('i < 4', 'i < 3')) },
@@ -103,8 +111,13 @@ try {
         assert(Math.abs(frames[8][i] - x) < 0.002, 'coefficient role');
         assert(Math.abs(frames[9][i] - x * spectralCurves(lambdas[i], curves)[3]) < 0.003, 'emission role');
     });
+    expectedTiny.forEach((expected, i) => expected.forEach((x, j) => {
+        const got = frames[10][4 * i + j];
+        assert(Number.isFinite(got), `tiny largest channel ${i}/${j}: coefficient ${got}`);
+        assert(Math.abs(got - x) <= 1e-3 * Math.max(1, Math.abs(x)), `tiny largest channel ${i}/${j}: ${got} != ${x}`);
+    }));
     mutations.forEach((m, i) => assert.throws(() => verifyFilm(frames[probes.length + i]), { name: 'AssertionError' }, m.name));
-    console.log(`PASS: ${colours.length} four-wavelength lookups (worst error ${worst}), two sampler/PDF/white integrations, signed film; ${mutations.length} compiled defects rejected`);
+    console.log(`PASS: ${colours.length} four-wavelength lookups (worst error ${worst}), ${tinyColours.length} tiny-channel table addresses, two sampler/PDF/white integrations, signed film; ${mutations.length} compiled defects rejected`);
 }
 finally {
     await browser.close();

@@ -15,7 +15,8 @@ vec3 spectral_node(int channel, int x, int y, int z) {
 vec3 spectral_coefficients(vec3 rgb) {
     int channel = rgb.x >= rgb.y && rgb.x >= rgb.z ? 0 : (rgb.y >= rgb.z ? 1 : 2);
     float z = rgb[channel];
-    vec2 xy = vec2(rgb[(channel + 1) % 3], rgb[(channel + 2) % 3]) * (63.0 / z);
+    // Divide before scaling: 63/z would overflow for tiny z.
+    vec2 xy = vec2(rgb[(channel + 1) % 3], rgb[(channel + 2) % 3]) / z * 63.0;
     ivec2 cell = min(ivec2(xy), ivec2(62));
     vec2 f = xy - vec2(cell);
     int lo = 0, hi = 63;
