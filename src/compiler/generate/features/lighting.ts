@@ -7,7 +7,7 @@
 import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
-import { isValueParam, type Vec3, type BlackbodyValue } from '../../types.js';
+import type { Vec3, BlackbodyValue } from '../../types.js';
 import { namedKindOf, kindById } from '../../../components/color/spectra/index.js';
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -93,7 +93,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         const b = plan.instanceBatches.find((x) => x.ordinal === il.ordinal);
         if (b === undefined) throw new Error(`lighting: instanceLights ordinal ${il.ordinal} has no planned batch`);
         const le = plan.materials[b.materialId]?.values[EMISSION_KEY];
-        if (!Array.isArray(le) && namedKindOf(le)?.roles.includes('emission') !== true && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
+        if (!Array.isArray(le) && namedKindOf(le) === undefined && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
         return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le as BlackbodyValue | AttributeValue };
     });
 
@@ -331,11 +331,15 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
     return lines.join('\n');
 }
 
-/** Evaluate radiometric rows for RGB packing and power selection. Geometry rows are
- * constant by contract and pass through; parameter bindings occur only on emission. */
-export function resolveLightValues(l: Pick<PlannedLight, 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
+/** Evaluate a light's rows for RGB packing and power selection: an emission row becomes its
+ * RGB stand-in at the given slider values; geometry rows are constant by contract and pass
+ * through. */
+export function resolveLightValues(l: Pick<PlannedLight, 'kind' | 'values'>, params: Record<string, unknown> = {}): Record<string, number | number[]> {
     const out: Record<string, number | number[]> = {};
-    for (const [k, v] of Object.entries(l.values)) out[k] = isValueParam(v) || namedKindOf(v)?.roles.includes('emission') ? projectRGB(v, params) : v as number | number[];
+    for (const row of LIGHT_KINDS[l.kind].params) {
+        const v = l.values[row.name];
+        out[row.name] = row.role !== undefined ? projectRGB(v, params) : v as number | number[];
+    }
     return out;
 }
 
@@ -404,7 +408,7 @@ function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral'): string {
         // a constant row bakes its literal via the row's formatter.
         const fmt = (row.shape === 'number' ? formatFloat
             : formatVec3) as (x: never) => string;
-        return row.semantic === 'radiometric'
+        return row.role !== undefined
             ? emitSpectrum(l.values[row.name] as ParamValue, row.role, 'wl', color)
             : emitValue(l.values[row.name] as ParamValue, fmt);
     });
@@ -724,7 +728,7 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
     const packedKinds = spectrumKinds.map(kindById).filter((k) => k.packed !== undefined);
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
-        const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.semantic === 'radiometric' ? r.role : undefined })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];
+        const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.role })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];
         const floats = rows.reduce((acc, r) => acc + (r.vec3 ? 3 : 1), 0);
         const texels = Math.ceil(floats / 4);
         lines.push(`${lightStructName(kind)} ${kind}_light_row(int li, Wavelengths wl) {`);

@@ -5,20 +5,14 @@
 // for pt ≡ pt-nee).
 
 import { namedKindOf } from '../../components/color/spectra/index.js';
-import type { Vec3, MaterialProperty, GlslExpression, ValueParam, NamedSpectrumValue, SpectralIndex } from '../types.js';
+import type { Vec3, MaterialProperty, GlslExpression, ValueParam, NamedSpectrumValue } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
-
-/** An index formula (Cauchy, Sellmeier) in a slot that is not an index slot. */
-function isIndexFormula(value: unknown): value is SpectralIndex {
-    return namedKindOf(value)?.roles.includes('index') === true;
-}
 
 /** A spectrum-valued property: a scalar broadcasts to vec3; blackbody, {param}, and
  *  GLSL spellings pass through (a {param}'s scalar default also
  *  broadcasts), and an absent value takes the fallback. */
 export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | NamedSpectrumValue {
     if (value === undefined) return fallback;
-    if (isIndexFormula(value)) throw new Error('Spectral index reached a non-index property');
     if (isGlslExpression(value)) return value;
     if (namedKindOf(value)) return value as NamedSpectrumValue;
     if (isValueParam(value)) {
@@ -30,14 +24,13 @@ export function resolveColorProperty(value: MaterialProperty | undefined, fallba
         return value as ValueParam<Vec3>;  // preserve — emitted as a uniform (§2.8)
     }
     if (typeof value === 'number') return [value, value, value] as Vec3;
-    return value;
+    return value as Vec3;
 }
 
 /** A scalar property: constants, {param} and GLSL spellings pass through; an absent value
  *  takes the fallback; a vector is a Planner bug (the Validator rejects it first). */
 export function resolveScalarProperty(value: MaterialProperty | undefined, fallback: number): number | GlslExpression | ValueParam<number> {
     if (value === undefined) return fallback;
-    if (isIndexFormula(value)) throw new Error('Spectral index reached a non-index property');
     if (isGlslExpression(value)) return value;
     if (isValueParam(value)) return value as ValueParam<number>;  // preserve — emitted as a uniform (§2.8)
     if (typeof value === 'number') return value;

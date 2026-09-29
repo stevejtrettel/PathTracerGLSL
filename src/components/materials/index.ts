@@ -32,8 +32,8 @@ export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] 
         ...(d.derived ?? []).map((s): PropertySchema => ({
             name: s.name,
             ...(s.glslType === 'Spectrum'
-                ? { glslType: s.glslType, semantic: 'radiometric', role: s.role }
-                : { glslType: s.glslType, semantic: 'geometric' }),
+                ? { glslType: s.glslType, role: s.role }
+                : { glslType: s.glslType }),
             source: s.name, default: 0, storage: 'field',
         })),
     ];
@@ -77,5 +77,5 @@ export const EMISSION_KEY = 'emission';
 
 /** The schema declares which surface models consume the adjacent regions' index. */
 export function modelIndexRow(id: MaterialModel): PropertySchema | undefined {
-    return MATERIAL_MODELS[id]?.properties.find(row => row.semantic === 'index' && row.storage === 'region-table');
+    return MATERIAL_MODELS[id]?.properties.find(row => row.role === 'index' && row.storage === 'region-table');
 }

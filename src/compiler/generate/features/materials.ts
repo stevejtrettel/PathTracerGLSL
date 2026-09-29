@@ -17,6 +17,7 @@ import { isAttributeValue } from '../../plan/types.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
+import { isRadiometric } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
@@ -206,7 +207,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             mintValueUniform(
                 mat.values[f.source] as Vec3 | number | GlslExpression | ValueParam<Vec3 | number>,
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
-                f.semantic === 'radiometric' ? 'color' : 'float',
+                isRadiometric(f.role) ? 'color' : 'float',
                 uniforms, parameters, seen,
                 f.source === EMISSION_KEY, plan.program.measurement.color,
             );
@@ -230,7 +231,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 mintValueUniform(
                     mat.medium.values[f.source] as number | ValueParam<number>,
                     f.glslType === 'Spectrum' ? 'vec3' : 'float',
-                    f.semantic === 'radiometric' ? 'color' : 'float',
+                    isRadiometric(f.role) ? 'color' : 'float',
                     uniforms, parameters, seen,
                 );
             }
@@ -389,9 +390,9 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             let resolved: string;
             if (isAttributeValue(raw)) {
                 const value = emitAttributeValue(raw);
-                resolved = f.semantic === 'radiometric' ? emitColor(value, f.role, 'wl') : value;
+                resolved = isRadiometric(f.role) ? emitColor(value, f.role, 'wl') : value;
             } else {
-                resolved = f.semantic === 'radiometric'
+                resolved = isRadiometric(f.role)
                     ? emitSpectrum(raw as ParamValue, f.role, 'wl', color)
                     : emitValue(raw as ParamValue, fmt);
             }
@@ -599,7 +600,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
             const format = f.glslType === 'Spectrum' ? formatVec3 : formatFloat;
             if (value === undefined) continue; // already initialized from this row's default
             const expr = mediumPropertyExpr(value, f.name, format as (v: never) => string);
-            const resolved = f.semantic === 'radiometric' ? emitColor(expr, f.role, 'wl') : expr;
+            const resolved = isRadiometric(f.role) ? emitColor(expr, f.role, 'wl') : expr;
             lines.push(`        m.${f.name} = ${resolved};`);
         }
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);

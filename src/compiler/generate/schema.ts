@@ -5,7 +5,7 @@
 // handful of models), never with library size; a single-model scene's struct IS that
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
-import type { PropertySchema, ParamKind } from '../../components/descriptors.js';
+import { isRadiometric, type PropertySchema, type ParamKind, type RadiometricRole } from '../../components/descriptors.js';
 import { emitColor } from './color.js';
 import { formatFloat } from '../../components/glsl-format.js';
 
@@ -15,14 +15,15 @@ export interface StructRow {
     name: string;
     shape: 'number' | 'vec3';
     kind?: ParamKind;
-    semantic?: 'radiometric' | 'geometric';
+    /** An emission row's role; absent for geometry. */
+    role?: RadiometricRole;
 }
 
 /** The row's GLSL type — typedef-disciplined (curved-space prep): radiometric →
  *  Spectrum; point → Point; direction → Direction; plain vectors → vec3;
  *  scalars → float. */
 export function rowGlslType(row: StructRow): string {
-    if (row.semantic === 'radiometric') return 'Spectrum';
+    if (isRadiometric(row.role)) return 'Spectrum';
     if (row.shape === 'number') return 'float';
     if (row.kind === 'point') return 'Point';
     if (row.kind === 'direction') return 'Direction';
@@ -42,7 +43,7 @@ export function structFromRows(structName: string, rows: StructRow[]): string {
 
 /** Resolve the row's authored grey default at the current wavelengths. */
 export function defaultExpr(f: PropertySchema<string>, wl: string): string {
-    return f.semantic === 'radiometric'
+    return isRadiometric(f.role)
         ? emitColor(`vec3(${formatFloat(f.default)})`, f.role, wl)
         : formatFloat(f.default);
 }

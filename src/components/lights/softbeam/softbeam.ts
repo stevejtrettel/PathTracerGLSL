@@ -23,11 +23,11 @@ export const softbeamLightDescriptor: LightKindDescriptor = {
         { name: 'divergence', shape: 'number', required: true, kind: 'angle', constraint: { kind: 'positive' } },
     ],
     params: [
-        { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },
-        { name: 'direction', shape: 'vec3', semantic: 'geometric', kind: 'direction' },
-        { name: 'radius', shape: 'number', semantic: 'geometric', kind: 'length' },
-        { name: 'cos_divergence', shape: 'number', semantic: 'geometric', kind: 'angle' },
-        { name: 'radiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // Le inside the cone, precomputed product
+        { name: 'position', shape: 'vec3', kind: 'point' },
+        { name: 'direction', shape: 'vec3', kind: 'direction' },
+        { name: 'radius', shape: 'number', kind: 'length' },
+        { name: 'cos_divergence', shape: 'number', kind: 'angle' },
+        { name: 'radiance', shape: 'vec3', role: 'emission' },   // Le inside the cone, precomputed product
     ],
     // Φ = Le·A·∫_cone cosθ dω = Le·(π r²)·(π sin²δ) — exact, not small-angle.
     power(v) {

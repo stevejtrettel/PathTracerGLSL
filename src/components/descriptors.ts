@@ -36,12 +36,18 @@ export type RowConstraint =
  *  the caller projects authored radiometric forms via `resolveLightValues` first. */
 export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue;
 
+/** How a setting reads its spectrum: light itself (emission), or a multiplier acting on light
+ *  (reflectance, a fraction in [0,1]; coefficient, a rate per unit length). */
 export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
 
-/** Radiometric rows declare how authored RGB is interpreted by the colour model. */
-export type ColorSemantic =
-    | { semantic: 'geometric' }
-    | { semantic: 'radiometric'; role: RadiometricRole };
+/** A spectrum setting's role: a radiometric role, or a refractive index. The role belongs to the
+ *  setting, never to the value in it; it decides how RGB converts, and the allowed domain. */
+export type SpectrumRole = RadiometricRole | 'index';
+
+/** Whether a role reads light or a multiplier of light, as opposed to an index. */
+export function isRadiometric(role: SpectrumRole | undefined): role is RadiometricRole {
+    return role !== undefined && role !== 'index';
+}
 
 /**
  * A field of a scene-scoped properties struct (MaterialProperties / MediumProperties)
@@ -50,7 +56,10 @@ export type ColorSemantic =
  * property vocabulary (materials-§7): no compiler type names a property, so a new model
  * with a new property adds a row here and nothing anywhere else.
  */
-export type PropertySchema<TSource extends string = string> = (ColorSemantic | { semantic: 'index' }) & {
+export type PropertySchema<TSource extends string = string> = {
+    /** A spectrum setting's role; absent for a setting that holds an ordinary number
+     *  (roughness, uv scale, a phase parameter). */
+    role?: SpectrumRole;
     /** Struct field name; shared across models by name+type (same name, different
      *  glslType is a Validator error — module-anatomy §3). */
     name: string;
@@ -62,9 +71,8 @@ export type PropertySchema<TSource extends string = string> = (ColorSemantic | {
     /** Which resolved data field feeds it — ALSO the authored scene key the resolver
      *  reads (materials-§7 reorg: resolution derives from the row). */
     source: TSource;
-    /** Numeric default — ONE truth (the geometry batch's defaults-in-rows lesson).
-     *  Radiometric rows lift the authored grey through their declared colour role;
-     *  geometric rows format the scalar directly. */
+    /** Numeric default, the one declaration of it. A radiometric row lifts this gray
+     *  through its role; any other row formats the number directly. */
     default: number;
     /** 'field' → struct member resolved at the shading point; 'region-table' → a
      *  generated <name>_of(region) table (read for the FAR side of a boundary — a
@@ -157,13 +165,15 @@ export interface AuthoredParamSpec {
  *  AND `PlannedLight.values` key. ROW ORDER = STRUCT FIELD ORDER = CTOR ORDER —
  *  the struct itself is GENERATED from these rows (A1: one declaration, everything
  *  derived), and the dispatcher constructs it positionally. */
-export type LightParamSpec = ColorSemantic & {
+export type LightParamSpec = {
+    /** An emission setting's role; absent for geometry. Lights have no index setting. */
+    role?: RadiometricRole;
     name: string;
     shape: 'number' | 'vec3';
-    /** Geometric kind (required for geometric rows): drives the generated struct's
+    /** Geometric kind, required for a row without a role: drives the generated struct's
      *  typedef (point → Point, direction → Direction, vector → vec3, length → float)
      *  and, later, the Value<T>-light-params transform rules — the same table as
-     *  geometry. Ignored for radiometric rows (they are Spectrum). */
+     *  geometry. An emission row is a Spectrum and has none. */
     kind?: ParamKind;
 }
 

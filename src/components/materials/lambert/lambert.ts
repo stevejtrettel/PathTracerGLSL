@@ -9,8 +9,8 @@ export const lambertDescriptor: MaterialModelDescriptor = {
     glsl: lambertGLSL,
     // Fields read (matches lambert.glsl's header): albedo, emission.
     properties: [
-        { name: 'albedo', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'albedo', default: 0.8, storage: 'field' },
-        { name: 'emission', glslType: 'Spectrum', semantic: 'radiometric', role: 'emission', source: 'emission', default: 0, storage: 'field' },
+        { name: 'albedo', glslType: 'Spectrum', role: 'reflectance', source: 'albedo', default: 0.8, storage: 'field' },
+        { name: 'emission', glslType: 'Spectrum', role: 'emission', source: 'emission', default: 0, storage: 'field' },
     ],
     capabilities: {
         nonDeltaLobes: true,

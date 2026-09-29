@@ -21,7 +21,7 @@ describe('blackbody forms survive planning', () => {
             expect(shared.materials.find(m => m.name === 'lamp')!.values.emission).toEqual(form);
             if (['surface', 'mesh', 'point', 'quad'].includes(site)) {
                 const light = shared.lights.at(-1)!;
-                const row = LIGHT_KINDS[light.kind].params.find(p => p.semantic === 'radiometric')!;
+                const row = LIGHT_KINDS[light.kind].params.find(p => p.role !== undefined)!;
                 expect(light.values[row.name]).toEqual(form);
             }
             const plan = planRenderers(analyze(scene), scene, [minimalStrategy], bag).plans[0];

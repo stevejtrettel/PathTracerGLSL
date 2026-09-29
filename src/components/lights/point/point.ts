@@ -17,8 +17,8 @@ export const pointLightDescriptor: LightKindDescriptor = {
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },
     ],
     params: [
-        { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },
-        { name: 'intensity', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // W/sr, precomputed product
+        { name: 'position', shape: 'vec3', kind: 'point' },
+        { name: 'intensity', shape: 'vec3', role: 'emission' },   // W/sr, precomputed product
     ],
     // pbrt PowerLightSampler: 4π·I (§6.1 conventions fold 1/d² into radiance).
     power(v) {

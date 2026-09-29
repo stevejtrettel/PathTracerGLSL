@@ -20,10 +20,10 @@ export const beamLightDescriptor: LightKindDescriptor = {
         { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' } },
     ],
     params: [
-        { name: 'position', shape: 'vec3', semantic: 'geometric', kind: 'point' },
-        { name: 'direction', shape: 'vec3', semantic: 'geometric', kind: 'direction' },
-        { name: 'radius', shape: 'number', semantic: 'geometric', kind: 'length' },
-        { name: 'irradiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // E (W/m²), precomputed product
+        { name: 'position', shape: 'vec3', kind: 'point' },
+        { name: 'direction', shape: 'vec3', kind: 'direction' },
+        { name: 'radius', shape: 'number', kind: 'length' },
+        { name: 'irradiance', shape: 'vec3', role: 'emission' },   // E (W/m²), precomputed product
     ],
     // Beam power: Φ = E·π·r² (the aperture area — pure over rows, no scene context).
     power(v) {

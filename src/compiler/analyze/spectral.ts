@@ -23,7 +23,7 @@ export function spectralLimitations(scene: SceneDescription): string[] {
         const material = scene.materials[object.prototype.material];
         for (const row of MATERIAL_MODELS[material?.model]?.properties ?? []) {
             const values = object.attributes?.[row.source];
-            if (values === undefined || row.semantic !== 'radiometric' || row.role !== 'reflectance') continue;
+            if (values === undefined || row.role !== 'reflectance') continue;
             // Nested RGB, scalar broadcasts and packed float arrays share this bound.
             if (!Array.from(values as ArrayLike<number | number[]>).every(v => atMost(v, 1)))
                 reasons.push(`spectral object ${index} attribute '${row.source}' requires RGB in [0,1]`);
@@ -45,7 +45,7 @@ export function spectralLimitations(scene: SceneDescription): string[] {
             }
         }
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-            if (row.semantic !== 'radiometric' || row.role !== 'reflectance') continue;
+            if (row.role !== 'reflectance') continue;
             const value = mat[row.source] ?? row.default;
             // Expressions author RGB in [0,1] at every evaluated point; their source and live
             // controls cannot establish that statically.

@@ -1199,7 +1199,7 @@ export function validate(
                 }
                 const spectrum = row.glslType === 'Spectrum';
                 // Per-instance values lie in the row's domain, like any other value there.
-                const role = row.semantic === 'radiometric' ? row.role : undefined;
+                const role = row.role;
                 const domain = slotDomain({ constraint: row.constraint, role });
                 const roleNote = role === undefined ? '' : ` (${role})`;
                 if (arr instanceof Float32Array) {

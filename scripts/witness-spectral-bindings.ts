@@ -7,6 +7,7 @@ import { packSceneData } from '../src/app/sceneData.js';
 import type { InstancedObject, LightDescription, SceneDescription, Vec3, RenderStrategy } from '../src/compiler/types.js';
 import { MATERIAL_MODELS } from '../src/components/materials/index.js';
 import { LIGHT_KINDS } from '../src/components/lights/index.js';
+import { isRadiometric } from '../src/components/descriptors.js';
 import { blackbodyFixture } from '../tests/helpers/blackbodyFixtures.js';
 import { spectralData } from '../src/components/color/spectral/data.js';
 import { spectralCoefficients, spectralCurves, evaluatePolynomial } from '../src/components/color/spectral/lookup.js';
@@ -90,7 +91,7 @@ const lights: LightDescription[] = [
 for (const light of lights) {
     const scene = structuredClone(spectralPackedReference);
     scene.lights = [light];
-    const row = LIGHT_KINDS[light.kind].params.find(p => p.semantic === 'radiometric')!;
+    const row = LIGHT_KINDS[light.kind].params.find(p => p.role !== undefined)!;
     await add(`${light.kind} light row`, scene, `fragColor = ${light.kind}_light_row(0,${carrier}).${row.name};`,
         [expected(emission, true)]);
 }
@@ -154,7 +155,7 @@ const expressionSource = `mix(${literal(expressionA)},${literal(expressionB)},${
 let expressionMutation: typeof probes[number] | undefined;
 for (const [model, descriptor] of Object.entries(MATERIAL_MODELS)) {
     for (const row of descriptor!.properties) {
-        if (row.semantic !== 'radiometric') continue;
+        if (!isRadiometric(row.role)) continue;
         const scene = structuredClone(spectralPackedReference);
         scene.materials.lamp0 = { model, [row.source]: {
             kind: 'glsl', source: expressionSource,

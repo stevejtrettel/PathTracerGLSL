@@ -9,10 +9,7 @@
 
 import type { Vec3, ParameterMetadata } from '../../../compiler/types.js';
 import type { PlannedUniform } from '../../../compiler/plan/types.js';
-import type { RadiometricRole } from '../../descriptors.js';
-
-/** How a slot reads a spectrum: light itself (emission), or a multiplier acting on light. */
-export type SpectrumRole = RadiometricRole | 'index';
+import type { SpectrumRole } from '../../descriptors.js';
 
 /** Helium d line, in nm. An RGB render uses the index at this wavelength. */
 export const indexReferenceNM = 587.5618;

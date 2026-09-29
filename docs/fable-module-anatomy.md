@@ -46,7 +46,7 @@ interface MaterialModelDescriptor {
 interface PropertySchema {
   name: string;                             // struct field name; shared across models by name+type
   glslType: 'float' | 'Spectrum' | ...;     // typedefs, per §2.5
-  semantic: 'radiometric' | 'geometric';    // radiometric constants format via formatSpectrum (§2.5)
+  role?: 'emission' | 'reflectance' | 'coefficient' | 'index';  // a spectrum setting's role; absent for an ordinary number
   default: unknown;
   storage: 'field' | 'region-table';        // region-table → generated <name>_of(region) (the ior_of lesson:
                                             //   some "material properties" are region-indexed and read for the

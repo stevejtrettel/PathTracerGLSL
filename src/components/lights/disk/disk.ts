@@ -24,10 +24,10 @@ export const diskLightDescriptor: LightKindDescriptor = {
         { name: 'normal', shape: 'vec3', required: false, kind: 'direction', default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
     ],
     params: [
-        { name: 'center', shape: 'vec3', semantic: 'geometric', kind: 'point' },
-        { name: 'radius', shape: 'number', semantic: 'geometric', kind: 'length' },
-        { name: 'normal', shape: 'vec3', semantic: 'geometric', kind: 'direction' },
-        { name: 'radiance', shape: 'vec3', semantic: 'radiometric', role: 'emission' },   // Le, precomputed product
+        { name: 'center', shape: 'vec3', kind: 'point' },
+        { name: 'radius', shape: 'number', kind: 'length' },
+        { name: 'normal', shape: 'vec3', kind: 'direction' },
+        { name: 'radiance', shape: 'vec3', role: 'emission' },   // Le, precomputed product
     ],
     // pbrt PowerLightSampler: one-sided disk π·A·Le = π·(π r²)·Le.
     power(v) {

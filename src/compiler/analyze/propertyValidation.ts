@@ -8,7 +8,7 @@ import { isGlslExpression, isValueParam, type SceneDescription } from '../types.
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { namedKindOf, namedKindsClaiming } from '../../components/color/spectra/index.js';
 import { valueParamProblems } from '../../components/param.js';
-import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
+import type { SpectrumRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 
@@ -24,7 +24,7 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
 
 export interface PropertyValueContract {
     shape: 'scalar' | 'spectrum';
-    role?: RadiometricRole | 'index';
+    role?: SpectrumRole;
     /** Only domains required by current transport mathematics, not artistic policy —
      *  the shared RowConstraint vocabulary (descriptor-unification D1). */
     constraint?: RowConstraint;
@@ -39,7 +39,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
                 validatePropertyValue(
                     (mat as unknown as Record<string, unknown>)[field.source],
-                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : field.semantic === 'index' ? 'index' : undefined },
+                    { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.role },
                     `Material '${name}': ${field.source}`,
                     bag,
                 );
@@ -69,7 +69,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         for (const field of phase?.properties ?? []) {
             validatePropertyValue(
                 (mat.medium as unknown as Record<string, unknown>)[field.source],
-                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.semantic === 'radiometric' ? field.role : field.semantic === 'index' ? 'index' : undefined },
+                { shape: field.glslType === 'Spectrum' ? 'spectrum' : 'scalar', constraint: field.constraint, role: field.role },
                 `Material '${name}': medium.${field.source}`,
                 bag,
             );

@@ -13,9 +13,9 @@ describe('light kind GLSL contract (struct-alignment batch — the _light_ infix
                 expect(new RegExp(`struct\\s+${sn}\\s*\\{`).test(d.glsl)).toBe(false);
             });
 
-            it('geometric rows declare a kind (drives the generated typedef + future Value<T> rules)', () => {
+            it('rows without a role declare a kind (drives the generated typedef + future Value<T> rules)', () => {
                 for (const p of d.params) {
-                    if (p.semantic === 'geometric') expect(p.kind, `${kind}.${p.name}`).toBeDefined();
+                    if (p.role === undefined) expect(p.kind, `${kind}.${p.name}`).toBeDefined();
                 }
             });
 

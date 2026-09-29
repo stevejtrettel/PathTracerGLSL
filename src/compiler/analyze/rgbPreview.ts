@@ -9,10 +9,10 @@ export function rgbPreviewWarnings(scene: SceneDescription): string[] {
     const warnings: string[] = [];
     for (const [name, mat] of Object.entries(scene.materials)) {
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-            if (row.semantic !== 'radiometric' || row.role !== 'reflectance') continue;
+            if (row.role !== 'reflectance') continue;
             const value = (mat as unknown as Record<string, unknown>)[row.source];
             const kind = namedKindOf(value);
-            if (kind === undefined || !kind.roles.includes('reflectance')) continue;
+            if (kind === undefined || !kind.roles.includes(row.role)) continue;
             // An invalid value gets its own error; only valid ones are previewed.
             let invalid = false;
             kind.validate?.(value, '', () => { invalid = true; });

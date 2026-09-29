@@ -10,7 +10,7 @@ export const mirrorDescriptor: MaterialModelDescriptor = {
     // (name+type), so the generated MaterialProperties shares ONE f0 field between
     // them (§3.4 unionFields dedupe — this occupant is its first real exercise).
     properties: [
-        { name: 'f0', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'f0', default: 0.9, storage: 'field' },
+        { name: 'f0', glslType: 'Spectrum', role: 'reflectance', source: 'f0', default: 0.9, storage: 'field' },
     ],
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)

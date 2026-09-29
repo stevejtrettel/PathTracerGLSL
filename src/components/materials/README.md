@@ -56,7 +56,7 @@ Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy conver
 §3.4 union-dedupe pair; F-MIRROR = f0·L convex).
 
 
-Index-consuming models mark their region-table row with `semantic: 'index'`.
+Index-consuming models mark their region-table row with `role: 'index'`.
 `modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics
 accept scalar indices, [Cauchy](../color/spectra/cauchy/README.md), or
 [Sellmeier](../color/spectra/sellmeier/README.md); spectral transport

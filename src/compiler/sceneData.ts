@@ -151,7 +151,7 @@ export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): Sce
 
     if (layout.lightTree !== undefined) {
         const resolved = plan.lights.map(l => {
-            const emissionRow = LIGHT_KINDS[l.kind].params.find(row => row.semantic === 'radiometric' && row.role === 'emission')!;
+            const emissionRow = LIGHT_KINDS[l.kind].params.find(row => row.role === 'emission')!;
             return { kind: l.kind, values: resolveLightValues(l), emission: l.values[emissionRow.name] as SpectrumValue };
         });
         const table = resolved.length > 0 ? packLightTable(resolved, lightTableLayout(resolved.map((l) => l.kind))) : new Float32Array(0);

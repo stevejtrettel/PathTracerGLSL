@@ -9,6 +9,7 @@ import type { SceneFeatures } from '../analyze/types.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
+import { isRadiometric } from '../../components/descriptors.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
@@ -921,7 +922,7 @@ export function resolveMaterialValues(
     if (model === 'none') return values;
     for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
         const v = authored[row.source];
-        values[row.source] = row.semantic === 'index' && namedKindOf(v)?.roles.includes('index') === true ? v as SpectralIndex : row.glslType === 'Spectrum'
+        values[row.source] = row.role === 'index' && namedKindOf(v) !== undefined ? v as SpectralIndex : row.glslType === 'Spectrum'
             ? resolveColorProperty(v, [row.default, row.default, row.default])
             : resolveScalarProperty(v, row.default);
     }
@@ -1001,19 +1002,21 @@ function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[])
     return any ? Math.max(r, 1e-3) : 10;
 }
 
-/** The named kinds a spectral program evaluates at wavelengths, in registry order: a
- *  radiometric kind in any material, light or constant-sky value, and the dispersive index
- *  kinds. */
+/** The named kinds a spectral program evaluates at wavelengths, in registry order: a named
+ *  kind in any radiometric setting (a material row, a light row, the constant sky's
+ *  emission), and the dispersive index kinds. */
 function spectrallyEvaluatedKinds(scenePlan: ScenePlan, scene: SceneDescription, dispersive: Set<string>): string[] {
     const used = new Set(dispersive);
     const values = [
-        ...scenePlan.materials.flatMap(m => Object.values(m.values)),
-        ...scenePlan.lights.flatMap(l => Object.values(l.values)),
+        ...scenePlan.materials.flatMap(m => (MATERIAL_MODELS[m.model]?.properties ?? [])
+            .filter(row => isRadiometric(row.role)).map(row => m.values[row.source])),
+        ...scenePlan.lights.flatMap(l => LIGHT_KINDS[l.kind].params
+            .filter(row => isRadiometric(row.role)).map(row => l.values[row.name])),
         ...(scene.environment?.type === 'constant' ? [scene.environment.color] : []),
     ];
     for (const v of values) {
         const kind = namedKindOf(v);
-        if (kind !== undefined && !kind.roles.includes('index')) used.add(kind.id);
+        if (kind !== undefined) used.add(kind.id);
     }
     return SPECTRUM_KINDS.filter(k => used.has(k.id)).map(k => k.id);
 }

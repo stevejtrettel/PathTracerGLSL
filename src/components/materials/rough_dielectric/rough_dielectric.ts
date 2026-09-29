@@ -14,9 +14,9 @@ export const roughDielectricDescriptor: MaterialModelDescriptor = {
     // region-table ior with dielectric — so this model adds NO field to
     // MaterialProperties. No f0: a dielectric's Fresnel is exact, not a Schlick fit.
     properties: [
-        { name: 'roughness', glslType: 'float', semantic: 'geometric', source: 'roughness', default: 0.2, storage: 'field' },
-        { name: 'transmittance', glslType: 'Spectrum', semantic: 'radiometric', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
-        { name: 'ior', glslType: 'float', semantic: 'index', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
+        { name: 'roughness', glslType: 'float', source: 'roughness', default: 0.2, storage: 'field' },
+        { name: 'transmittance', glslType: 'Spectrum', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
+        { name: 'ior', glslType: 'float', role: 'index', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
     // D4 derived, SHARED with ggx by name + type (the union dedupes; the fn is the same
     // declaration, so the two can never disagree about the floor).

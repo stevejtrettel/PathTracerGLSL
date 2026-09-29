@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
 import type { SpectrumProperty, SceneDescription } from '../../src/compiler/types.js';
 import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
+import { isRadiometric } from '../../src/components/descriptors.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import { spectralMaterials, spectralMaterialStrategies } from '../witnesses/scenes/spectralMaterials.js';
 import { compiledJson } from '../helpers/compiledJson.js';
@@ -19,7 +20,7 @@ describe('spectral surface materials', () => {
                 glslangCheck(shader.fragment, 'frag', id);
         });
         for (const row of descriptor!.properties) {
-            if (row.semantic !== 'radiometric') continue;
+            if (!isRadiometric(row.role)) continue;
             it(`validates ${model}.${row.source} through its declared role`, () => {
                 const scene = structuredClone(minimalScene);
                 scene.materials.sphere = { model };

@@ -24,7 +24,7 @@ opaque-dielectric shadow policy.
 
 ## Ownership
 
-Material descriptors mark region-index rows with `semantic: 'index'`. `modelIndexRow`
+Material descriptors mark region-index rows with `role: 'index'`. `modelIndexRow`
 reads that declaration; the planner records the consumer materials and actual dispersive
 interior regions. Open meshes and thin batches do not supply an interior index. The
 spectral program's dispersion record also lists the used index forms; an empty region

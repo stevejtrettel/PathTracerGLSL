@@ -37,6 +37,20 @@ describe('spectrum kinds', () => {
         expect(found).toEqual(ALLOWED);
     });
 
+    it('code outside color/spectra/ never compares a kind against a literal role', () => {
+        // A setting's role comes from the setting (its descriptor row), never from the kind of
+        // value in it. Asking whether a kind may sit in a setting compares against that
+        // setting's role variable, which this pattern does not match.
+        const found: string[] = [];
+        for (const file of tsFiles(SRC)) {
+            if (file.startsWith(SPECTRA)) continue;
+            readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+                if (/roles\.includes\(\s*['"]/.test(line)) found.push(`${relative(SRC, file)}:${i + 1}`);
+            });
+        }
+        expect(found).toEqual([]);
+    });
+
     it('the named kinds are disjoint and plain values are the rgb kind', () => {
         const examples: Record<string, unknown> = {
             blackbody: { blackbody: { kelvin: 3000, scale: 2 } },
@@ -66,8 +80,7 @@ describe('spectrum kinds', () => {
             const scene = entry.scene;
             for (const [name, mat] of Object.entries(scene.materials)) {
                 for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-                    const role = row.semantic === 'radiometric' ? row.role : row.semantic === 'index' ? 'index' : undefined;
-                    if (role !== undefined) check((mat as unknown as Record<string, unknown>)[row.source], role, `${id} material ${name}.${row.source}`);
+                    if (row.role !== undefined) check((mat as unknown as Record<string, unknown>)[row.source], row.role, `${id} material ${name}.${row.source}`);
                 }
                 for (const f of ['sigma_a', 'sigma_s'] as const) check(mat.medium?.[f], 'coefficient', `${id} medium ${name}.${f}`);
                 check(mat.medium?.emission, 'emission', `${id} medium ${name}.emission`);
