@@ -342,6 +342,9 @@ break]
   - [reviewer compiled it; I read the generator]
 - **Dead struct fields:** `MaterialProperties.wl` and `MediumProperties.wl` are written
   (materials.ts:370, :551) and read nowhere (0 reads in GLSL). [read, untruncated]
+  *Correction (Sep 29):* they are load-bearing. They are the one member every properties struct
+  is guaranteed to have, and removing them leaves an empty struct in scenes whose materials are
+  all `none`. They stay.
 - **Copied accumulator code:** the three accumulators copy the sample → trace → project
   sequence, so the spectral change had to touch all three. [reviewer]
 - **Stale defaults:** `mintValueUniform(…, color = 'rgb')` (generate/values.ts:95) makes a

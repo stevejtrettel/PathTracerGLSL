@@ -279,7 +279,8 @@ These need nothing from the other steps. A hue slider on a lamp needs step 3's C
 numbers.
 
 **Small cleanups, any time:**
-- `MaterialProperties.wl` and `MediumProperties.wl` are written and never read.
+- ~~`MaterialProperties.wl` and `MediumProperties.wl` are written and never read.~~ No other
+  code reads them, but they keep the structs non-empty; they stay (see "After step 3").
 - `formatSpectrum` has no caller (the owner's call).
 - The Validator's false "envSelectWeight controls nothing" warning when a scene's only lamps are
   instanced.
@@ -616,6 +617,57 @@ Nothing else should change.
 - **Checks.** Full test run (4,059). GPU: the spectral skies, image, procedural and compensated
   skies, the blackbody twin and the RGB sky pass 16 of 16 checks, and `witness:blackbody` passes
   48 Planck probes.
+
+
+## After step 3: three small improvements (owner approved Sep 28)
+
+**1. The color model owns the wavelength bookkeeping.**
+
+Problem: two facts about the four lanes live outside the color model:
+- "lane 0 is the hero wavelength" is spelled `wl.lambda.x` in the Cauchy and Sellmeier kinds
+  (cauchy.ts:42, sellmeier.ts:56);
+- "collapse keeps lane 0 times four" is spelled `vec4(4.0, 0.0, 0.0, 0.0)` in the transport
+  (pt.ts:448).
+
+Change: the spectral color model's GLSL defines `wavelengths_hero(wl)` and
+`spectrum_collapse_to_hero(s)`, and the kinds and the transport call them. The transport keeps
+its own "already collapsed" flag, which is path state. Values are identical; shader text changes.
+
+Verification:
+- a scan test (fails today on 3 sites): no TypeScript source spells a lane (`lambda.x`,
+  `lambda[0]`, `vec4(4.0, 0.0, 0.0, 0.0)`);
+- the dispersion probe script's "missing compensation" mutation follows the factor into the
+  color model, and `witness:dispersion` passes;
+- the digest differs only in those lines.
+
+**2. Delete `MaterialProperties.wl` and `MediumProperties.wl`.**
+
+They are written at every lookup (materials.ts:370, :551; schema.ts:76) and read by nothing in
+the renderer. Only the wavelengths probe script reads them, in four "carrier" probes and one
+mutation that test the fields themselves; those go too. A future material whose reflection
+depends on wavelength would add a way to receive it.
+
+Verification: the digest differs only in the struct field and the two assignments, and
+`witness:wavelengths` passes.
+
+**Outcome: not done, reverted.** The field is the one member every properties struct is
+guaranteed to have. In scenes whose materials are all `none` (the slab-albedo and GRIN
+witnesses) no model reads any field. Without `wl`, `MaterialProperties` becomes an empty
+struct, which GLSL rejects; the static compile failed for them. Replacing the field would
+need a placeholder member, which is worse than what is there, so the field stays.
+
+**3. The Validator's false "envSelectWeight controls nothing" warning.**
+
+Problem: the warning counts only ordinary lights (Validator.ts:430). A scene whose only lamps are
+instanced still splits samples between the sky and its lamps under the light tree, so the
+setting is not inert there.
+
+Change: "does this renderer sample instanced lamps" becomes one function in
+plan/dataTenants.ts, `samplesBatchLights(strategy, lightBatches)`, which the Planner
+(Planner.ts:493) and the Validator both call.
+
+Verification: a test with instanced lamps and a sky under the light tree gets no warning
+(fails today); the existing warning tests still pass.
 
 ---
 

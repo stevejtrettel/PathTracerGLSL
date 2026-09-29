@@ -4,6 +4,39 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-29 — the color model owns the wavelength bookkeeping; a false validator warning
+
+**Wavelength bookkeeping** (plan: [spectra in every slot](docs/claude-spectrum-fields.md), "After
+step 3").
+- **The spectral color model defines two functions:** `wavelengths_hero(wl)` (lane 0) and
+  `spectrum_collapse_to_hero(s)` (lane 0 times N). The transport's one-time collapse and the
+  Cauchy and Sellmeier index formulas call them, instead of spelling `vec4(4.0, 0.0, 0.0, 0.0)`
+  and `wl.lambda.x`.
+- **The comment states the precise condition.** The lanes' joint law is unchanged by a cyclic
+  relabeling, and the path before the collapse treats them alike.
+- **Checks.**
+  - A scan test that no TypeScript source spells a lane failed first, on the three sites.
+  - Shader text changes only in dispersive-glass scenes, plus the two definitions in every
+    spectral program. Values are identical.
+  - `witness:dispersion` passes. Its "missing compensation" mutation now targets the factor in
+    the color model.
+
+**The false "envSelectWeight controls nothing" warning.** "Does this renderer sample instanced
+lamps" is now one function, `samplesBatchLights` (plan/dataTenants.ts). The Planner and both
+Validator checks that asked it call this function. The warning no longer fires when a scene's
+only lamps are instanced under the light tree, and it still fires under 'power', where they are
+only found by paths. Two tests cover the cases; the first failed before the change.
+
+**Not done: deleting `MaterialProperties.wl` and `MediumProperties.wl`.** Nothing else reads
+them, but they are the one member every properties struct is guaranteed to have. Without them,
+scenes whose materials are all `none` get an empty struct, which GLSL rejects; the static compile
+caught it. The change was reverted, and the review and design note that called them dead are
+corrected.
+
+Full test run: 108 files, 4,062 tests. An independent review found no bug; its points (the
+comment's precision, a second spelling of the batch-lamp rule in the Validator, a missing
+test for the warning's other direction, three stale doc passages) are fixed.
+
 ## 2026-09-28 — a spectrum kind never asks whether the render is RGB (spectra-in-every-slot, step 3)
 
 This is step 3 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md). The owner
