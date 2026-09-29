@@ -1,8 +1,8 @@
 # Spectra in every slot
 
 **Status:** proposal (September 28, 2026), for the owner. Part 1 is the model, Part 2 the build
-steps. Step 1 was approved and built on Sep 28 (see the CHANGELOG); later steps each need their
-own plan and approval.
+steps. Steps 1 and 2 were approved and built on Sep 28 (see the CHANGELOG); later steps each
+need their own plan and approval.
 
 This builds on the approved [one-spectrum-type spec](claude-spectrum-spec.md), whose §1–3 stand
 unchanged. It would replace that spec's §4 ("numbers can be live") and its step 4, and the
@@ -393,6 +393,142 @@ numbers.
 - **GPU:** `npm run witness:spectral-bindings`, because the script is edited and nothing else
   checks it. No render witnesses are needed, since shaders are identical.
 - **Review:** an independent review of the diff.
+
+## Step 2 in full: every spectrum setting goes through one path
+
+**Approved** by the owner ("do step 2!", Sep 28). It is built in three parts. Each part is a
+refactor: its compiled output must be byte-identical for all 268 synchronous scenes, it is
+committed on its own, and an independent review of the whole step follows the last part.
+
+**The rule after step 2.** Every spectrum setting reaches the shader through one function,
+`emitSpectrum(value, role, context)`:
+- the value's kind writes its GLSL;
+- the kind's numbers come from one binding function, `emitValue`, which handles a constant, a
+  slider, a GLSL expression and a per-instance value;
+- the role comes from the setting's declaration.
+
+A number computed in GLSL is the expression binding: an image lookup, a procedural sky's
+formula, a fog's clamped field. Only the RGB kind converts RGB to a spectrum.
+
+### 2a. Declarations for the settings without a descriptor row (read Sep 28)
+
+The fog's four settings and the constant sky write their roles at each use:
+- propertyValidation.ts:53–56;
+- Validator.ts:314;
+- materials.ts:529, :562–594;
+- analyze/spectral.ts:42;
+- environment.ts:120;
+- Validator.ts:908.
+
+A light's authored emission and a material's fallback emission are validated with a literal
+role (Validator.ts:142, :268). The delta-light query writes one too (lighting.ts:312).
+
+**What changes:**
+- **compiler/types.ts,** beside `MediumDescription` and the environment description:
+  - `MEDIUM_ROLES = { sigma_a: 'coefficient', sigma_s: 'coefficient', emission: 'emission',
+    ior: 'index' }`;
+  - `SKY_COLOR_ROLE = 'emission'`.
+
+  These sit beside the types they describe. They are not descriptor rows, because the GRIN
+  index has neither a field nor a region table.
+- **Readers.** The sites above read these declarations. A light's emission reads its kind's
+  role row. The fallback emission reads the material emission row's role (`EMISSION_KEY`).
+
+### 2b. A per-instance value is a binding
+
+The per-instance address, row `slot` of instance `k` with `rows` values each, is written three
+times:
+- the packer's `(i*A + a)*4` (instancing.ts:156);
+- the App's `(k*rows + slot)*4` (app/sceneData.ts:130);
+- two GLSL fetches (`emitAttributeValue`, generate/values.ts:73, and the batch light arm,
+  lighting.ts:695).
+
+`emitValue` throws on a per-instance value (generate/values.ts:52), and two sites convert its
+RGB by hand.
+
+**What changes:**
+- **instancing.ts** gets the address once, beside the packer:
+  - `attributeTexel(instance, slot, rows)`, used by the packer and the App;
+  - `attributeFetch(attribute, instanceExpr)`, its GLSL twin.
+- **`emitValue`** takes an options object `{ exprFormat?, instance? }` and emits a per-instance
+  value through `attributeFetch`. `emitAttributeValue` goes.
+- **`emitSpectrum`** takes `{ wl, color, factor?, instance? }`. The material fill and the batch
+  light arm emit per-instance values through it, and the App reads through `attributeTexel`.
+
+### 2c. Every spectrum through its kind
+
+- **The eleven direct conversions go.** They are:
+  - schema defaults (schema.ts:47);
+  - the image and procedural skies (environment.ts:158, :211);
+  - the batch arm, already moved in 2b;
+  - the light-table payload (lighting.ts:745);
+  - derived fields (materials.ts:344);
+  - the per-instance fill, already moved in 2b;
+  - fog σ_a, σ_s and emission (materials.ts:591–594);
+  - fog phase rows (materials.ts:603).
+
+  Each is now `emitSpectrum` of its value. For a GLSL-computed number the value is the
+  expression binding `{ kind: 'glsl', source }`, and each call keeps its text: the sky's
+  intensity rides the existing `factor`, and the procedural formula keeps its parentheses. The
+  derived-field and phase paths have no user today (ggx's `alpha` and `phase_g` are plain
+  numbers).
+- **Row defaults are gray numbers.** They are written `vec3(0.8)` today, while a triple is
+  written `vec3(0.8, 0.8, 0.8)`. The RGB kind formats its constant with `formatSpectrum`,
+  which today has no caller:
+  - a number becomes `vec3(g)`, a triple `vec3(r, g, b)`, so the text is unchanged;
+  - `formatSpectrum`'s wrong comment is corrected.
+- **The fog keeps its clamp as a step on the numbers.** The formula's RGB is clamped to the
+  ceiling, then the clamped local is evaluated: K_r(clamp(θ(x))). Only the call that evaluates
+  it changes.
+- **Light-table rows.** A contract test requires every non-RGB kind that may be emission to
+  state its row form (today, blackbody), with a nonzero code that no other kind uses. Code 0
+  is RGB's plain color. The payload lift goes through the RGB kind.
+- **`emitColor` becomes internal** to generate/color.ts, where the RGB kind's lift is built.
+
+### Verification, written first
+
+1. **A scan test (fails today: 11 sites).** Outside generate/color.ts, no generator calls
+   `emitColor` or writes `color_lift_`.
+2. **After each part, the digest** is identical for all 268 synchronous scenes: shaders,
+   uniforms, closure values, parameters, source maps, scene data and warnings.
+3. **App packing:** tests/app/sceneData.test.ts byte fingerprints pass unchanged. They cover
+   the packer and the per-instance reads, which the digest does not.
+4. **The light-row contract test:** codes unique, and every non-RGB emission kind states its
+   row.
+5. **Static checks:** `npx tsc --noEmit` and the full `npx vitest run`.
+6. **GPU:** `npm run witness:spectral-bindings`. It runs the generated per-instance, light-row,
+   fog and sky readers on packed data, and must show the same 69 probes passing. Shaders are
+   identical, so render witnesses are not needed.
+7. **Review:** an independent review of the whole step.
+
+**Not in this step:**
+- named kinds in fog (step 5);
+- anything that changes a kind's contract beyond the light-row test;
+- any change to validation behavior.
+
+### As built (Sep 28), and what the independent review changed
+
+- **One table.** The fog's, the sky's and a material's fallback emission roles live in one
+  table, `SETTING_ROLES` in compiler/types.ts, not in `MEDIUM_ROLES` and `SKY_COLOR_ROLE`.
+  - The sky's entry covers every sky form, so the image and procedural skies read it too.
+  - A light's emission and a batch lamp's emission read their own rows' roles. The review
+    found that the table first repeated them, which gave two answers to one fact.
+- **The GRIN index goes through its kind** (`emitIndex`), with the same text. The review found
+  it still bound directly.
+- **Derived Spectrum fields and radiometric phase rows pass their value to their kind.**
+  Neither has a user today. The derived uniform, a number the CPU computes, is the expression
+  binding.
+- **A bug the review found, now fixed and tested:** a medium key named like a built-in object
+  property (`toString`) was read as a coefficient. `mediumSettingRole` now checks own keys.
+- **The fog's name-based checks** (analyze/spectral.ts:42) are about extinction σ_a + σ_s, not
+  roles, and stay as they are.
+- **Checks:** after the review fixes, the digest is identical for all 268 scenes, the full test
+  run passes (4,058), and `witness:spectral-bindings` passes with 69 probes.
+  - The reviewer also compiled 216 renderers outside the suite (RGB and spectral; power, tree
+    and uniform selection; per-instance float rows; a 500-instance cloud under the light
+    tree; every sky; every kind of fog). All were identical apart from the bug above.
+
+---
 
 ## Appendix A: the independent review of the first draft
 

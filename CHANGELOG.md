@@ -4,6 +4,64 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — every spectrum setting goes through one path (spectra-in-every-slot, step 2)
+
+Step 2 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) is a refactor in
+three parts. Every scene's compiled output is unchanged.
+
+**The rule.** Every spectrum setting reaches the shader through one function,
+`emitSpectrum(value, role, site)`:
+- the value's kind writes its GLSL;
+- its numbers come from one binding function (`emitValue`: constant, slider, GLSL expression or
+  per-instance value);
+- its role comes from the setting's declaration.
+
+Only the RGB kind converts RGB to a spectrum.
+
+**The parts:**
+- **Roles for settings without a descriptor row.** One table, `SETTING_ROLES` (compiler/types.ts),
+  holds the roles of the fog's absorption, scattering, glow and index, the sky's radiance, and a
+  material's emission when its model has no emission row. A light's emission and a batch lamp's
+  emission read their own rows.
+- **A per-instance value is a binding.**
+  - The record address is written once, beside the packer: `attributeTexel`, and its GLSL twin
+    `attributeFetch`. The packer, the App and `emitValue` all use them.
+  - The material fill and the batch light arm emit per-instance values through the value's kind,
+    and `emitAttributeValue` is gone.
+  - `emitSpectrum` takes its site (wavelengths, color model, factor, instance index) as one
+    object.
+- **Every spectrum goes through its kind.**
+  - The last eleven direct RGB conversions now go through `emitSpectrum`: row defaults, the image
+    and procedural skies, fog absorption, scattering and glow, fog phase rows, derived fields and
+    the light-table payload. The GRIN index goes through `emitIndex`.
+  - A number the shader computes (an image lookup, a formula, the fog's clamped field) is the
+    expression binding (`glslValue`). The fog keeps its clamp on the numbers, before the kind
+    evaluates them.
+  - The RGB kind formats constants with `formatSpectrum` (a gray as `vec3(g)`), so that function
+    now has a caller and a correct comment.
+  - The raw lift is internal to generate/color.ts.
+
+**Verification:**
+- **Tests written first.** A scan test failed on the 11 direct conversions; it now finds none
+  outside generate/color.ts. A contract test requires every non-RGB emission kind to state its
+  light-table row, with unique nonzero codes.
+- **Unchanged output.** After each part, the digest is identical for all 268 synchronous scenes,
+  and the App's packing fingerprints (tests/app/sceneData.test.ts) are unchanged.
+- **Test suite.** The full run passes: 108 files, 4,058 tests.
+- **GPU.** `witness:spectral-bindings` passes with 69 probes, as before. It runs the generated
+  per-instance, light-row, fog and sky readers on packed data.
+- **Independent review.** It compiled 216 more renderers outside the suite in both trees:
+  - RGB and spectral;
+  - power, tree and uniform selection;
+  - per-instance float rows;
+  - a 500-instance cloud under the light tree;
+  - every sky form and every kind of fog.
+
+  All were identical, apart from one bug that is now fixed and tested: a medium key named like a
+  built-in object property (`toString`) was read as a coefficient. The review also found the
+  duplicated light and lamp roles, the GRIN index bypass and a misplaced section in the design
+  note. All are fixed.
+
 ## 2026-09-28 — spectrum settings state their role in one field (spectra-in-every-slot, step 1)
 
 This is the first step of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) (Part
