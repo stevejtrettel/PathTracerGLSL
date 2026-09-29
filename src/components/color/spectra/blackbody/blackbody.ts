@@ -2,7 +2,7 @@ import type { Vec3, BlackbodyValue, ValueParam } from '../../../../compiler/type
 import type { SpectrumKind, EmitContext } from '../spectrumKind.js';
 import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
 import { spectralData } from '../../spectral/data.js';
-import { isValueParam } from '../../../param.js';
+import { isValueParam, valueParamProblems } from '../../../param.js';
 import { formatFloat, formatVec3, paramToUniform } from '../../../glsl-format.js';
 import blackbodyGLSL from './blackbody.glsl?raw';
 
@@ -48,6 +48,13 @@ export function isBlackbody(v: unknown): v is BlackbodyValue {
     return typeof v === 'object' && v !== null && 'blackbody' in v;
 }
 
+/** The `blackbody` entry if it is an object. The census runs before validation, so it must
+ *  tolerate a malformed value; `validate` reports it. */
+function dials(v: BlackbodyValue): Partial<BlackbodyValue['blackbody']> | undefined {
+    const b: unknown = v.blackbody;
+    return typeof b === 'object' && b !== null && !Array.isArray(b) ? b as Partial<BlackbodyValue['blackbody']> : undefined;
+}
+
 /** The temperature-derived uniform excludes scale, so emitters sharing a temperature share
  *  only their chroma and normalization; each use keeps its own brightness. Spectral programs
  *  read (kelvin, normalization) as a vec2, RGB programs the normalized RGB as a vec3. */
@@ -85,18 +92,26 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
     is: isBlackbody,
     roles: ['emission'],
     liveParams(v) {
-        const { kelvin, scale } = v.blackbody;
-        return [...(isValueParam(kelvin) ? [kelvin.param] : []), ...(scale !== undefined && isValueParam(scale) ? [scale.param] : [])];
+        const { kelvin, scale } = dials(v) ?? {};
+        return [...(isValueParam(kelvin) ? [kelvin.param] : []), ...(isValueParam(scale) ? [scale.param] : [])];
     },
     validate(v, label, report) {
-        const { kelvin, scale = 1 } = v.blackbody;
+        const b = dials(v);
+        if (b === undefined) {
+            report(`${label}: blackbody must be an object { kelvin, scale? }`);
+            return;
+        }
+        const unknown = Object.keys(b).filter(k => k !== 'kelvin' && k !== 'scale');
+        if (unknown.length > 0)
+            report(`${label}: blackbody takes kelvin and scale; unknown ${unknown.length === 1 ? 'key' : 'keys'} ${unknown.map(k => `'${k}'`).join(', ')}`);
+        const { kelvin, scale = 1 } = b;
         const checkDial = (dial: unknown, name: string, min: number, max: number) => {
-            const parameter = isValueParam(dial as never) ? dial as { param: string; default?: number; min?: number; max?: number } : null;
+            const parameter = isValueParam(dial as never) ? dial as { param: unknown; default?: unknown; min?: unknown; max?: unknown } : null;
+            for (const problem of parameter ? valueParamProblems(parameter) : [])
+                report(`${label}: blackbody ${name} ${problem}`);
             const values = parameter ? [parameter.default, ...[parameter.min, parameter.max].filter(x => x !== undefined)] : [dial];
-            if (values.some(x => typeof x !== 'number' || !Number.isFinite(x) || x < min || x > max)
-                || (parameter?.min !== undefined && parameter.max !== undefined && parameter.min > parameter.max)) {
+            if (values.some(x => typeof x !== 'number' || !Number.isFinite(x) || x < min || x > max))
                 report(`${label}: blackbody ${name} requires finite values in [${min}, ${max}], including defaults and bounds`);
-            }
         };
         checkDial(kelvin, 'kelvin', ...blackbodyTemperatureRange);
         checkDial(scale, 'scale', 0, Infinity);
@@ -109,12 +124,12 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
         );
     },
     constantNonzero(v) {
-        const { kelvin, scale } = v.blackbody;
-        return !isValueParam(kelvin) && (scale === undefined || (!isValueParam(scale) && scale > 0));
+        const { kelvin, scale } = dials(v) ?? {};
+        return typeof kelvin === 'number' && (scale === undefined || (typeof scale === 'number' && scale > 0));
     },
     mayBeNonzero(v) {
-        const scale = v.blackbody.scale;
-        return scale === undefined || isValueParam(scale) || scale > 0;
+        const { scale } = dials(v) ?? {};
+        return scale === undefined || isValueParam(scale) || (typeof scale === 'number' && scale > 0);
     },
     glsl: { origin: 'components/color/spectra/blackbody/blackbody.glsl', source: blackbodyGLSL },
     dispersive: () => false,

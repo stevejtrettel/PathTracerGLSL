@@ -352,11 +352,11 @@ exports[`spectrum diagnostics > blackbody kelvin slider min above max 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin parameter min must be <= max",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin parameter min must be <= max",
       ],
       "warnings": [],
     },
@@ -364,11 +364,11 @@ exports[`spectrum diagnostics > blackbody kelvin slider min above max 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin parameter min must be <= max",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin parameter min must be <= max",
       ],
       "warnings": [],
     },

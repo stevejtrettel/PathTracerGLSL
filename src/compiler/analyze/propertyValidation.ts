@@ -7,6 +7,7 @@
 import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { namedKindOf, namedKindsClaiming } from '../../components/color/spectra/index.js';
+import { valueParamProblems } from '../../components/param.js';
 import type { RadiometricRole, RowConstraint } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
@@ -113,12 +114,7 @@ export function validatePropertyValue(
     let parameterMax: unknown;
     if (isValueParam(value as never)) {
         const param = value as { param?: unknown; default?: unknown; min?: unknown; max?: unknown };
-        if (typeof param.param !== 'string' || param.param.trim() === '') {
-            bag.error('invalid-setting', `${label} parameter path must be a non-empty string`).add();
-        }
-        if (isFiniteNumber(param.min) && isFiniteNumber(param.max) && param.min > param.max) {
-            bag.error('invalid-setting', `${label} parameter min must be <= max`).add();
-        }
+        for (const problem of valueParamProblems(param)) bag.error('invalid-setting', `${label} ${problem}`).add();
         authored = param.default;
         parameterMin = param.min;
         parameterMax = param.max;
