@@ -205,6 +205,7 @@ function roulette(f: Flags): ShaderBlock {
             'bool roulette(inout PathState s, int bounce) {',
             `    if (bounce < ${f.rr!.startDepth}) return true;`,
             `    float p_survive = min(RR_MAX_SURVIVAL, ${metric}`,
+            '    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN',
             '    if (random() > p_survive) return false;',
             '    s.throughput /= p_survive;',
             '    return true;',

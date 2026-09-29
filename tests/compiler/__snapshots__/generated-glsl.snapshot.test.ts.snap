@@ -1275,6 +1275,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -1656,39 +1657,39 @@ void main() {
         "startLine": 1093,
       },
       {
-        "endLine": 1106,
+        "endLine": 1107,
         "origin": "generated:transport/roulette",
         "startLine": 1099,
       },
       {
-        "endLine": 1110,
+        "endLine": 1111,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1107,
+        "startLine": 1108,
       },
       {
-        "endLine": 1145,
+        "endLine": 1146,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1111,
+        "startLine": 1112,
       },
       {
-        "endLine": 1174,
+        "endLine": 1175,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1146,
-      },
-      {
-        "endLine": 1201,
-        "origin": "generated:transport/walk",
-        "startLine": 1175,
+        "startLine": 1147,
       },
       {
         "endLine": 1202,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1202,
+        "origin": "generated:transport/walk",
+        "startLine": 1176,
       },
       {
-        "endLine": 1231,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1203,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1203,
+      },
+      {
+        "endLine": 1232,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1204,
       },
     ],
   },
@@ -2823,6 +2824,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -3184,39 +3186,39 @@ void main() {
         "startLine": 853,
       },
       {
-        "endLine": 866,
+        "endLine": 867,
         "origin": "generated:transport/roulette",
         "startLine": 859,
       },
       {
-        "endLine": 870,
+        "endLine": 871,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 867,
+        "startLine": 868,
       },
       {
-        "endLine": 905,
+        "endLine": 906,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 871,
+        "startLine": 872,
       },
       {
-        "endLine": 934,
+        "endLine": 935,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 906,
-      },
-      {
-        "endLine": 956,
-        "origin": "generated:transport/walk",
-        "startLine": 935,
+        "startLine": 907,
       },
       {
         "endLine": 957,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 957,
+        "origin": "generated:transport/walk",
+        "startLine": 936,
       },
       {
-        "endLine": 986,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 958,
+        "origin": "generated:accumulation-inputs",
         "startLine": 958,
+      },
+      {
+        "endLine": 987,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 959,
       },
     ],
   },
@@ -4536,6 +4538,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -4902,39 +4905,39 @@ void main() {
         "startLine": 1027,
       },
       {
-        "endLine": 1040,
+        "endLine": 1041,
         "origin": "generated:transport/roulette",
         "startLine": 1033,
       },
       {
-        "endLine": 1044,
+        "endLine": 1045,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1041,
+        "startLine": 1042,
       },
       {
-        "endLine": 1079,
+        "endLine": 1080,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1045,
+        "startLine": 1046,
       },
       {
-        "endLine": 1108,
+        "endLine": 1109,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1080,
-      },
-      {
-        "endLine": 1130,
-        "origin": "generated:transport/walk",
-        "startLine": 1109,
+        "startLine": 1081,
       },
       {
         "endLine": 1131,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1131,
+        "origin": "generated:transport/walk",
+        "startLine": 1110,
       },
       {
-        "endLine": 1160,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1132,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1132,
+      },
+      {
+        "endLine": 1161,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1133,
       },
     ],
   },
@@ -6238,6 +6241,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -6545,29 +6549,29 @@ void main() {
         "startLine": 1011,
       },
       {
-        "endLine": 1024,
+        "endLine": 1025,
         "origin": "generated:transport/roulette",
         "startLine": 1017,
       },
       {
-        "endLine": 1059,
+        "endLine": 1060,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1025,
-      },
-      {
-        "endLine": 1080,
-        "origin": "generated:transport/walk",
-        "startLine": 1060,
+        "startLine": 1026,
       },
       {
         "endLine": 1081,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1081,
+        "origin": "generated:transport/walk",
+        "startLine": 1061,
       },
       {
-        "endLine": 1110,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1082,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1082,
+      },
+      {
+        "endLine": 1111,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1083,
       },
     ],
   },
@@ -8030,6 +8034,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -8416,39 +8421,39 @@ void main() {
         "startLine": 1168,
       },
       {
-        "endLine": 1183,
+        "endLine": 1184,
         "origin": "generated:transport/roulette",
         "startLine": 1176,
       },
       {
-        "endLine": 1187,
+        "endLine": 1188,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1184,
+        "startLine": 1185,
       },
       {
-        "endLine": 1222,
+        "endLine": 1223,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1188,
+        "startLine": 1189,
       },
       {
-        "endLine": 1251,
+        "endLine": 1252,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1223,
-      },
-      {
-        "endLine": 1273,
-        "origin": "generated:transport/walk",
-        "startLine": 1252,
+        "startLine": 1224,
       },
       {
         "endLine": 1274,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1274,
+        "origin": "generated:transport/walk",
+        "startLine": 1253,
       },
       {
-        "endLine": 1303,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1275,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1275,
+      },
+      {
+        "endLine": 1304,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1276,
       },
     ],
   },
@@ -9878,6 +9883,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -10254,39 +10260,39 @@ void main() {
         "startLine": 1137,
       },
       {
-        "endLine": 1150,
+        "endLine": 1151,
         "origin": "generated:transport/roulette",
         "startLine": 1143,
       },
       {
-        "endLine": 1154,
+        "endLine": 1155,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1151,
+        "startLine": 1152,
       },
       {
-        "endLine": 1189,
+        "endLine": 1190,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1155,
+        "startLine": 1156,
       },
       {
-        "endLine": 1218,
+        "endLine": 1219,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1190,
-      },
-      {
-        "endLine": 1240,
-        "origin": "generated:transport/walk",
-        "startLine": 1219,
+        "startLine": 1191,
       },
       {
         "endLine": 1241,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1241,
+        "origin": "generated:transport/walk",
+        "startLine": 1220,
       },
       {
-        "endLine": 1270,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1242,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1242,
+      },
+      {
+        "endLine": 1271,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1243,
       },
     ],
   },
@@ -11643,6 +11649,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -11965,29 +11972,29 @@ void main() {
         "startLine": 1075,
       },
       {
-        "endLine": 1088,
+        "endLine": 1089,
         "origin": "generated:transport/roulette",
         "startLine": 1081,
       },
       {
-        "endLine": 1123,
+        "endLine": 1124,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1089,
-      },
-      {
-        "endLine": 1149,
-        "origin": "generated:transport/walk",
-        "startLine": 1124,
+        "startLine": 1090,
       },
       {
         "endLine": 1150,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1150,
+        "origin": "generated:transport/walk",
+        "startLine": 1125,
       },
       {
-        "endLine": 1179,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1151,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1151,
+      },
+      {
+        "endLine": 1180,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1152,
       },
     ],
   },
@@ -13499,6 +13506,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -13900,39 +13908,39 @@ void main() {
         "startLine": 1235,
       },
       {
-        "endLine": 1250,
+        "endLine": 1251,
         "origin": "generated:transport/roulette",
         "startLine": 1243,
       },
       {
-        "endLine": 1254,
+        "endLine": 1255,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1251,
+        "startLine": 1252,
       },
       {
-        "endLine": 1289,
+        "endLine": 1290,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1255,
+        "startLine": 1256,
       },
       {
-        "endLine": 1318,
+        "endLine": 1319,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1290,
-      },
-      {
-        "endLine": 1345,
-        "origin": "generated:transport/walk",
-        "startLine": 1319,
+        "startLine": 1291,
       },
       {
         "endLine": 1346,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1346,
+        "origin": "generated:transport/walk",
+        "startLine": 1320,
       },
       {
-        "endLine": 1375,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1347,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1347,
+      },
+      {
+        "endLine": 1376,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1348,
       },
     ],
   },
@@ -15410,6 +15418,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -15801,39 +15810,39 @@ void main() {
         "startLine": 1203,
       },
       {
-        "endLine": 1216,
+        "endLine": 1217,
         "origin": "generated:transport/roulette",
         "startLine": 1209,
       },
       {
-        "endLine": 1220,
+        "endLine": 1221,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1217,
+        "startLine": 1218,
       },
       {
-        "endLine": 1255,
+        "endLine": 1256,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1221,
+        "startLine": 1222,
       },
       {
-        "endLine": 1284,
+        "endLine": 1285,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1256,
-      },
-      {
-        "endLine": 1311,
-        "origin": "generated:transport/walk",
-        "startLine": 1285,
+        "startLine": 1257,
       },
       {
         "endLine": 1312,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1312,
+        "origin": "generated:transport/walk",
+        "startLine": 1286,
       },
       {
-        "endLine": 1341,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1313,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1313,
+      },
+      {
+        "endLine": 1342,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1314,
       },
     ],
   },
@@ -17197,6 +17206,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -17578,39 +17588,39 @@ void main() {
         "startLine": 1093,
       },
       {
-        "endLine": 1106,
+        "endLine": 1107,
         "origin": "generated:transport/roulette",
         "startLine": 1099,
       },
       {
-        "endLine": 1110,
+        "endLine": 1111,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1107,
+        "startLine": 1108,
       },
       {
-        "endLine": 1145,
+        "endLine": 1146,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1111,
+        "startLine": 1112,
       },
       {
-        "endLine": 1174,
+        "endLine": 1175,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1146,
-      },
-      {
-        "endLine": 1201,
-        "origin": "generated:transport/walk",
-        "startLine": 1175,
+        "startLine": 1147,
       },
       {
         "endLine": 1202,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1202,
+        "origin": "generated:transport/walk",
+        "startLine": 1176,
       },
       {
-        "endLine": 1231,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1203,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1203,
+      },
+      {
+        "endLine": 1232,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1204,
       },
     ],
   },
@@ -18888,6 +18898,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -19259,39 +19270,39 @@ void main() {
         "startLine": 974,
       },
       {
-        "endLine": 987,
+        "endLine": 988,
         "origin": "generated:transport/roulette",
         "startLine": 980,
       },
       {
-        "endLine": 991,
+        "endLine": 992,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 988,
+        "startLine": 989,
       },
       {
-        "endLine": 1026,
+        "endLine": 1027,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 992,
+        "startLine": 993,
       },
       {
-        "endLine": 1055,
+        "endLine": 1056,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1027,
-      },
-      {
-        "endLine": 1077,
-        "origin": "generated:transport/walk",
-        "startLine": 1056,
+        "startLine": 1028,
       },
       {
         "endLine": 1078,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1078,
+        "origin": "generated:transport/walk",
+        "startLine": 1057,
       },
       {
-        "endLine": 1107,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1079,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1079,
+      },
+      {
+        "endLine": 1108,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1080,
       },
     ],
   },
@@ -22137,6 +22148,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -22591,39 +22603,39 @@ void main() {
         "startLine": 1213,
       },
       {
-        "endLine": 1226,
+        "endLine": 1227,
         "origin": "generated:transport/roulette",
         "startLine": 1219,
       },
       {
-        "endLine": 1273,
+        "endLine": 1274,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1227,
+        "startLine": 1228,
       },
       {
-        "endLine": 1308,
+        "endLine": 1309,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1274,
+        "startLine": 1275,
       },
       {
-        "endLine": 1324,
+        "endLine": 1325,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1309,
-      },
-      {
-        "endLine": 1379,
-        "origin": "generated:transport/walk",
-        "startLine": 1325,
+        "startLine": 1310,
       },
       {
         "endLine": 1380,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1380,
+        "origin": "generated:transport/walk",
+        "startLine": 1326,
       },
       {
-        "endLine": 1409,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1381,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1381,
+      },
+      {
+        "endLine": 1410,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1382,
       },
     ],
   },
@@ -24334,6 +24346,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -24892,54 +24905,54 @@ void main() {
         "startLine": 1416,
       },
       {
-        "endLine": 1431,
+        "endLine": 1432,
         "origin": "generated:transport/roulette",
         "startLine": 1424,
       },
       {
-        "endLine": 1478,
+        "endLine": 1479,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1432,
+        "startLine": 1433,
       },
       {
-        "endLine": 1482,
+        "endLine": 1483,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1479,
+        "startLine": 1480,
       },
       {
-        "endLine": 1517,
+        "endLine": 1518,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1483,
+        "startLine": 1484,
       },
       {
-        "endLine": 1533,
+        "endLine": 1534,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1518,
+        "startLine": 1519,
       },
       {
-        "endLine": 1562,
+        "endLine": 1563,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1534,
+        "startLine": 1535,
       },
       {
-        "endLine": 1581,
+        "endLine": 1582,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1563,
-      },
-      {
-        "endLine": 1638,
-        "origin": "generated:transport/walk",
-        "startLine": 1582,
+        "startLine": 1564,
       },
       {
         "endLine": 1639,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1639,
+        "origin": "generated:transport/walk",
+        "startLine": 1583,
       },
       {
-        "endLine": 1668,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1640,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1640,
+      },
+      {
+        "endLine": 1669,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1641,
       },
     ],
   },
@@ -26611,6 +26624,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -27159,54 +27173,54 @@ void main() {
         "startLine": 1379,
       },
       {
-        "endLine": 1392,
+        "endLine": 1393,
         "origin": "generated:transport/roulette",
         "startLine": 1385,
       },
       {
-        "endLine": 1439,
+        "endLine": 1440,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1393,
+        "startLine": 1394,
       },
       {
-        "endLine": 1443,
+        "endLine": 1444,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1440,
+        "startLine": 1441,
       },
       {
-        "endLine": 1478,
+        "endLine": 1479,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1444,
+        "startLine": 1445,
       },
       {
-        "endLine": 1494,
+        "endLine": 1495,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1479,
+        "startLine": 1480,
       },
       {
-        "endLine": 1523,
+        "endLine": 1524,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1495,
+        "startLine": 1496,
       },
       {
-        "endLine": 1542,
+        "endLine": 1543,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1524,
-      },
-      {
-        "endLine": 1599,
-        "origin": "generated:transport/walk",
-        "startLine": 1543,
+        "startLine": 1525,
       },
       {
         "endLine": 1600,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1600,
+        "origin": "generated:transport/walk",
+        "startLine": 1544,
       },
       {
-        "endLine": 1629,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1601,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1601,
+      },
+      {
+        "endLine": 1630,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1602,
       },
     ],
   },
@@ -28731,6 +28745,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -29185,39 +29200,39 @@ void main() {
         "startLine": 1232,
       },
       {
-        "endLine": 1245,
+        "endLine": 1246,
         "origin": "generated:transport/roulette",
         "startLine": 1238,
       },
       {
-        "endLine": 1292,
+        "endLine": 1293,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1246,
+        "startLine": 1247,
       },
       {
-        "endLine": 1327,
+        "endLine": 1328,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1293,
+        "startLine": 1294,
       },
       {
-        "endLine": 1343,
+        "endLine": 1344,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1328,
-      },
-      {
-        "endLine": 1398,
-        "origin": "generated:transport/walk",
-        "startLine": 1344,
+        "startLine": 1329,
       },
       {
         "endLine": 1399,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1399,
+        "origin": "generated:transport/walk",
+        "startLine": 1345,
       },
       {
-        "endLine": 1428,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1400,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1400,
+      },
+      {
+        "endLine": 1429,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1401,
       },
     ],
   },
@@ -30908,6 +30923,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -31456,54 +31472,54 @@ void main() {
         "startLine": 1398,
       },
       {
-        "endLine": 1411,
+        "endLine": 1412,
         "origin": "generated:transport/roulette",
         "startLine": 1404,
       },
       {
-        "endLine": 1458,
+        "endLine": 1459,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1412,
+        "startLine": 1413,
       },
       {
-        "endLine": 1462,
+        "endLine": 1463,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1459,
+        "startLine": 1460,
       },
       {
-        "endLine": 1497,
+        "endLine": 1498,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1463,
+        "startLine": 1464,
       },
       {
-        "endLine": 1513,
+        "endLine": 1514,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1498,
+        "startLine": 1499,
       },
       {
-        "endLine": 1542,
+        "endLine": 1543,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1514,
+        "startLine": 1515,
       },
       {
-        "endLine": 1561,
+        "endLine": 1562,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1543,
-      },
-      {
-        "endLine": 1618,
-        "origin": "generated:transport/walk",
-        "startLine": 1562,
+        "startLine": 1544,
       },
       {
         "endLine": 1619,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1619,
+        "origin": "generated:transport/walk",
+        "startLine": 1563,
       },
       {
-        "endLine": 1648,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1620,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1620,
+      },
+      {
+        "endLine": 1649,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1621,
       },
     ],
   },
@@ -41373,6 +41389,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 4) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -41817,39 +41834,39 @@ void main() {
         "startLine": 1023,
       },
       {
-        "endLine": 1036,
+        "endLine": 1037,
         "origin": "generated:transport/roulette",
         "startLine": 1029,
       },
       {
-        "endLine": 1083,
+        "endLine": 1084,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1037,
+        "startLine": 1038,
       },
       {
-        "endLine": 1118,
+        "endLine": 1119,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1084,
+        "startLine": 1085,
       },
       {
-        "endLine": 1134,
+        "endLine": 1135,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1119,
-      },
-      {
-        "endLine": 1189,
-        "origin": "generated:transport/walk",
-        "startLine": 1135,
+        "startLine": 1120,
       },
       {
         "endLine": 1190,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1190,
+        "origin": "generated:transport/walk",
+        "startLine": 1136,
       },
       {
-        "endLine": 1219,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1191,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1191,
+      },
+      {
+        "endLine": 1220,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1192,
       },
     ],
   },
@@ -43293,6 +43310,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 4) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -43826,54 +43844,54 @@ void main() {
         "startLine": 1155,
       },
       {
-        "endLine": 1168,
+        "endLine": 1169,
         "origin": "generated:transport/roulette",
         "startLine": 1161,
       },
       {
-        "endLine": 1215,
+        "endLine": 1216,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1169,
+        "startLine": 1170,
       },
       {
-        "endLine": 1219,
+        "endLine": 1220,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1216,
+        "startLine": 1217,
       },
       {
-        "endLine": 1254,
+        "endLine": 1255,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1220,
+        "startLine": 1221,
       },
       {
-        "endLine": 1270,
+        "endLine": 1271,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1255,
+        "startLine": 1256,
       },
       {
-        "endLine": 1299,
+        "endLine": 1300,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1271,
+        "startLine": 1272,
       },
       {
-        "endLine": 1318,
+        "endLine": 1319,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1300,
-      },
-      {
-        "endLine": 1375,
-        "origin": "generated:transport/walk",
-        "startLine": 1319,
+        "startLine": 1301,
       },
       {
         "endLine": 1376,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1376,
+        "origin": "generated:transport/walk",
+        "startLine": 1320,
       },
       {
-        "endLine": 1405,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1377,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1377,
+      },
+      {
+        "endLine": 1406,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1378,
       },
     ],
   },
@@ -45523,6 +45541,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 4) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -45977,39 +45996,39 @@ void main() {
         "startLine": 1359,
       },
       {
-        "endLine": 1372,
+        "endLine": 1373,
         "origin": "generated:transport/roulette",
         "startLine": 1365,
       },
       {
-        "endLine": 1376,
+        "endLine": 1377,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1373,
+        "startLine": 1374,
       },
       {
-        "endLine": 1411,
+        "endLine": 1412,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1377,
+        "startLine": 1378,
       },
       {
-        "endLine": 1440,
+        "endLine": 1441,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1412,
-      },
-      {
-        "endLine": 1480,
-        "origin": "generated:transport/walk",
-        "startLine": 1441,
+        "startLine": 1413,
       },
       {
         "endLine": 1481,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1481,
+        "origin": "generated:transport/walk",
+        "startLine": 1442,
       },
       {
-        "endLine": 1510,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1482,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1482,
+      },
+      {
+        "endLine": 1511,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1483,
       },
     ],
   },
@@ -47347,6 +47366,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 4) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -47707,29 +47727,29 @@ void main() {
         "startLine": 1037,
       },
       {
-        "endLine": 1050,
+        "endLine": 1051,
         "origin": "generated:transport/roulette",
         "startLine": 1043,
       },
       {
-        "endLine": 1085,
+        "endLine": 1086,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1051,
-      },
-      {
-        "endLine": 1124,
-        "origin": "generated:transport/walk",
-        "startLine": 1086,
+        "startLine": 1052,
       },
       {
         "endLine": 1125,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1125,
+        "origin": "generated:transport/walk",
+        "startLine": 1087,
       },
       {
-        "endLine": 1154,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1126,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1126,
+      },
+      {
+        "endLine": 1155,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1127,
       },
     ],
   },
@@ -49203,6 +49223,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 4) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -49657,39 +49678,39 @@ void main() {
         "startLine": 1155,
       },
       {
-        "endLine": 1168,
+        "endLine": 1169,
         "origin": "generated:transport/roulette",
         "startLine": 1161,
       },
       {
-        "endLine": 1215,
+        "endLine": 1216,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1169,
+        "startLine": 1170,
       },
       {
-        "endLine": 1250,
+        "endLine": 1251,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1216,
+        "startLine": 1217,
       },
       {
-        "endLine": 1266,
+        "endLine": 1267,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1251,
-      },
-      {
-        "endLine": 1316,
-        "origin": "generated:transport/walk",
-        "startLine": 1267,
+        "startLine": 1252,
       },
       {
         "endLine": 1317,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1317,
+        "origin": "generated:transport/walk",
+        "startLine": 1268,
       },
       {
-        "endLine": 1346,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1318,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1318,
+      },
+      {
+        "endLine": 1347,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1319,
       },
     ],
   },
@@ -52595,6 +52616,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -52966,39 +52988,39 @@ void main() {
         "startLine": 963,
       },
       {
-        "endLine": 976,
+        "endLine": 977,
         "origin": "generated:transport/roulette",
         "startLine": 969,
       },
       {
-        "endLine": 980,
+        "endLine": 981,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 977,
+        "startLine": 978,
       },
       {
-        "endLine": 1015,
+        "endLine": 1016,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 981,
+        "startLine": 982,
       },
       {
-        "endLine": 1044,
+        "endLine": 1045,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1016,
-      },
-      {
-        "endLine": 1066,
-        "origin": "generated:transport/walk",
-        "startLine": 1045,
+        "startLine": 1017,
       },
       {
         "endLine": 1067,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1067,
+        "origin": "generated:transport/walk",
+        "startLine": 1046,
       },
       {
-        "endLine": 1096,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1068,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1068,
+      },
+      {
+        "endLine": 1097,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1069,
       },
     ],
   },
@@ -54596,6 +54618,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -55134,54 +55157,54 @@ void main() {
         "startLine": 1297,
       },
       {
-        "endLine": 1310,
+        "endLine": 1311,
         "origin": "generated:transport/roulette",
         "startLine": 1303,
       },
       {
-        "endLine": 1357,
+        "endLine": 1358,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1311,
+        "startLine": 1312,
       },
       {
-        "endLine": 1361,
+        "endLine": 1362,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1358,
+        "startLine": 1359,
       },
       {
-        "endLine": 1396,
+        "endLine": 1397,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1362,
+        "startLine": 1363,
       },
       {
-        "endLine": 1412,
+        "endLine": 1413,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1397,
+        "startLine": 1398,
       },
       {
-        "endLine": 1441,
+        "endLine": 1442,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1413,
+        "startLine": 1414,
       },
       {
-        "endLine": 1460,
+        "endLine": 1461,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1442,
-      },
-      {
-        "endLine": 1517,
-        "origin": "generated:transport/walk",
-        "startLine": 1461,
+        "startLine": 1443,
       },
       {
         "endLine": 1518,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1518,
+        "origin": "generated:transport/walk",
+        "startLine": 1462,
       },
       {
-        "endLine": 1547,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1519,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1519,
+      },
+      {
+        "endLine": 1548,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1520,
       },
     ],
   },
@@ -56350,6 +56373,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -56711,39 +56735,39 @@ void main() {
         "startLine": 873,
       },
       {
-        "endLine": 886,
+        "endLine": 887,
         "origin": "generated:transport/roulette",
         "startLine": 879,
       },
       {
-        "endLine": 890,
+        "endLine": 891,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 887,
+        "startLine": 888,
       },
       {
-        "endLine": 925,
+        "endLine": 926,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 891,
+        "startLine": 892,
       },
       {
-        "endLine": 954,
+        "endLine": 955,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 926,
-      },
-      {
-        "endLine": 976,
-        "origin": "generated:transport/walk",
-        "startLine": 955,
+        "startLine": 927,
       },
       {
         "endLine": 977,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 977,
+        "origin": "generated:transport/walk",
+        "startLine": 956,
       },
       {
-        "endLine": 1006,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 978,
+        "origin": "generated:accumulation-inputs",
         "startLine": 978,
+      },
+      {
+        "endLine": 1007,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 979,
       },
     ],
   },
@@ -57970,6 +57994,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -58287,29 +58312,29 @@ void main() {
         "startLine": 938,
       },
       {
-        "endLine": 951,
+        "endLine": 952,
         "origin": "generated:transport/roulette",
         "startLine": 944,
       },
       {
-        "endLine": 986,
+        "endLine": 987,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 952,
-      },
-      {
-        "endLine": 1012,
-        "origin": "generated:transport/walk",
-        "startLine": 987,
+        "startLine": 953,
       },
       {
         "endLine": 1013,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1013,
+        "origin": "generated:transport/walk",
+        "startLine": 988,
       },
       {
-        "endLine": 1042,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1014,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1014,
+      },
+      {
+        "endLine": 1043,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1015,
       },
     ],
   },
@@ -59686,6 +59711,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -60072,39 +60098,39 @@ void main() {
         "startLine": 1088,
       },
       {
-        "endLine": 1101,
+        "endLine": 1102,
         "origin": "generated:transport/roulette",
         "startLine": 1094,
       },
       {
-        "endLine": 1105,
+        "endLine": 1106,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1102,
+        "startLine": 1103,
       },
       {
-        "endLine": 1140,
+        "endLine": 1141,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1106,
+        "startLine": 1107,
       },
       {
-        "endLine": 1169,
+        "endLine": 1170,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1141,
-      },
-      {
-        "endLine": 1196,
-        "origin": "generated:transport/walk",
-        "startLine": 1170,
+        "startLine": 1142,
       },
       {
         "endLine": 1197,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1197,
+        "origin": "generated:transport/walk",
+        "startLine": 1171,
       },
       {
-        "endLine": 1226,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1198,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1198,
+      },
+      {
+        "endLine": 1227,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1199,
       },
     ],
   },
@@ -61515,6 +61541,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -61901,39 +61928,39 @@ void main() {
         "startLine": 1103,
       },
       {
-        "endLine": 1118,
+        "endLine": 1119,
         "origin": "generated:transport/roulette",
         "startLine": 1111,
       },
       {
-        "endLine": 1122,
+        "endLine": 1123,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1119,
+        "startLine": 1120,
       },
       {
-        "endLine": 1157,
+        "endLine": 1158,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1123,
+        "startLine": 1124,
       },
       {
-        "endLine": 1186,
+        "endLine": 1187,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1158,
-      },
-      {
-        "endLine": 1213,
-        "origin": "generated:transport/walk",
-        "startLine": 1187,
+        "startLine": 1159,
       },
       {
         "endLine": 1214,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1214,
+        "origin": "generated:transport/walk",
+        "startLine": 1188,
       },
       {
-        "endLine": 1243,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1215,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1215,
+      },
+      {
+        "endLine": 1244,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1216,
       },
     ],
   },
@@ -63337,6 +63364,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -63718,39 +63746,39 @@ void main() {
         "startLine": 1077,
       },
       {
-        "endLine": 1090,
+        "endLine": 1091,
         "origin": "generated:transport/roulette",
         "startLine": 1083,
       },
       {
-        "endLine": 1094,
+        "endLine": 1095,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1091,
+        "startLine": 1092,
       },
       {
-        "endLine": 1129,
+        "endLine": 1130,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1095,
+        "startLine": 1096,
       },
       {
-        "endLine": 1158,
+        "endLine": 1159,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1130,
-      },
-      {
-        "endLine": 1185,
-        "origin": "generated:transport/walk",
-        "startLine": 1159,
+        "startLine": 1131,
       },
       {
         "endLine": 1186,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1186,
+        "origin": "generated:transport/walk",
+        "startLine": 1160,
       },
       {
-        "endLine": 1215,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1187,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1187,
+      },
+      {
+        "endLine": 1216,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1188,
       },
     ],
   },
@@ -67082,6 +67110,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -67399,29 +67428,29 @@ void main() {
         "startLine": 877,
       },
       {
-        "endLine": 890,
+        "endLine": 891,
         "origin": "generated:transport/roulette",
         "startLine": 883,
       },
       {
-        "endLine": 925,
+        "endLine": 926,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 891,
-      },
-      {
-        "endLine": 951,
-        "origin": "generated:transport/walk",
-        "startLine": 926,
+        "startLine": 892,
       },
       {
         "endLine": 952,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 952,
+        "origin": "generated:transport/walk",
+        "startLine": 927,
       },
       {
-        "endLine": 981,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 953,
+        "origin": "generated:accumulation-inputs",
         "startLine": 953,
+      },
+      {
+        "endLine": 982,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 954,
       },
     ],
   },
@@ -68862,6 +68891,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -69248,39 +69278,39 @@ void main() {
         "startLine": 1125,
       },
       {
-        "endLine": 1140,
+        "endLine": 1141,
         "origin": "generated:transport/roulette",
         "startLine": 1133,
       },
       {
-        "endLine": 1144,
+        "endLine": 1145,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1141,
+        "startLine": 1142,
       },
       {
-        "endLine": 1179,
+        "endLine": 1180,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1145,
+        "startLine": 1146,
       },
       {
-        "endLine": 1208,
+        "endLine": 1209,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1180,
-      },
-      {
-        "endLine": 1235,
-        "origin": "generated:transport/walk",
-        "startLine": 1209,
+        "startLine": 1181,
       },
       {
         "endLine": 1236,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1236,
+        "origin": "generated:transport/walk",
+        "startLine": 1210,
       },
       {
-        "endLine": 1265,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1237,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1237,
+      },
+      {
+        "endLine": 1266,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1238,
       },
     ],
   },
@@ -70681,6 +70711,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -71057,39 +71088,39 @@ void main() {
         "startLine": 1073,
       },
       {
-        "endLine": 1086,
+        "endLine": 1087,
         "origin": "generated:transport/roulette",
         "startLine": 1079,
       },
       {
-        "endLine": 1090,
+        "endLine": 1091,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1087,
+        "startLine": 1088,
       },
       {
-        "endLine": 1125,
+        "endLine": 1126,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1091,
+        "startLine": 1092,
       },
       {
-        "endLine": 1154,
+        "endLine": 1155,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1126,
-      },
-      {
-        "endLine": 1181,
-        "origin": "generated:transport/walk",
-        "startLine": 1155,
+        "startLine": 1127,
       },
       {
         "endLine": 1182,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1182,
+        "origin": "generated:transport/walk",
+        "startLine": 1156,
       },
       {
-        "endLine": 1211,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1183,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1183,
+      },
+      {
+        "endLine": 1212,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1184,
       },
     ],
   },
@@ -72678,6 +72709,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput) * s.eta_scale);   // η²-corrected (§7.2 note)
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -73089,39 +73121,39 @@ void main() {
         "startLine": 1266,
       },
       {
-        "endLine": 1281,
+        "endLine": 1282,
         "origin": "generated:transport/roulette",
         "startLine": 1274,
       },
       {
-        "endLine": 1285,
+        "endLine": 1286,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1282,
+        "startLine": 1283,
       },
       {
-        "endLine": 1320,
+        "endLine": 1321,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1286,
+        "startLine": 1287,
       },
       {
-        "endLine": 1349,
+        "endLine": 1350,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1321,
-      },
-      {
-        "endLine": 1376,
-        "origin": "generated:transport/walk",
-        "startLine": 1350,
+        "startLine": 1322,
       },
       {
         "endLine": 1377,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1377,
+        "origin": "generated:transport/walk",
+        "startLine": 1351,
       },
       {
-        "endLine": 1406,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1378,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1378,
+      },
+      {
+        "endLine": 1407,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1379,
       },
     ],
   },
@@ -82663,6 +82695,7 @@ void kernel_record(inout PathState s, float pdf, LightQuery q, bool is_delta) {
 bool roulette(inout PathState s, int bounce) {
     if (bounce < 3) return true;
     float p_survive = min(RR_MAX_SURVIVAL, spectrum_max(s.throughput));   // §2.5: basis-agnostic, no Rec.709 weights
+    if (p_survive <= 0.0) return false;   // a dead path: random() can be 0, and 0/0 is NaN
     if (random() > p_survive) return false;
     s.throughput /= p_survive;
     return true;
@@ -83054,39 +83087,39 @@ void main() {
         "startLine": 1275,
       },
       {
-        "endLine": 1290,
+        "endLine": 1291,
         "origin": "generated:transport/roulette",
         "startLine": 1283,
       },
       {
-        "endLine": 1294,
+        "endLine": 1295,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1291,
+        "startLine": 1292,
       },
       {
-        "endLine": 1329,
+        "endLine": 1330,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1295,
+        "startLine": 1296,
       },
       {
-        "endLine": 1358,
+        "endLine": 1359,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1330,
-      },
-      {
-        "endLine": 1380,
-        "origin": "generated:transport/walk",
-        "startLine": 1359,
+        "startLine": 1331,
       },
       {
         "endLine": 1381,
-        "origin": "generated:accumulation-inputs",
-        "startLine": 1381,
+        "origin": "generated:transport/walk",
+        "startLine": 1360,
       },
       {
-        "endLine": 1410,
-        "origin": "components/accumulator/average/average.glsl",
+        "endLine": 1382,
+        "origin": "generated:accumulation-inputs",
         "startLine": 1382,
+      },
+      {
+        "endLine": 1411,
+        "origin": "components/accumulator/average/average.glsl",
+        "startLine": 1383,
       },
     ],
   },
