@@ -6,7 +6,7 @@
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
 import { emitColor, emitSpectrum } from '../color.js';
-import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
+import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -527,7 +527,7 @@ function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boole
 // policy (the third axis): a coefficient formula gets the nonnegativity floor, a phase-param
 // formula is rejected (the Validator already guarantees phase params never vary spatially).
 function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) => string): string {
-    const isCoefficient = name === 'sigma_a' || name === 'sigma_s' || name === 'emission';
+    const isCoefficient = isRadiometric(mediumSettingRole(name));
     return emitValue(prop, format, (e) => {
         if (isCoefficient) {
             // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
@@ -588,10 +588,10 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
                 lines.push('        emission *= sigma_scale;');
             }
         }
-        lines.push(`        m.sigma_a = ${emitColor('sigma_a', 'coefficient', 'wl')};`);
-        lines.push(`        m.sigma_s = ${emitColor('sigma_s', 'coefficient', 'wl')};`);
+        lines.push(`        m.sigma_a = ${emitColor('sigma_a', SETTING_ROLES.medium.sigma_a, 'wl')};`);
+        lines.push(`        m.sigma_s = ${emitColor('sigma_s', SETTING_ROLES.medium.sigma_s, 'wl')};`);
         if (wantsEmission && isEmissiveMedium(med)) {
-            lines.push(`        m.emission = ${emitColor('emission', 'emission', 'wl')};`);
+            lines.push(`        m.emission = ${emitColor('emission', SETTING_ROLES.medium.emission, 'wl')};`);
         }
         for (const f of phaseFields) {
             // Union fields of OTHER present models fall back to their row default —

@@ -4,7 +4,7 @@
 // migration can later carry the same shape/domain data and call this function directly; the
 // validation behavior and diagnostics do not need to be rewritten when ownership moves.
 
-import { isGlslExpression, isValueParam, type SceneDescription } from '../types.js';
+import { isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { namedKindOf, namedKindsClaiming } from '../../components/color/spectra/index.js';
 import { valueParamProblems } from '../../components/param.js';
@@ -49,11 +49,12 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
         if (mat.medium === undefined) continue;
         // Media take plain values (constants, {param} or expressions): no named kind has a
         // medium reader yet, including a wavelength-dependent GRIN index.
+        const roles = SETTING_ROLES.medium;
         const mediumSlots = [
-            ['sigma_a', mat.medium.sigma_a, { shape: 'spectrum', role: 'coefficient' }],
-            ['sigma_s', mat.medium.sigma_s, { shape: 'spectrum', role: 'coefficient' }],
-            ['emission', mat.medium.emission, { shape: 'spectrum', role: 'emission' }],
-            ['ior', mat.medium.ior, { shape: 'scalar', role: 'index' }],
+            ['sigma_a', mat.medium.sigma_a, { shape: 'spectrum', role: roles.sigma_a }],
+            ['sigma_s', mat.medium.sigma_s, { shape: 'spectrum', role: roles.sigma_s }],
+            ['emission', mat.medium.emission, { shape: 'spectrum', role: roles.emission }],
+            ['ior', mat.medium.ior, { shape: 'scalar', role: roles.ior }],
         ] as const;
         for (const [prop, v, contract] of mediumSlots) {
             const label = `Material '${name}': medium.${prop}`;

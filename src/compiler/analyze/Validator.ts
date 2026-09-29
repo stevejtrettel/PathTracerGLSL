@@ -7,7 +7,8 @@ import { SENSORS } from '../../components/sensor/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole } from '../types.js';
+import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
@@ -139,7 +140,7 @@ export function validate(
         } else if (isGlslExpression(e)) {
             bag.error('invalid-setting', `Light ${i} (${light.kind}): emission cannot be a GLSL expression — a light takes a constant, a {param} or a blackbody`).add();
         } else {
-            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Light ${i} (${light.kind}): emission`, bag);
+            validatePropertyValue(e, { shape: 'spectrum', role: SETTING_ROLES.lightEmission }, `Light ${i} (${light.kind}): emission`, bag);
         }
         // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
         // radius): the kind DESCRIPTOR declares its rules; the Validator emits them —
@@ -265,7 +266,7 @@ export function validate(
         // any other model's emission is still checked against the emission domain before the
         // rule below decides whether it is a phantom light or ignored.
         if (e !== undefined && !(MATERIAL_MODELS[mat.model]?.properties ?? []).some((f) => f.source === EMISSION_KEY)) {
-            validatePropertyValue(e, { shape: 'spectrum', role: 'emission' }, `Material '${name}': emission`, bag);
+            validatePropertyValue(e, { shape: 'spectrum', role: SETTING_ROLES.materialEmission }, `Material '${name}': emission`, bag);
         }
         // Emission on a model whose emission dispatch returns zero — one rule, one diagnostic.
         // A CONSTANT nonzero emission (incl. a constant blackbody) that the light registry would
@@ -311,7 +312,8 @@ export function validate(
         if (mat.medium !== undefined) {
             for (const [prop, value] of Object.entries(mat.medium)) {
                 if (!isGlslExpression(value)) continue;
-                if (prop === 'sigma_a' || prop === 'sigma_s' || prop === 'emission') {
+                const role = mediumSettingRole(prop);
+                if (isRadiometric(role)) {
                     // Rule 1: an expression coefficient is legal ONLY under a declared
                     // ceiling — D1: the rendered medium IS the field min-scaled to σ̄
                     // (an expression ε needs per-position evaluation at σ̄-paced points,
@@ -325,7 +327,7 @@ export function validate(
                             `Material '${name}': medium.${prop} is a GLSL expression but the medium declares no majorant — heterogeneous media require a density ceiling σ̄ (D1: the rendered medium IS min(σ, σ̄); fable-heterogeneous-media.md). Add majorant: <finite number > 0>`)
                             .add();
                     }
-                } else if (prop === 'ior') {
+                } else if (role === 'index') {
                     // GRIN (fable-variable-ior): a spatial refractive index n(x) is the whole
                     // point of a deflecting medium — allowed, and needs NO majorant (n is not
                     // extinction; nothing clamps it). Deferred: n(λ) dispersion (no `λ` yet).
@@ -905,7 +907,7 @@ export function validate(
         if (isGlslExpression(env.color)) {
             bag.error('invalid-setting', 'environment.color cannot be a GLSL expression — a constant sky takes a constant, a {param} or a blackbody; a formula sky is `type: \'procedural\'`').add();
         } else {
-            validatePropertyValue(env.color, { shape: 'spectrum', role: 'emission' }, 'environment.color', bag);
+            validatePropertyValue(env.color, { shape: 'spectrum', role: SETTING_ROLES.skyColor }, 'environment.color', bag);
         }
     }
     if (env && env.type !== 'none') {

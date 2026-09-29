@@ -309,7 +309,8 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
     const arm = (l: PlannedLight, i: number) => {
         const q = lightKind(l).deltaQuery!;   // Validator-guaranteed (the isotropy pin)
         // Position is geometry (constant in v1); intensity routes through the shared split.
-        const intensityE = emitSpectrum(l.values[q.intensityRow] as ParamValue, 'emission', 'wl', color);
+        const intensityRow = lightKind(l).params.find((r) => r.name === q.intensityRow)!;
+        const intensityE = emitSpectrum(l.values[q.intensityRow] as ParamValue, intensityRow.role!, 'wl', color);
         return [
             `pos = ${formatVec3(l.values[q.positionRow] as number[])};`,
             `intensity = ${intensityE};`,

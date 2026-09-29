@@ -15,6 +15,7 @@ import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
+import { SETTING_ROLES } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { mintValueUniform, type ParamValue } from '../values.js';
@@ -117,7 +118,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitSpectrum(env.color as ParamValue, 'emission', 'wl', plan.program.measurement.color, 'u_envIntensity');
+        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.skyColor, 'wl', plan.program.measurement.color, 'u_envIntensity');
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];

@@ -4,6 +4,7 @@ export { isValueParam, hasConstantNonzeroEmission } from '../components/color/va
 import { emissionMayBeNonzero } from '../components/color/values.js';
 
 import type { SceneDataPlan } from './sceneData.js';
+import type { SpectrumRole } from '../components/descriptors.js';
 
 // ============================================================================
 // Utility types
@@ -459,6 +460,25 @@ export interface MediumDescription {
     /** Volume scattering model — registry-validated (A2: unknown models get a
      *  Validator diagnostic; adding a phase model touches no union). Default 'hg'. */
     model?: string;
+}
+
+/** The roles of the spectrum settings that no descriptor row declares: a medium's absorption,
+ *  scattering, glow and index; a constant sky's color; a light's authored emission; and a
+ *  material's emission on a model whose rows have no emission row. Every reader takes these
+ *  settings' roles from here. */
+export const SETTING_ROLES = {
+    medium: { sigma_a: 'coefficient', sigma_s: 'coefficient', emission: 'emission', ior: 'index' },
+    skyColor: 'emission',
+    lightEmission: 'emission',
+    materialEmission: 'emission',
+} as const satisfies {
+    medium: Record<'sigma_a' | 'sigma_s' | 'emission' | 'ior', SpectrumRole>;
+    skyColor: SpectrumRole; lightEmission: SpectrumRole; materialEmission: SpectrumRole;
+};
+
+/** A medium setting's role, or undefined for a setting that holds an ordinary number. */
+export function mediumSettingRole(key: string): SpectrumRole | undefined {
+    return (SETTING_ROLES.medium as Record<string, SpectrumRole>)[key];
 }
 
 export interface MaterialDescription {
