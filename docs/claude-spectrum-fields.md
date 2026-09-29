@@ -252,7 +252,9 @@ byte-identical, and the digest will show whether they do:
 The four checkers it merges are the shared value check (`validatePropertyValue`), the
 spectral-only limits (analyze/spectral.ts), blackbody's own slider check, and the per-instance
 check in the Validator. The spectral model's extra limit, reflectance at most 1, becomes a
-stated fact of that color model.
+stated fact of that color model. "Step 4 in full" (below) is the detailed plan. The owner
+chose to leave that limit where it is (decision B): reflectance above 1 stays allowed in RGB
+renders.
 
 **Step 5, the physics.** A fog's absorption, scattering and glow share one density d(x):
 
@@ -668,6 +670,287 @@ plan/dataTenants.ts, `samplesBatchLights(strategy, lightBatches)`, which the Pla
 
 Verification: a test with instanced lamps and a sky under the light tree gets no warning
 (fails today); the existing warning tests still pass.
+
+
+## Step 4 in full: each value is checked once
+
+**Status:** approved by the owner (Sep 29), with decision B, and built the same day; see "As
+built" at the end of this section. The plan was revised after an independent review, whose
+findings follow the plan.
+
+### The rule after this step
+
+A setting holds one of four forms of value:
+- a number or an RGB triple;
+- a slider, `{ param, default, min?, max? }`;
+- a formula, `{ kind: 'glsl', source, params? }`, whose `params` are sliders too;
+- a named kind, `{ <id>: … }` (blackbody, Gaussian, Cauchy, Sellmeier).
+
+An instanced batch can also give a setting one plain value per instance.
+
+One function checks a value in its setting. It asks four questions:
+1. **Keys.** A value has only its form's keys. A named kind has the one key `<id>`; a slider
+   has `param`, `default`, `min` and `max`; a formula has `kind`, `source` and `params`. Any
+   other key is an error. The form is decided in a fixed order: a named kind (in registry
+   order), then a formula, then a slider. A value with an unknown key gets that one message
+   and no other. An object that has no form's key (`{ foo: 1 }`) gets only the shape message,
+   as today. Today's "keys of more than one kind of value" check is a special case of this
+   rule, and it goes.
+2. **Slider.** A slider has only its four keys, a parameter path and a default. Its min is at
+   most its max, and its default lies between them. This holds for every slider in a setting:
+   the value's own, a blackbody's kelvin and scale, and a formula's `params`.
+3. **Domain.** Every number the value can take lies in the setting's domain: a constant, a
+   slider's default and both ends, and each per-instance entry. The domain is the setting's
+   own constraint, or else its role's: reflectance, coefficient and emission ≥ 0, index > 0.
+   A formula's numbers are not known before the render, so its domain stays the author's
+   contract, as today.
+4. **Kind.** A named kind sits only in settings of its roles. Where its numbers sit in an
+   object, the kind declares them as data: each one's name, its domain, whether it may be a
+   slider, whether it may be omitted, and whether it is a triple. The checker applies
+   questions 1–3 to them, and reports numbers that are not an object. The kind's own
+   `validate` keeps only rules that relate several numbers, and runs only when the declared
+   numbers are valid.
+
+   | Kind | Declared numbers | `validate` keeps |
+   |---|---|---|
+   | blackbody | kelvin in [1000, 40000], may be a slider; scale ≥ 0, may be a slider, optional | nothing |
+   | Gaussian | center; width > 0; peak in [0, 1]; floor in [0, 1], optional | nothing |
+   | Sellmeier | B and C, triples ≥ 0 | poles outside the visible range; n² > 0 |
+   | Cauchy | none (its numbers are an array) | its whole check, as today |
+
+Every setting calls this function: material rows, a material's fallback emission, light
+emission, the constant sky, the fog's settings and the phase rows. The per-instance check
+calls its constant test once per entry.
+
+Spectral renders keep one more check, in analyze/spectral.ts: what the spectral lift can
+represent (reflectance ≤ 1, and the fog's ceilings). See the decision below.
+
+### The decision: reflectance above 1
+
+Today a reflectance above 1 is an error in spectral renders and allowed in RGB renders.
+
+| | A: [0, 1] becomes reflectance's domain | B: leave it as today |
+|---|---|---|
+| Albedo 1.5 in an RGB render | error | allowed |
+| Earlier decisions | Reverses the approved spec: "RGB reflectance above 1 stays allowed, as today" (claude-spectrum-spec.md:344). Closes the open research-gain proposal R-6, which would let the spectral lift accept values above 1 (claude-spectral-implementation-plan.md:268–282). The pinned taxonomy admits non-physical transport (fable-strategy-taxonomy.md:203–204). | keeps all three |
+| RGB and spectral | the same errors, except the fog's ceilings | a scene can fail only in spectral |
+| Code | analyze/spectral.ts loses its reflectance checks | analyze/spectral.ts unchanged |
+| pbrt-v4, Mitsuba 3 | both reject an RGB albedo above 1: pbrt paramdict.cpp:399; Mitsuba srgb.cpp:56, in its RGB modes too, unless the author sets `unbounded` | — |
+| Scenes affected | none of the 268 suite scenes (measured). The data scene `c32`'s color ramp reaches about 1.00005 (from the hit count in its comment, demos/dataScenes.ts:94; the file is not in this checkout), so it would need `min(t, 1)`. | none |
+| Tests to update | spectralPacked.test.ts:39–57 (three cases), and the snapshot's three reflectance cases | none |
+
+**Recommendation: B.** My first draft recommended A. The review showed that A reverses a
+decision the spec records and would close R-6. That is a policy choice for you, not a
+cleanup. B is the smaller step. If you decide R-6 is not wanted, A is a short separate
+change, and the table above is its whole cost: no suite scene breaks, and `c32` needs one
+line.
+
+A third route, making the spectral model state its limit instead of analyze/spectral.ts,
+would pass the color model into seven checks. That is not worth it while R-6 may change the
+limit.
+
+### Problem (read and measured Sep 29, at commit 25d2320)
+
+**Four checkers:**
+- `validatePropertyValue` (propertyValidation.ts:81–148) checks the keys of two kinds, the
+  role, the slider's structure, the shape and the domain.
+- analyze/spectral.ts, spectral renders only:
+  - reflectance ≤ 1 on material rows (:47–55) and per-instance entries (:21–31), with its own
+    reading of slider defaults and bounds (`atMost`, :15–20);
+  - the fog's ceilings (:32–46), which also use `atMost`.
+- Blackbody's `checkDial` (blackbody.ts:96–105) is a second slider check, with its own
+  combined message ("requires finite values in [1000, 40000], including defaults and bounds").
+- The per-instance entry check (Validator.ts:1202–1245) has its own shape and domain tests.
+
+**Two more readers:**
+- The RGB preview warning (rgbPreview.ts:16–20) tests the role itself, and runs the kind's
+  check with a dummy reporter to learn whether a value is valid.
+- A formula's `params` (Validator.ts:1721–1746) are checked only for a path and a finite
+  default. `params: [{ param, default: 5, min: 0, max: 1 }]` passes (measured by the review).
+
+**Inputs that pass silently today.** Measured with a probe of the Validator, in both color
+models:
+- `{ blackbody: { kelvin: 3000 }, scale: 5 }`: a key beside the kind, and the lamp renders at
+  scale 1;
+- `{ gaussian: { …, flor: 0.1 } }` and `{ sellmeier: { B, C, D } }`: unknown keys inside a
+  kind (blackbody reports its own since the A2 fix; the others do not);
+- `{ param: 'm.a', default: 0.5, mn: 0 }`, the same on blackbody's kelvin, and
+  `{ kind: 'glsl', source, sorce }`: a misspelled key on a slider or a formula;
+- `{ param: 'm.a', default: 0.9, min: 0, max: 0.5 }`, and the same on blackbody's kelvin and
+  on a formula's parameter: a default outside its own slider range.
+
+**Impact of the new errors (measured).** The 268 synchronous suite scenes hold 58 sliders in
+settings (6 of them blackbody numbers), 17 formula parameters, 59 formulas and 37 named-kind
+values. None has an unknown key or a default outside its slider range. (They also hold 14
+sliders in placements and 76 in strategies, which this step does not check.) The 7 data
+scenes load files that are not in this checkout.
+
+### What changes
+
+1. **The constraint vocabulary** (descriptors.ts) gets a closed interval,
+   `{ kind: 'closed-interval', min, max }`, for blackbody's kelvin and Gaussian's peak and
+   floor. The existing `interval` is open (the camera's field of view).
+2. **One checker** (propertyValidation.ts):
+   - `valueProblems(value, setting, label)` returns messages. It replaces
+     `validatePropertyValue`, and its six call sites report what it returns.
+   - `numberProblems(value, shape, domain, label, slider)` checks a constant or, where
+     allowed, a slider. Plain values, a kind's declared numbers and a formula's `params` all
+     use it.
+   - `constantProblem(value, shape, domain)` checks one constant; the per-instance check uses
+     it.
+3. **The slider's structure** (param.ts, `valueParamProblems`) gains three checks:
+   - only the four keys;
+   - "needs a default", moved from propertyValidation.ts;
+   - "default between min and max": per component, against each finite bound, and skipped
+     when min > max, which is already reported.
+
+   The formula's key list sits beside `isGlslExpression` (compiler/types.ts).
+4. **The kind contract** (spectrumKind.ts):
+   - It states that a named kind's value is `{ <id>: … }`; all four already are.
+   - A new `fields?` holds the declared numbers of the table above.
+   - `validate` keeps its signature. It now holds only rules that relate several numbers, and
+     the checker calls it only when the fields are valid.
+   - Blackbody's `validate` goes, including `checkDial`, and so does Gaussian's. Sellmeier's
+     loses its triple test.
+   - `namedKindsClaiming` (spectra/index.ts) loses its only caller and goes.
+5. **A formula's `params`** (Validator.ts:1721–1746) are checked by `numberProblems` as
+   sliders with no domain. The warning for a parameter the formula never reads stays.
+6. **The per-instance check** (Validator.ts) keeps its rules about which settings may vary per
+   instance, array lengths and exclusivity. It tests each entry with `constantProblem`, and
+   reports the first bad entry as today.
+7. **The RGB preview warning** asks the checker whether a value is valid
+   (`valueProblems(…).length === 0`), instead of its own role test and dummy reporter.
+8. **Documents:** the spectra README (the contract and the registry), and the blackbody,
+   Gaussian and Sellmeier READMEs where they state their domains.
+
+### Unchanged
+
+- Shaders, uniforms, parameters, the Planner and scene data. Only diagnostics change.
+- analyze/spectral.ts (decision B), including the fog's ceilings, which step 5 rewrites.
+- The fog still rejects named kinds (step 5).
+- Rules that belong to a setting rather than a value: lights and the constant sky take no
+  formula, and some rows cannot vary per instance.
+- Cauchy's check, and Sellmeier's pole and n² checks, with their messages.
+- Every message about a plain value, except the new errors and a packed per-instance array's
+  non-finite message, which now names the entry like the others.
+
+### Verification, written first
+
+1. **A new test fails today** (tests/compiler/valueChecks.test.ts). Each input listed under
+   "pass silently today" gets an error, in both color models. The same value with the key or
+   the default corrected gets none.
+2. **A contract test** (spectrumKinds.test.ts):
+   - every named kind has an example value;
+   - each example has the single key `<id>`;
+   - where a kind declares `fields`, they name every key of its example.
+3. **The diagnostics snapshot** changes in exactly these 12 cases:
+   - kelvin below range, and kelvin slider default above range: "…blackbody kelvin must be in
+     [1000, 40000]";
+   - negative scale, both cases: "…blackbody scale components must be >= 0";
+   - Gaussian peak above 1 and zero width: a message for the one number ("…Gaussian peak must
+     be in [0, 1]", "…Gaussian width must be > 0");
+   - Sellmeier negative B: "…Sellmeier B components must be >= 0";
+   - Sellmeier wrong length: one message each for B and C;
+   - the three "keys together" cases: an unknown-key message instead of "more than one kind
+     of value";
+   - albedo slider max −1: a second error, since its default 0.5 lies above its max.
+
+   The other 37 cases are unchanged, including kelvin min above max, the unknown-object cases
+   and the RGB gamut warning. The new inputs are added as cases.
+4. **The digest** is identical for all 268 synchronous scenes: only diagnostics change, and no
+   suite scene trips a new error.
+5. **Static checks:** `npx tsc --noEmit` and the full `npx vitest run`.
+6. **No GPU runs.** The digest shows the shaders are unchanged.
+7. **An independent review** of the diff, before it is reported as done.
+
+### Not in this step
+
+- **Sliders shared across settings.** When two settings name the same parameter path, the
+  first declaration's range wins (generate/values.ts:135, :152). A slider shared by a light's
+  emission (max 5) and an albedo (max 1) reaches 5 in the albedo, and each declaration passes
+  its own check (measured by the review). A rule that every declaration of a path agree would
+  close this; it is a separate item.
+- **Misspelled setting names.** `albdo`, `sigam_s` or `colr` on a material, medium or sky
+  pass silently; unknown light fields only warn (Validator.ts:96–101). This step checks the
+  keys inside a value, not the names of a setting. Making those errors is a separate item.
+- **Sliders in other families** keep their own checks: placements and the camera
+  (Validator.ts:808–826). With `numberProblems` in place, the camera's becomes one call.
+- **HG's |g| ≤ 0.99** (Validator.ts:398–412) could become that row's closed-interval
+  constraint. It is a separate item, because it turns a warning into an error.
+- **A NaN** is still reported by the scene-wide finiteness sweep as well.
+- **Named kinds in fog, and the fog's ceilings:** step 5.
+
+### The independent review of this plan's first draft
+
+| Finding | Change |
+|---|---|
+| `atMost` cannot go: the fog's ceilings use it (spectral.ts:43) | analyze/spectral.ts is untouched under B |
+| Option A breaks three cases in spectralPacked.test.ts:39–57, missing from the verification | listed under A |
+| The decision table omitted the spec's "RGB reflectance above 1 stays allowed", the open R-6 gain proposal and the pinned taxonomy | added; the recommendation changed from A to B |
+| "Every number the value can take lies in the domain" fails for a slider shared across settings | listed under "Not in this step", with the measured case |
+| A kind's slider numbers skipped the key rule (`{ kelvin: { param, default, mn } }` passes) | the slider's key check sits in `valueParamProblems`, which every slider uses |
+| The order in which a value's form is decided, and the `{ foo: 1 }` case, were unstated | stated in rule 1 |
+| The kind contract was underspecified (`ctx.number` had no shape; labels and reporting unstated). The reviewer suggested declaring a kind's numbers as data. | adopted: `fields`, with `validate` kept for rules relating several numbers |
+| Under A, descriptor row defaults would lose their only check (spectral.ts:49) | moot under B; if A is chosen, a contract test checks every row default against its domain |
+| Under A, [0, 1] would be stated three times (the role, the stand-in clip, Gaussian) | noted for A: `roleDomain` would move beside `SpectrumRole` |
+| "165 sliders" mixed settings, formula parameters, placements and strategies; formula parameters inside these settings kept a weaker check | counts corrected; formula parameters are included |
+| Unknown keys inside values become errors while misspelled setting names pass silently | listed under "Not in this step" |
+| `checkDial` does reject a missing default, through its range message; B would touch seven call sites, not six | corrected |
+
+The reviewer confirmed the line citations, the callers of every function this step deletes or
+changes (a full search of src, tests, scripts, tools, pages and demos), every input listed as
+passing silently, the suite counts, the form `{ <id>: … }` of all four kinds, and, for option
+A, the snapshot prediction case by case.
+
+### As built (Sep 29), and what the independent review changed
+
+Built as planned, with decision B: a reflectance above 1 stays allowed in RGB renders, and
+analyze/spectral.ts keeps its checks (one stale comment line changed).
+
+**Details the plan left open, or that differ from it:**
+- **The slider's key check** is made by the checker (`numberProblems`), so that a slider with
+  an unknown key gets that one message. The key list `SLIDER_KEYS` and the one wording
+  helper `unknownKeysProblem` sit in param.ts. `valueParamProblems` checks the path, the
+  default's presence and the order of the bounds.
+- **The default is compared with its slider's ends** in the checker as well, after its shape
+  is checked (a review fix, below).
+- **Unknown keys** read "has an unknown key 'x' (its keys: …)".
+- **A per-instance array** reports its first entry with any problem. Before, a shape problem
+  anywhere was reported ahead of a domain problem.
+- **A formula's parameters** get the slider messages, which replace "params entries must be
+  { param: string, default: finite number }". A formula with an unknown key still has its
+  parameters checked by their own sweep, so it can get two messages.
+- **`rowSetting`** turns a material or phase row into a setting; that mapping was written in
+  three places.
+- **The blackbody, Gaussian and Sellmeier READMEs** needed no change: what they state is
+  still true.
+
+**The independent review of the code:**
+
+| Finding | Change |
+|---|---|
+| A formula whose `params` is a string made the Validator throw (before, it was reported); an object or a number threw before too | all three are reported; test added |
+| A slider default of the wrong shape also got "default must be <= max" | the comparison moved after the shape check; test added |
+| Deviations: where the slider's key check sits, which per-instance entry is reported, the formula-parameter messages, and blackbody's "{ kelvin, scale? }" losing its "?" | recorded above; the "?" restored for optional numbers |
+| Stale text: this note, the spectra README (Sellmeier's rules; a new kind needs an example in the contract test), the constraint list in descriptors.ts, a comment left above the wrong function, analyze/spectral.ts's comment | fixed |
+| Two regexes also matched "needs a default"; the contract test checked only its own literal | regexes tightened; the test also asks the kind's `is` |
+
+Not fixed, because they predate this step:
+- a formula without `source` passes validation, and with `params` the Validator throws on it;
+- with decision B, a NaN in a spectral render still gets analyze/spectral.ts's extra
+  "requires RGB in [0,1]".
+
+The reviewer confirmed that all 268 suite scenes (495 renderers) get the same errors and
+warnings before and after, and ran about 100 malformed inputs against both versions.
+
+**Checks:**
+- The new value test failed first on all 20 of its cases, and the contract test failed first.
+  The two regression tests from the review were added after the fixes; the reviewer measured
+  the old behavior.
+- The diagnostics snapshot changed in exactly the 12 predicted cases, and 9 cases were added.
+- The digest: 268 of 268 scenes identical, before and after the review fixes.
+- The full test run: 109 files, 4,095 tests, and `tsc` clean. One earlier run had a glslang
+  static-compile test time out at 80 s; it passed alone and in a full rerun.
 
 ---
 

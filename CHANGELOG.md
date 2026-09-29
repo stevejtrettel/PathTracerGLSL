@@ -4,6 +4,69 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-29 — each value is checked once (spectra-in-every-slot, step 4)
+
+Step 4 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) ("Step 4 in full").
+Only diagnostics change; every scene's compiled output is unchanged.
+
+**The rule.** One function (`valueProblems`, analyze/propertyValidation.ts) checks a value in
+its setting: material rows, a material's fallback emission, light emission, the constant sky,
+the fog's settings and phase rows. It asks four things:
+- **Keys:** a value has only its form's keys. A named kind is `{ <id>: … }`; a slider has
+  `param`, `default`, `min` and `max`; a formula has `kind`, `source` and `params`. This
+  replaces the "keys of more than one kind of value" check.
+- **Slider:** a path, a default, min at most max, and a default between them. This holds for a
+  setting's own slider, a blackbody's kelvin and scale, and a formula's parameters.
+- **Domain:** every number the value can take lies in the setting's domain.
+- **Kind:** a named kind sits in a setting of one of its roles. Its numbers are declared as data
+  (`fields`: each one's domain, and whether it may be a slider, may be omitted or is a triple),
+  and pass the same checks. `validate` keeps only the rules `fields` cannot state.
+
+**What this replaced:**
+- blackbody's own slider check (`checkDial`) and its `validate`;
+- Gaussian's `validate`, and Sellmeier's triple test;
+- the per-instance entry checks, which now use the same constant test;
+- the RGB preview warning's own validity test;
+- `namedKindsClaiming`, which lost its only caller.
+
+The constraint vocabulary gains a closed interval.
+
+**Newly rejected** (all passed silently before, in both color models):
+- a key beside a named kind: `{ blackbody: { kelvin: 3000 }, scale: 5 }` rendered at scale 1;
+- an unknown key inside a Gaussian or a Sellmeier;
+- a misspelled key on a slider, on blackbody's kelvin, on a formula or on a formula's parameter;
+- a slider default outside its own min and max, on a setting, on blackbody's kelvin, or on a
+  formula's parameter;
+- a formula whose `params` is not a list. As a string, it used to be reported per character;
+  as an object or a number, it made the Validator throw.
+
+No suite scene is affected.
+
+**Messages that changed:**
+- kelvin and scale out of range: "…blackbody kelvin must be in [1000, 40000]";
+- Gaussian and Sellmeier numbers: one message per number;
+- the three "keys together" cases: an unknown-key message;
+- a formula parameter's structure: the slider messages;
+- a packed per-instance array: it names the bad entry.
+
+**Unchanged by the owner's choice:** a reflectance above 1 stays allowed in RGB renders, and
+analyze/spectral.ts keeps the spectral lift's limits (reflectance ≤ 1, the fog's ceilings).
+The spec records that choice, and the research-gain proposal R-6 depends on it.
+
+**Verification:**
+- **Tests written first.** tests/compiler/valueChecks.test.ts failed on all 20 cases, and a
+  contract test (every named kind has an example; its value is `{ <id>: … }`; its `fields` name
+  its keys) failed too.
+- **Diagnostics snapshot.** Exactly the 12 predicted cases changed, and 9 were added.
+- **Digest.** 268 of 268 scenes identical.
+- **Test suite.** The full run passes: 109 files, 4,095 tests.
+- **Independent review.** It found two bugs in the new code, both fixed with tests:
+  - a string `params` made the Validator throw;
+  - a wrong-shape slider default also got a bounds message.
+
+  It also found deviations from the plan, which are recorded in the design note, and stale text,
+  which is fixed.
+
 ## 2026-09-29 — the color model owns the wavelength bookkeeping; a false validator warning
 
 **Wavelength bookkeeping** (plan: [spectra in every slot](docs/claude-spectrum-fields.md), "After
