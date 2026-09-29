@@ -4,6 +4,57 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — spectral review and five bug fixes
+
+A code review of the spectral work ([review](docs/claude-spectral-review-2026-09-28.md): how the
+system works, then findings), and fixes for five of its six bugs
+([plan](docs/claude-spectral-bugfix-plan.md)):
+
+- **Surface Russian roulette ends a zero-throughput path before dividing.** A path absorbed by
+  delta tracking, or zeroed by the wavelength collapse, still reached roulette. When
+  `random()` returned exactly 0 (probability 2⁻²⁴), the result was 0/0, and the pixel's mean
+  stayed NaN. The interior rule already had this guard.
+- **Malformed blackbody values are reported instead of crashing.**
+  - Before: `{blackbody: null}` or `{blackbody: undefined}` threw inside the census or the
+    Validator, a numeric slider path crashed the compile, and a misspelled `scale` was
+    ignored.
+  - Now: the census tolerates malformed values; `validate` checks that the entry is an object
+    and rejects unknown keys.
+  - The slider-structure check (path, min ≤ max) is one function in `components/param.ts`,
+    shared by blackbody and `validatePropertyValue`.
+- **The reflectance lift no longer overflows for a tiny largest channel.** It divides before
+  scaling (`other / z * 63.0`); `63/z` overflowed float32 below about 1.85·10⁻³⁷ and gave NaN.
+- **The kelvin slider's default range reaches its default** (it ended at 12000 K even for a
+  20000 K default).
+- **Per-instance attribute values are checked against the row's own constraint**, through one
+  `slotDomain` function shared with `validatePropertyValue`. A per-instance checker `uv_scale`
+  of −1 used to pass.
+
+The sixth, the sky-versus-lights split ignoring instanced lights under the light tree (variance
+only), waits for an owner decision.
+
+**Verification**
+
+- **Tests first.** Each fix has a test that failed first: vitest for the roulette guard,
+  blackbody validation, the slider range and the attribute check; a GPU probe in
+  `witness:spectral` for the lookup, which read NaN before the fix.
+- **Unchanged output.**
+  - A line-level diff of every suite renderer's shaders against f720e64 shows exactly two
+    changed lines: the roulette guard (246 shaders) and the lookup line (122 shaders).
+  - Everything else is identical, source maps aside: uniforms, their computed values,
+    parameters, scene data and warnings, over 495 renderers.
+  - One diagnostics-snapshot entry changed deliberately: "kelvin slider min above max" now
+    gets the shared "parameter min must be <= max".
+- **Test suite.** 4,050 of 4,051 tests pass. The one failure was a glslang timeout while the
+  Mac slept on battery; it passes when run alone.
+- **GPU** (SwiftShader):
+  - `witness:spectral` passes, including the new probe.
+  - `npm run witness -- spectral-colored-furnace spectral-plane spectral-materials haze` passes
+    11 of 11 checks: the furnace and plane agree with their quadrature targets, and NEE ≡ MIS.
+- **Independent review.** A fresh agent reviewed the diff and found no bug. It reported two
+  further gaps, recorded in the plan for later: a key beside a named kind is ignored, and no
+  check keeps a slider's default within its authored bounds.
+
 ## 2026-09-28 — Gaussian reflectance, N-SF11 glass and a spectral showcase scene
 
 Built the [showcase plan](docs/claude-spectral-showcase-plan.md): the first spectrum kind added
