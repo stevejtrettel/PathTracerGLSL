@@ -16,6 +16,9 @@ An occupant supplies `types.glsl` and `<id>.glsl`:
 - `Wavelengths` describes wavelength coordinates; `WavelengthSample` keeps the camera
   coordinates and their sampling densities together. RGB uses initialized placeholders.
 - `wavelengths_sample()` creates that camera sample. RGB consumes no random numbers.
+- Spectral only: `wavelengths_hero(wl)` is the wavelength a path follows once it must follow
+  one, and `spectrum_collapse_to_hero(s)` keeps that lane, rescaled so the film stays
+  unbiased. Only programs with dispersion call them.
 - `color_to_pixel(film, ray_dir, L, camera_sample)` applies the sensor response and projects
   transport radiance to signed linear-sRGB. RGB multiplication is component-wise.
 

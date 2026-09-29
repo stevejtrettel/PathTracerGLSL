@@ -53,6 +53,6 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
         // Every term with B = 0 or C = 0 is constant in wavelength; then so is the index.
         if (!sellmeierKind.dispersive(v)) return formatFloat(sellmeierIndex(v, indexReferenceNM));
         const { B, C } = v.sellmeier;
-        return `sellmeier_index(${formatVec3(B)}, ${formatVec3(C)}, ${ctx.wl}.lambda.x)`;
+        return `sellmeier_index(${formatVec3(B)}, ${formatVec3(C)}, wavelengths_hero(${ctx.wl}))`;
     },
 };

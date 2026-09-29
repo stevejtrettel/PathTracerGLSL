@@ -445,7 +445,7 @@ function collapseWavelengths(): ShaderBlock {
     return { origin: 'generated:transport/collapse', source: `
 void collapse_wavelengths(inout PathState s) {
     if (s.wavelengths_collapsed) return;
-    s.throughput *= vec4(4.0, 0.0, 0.0, 0.0);
+    s.throughput = spectrum_collapse_to_hero(s.throughput);
     s.wavelengths_collapsed = true;
 }` };
 }

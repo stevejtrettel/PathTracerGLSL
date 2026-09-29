@@ -74,7 +74,7 @@ add('emission-only budget vertex', `fragColor=transport_trace(${ray});`, [1,1,1,
     { ...finalVertex, source: finalVertex.source.replace('return s.radiance;', 'return s.throughput;') });
 const mutations = [
     { ...twice, name: 'repeated factor', source: twice.source.replace('if (s.wavelengths_collapsed) return;', '') },
-    { ...twice, name: 'missing compensation', source: twice.source.replace('vec4(4.0, 0.0, 0.0, 0.0)', 'vec4(1.0, 0.0, 0.0, 0.0)') },
+    { ...twice, name: 'missing compensation', source: twice.source.replace('vec4(float(SPECTRUM_N), 0.0, 0.0, 0.0)', 'vec4(1.0, 0.0, 0.0, 0.0)') },
 ];
 const bk7Slab = structuredClone(dispersionSlab);
 bk7Slab.materials.glass.ior = N_BK7;

@@ -34,11 +34,13 @@ list needs no collapse state. RGB has no dispersion record or collapse code.
 ordinary and data-backed region accessors use the same value emitter. The dielectric
 BSDFs, Snell/Fresnel conventions and eta-scale arithmetic are unchanged.
 
-The generated transport owns one Boolean and one helper:
+The generated transport owns one Boolean; the spectral color model owns the collapse itself
+(`spectrum_collapse_to_hero`, which keeps lane 0 times N) and the hero wavelength
+(`wavelengths_hero`) at which index formulas are evaluated:
 
 ```
 if (!wavelengths_collapsed) {
-    throughput *= (4,0,0,0);
+    throughput = spectrum_collapse_to_hero(throughput);
     wavelengths_collapsed = true;
 }
 ```

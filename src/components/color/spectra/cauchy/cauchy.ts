@@ -39,6 +39,6 @@ export const cauchyKind: SpectrumKind<CauchyIndex> = {
         // Without B and C the index is A at every wavelength.
         if (!cauchyKind.dispersive(v)) return formatFloat(cauchyIndex(v, indexReferenceNM));
         const [a, b, c = 0] = v.cauchy;
-        return `cauchy_index(${formatVec3([a, b, c])}, ${ctx.wl}.lambda.x)`;
+        return `cauchy_index(${formatVec3([a, b, c])}, wavelengths_hero(${ctx.wl}))`;
     },
 };

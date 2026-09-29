@@ -66,6 +66,17 @@ describe('spectrum kinds', () => {
         expect(found).toEqual([]);
     });
 
+    it('only the color model spells a wavelength lane: generated code asks it for the hero and the collapse', () => {
+        const found: string[] = [];
+        for (const file of tsFiles(SRC)) {
+            readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+                if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+                if (/lambda\.x|lambda\[0\]|vec4\(4\.0, 0\.0, 0\.0, 0\.0\)/.test(line)) found.push(`${relative(SRC, file)}:${i + 1}`);
+            });
+        }
+        expect(found).toEqual([]);
+    });
+
     it('a kind that may be emission, other than rgb, states its light-table row, with its own code', () => {
         // A light-table row keeps an emission kind whole in its header; code 0 is RGB's plain
         // color. A kind without a row form would be read as its RGB stand-in under the light

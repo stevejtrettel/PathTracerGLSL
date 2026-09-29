@@ -280,10 +280,9 @@ attenuation/source lanes, exact vacuum, zero-rate sampling and a curved trajecto
 `n²=1+0.2y`. Spectral slab, source, hard-interface/scattering furnaces, an analytic scattering
 twin and a Luneburg NEE/MIS comparison exercise complete renders.
 
-Dispersion is a separate planned stage: collapse to one contributing wavelength before the
-first wavelength-dependent refraction or interior advance, then evaluate the scalar index
-at that wavelength. The existing walker and source/attenuation math remain in use. Cameras
-starting inside dispersive media need collapse before their first interior step too.
+Surface dispersion is built (Surface dispersion, below). A wavelength-dependent GRIN index
+would need the same collapse before the first dispersive interior advance, including for a
+camera that starts inside the medium; it remains gated.
 
 ## Volume emission
 
