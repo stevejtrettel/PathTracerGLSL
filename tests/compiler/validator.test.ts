@@ -621,6 +621,36 @@ describe('Validator — mesh/instancing validation batch', () => {
     });
 });
 
+// envSelectWeight is inert only where nothing splits samples with the sky. Instanced lamps under the
+// light tree do split them, so the setting is live there.
+describe('Validator — envSelectWeight', () => {
+    it('does not call the setting inert when the only lamps are instanced (light tree)', () => {
+        const bag = run((s, st) => {
+            s.lights = [];
+            s.materials.lamps = { model: 'lambert', albedo: 0, emission: [2, 2, 2] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.2 }, material: 'lamps' },
+                placements: [{ position: [2, 1, 0] }, { position: [-2, 1, 0] }] } as never);
+            s.environment = { type: 'constant', color: [0.1, 0.1, 0.1], sampleAsLight: true } as never;
+            st.estimator.lightSelection = 'bvh';
+            st.estimator.envSelectWeight = 0.3;
+        });
+        expect(bag.getWarnings().some(w => /envSelectWeight controls nothing/.test(w.message))).toBe(false);
+    });
+
+    it('still calls it inert under power selection, where instanced lamps are only found by paths', () => {
+        const bag = run((s, st) => {
+            s.lights = [];
+            s.materials.lamps = { model: 'lambert', albedo: 0, emission: [2, 2, 2] };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.2 }, material: 'lamps' },
+                placements: [{ position: [2, 1, 0] }, { position: [-2, 1, 0] }] } as never);
+            s.environment = { type: 'constant', color: [0.1, 0.1, 0.1], sampleAsLight: true } as never;
+            st.estimator.lightSelection = 'power';
+            st.estimator.envSelectWeight = 0.3;
+        });
+        expect(bag.getWarnings().some(w => /envSelectWeight controls nothing/.test(w.message))).toBe(true);
+    });
+});
+
 // A medium key that is not a spectrum setting stays one, even when its name is a property every
 // object has (toString): an expression there is rejected like any phase parameter's.
 describe('Validator — medium settings', () => {

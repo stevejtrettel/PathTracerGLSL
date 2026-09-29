@@ -34,7 +34,7 @@ import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMes
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, dataReadsOf, unionDataReads } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
@@ -458,7 +458,6 @@ export function placeScene(scene: SceneDescription, scenePlan: ScenePlan, reads:
 
 function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan): ProgramDescription {
     const { lights, materials, objects, meshes, instanceBatches } = scenePlan;
-    const batchLightTotal = scenePlan.lightBatches.reduce((a, b) => a + b.count, 0);
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
     // light kind can never leave its backing model out of the program (the lights-door
@@ -490,8 +489,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // the power CDF never meets a 100k-entry bake. batchLights true ⇒ NEE is on ⇒
     // lighting below is non-null.
     const selection = strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION;
-    const batchLights = selection === 'bvh' && batchLightTotal > 0
-        && strategy.estimator.directLighting !== 'none';
+    const batchLights = samplesBatchLights(strategy, scenePlan.lightBatches);
     const hasLights = features.lighting.totalLightCount > 0 || envKindSamplable || batchLights;
     const wantsNEE = strategy.estimator.directLighting !== 'none' && hasLights;
     const lighting = wantsNEE

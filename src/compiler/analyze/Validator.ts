@@ -13,7 +13,7 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
@@ -60,8 +60,7 @@ export function validate(
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
     // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
     // target and the error stands.
-    const hasBatchLightsUnderTree = (strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION) === 'bvh'
-        && scene.objects.some((o) => isInstancedObject(o) && batchLightEligible(o, scene));
+    const hasBatchLightsUnderTree = samplesBatchLights(strategy, lightBatchesOf(scene));
     if (strategy.estimator.directLighting !== 'none'
         && features.lighting.totalLightCount === 0
         && !features.environment.samplable
@@ -429,7 +428,7 @@ export function validate(
                 .add();
         } else if (strategy.estimator.directLighting === 'none'
             || !features.environment.samplable
-            || features.lighting.totalLightCount === 0) {
+            || (features.lighting.totalLightCount === 0 && !samplesBatchLights(strategy, lightBatchesOf(scene)))) {
             bag.warning('invalid-setting',
                 'estimator.envSelectWeight controls nothing here (needs NEE, a samplable environment, AND finite lights to split selection mass with) — the knob is inert')
                 .add();

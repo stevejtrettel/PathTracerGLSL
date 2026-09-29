@@ -7,13 +7,13 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission } from '../types.js';
+import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission, RenderStrategy } from '../types.js';
 import type { ProgramDescription } from './types.js';
 import { resolveColorProperty } from './values.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
 import { isDrivenTransform, isIdentityRotation, similarityFromTransform } from '../../components/geometry/similarity.js';
 import { PRIMITIVES, paramsRecordFloats, primitiveIsBounded, resolveBackend, classifyPlacement } from '../../components/geometry/index.js';
-import { LIGHT_KINDS } from '../../components/lights/index.js';
+import { LIGHT_KINDS, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
@@ -264,6 +264,14 @@ export function lightBatchesOf(scene: SceneDescription): Array<{ ordinal: number
         .map((b, ordinal) => ({ ordinal, count: placementCount(b.placements), eligible: batchLightEligible(b, scene) }))
         .filter((b) => b.eligible)
         .map(({ ordinal, count }) => ({ ordinal, count }));
+}
+
+/** Whether a renderer samples instanced lamps as lights: only under light-tree selection, with
+ *  next-event estimation on, in a scene that has some. Under 'power' they stay path-found. */
+export function samplesBatchLights(strategy: RenderStrategy, lightBatches: ReadonlyArray<{ count: number }>): boolean {
+    return (strategy.estimator.lightSelection ?? DEFAULT_LIGHT_SELECTION) === 'bvh'
+        && lightBatches.some((b) => b.count > 0)
+        && strategy.estimator.directLighting !== 'none';
 }
 
 /** THE instanced-containment predicate (impl-plan-instanced-containment §2), shared by
