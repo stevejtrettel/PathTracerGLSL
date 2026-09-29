@@ -118,7 +118,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.skyColor, 'wl', plan.program.measurement.color, 'u_envIntensity');
+        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.skyColor, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' });
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];

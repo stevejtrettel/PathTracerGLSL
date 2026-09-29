@@ -5,7 +5,7 @@
 // workers, with a synchronous fallback, so this also runs in tests).
 
 import { packMesh, type PackedMesh } from '../components/intersection/mesh/mesh.js';
-import { placementCount, type PackedInstanceBatch } from '../components/intersection/instancing/instancing.js';
+import { placementCount, attributeTexel, type PackedInstanceBatch } from '../components/intersection/instancing/instancing.js';
 import { packInstanceBatchOffThread } from './utils/instancePack.js';
 import { similarityApplyPoint } from '../components/geometry/similarity.js';
 import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
@@ -127,7 +127,7 @@ export async function packSceneData(plan: SceneDataPlan): Promise<PackedSceneDat
                 center[0] = recs[4 * k]; center[1] = recs[4 * k + 1]; center[2] = recs[4 * k + 2];
                 values.radius = recs[4 * k + 3];
                 if ('attribute' in emission && attrs !== undefined) {
-                    const t = (k * emission.attribute.rows + emission.attribute.slot) * 4;
+                    const t = attributeTexel(k, emission.attribute.slot, emission.attribute.rows) * 4;
                     radiance[0] = attrs[t]; radiance[1] = attrs[t + 1]; radiance[2] = attrs[t + 2];
                 }
                 const b = treeBounds(values);

@@ -422,11 +422,11 @@ export interface PlannedInstanceBatch {
         };
 }
 
-/** A per-instance ATTRIBUTE reference (fable-instance-attributes — the fourth storage
- *  class): the row's value lives in batch `batch`'s instance_k_attrs texture at slot
- *  `slot` of `count` rows, indexed by Hit.element. Never authored — the Planner mints it
- *  onto the batch material's values from InstancedObject.attributes. Its ONLY legal use
- *  site is the scene_material_properties fill (emitAttributeValue); emitValue throws on it. */
+/** A per-instance attribute reference (fable-instance-attributes): the row's value lives in
+ *  the batch's attribute records at slot `slot` of `count` rows per instance
+ *  (attributeTexel). Never authored — the Planner mints it onto the batch material's values
+ *  from InstancedObject.attributes. emitValue reads it wherever the instance index is in scope:
+ *  the material fill (Hit.element) and the batch light arm. */
 export interface AttributeValue {
     attribute: {
         batch: number;

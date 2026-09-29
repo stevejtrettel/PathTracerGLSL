@@ -80,6 +80,20 @@ export function instanceAttributeRows(model: string, attributes: Record<string, 
         .map((f) => ({ source: f.source, shape: f.glslType === 'Spectrum' ? 'vec3' as const : 'float' as const }));
 }
 
+/** Where attribute row `slot` of instance `instance` sits in its batch's attribute records,
+ *  in texels from the batch's base: `rows` texels per instance, one per attribute row, in the
+ *  order of instanceAttributeRows. The packer writes and the App reads through this;
+ *  attributeFetch is its GLSL twin. */
+export function attributeTexel(instance: number, slot: number, rows: number): number {
+    return instance * rows + slot;
+}
+
+/** The GLSL fetch of an attribute record: `instanceExpr` is the GLSL expression of the
+ *  instance index, parenthesized by the caller when it is compound. */
+export function attributeFetch(base: number, slot: number, rows: number, instanceExpr: string): string {
+    return `texelFetch(u_data_records, data_texel1d(uint(${base} + ${instanceExpr} * ${rows} + ${slot})), 0)`;
+}
+
 /** The params-tier pack spec (impl-plan-placement-fold stage 3): CANONICAL prototype
  *  values to fold per instance. Present iff the batch's tier is 'params' — the caller
  *  reads the dataTenants adapter's ONE tier truth; the pack never re-decides. */
@@ -153,7 +167,7 @@ export function packInstanceBatch(localBox: AABB, placements: Similarity[] | Pac
             for (let a = 0; a < A; a++) {
                 const { values, shape } = attributeRows[a];
                 const src = order[i];
-                const t = (i * A + a) * 4;
+                const t = attributeTexel(i, a, A) * 4;
                 if (values instanceof Float32Array) {
                     // Packed arm: N floats or 3N interleaved (fable-instance-clouds §4).
                     if (shape === 'vec3') {

@@ -7,7 +7,7 @@
 import { emitColor, emitSpectrum } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
-import type { Vec3, BlackbodyValue } from '../../types.js';
+import { SETTING_ROLES, type Vec3, type BlackbodyValue } from '../../types.js';
 import { namedKindOf, kindById } from '../../../components/color/spectra/index.js';
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -310,7 +310,7 @@ function generateLightingQueryDelta(lights: PlannedLight[], selectPdf: number[],
         const q = lightKind(l).deltaQuery!;   // Validator-guaranteed (the isotropy pin)
         // Position is geometry (constant in v1); intensity routes through the shared split.
         const intensityRow = lightKind(l).params.find((r) => r.name === q.intensityRow)!;
-        const intensityE = emitSpectrum(l.values[q.intensityRow] as ParamValue, intensityRow.role!, 'wl', color);
+        const intensityE = emitSpectrum(l.values[q.intensityRow] as ParamValue, intensityRow.role!, { wl: 'wl', color });
         return [
             `pos = ${formatVec3(l.values[q.positionRow] as number[])};`,
             `intensity = ${intensityE};`,
@@ -410,7 +410,7 @@ function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral'): string {
         const fmt = (row.shape === 'number' ? formatFloat
             : formatVec3) as (x: never) => string;
         return row.role !== undefined
-            ? emitSpectrum(l.values[row.name] as ParamValue, row.role, 'wl', color)
+            ? emitSpectrum(l.values[row.name] as ParamValue, row.role, { wl: 'wl', color })
             : emitValue(l.values[row.name] as ParamValue, fmt);
     });
     // Derived fields (quad normal/area) read GEOMETRY rows, constant in v1 — pass RESOLVED
@@ -692,9 +692,8 @@ interface BatchLightArm { base: number; count: number; region: number; placement
 /** The batch instance's SphereLight ctor from its placement record (params tier);
  *  attribute Le fetches the SAME records texel the hit-side fill reads (one truth). */
 function batchSphereExpr(a: BatchLightArm, indexExpr: string, wl: string, color: 'rgb' | 'spectral'): { fetch: string; ctor: string } {
-    const leExpr = isAttributeValue(a.le)
-        ? emitColor(`texelFetch(u_data_records, data_texel1d(uint(${a.le.attribute.base} + (${indexExpr}) * ${a.le.attribute.count} + ${a.le.attribute.slot})), 0).xyz`, 'emission', wl)
-        : emitSpectrum(a.le, 'emission', wl, color);
+    // The batch material's emission, per instance or constant, at this instance's index.
+    const leExpr = emitSpectrum(a.le, SETTING_ROLES.materialEmission, { wl, color, instance: `(${indexExpr})` });
     return {
         fetch: `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${a.placementsBase} + (${indexExpr}))), 0);`,
         ctor: `SphereLight(rec.xyz, rec.w, ${leExpr})`,

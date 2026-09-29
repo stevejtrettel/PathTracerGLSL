@@ -31,29 +31,38 @@
 import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type NamedSpectrumValue, type ParameterMetadata } from '../types.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
+import { attributeFetch } from '../../components/intersection/instancing/instancing.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
 
-/** A parameter-surface value: constant, driven ({param}), or a spatial expression
- *  (surface properties and medium coefficients). */
-export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | NamedSpectrumValue;
+/** A parameter-surface value: constant, driven ({param}), a spatial expression (surface
+ *  properties and medium coefficients) or a per-instance attribute. */
+export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | NamedSpectrumValue | AttributeValue;
+
+/** Where a value is being emitted: how to write an expression (the default is its source), and
+ *  the GLSL expression of the instance index when one is in scope (a per-instance value needs
+ *  it). */
+export interface EmitValueOptions {
+    exprFormat?: (e: GlslExpression) => string;
+    instance?: string;
+}
 
 /**
  * USE SITE. What the emitted GLSL reads for a value:
- *   driven  → its `u_` uniform name (live),
- *   expr    → `exprFormat(e)` (default: the raw source; media coefficients override it to
- *             clamp; media phase params override it to throw — expressions are Validator-rejected there),
- *   const   → the baked literal via `format`.
+ *   driven       → its `u_` uniform name (live),
+ *   expr         → `exprFormat(e)` (default: the raw source; media coefficients override it
+ *                  to clamp; media phase params override it to throw — expressions are
+ *                  Validator-rejected there),
+ *   per instance → its attribute record at `instance` (attributeFetch),
+ *   const        → the baked literal via `format`.
  */
-export function emitValue(
-    v: ParamValue,
-    format: (x: never) => string,
-    exprFormat: (e: GlslExpression) => string = (e) => e.source,
-): string {
+export function emitValue(v: ParamValue, format: (x: never) => string, options: EmitValueOptions = {}): string {
     if (isAttributeValue(v)) {
-        // Backstop: the ATTRIBUTE storage class (fable-instance-attributes) has exactly ONE
-        // legal use site — the scene_material_properties fill, where Hit.element is in scope
-        // (emitAttributeValue). Reaching any other emitValue site is a Planner bug.
-        throw new Error('emitValue: AttributeValue reached a non-attribute site — attribute rows are legal only in the material-properties fill');
+        if (options.instance === undefined) {
+            throw new Error('emitValue: a per-instance value reached a site with no instance index in scope');
+        }
+        const { base, slot, count, shape } = v.attribute;
+        const fetch = attributeFetch(base, slot, count, options.instance);
+        return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
     }
     if (namedKindOf(v)) {
         // Backstop: named spectrum kinds (blackbody, index formulas) are emitted by their
@@ -61,19 +70,8 @@ export function emitValue(
         throw new Error(`emitValue: a ${namedKindOf(v)!.label} value reached a plain-value site — spectrum slots emit through their kind`);
     }
     if (isValueParam(v)) return paramToUniform(v.param);
-    if (isGlslExpression(v)) return exprFormat(v);
+    if (isGlslExpression(v)) return (options.exprFormat ?? ((e) => e.source))(v);
     return format(v as never);
-}
-
-/** ATTRIBUTE use site (fable-instance-attributes — the fourth storage class: constant |
- *  driven | expression | attribute). The ONE legal reader is the scene_material_properties
- *  fill, where `element` (Hit.element, the TLAS-leaf placement index) is in scope:
- *  texel = element·count + slot in batch `batch`'s instance_k_attrs table (packed in the
- *  SAME leaf order as the placements — one reorder truth). */
-export function emitAttributeValue(a: AttributeValue): string {
-    const { base, slot, count, shape } = a.attribute;
-    const fetch = `texelFetch(u_data_records, data_texel1d(uint(${base} + element * ${count} + ${slot})), 0)`;
-    return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
 }
 
 /**

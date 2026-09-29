@@ -12,8 +12,7 @@ import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
-import { emitValue, emitAttributeValue, mintValueUniform, type ParamValue } from '../values.js';
-import { isAttributeValue } from '../../plan/types.js';
+import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
@@ -388,14 +387,10 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             if (f.name === 'emission' && !emissionMayBeNonzero(raw)) continue;
             const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
             let resolved: string;
-            if (isAttributeValue(raw)) {
-                const value = emitAttributeValue(raw);
-                resolved = isRadiometric(f.role) ? emitColor(value, f.role, 'wl') : value;
-            } else {
-                resolved = isRadiometric(f.role)
-                    ? emitSpectrum(raw as ParamValue, f.role, 'wl', color)
-                    : emitValue(raw as ParamValue, fmt);
-            }
+            // `element` is Hit.element, the instance index a per-instance value is read at.
+            resolved = isRadiometric(f.role)
+                ? emitSpectrum(raw as ParamValue, f.role, { wl: 'wl', color, instance: 'element' })
+                : emitValue(raw as ParamValue, fmt, { instance: 'element' });
             body.push(`${target} = ${resolved};`);
         }
         // DERIVED fields (D4): assigned after the rows they derive from.
@@ -528,7 +523,7 @@ function generateMediaTables(materials: PlannedMaterial[], wantsNullTable: boole
 // formula is rejected (the Validator already guarantees phase params never vary spatially).
 function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) => string): string {
     const isCoefficient = isRadiometric(mediumSettingRole(name));
-    return emitValue(prop, format, (e) => {
+    return emitValue(prop, format, { exprFormat: (e) => {
         if (isCoefficient) {
             // Heterogeneous coefficient (fable-heterogeneous-media.md D4): the authored
             // formula of `p` (+ declared-param uniforms). vec3(...) broadcasts a scalar
@@ -537,7 +532,7 @@ function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) =
             return `max(vec3(${e.source}), 0.0)`;
         }
         throw new Error(`materials: medium.${name} cannot be a GLSL expression (only sigma_a/sigma_s may vary spatially)`);
-    });
+    } });
 }
 
 function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean, color: ColorModelDescriptor): string {
