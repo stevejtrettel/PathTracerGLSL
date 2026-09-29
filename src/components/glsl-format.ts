@@ -20,14 +20,10 @@ export function formatVec4(v: number[]): string {
     return `vec4(${formatFloat(v[0])}, ${formatFloat(v[1])}, ${formatFloat(v[2])}, ${formatFloat(v[3])})`;
 }
 
-/**
- * Format a RADIOMETRIC constant (albedo, emission, light radiance, sky color) — §2.5.
- * The SINGLE point spectral mode overrides: RGB mode emits `vec3(r,g,b)` (identical to
- * formatVec3 today); spectral mode will emit upsampling-coefficient evaluation here. Kept
- * distinct from formatVec3 so geometric constants (positions, normals) are never touched.
- */
-export function formatSpectrum(v: number[]): string {
-    return formatVec3(v);
+/** An RGB constant of a spectrum setting: a gray number as `vec3(g)`, a triple as
+ *  `vec3(r, g, b)`. The color model converts it to a spectrum afterward. */
+export function formatSpectrum(v: number | number[]): string {
+    return typeof v === 'number' ? `vec3(${formatFloat(v)})` : formatVec3(v);
 }
 
 /** Column-major mat3 literal (GLSL constructor order) from 9 numbers. */

@@ -51,6 +51,31 @@ describe('spectrum kinds', () => {
         expect(found).toEqual([]);
     });
 
+    it('every spectrum reaches the shader through its kind: only generate/color.ts writes the RGB lift', () => {
+        // A setting's GLSL is its kind's (emitSpectrum); a number computed in GLSL is the
+        // expression binding. Only the RGB kind converts RGB to a spectrum, and its lift is
+        // built in generate/color.ts.
+        const found: string[] = [];
+        for (const file of tsFiles(SRC)) {
+            if (relative(SRC, file) === 'compiler/generate/color.ts') continue;
+            readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+                if (/\bemitColor\(|color_lift_/.test(line)) found.push(`${relative(SRC, file)}:${i + 1}`);
+            });
+        }
+        expect(found).toEqual([]);
+    });
+
+    it('a kind that may be emission, other than rgb, states its light-table row, with its own code', () => {
+        // A light-table row keeps an emission kind whole in its header; code 0 is RGB's plain
+        // color. A kind without a row form would be read as its RGB stand-in under the light
+        // tree while hits see the true spectrum.
+        const emitting = SPECTRUM_KINDS.filter((k) => k !== rgbKind && k.roles.includes('emission'));
+        for (const k of emitting) expect(k.packed, k.id).toBeDefined();
+        const codes = SPECTRUM_KINDS.flatMap((k) => (k.packed ? [k.packed.code] : []));
+        expect(codes.every((c) => c > 0)).toBe(true);
+        expect(new Set(codes).size).toBe(codes.length);
+    });
+
     it('the named kinds are disjoint and plain values are the rgb kind', () => {
         const examples: Record<string, unknown> = {
             blackbody: { blackbody: { kelvin: 3000, scale: 2 } },

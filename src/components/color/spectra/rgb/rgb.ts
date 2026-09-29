@@ -4,7 +4,7 @@
 import type { Vec3 } from '../../../../compiler/types.js';
 import type { SpectrumKind } from '../spectrumKind.js';
 import { isValueParam } from '../../../param.js';
-import { formatFloat, formatVec3 } from '../../../glsl-format.js';
+import { formatFloat, formatSpectrum } from '../../../glsl-format.js';
 
 /** Plain values. In RGB programs a typed color is used exactly as typed; in spectral programs
  *  the colour model lifts it by the slot's role. */
@@ -27,7 +27,7 @@ export const rgbKind: SpectrumKind = {
     dispersive: () => false,
     emit(v, ctx) {
         if (ctx.role === 'index') return ctx.bind(v, formatFloat);
-        const rgb = ctx.bind(v, formatVec3);
+        const rgb = ctx.bind(v, formatSpectrum);
         return ctx.lift(ctx.factor ? `${rgb} * ${ctx.factor}` : rgb);
     },
 };

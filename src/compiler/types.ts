@@ -463,17 +463,17 @@ export interface MediumDescription {
 }
 
 /** The roles of the spectrum settings that no descriptor row declares: a medium's absorption,
- *  scattering, glow and index; a constant sky's color; a light's authored emission; and a
- *  material's emission on a model whose rows have no emission row. Every reader takes these
- *  settings' roles from here. */
+ *  scattering, glow and index; the sky's radiance (a constant color, an image or a formula); a
+ *  light's authored emission; and a material's emission (its `emission` key, which a batch's
+ *  lamps also read). Every reader takes these settings' roles from here. */
 export const SETTING_ROLES = {
     medium: { sigma_a: 'coefficient', sigma_s: 'coefficient', emission: 'emission', ior: 'index' },
-    skyColor: 'emission',
+    sky: 'emission',
     lightEmission: 'emission',
     materialEmission: 'emission',
 } as const satisfies {
     medium: Record<'sigma_a' | 'sigma_s' | 'emission' | 'ior', SpectrumRole>;
-    skyColor: SpectrumRole; lightEmission: SpectrumRole; materialEmission: SpectrumRole;
+    sky: SpectrumRole; lightEmission: SpectrumRole; materialEmission: SpectrumRole;
 };
 
 /** A medium setting's role, or undefined for a setting that holds an ordinary number. */

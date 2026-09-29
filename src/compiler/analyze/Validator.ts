@@ -907,7 +907,7 @@ export function validate(
         if (isGlslExpression(env.color)) {
             bag.error('invalid-setting', 'environment.color cannot be a GLSL expression — a constant sky takes a constant, a {param} or a blackbody; a formula sky is `type: \'procedural\'`').add();
         } else {
-            validatePropertyValue(env.color, { shape: 'spectrum', role: SETTING_ROLES.skyColor }, 'environment.color', bag);
+            validatePropertyValue(env.color, { shape: 'spectrum', role: SETTING_ROLES.sky }, 'environment.color', bag);
         }
     }
     if (env && env.type !== 'none') {

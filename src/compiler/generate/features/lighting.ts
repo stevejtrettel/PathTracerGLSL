@@ -4,7 +4,7 @@
 // Mirrors the material pattern: fixed per-kind GLSL (light_point/quad/sphere.glsl) + a
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
-import { emitColor, emitSpectrum } from '../color.js';
+import { emitSpectrum, glslValue } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
 import { SETTING_ROLES, type Vec3, type BlackbodyValue } from '../../types.js';
@@ -132,7 +132,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     if (bvh && layout !== null && plan.lightTree !== undefined) {
         blocks.push({ origin: 'components/accel/light_tree/light_tree.glsl', source: lightTreeGLSL });
         if (plan.lights.length > 0) {
-            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree, plan.program.spectrumKinds) });
+            blocks.push({ origin: 'generated:light-table-loaders', source: generateLightRowLoaders(layout, plan.lightTree, plan.program.spectrumKinds, plan.program.measurement.color) });
         }
         blocks.push({ origin: 'generated:light-tree-walks', source: generateLightTreeWalks(plan.lightTree) });
     }
@@ -722,7 +722,7 @@ function fieldExpr(f: number, vec3: boolean): string {
 /** One loader per present kind: `<Kind>Light <kind>_light_row(int li, Wavelengths wl)` — positional
  *  float reads in ctor order (rows then derived), mirroring packLightTable exactly
  *  (the ONE layout truth on both sides). */
-function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: string[]): string {
+function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: string[], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
     // Spectrum kinds this program evaluates that pack their own numbers into the row header.
     const packedKinds = spectrumKinds.map(kindById).filter((k) => k.packed !== undefined);
@@ -742,7 +742,7 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
             const e = fieldExpr(f, r.vec3);
             f += r.vec3 ? 3 : 1;
             if (r.role === undefined) return e;
-            const rgb = emitColor(e, r.role, 'wl');
+            const rgb = emitSpectrum(glslValue(e), r.role, { wl: 'wl', color });
             if (r.role !== 'emission') return rgb;
             // A kind kept whole in the row header is read from it; otherwise the RGB payload.
             return packedKinds.reduceRight((inner, k) =>

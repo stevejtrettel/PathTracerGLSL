@@ -5,7 +5,7 @@
 
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
-import { emitColor, emitSpectrum } from '../color.js';
+import { emitSpectrum, glslValue, type SpectrumSite } from '../color.js';
 import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression } from '../../types.js';
 import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
@@ -63,7 +63,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     const derivedByMat = new Map<number, DerivedExpr[]>();
     for (const mat of plan.materials) {
         const specs = mat.model === 'none' ? [] : (MATERIAL_MODELS[mat.model]?.derived ?? []);
-        if (specs.length > 0) derivedByMat.set(mat.id, specs.map((s) => materialDerivedExpr(mat, s)));
+        if (specs.length > 0) derivedByMat.set(mat.id, specs.map((s) => materialDerivedExpr(mat, s, { wl: 'wl', color: plan.program.measurement.color })));
     }
     const blocks: ShaderBlock[] = [
         { origin: 'generated:material-lookup', source: generateMaterialLookup(plan.materials, structFields, derivedByMat, plan.program.measurement.color) },
@@ -124,7 +124,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     }
     if (media.present) {
         blocks.push({ origin: 'generated:media-tables', source: generateMediaTables(plan.materials, wantsNullTable) });
-        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission, color) });
+        blocks.push({ origin: 'generated:medium-properties', source: generateMediumProperties(plan.materials, plan.program.media.models, phaseFields, media.emission, color, { wl: 'wl', color: plan.program.measurement.color }) });
         // IOR is consumed by its GRADIENT (the ray bends by ∇n), evaluated at many nearby points
         // per GRIN step — so it gets its OWN cheap accessor, NOT a MediumProperties field (which
         // bundles the value-consumed σ_a/σ_s/ε, read once per collision). fable-variable-ior.
@@ -338,9 +338,9 @@ function resolveDerivedInputs(mat: PlannedMaterial, inputs: string[], params: Re
     return out;
 }
 
-function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec): DerivedExpr {
+function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec, site: SpectrumSite): DerivedExpr {
     const fmt = (s.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
-    const evaluate = (expr: string) => s.glslType === 'Spectrum' ? emitColor(expr, s.role, 'wl') : expr;
+    const evaluate = (expr: string) => s.glslType === 'Spectrum' ? emitSpectrum(glslValue(expr), s.role, site) : expr;
     const deps = s.inputs.map((src) => mat.values[src]).filter((v) => isValueParam(v)).map((v) => (v as ValueParam<number>).param);
     if (deps.length === 0) {
         return { name: s.name, expr: evaluate(fmt(s.fn(resolveDerivedInputs(mat, s.inputs)) as never)) };
@@ -371,7 +371,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
     // numeric default.
     for (const f of fields) {
-        lines.push(`    props.${f.name} = ${defaultExpr(f, 'wl')};`);
+        lines.push(`    props.${f.name} = ${defaultExpr(f, { wl: 'wl', color })};`);
     }
 
     let arms = 0;
@@ -535,7 +535,7 @@ function mediumPropertyExpr(prop: ParamValue, name: string, format: (v: never) =
     } });
 }
 
-function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean, color: ColorModelDescriptor): string {
+function generateMediumProperties(materials: PlannedMaterial[], models: string[], phaseFields: PropertySchema[], wantsEmission: boolean, color: ColorModelDescriptor, site: SpectrumSite): string {
     const withMedium = materials.filter((m) => m.medium !== null);
     const hasModel = models.length > 0;         // the `model` field exists only when scattering is live
     // Field set = the PRESENT scattering models' schema union (§3.4 literal — the same
@@ -548,7 +548,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
     lines.push('    m.sigma_s = SPECTRUM_ZERO;');
     if (wantsEmission) lines.push('    m.emission = SPECTRUM_ZERO;');
-    for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f, 'wl')};`);
+    for (const f of phaseFields) lines.push(`    m.${f.name} = ${defaultExpr(f, site)};`);
     if (hasModel) lines.push('    m.model = 0;');
     for (let i = 0; i < withMedium.length; i++) {
         const mat = withMedium[i];
@@ -583,10 +583,11 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
                 lines.push('        emission *= sigma_scale;');
             }
         }
-        lines.push(`        m.sigma_a = ${emitColor('sigma_a', SETTING_ROLES.medium.sigma_a, 'wl')};`);
-        lines.push(`        m.sigma_s = ${emitColor('sigma_s', SETTING_ROLES.medium.sigma_s, 'wl')};`);
+        // The numbers are the (clamped) locals above; the kind evaluates them.
+        lines.push(`        m.sigma_a = ${emitSpectrum(glslValue('sigma_a'), SETTING_ROLES.medium.sigma_a, site)};`);
+        lines.push(`        m.sigma_s = ${emitSpectrum(glslValue('sigma_s'), SETTING_ROLES.medium.sigma_s, site)};`);
         if (wantsEmission && isEmissiveMedium(med)) {
-            lines.push(`        m.emission = ${emitColor('emission', SETTING_ROLES.medium.emission, 'wl')};`);
+            lines.push(`        m.emission = ${emitSpectrum(glslValue('emission'), SETTING_ROLES.medium.emission, site)};`);
         }
         for (const f of phaseFields) {
             // Union fields of OTHER present models fall back to their row default —
@@ -595,7 +596,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
             const format = f.glslType === 'Spectrum' ? formatVec3 : formatFloat;
             if (value === undefined) continue; // already initialized from this row's default
             const expr = mediumPropertyExpr(value, f.name, format as (v: never) => string);
-            const resolved = isRadiometric(f.role) ? emitColor(expr, f.role, 'wl') : expr;
+            const resolved = isRadiometric(f.role) ? emitSpectrum(glslValue(expr), f.role, site) : expr;
             lines.push(`        m.${f.name} = ${resolved};`);
         }
         if (hasModel) lines.push(`        m.model = ${models.indexOf(med.model)};   // '${med.model}'`);

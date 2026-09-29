@@ -11,7 +11,7 @@
 //              engine registry; the executor binds it like any pass input (§2.10).
 //   procedural → direct formula evaluation; the bake guides sampling only.
 
-import { emitColor, emitSpectrum } from '../color.js';
+import { emitSpectrum, glslValue } from '../color.js';
 import type { RenderPlan } from '../../plan/types.js';
 import type { PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
@@ -118,7 +118,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.skyColor, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' });
+        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' });
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];
@@ -156,7 +156,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const blocks = [
             EQUIRECT_MAP,
             { origin: ORIGIN, source: '// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)\n'
-                + radianceFn(`return ${emitColor('texture(u_envMap, equirect_uv(dir)).rgb * u_envIntensity', 'emission', 'wl')};`) },
+                + radianceFn(`return ${emitSpectrum(glslValue('texture(u_envMap, equirect_uv(dir)).rgb'), SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' })};`) },
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
@@ -209,7 +209,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
             // GLSL params are value copies: reassigning `dir` scopes the rotation to the
             // formula without touching the author's expression.
-            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${emitColor(`(${env.glsl.source}) * u_envIntensity`, 'emission', 'wl')};`) },
+            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${emitSpectrum(glslValue(`(${env.glsl.source})`), SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' })};`) },
         ];
         // Procedural radiance always uses the matrix rotation → always ships u_envRotCS.
         uniforms.push(rotCsUniform(rotation));

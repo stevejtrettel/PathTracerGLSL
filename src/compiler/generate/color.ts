@@ -1,12 +1,19 @@
 import { emitValue, type ParamValue } from './values.js';
-import type { IndexProperty } from '../types.js';
+import type { IndexProperty, GlslExpression } from '../types.js';
 import type { RadiometricRole, SpectrumRole } from '../../components/descriptors.js';
 import { kindOf } from '../../components/color/spectra/index.js';
 import type { EmitContext } from '../../components/color/spectra/spectrumKind.js';
 
-/** Evaluate authored RGB at the current wavelengths, after authored arithmetic. */
-export function emitColor(rgb: string, role: RadiometricRole, wl: string): string {
+/** The RGB kind's evaluation: the color model's lift of an RGB expression, in a role, at the
+ *  wavelengths. Only the RGB kind reaches it, through its EmitContext. */
+function emitColor(rgb: string, role: RadiometricRole, wl: string): string {
     return `color_lift_${role}(${rgb}, ${wl})`;
+}
+
+/** A value whose numbers a GLSL expression computes (the expression binding): an image lookup,
+ *  a procedural formula, a clamped field, a packed light-table payload. */
+export function glslValue(source: string): GlslExpression {
+    return { kind: 'glsl', source };
 }
 
 /** Where a spectrum is emitted: the GLSL expression of the wavelength carrier, the program's
