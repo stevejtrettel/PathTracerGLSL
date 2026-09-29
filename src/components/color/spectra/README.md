@@ -22,8 +22,15 @@ index positive; the spectral model also limits reflectance to 1), and the units.
 `spectrumKind.ts` defines `SpectrumKind`. A kind answers every question the compiler asks
 about its values:
 
-- `is` recognizes its authored data; `roles` lists the slots it may go in;
-- `liveParams` names its live sliders; `validate` checks its own numbers;
+- `is` recognizes its authored data. A named kind is written `{ <id>: … }`: one key, the kind's
+  id, holding its numbers. `roles` lists the slots it may go in;
+- `liveParams` names its live sliders;
+- `fields` declares its numbers where they sit in an object: each one's domain, and whether it
+  may be a slider, may be omitted or is a triple. The compiler checks them like every other
+  authored number: their keys, their sliders' structure, their domains. `validate` checks the
+  rules that relate several numbers (Sellmeier's positive n²) or that `fields` cannot state
+  (Sellmeier's poles outside the visible range, Cauchy's array), and runs only when the fields
+  are valid;
 - `toRGB` gives its RGB stand-in: the RGB value for a radiometric role, the index at the helium
   d line (587.5618 nm) for the index role;
 - `constantNonzero` and `mayBeNonzero` answer the light census and the emitter checks;
@@ -42,7 +49,7 @@ a literal, uniform or expression; the color model's lift; minting a slider) reac
 
 `index.ts` is the registry: `SPECTRUM_KINDS` in lookup order (the index formulas, then
 blackbody and gaussian, then `rgb`, which claims everything else), `kindOf`, `namedKindOf`,
-`namedKindsClaiming` (more than one is a malformed value), `kindById` and `rgbKind`.
+`kindById` and `rgbKind`.
 A program lists the kinds it evaluates at wavelengths in `ProgramDescription.spectrumKinds`
 (registry order); their `glsl` helpers are linked in that order.
 
@@ -55,6 +62,8 @@ for these. The authored value types (`BlackbodyValue`, `GaussianValue`, `CauchyI
 ## Adding a kind
 
 One folder with `<id>.ts` (the `SpectrumKind`), any `<id>.glsl` helpers and a README stating its
-spelling, units, domain and RGB meaning; one line in `index.ts`. A kind that is the first to
-need a new capability in some reader (for example a maximum over wavelength for a medium's
-tracking bound) adds that method to the contract and to the reader, not a test for itself.
+spelling, units, domain and RGB meaning; one line in `index.ts`; and an example value in
+tests/components/spectrumKinds.test.ts, which checks its spelling against its `fields`. A kind
+that is the first to need a new capability in some reader (for example a maximum over
+wavelength for a medium's tracking bound) adds that method to the contract and to the reader,
+not a test for itself.

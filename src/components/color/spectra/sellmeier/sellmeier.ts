@@ -22,17 +22,15 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
     is: isSellmeierIndex,
     roles: ['index'],
     liveParams: () => [],
+    // B is dimensionless, C in micrometres squared.
+    fields: {
+        B: { domain: { kind: 'nonnegative' }, triple: true },
+        C: { domain: { kind: 'nonnegative' }, triple: true },
+    },
     validate(v, label, report) {
-        const coefficients = v.sellmeier;
-        const validTriplet = (x: unknown): x is [number, number, number] => Array.isArray(x)
-            && x.length === 3 && x.every(c => typeof c === 'number' && Number.isFinite(c) && c >= 0);
-        if (!coefficients || !validTriplet(coefficients.B) || !validTriplet(coefficients.C)) {
-            report(`${label}: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)`);
-            return;
-        }
         const min2 = (spectralData.lambdaMin / 1000) ** 2;
         const max2 = (spectralData.lambdaMax / 1000) ** 2;
-        if (coefficients.C.some(c => c >= min2 && c <= max2)) {
+        if (v.sellmeier.C.some(c => c >= min2 && c <= max2)) {
             report(`${label}: Sellmeier poles must lie outside ${spectralData.lambdaMin}–${spectralData.lambdaMax} nm`);
         } else {
             // With B,C >= 0 and no poles, d(n²)/d(lambda²) = -sum(B*C/(lambda²-C)²) <= 0.

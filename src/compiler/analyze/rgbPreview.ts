@@ -2,6 +2,7 @@ import type { SceneDescription, Vec3 } from '../types.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
 import { rgbStandIn } from '../../components/color/values.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { rowSetting, valueProblems } from './propertyValidation.js';
 
 /** Where an RGB program cannot show a named spectrum exactly: a reflectance whose RGB stand-in
  *  lies outside [0, 1] is clipped there (a saturated Gaussian band, for example). Spectral
@@ -13,11 +14,8 @@ export function rgbPreviewWarnings(scene: SceneDescription): string[] {
             if (row.role !== 'reflectance') continue;
             const value = (mat as unknown as Record<string, unknown>)[row.source];
             const kind = namedKindOf(value);
-            if (kind === undefined || !kind.roles.includes(row.role)) continue;
             // An invalid value gets its own error; only valid ones are previewed.
-            let invalid = false;
-            kind.validate?.(value, '', () => { invalid = true; });
-            if (invalid) continue;
+            if (kind === undefined || valueProblems(value, rowSetting(row), '').length > 0) continue;
             const rgb = kind.toRGB(value, row.role, {}) as Vec3;
             const shown = rgbStandIn(value, row.role) as Vec3;
             if (rgb.some((c, i) => c !== shown[i])) {

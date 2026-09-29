@@ -101,6 +101,16 @@ const cases: Record<string, Mutation> = {
     'emission slider min -1 on a non-emitting model': set((s) => { s.materials.glass.emission = { param: 'g.e', default: 1, min: -1 }; }),
     'expression as sky color': set((s) => { s.environment.color = { kind: 'glsl', source: 'vec3(0.1)' }; }),
     'expression and blackbody keys together': set((s) => { s.materials.m.emission = { kind: 'glsl', source: 'vec3(1.0)', ...blackbody(3000) }; }),
+    // A value has only its form's keys, and a slider's default lies between its own min and max.
+    'a key beside blackbody': set((s) => { s.lights[0].emission = { ...blackbody(3000), scale: 5 }; }),
+    'an unknown key inside a Gaussian': set((s) => { s.materials.m.albedo = { gaussian: { center: 600, width: 20, peak: 0.8, flor: 0.1 } }; }),
+    'an unknown key inside a Sellmeier': set((s) => { s.materials.glass.ior = { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0], D: [1, 1, 1] } }; }),
+    'a misspelled slider key': set((s) => { s.materials.m.albedo = { param: 'm.a', default: 0.5, mn: 0 }; }),
+    'a misspelled key on a kelvin slider': set((s) => { s.lights[0].emission = blackbody({ param: 'lamp.k', default: 3000, mn: 1000 }); }),
+    'a misspelled key on an expression': set((s) => { s.materials.m.albedo = { kind: 'glsl', source: 'vec3(0.5)', sorce: 'vec3(0.5)' }; }),
+    'albedo slider default above its max': set((s) => { s.materials.m.albedo = { param: 'm.a', default: 0.9, min: 0, max: 0.5 }; }),
+    'kelvin slider default above its max': set((s) => { s.lights[0].emission = blackbody({ param: 'lamp.k', default: 6000, min: 2000, max: 4000 }); }),
+    'expression parameter default above its max': set((s) => { s.materials.m.albedo = { kind: 'glsl', source: 'vec3(u_m_g)', params: [{ param: 'm.g', default: 5, min: 0, max: 1 }] }; }),
 };
 
 function outcome(mutate: Mutation, color: 'rgb' | 'spectral') {

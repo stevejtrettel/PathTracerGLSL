@@ -340,6 +340,9 @@ export function isGlslExpression(v: unknown): v is GlslExpression {
     return v != null && typeof v === 'object' && (v as GlslExpression).kind === 'glsl';
 }
 
+/** The keys a formula may have. */
+export const GLSL_EXPRESSION_KEYS = ['kind', 'source', 'params'] as const;
+
 /** Heterogeneous-medium predicate (fable-heterogeneous-media.md; extended by
  * impl-plan-medium-emission P5): any expression coefficient — σ_a, σ_s, OR ε.
  * Classification is by AUTHORED TYPE — an expression that happens to evaluate to a

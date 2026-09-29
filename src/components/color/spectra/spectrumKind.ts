@@ -9,7 +9,7 @@
 
 import type { Vec3, ParameterMetadata } from '../../../compiler/types.js';
 import type { PlannedUniform } from '../../../compiler/plan/types.js';
-import type { SpectrumRole } from '../../descriptors.js';
+import type { SpectrumRole, RowConstraint } from '../../descriptors.js';
 
 /** Helium d line, in nm. An RGB render uses the index at this wavelength. */
 export const indexReferenceNM = 587.5618;
@@ -34,6 +34,21 @@ export interface MintContext {
     mint(value: unknown, glslType: 'vec3' | 'float', metaType: 'color' | 'float', hdr: boolean): void;
 }
 
+/** One of a named kind's numbers, where they sit in an object. The compiler checks it like any
+ *  other authored number: a constant (or, if allowed, a slider) whose values lie in `domain`. */
+export interface KindField {
+    /** The values it may take, per component; absent means any finite number. */
+    domain?: RowConstraint;
+    /** It may be a slider `{ param, default, min?, max? }`. */
+    slider?: boolean;
+    /** It may be omitted. */
+    optional?: boolean;
+    /** It is a triple (exactly three numbers), not a number. */
+    triple?: boolean;
+}
+
+/** A named kind's value is `{ <id>: … }`: one key, the kind's id, holding its numbers. The
+ *  plain `rgb` kind has no such key. */
 export interface SpectrumKind<V = unknown> {
     id: string;
     /** The kind's name in diagnostics. */
@@ -43,8 +58,11 @@ export interface SpectrumKind<V = unknown> {
     roles: readonly SpectrumRole[];
     /** Parameter paths of its live sliders. */
     liveParams(value: V): string[];
-    /** Domain checks on its own numbers, reported as messages; the slot's role is checked
-     *  before this is called. */
+    /** Its numbers, where they sit in an object (`{ <id>: { <field>: … } }`). The compiler
+     *  checks their keys, their sliders and their domains. */
+    fields?: Readonly<Record<string, KindField>>;
+    /** Rules that relate several of its numbers, or that `fields` cannot state, reported as
+     *  messages. Called only when the slot takes the kind and its fields are valid. */
     validate?(value: V, label: string, report: (message: string) => void): void;
     /** The RGB stand-in at the given slider values: a triple for a radiometric role, the
      *  index at indexReferenceNM for the index role. */

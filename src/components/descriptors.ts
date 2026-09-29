@@ -19,17 +19,19 @@ import type { AABB } from './accel/bvh/bvh.js';
  *  one checker, one error voice, one contract test, UI-consumable ranges. Shared by every
  *  family's rows (primitives, material/phase properties, lights' authored params).
  *  Shape-agnostic: scalar rules apply per-component to vec3/Spectrum values.
- *    nonnegative — every component ≥ 0 (RTE coefficients, albedo)
- *    positive    — every component > 0 (radii, half-sizes, ior)
- *    min-length  — vec3 magnitude ≥ value (unit-normalizable directions)
+ *    nonnegative     — every component ≥ 0 (RTE coefficients, albedo)
+ *    positive        — every component > 0 (radii, half-sizes, ior)
+ *    min-length      — vec3 magnitude ≥ value (unit-normalizable directions)
+ *    interval        — every component in the open interval (min, max) (a field of view)
+ *    closed-interval — every component in [min, max] (a blackbody's kelvin)
  *  Coupled rules (quad parallel-edges, spot falloffStart < angle) stay code — that is
  *  what `validateAuthored` is FOR; a separable rule there is a smell. */
 export type RowConstraint =
     | { kind: 'nonnegative' }
     | { kind: 'positive' }
     | { kind: 'min-length'; value: number }
-    /** Open interval (min, max), per component. */
-    | { kind: 'interval'; min: number; max: number };
+    | { kind: 'interval'; min: number; max: number }
+    | { kind: 'closed-interval'; min: number; max: number };
 
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —

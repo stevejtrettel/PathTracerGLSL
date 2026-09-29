@@ -1,5 +1,121 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`spectrum diagnostics > a key beside blackbody 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the blackbody value has an unknown key 'scale' (its keys: blackbody)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the blackbody value has an unknown key 'scale' (its keys: blackbody)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the blackbody value has an unknown key 'scale' (its keys: blackbody)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the blackbody value has an unknown key 'scale' (its keys: blackbody)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > a misspelled key on a kelvin slider 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: blackbody kelvin {param: 'lamp.k'} has an unknown key 'mn' (its keys: param, default, min, max)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: blackbody kelvin {param: 'lamp.k'} has an unknown key 'mn' (its keys: param, default, min, max)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: blackbody kelvin {param: 'lamp.k'} has an unknown key 'mn' (its keys: param, default, min, max)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: blackbody kelvin {param: 'lamp.k'} has an unknown key 'mn' (its keys: param, default, min, max)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > a misspelled key on an expression 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the expression has an unknown key 'sorce' (its keys: kind, source, params)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the expression has an unknown key 'sorce' (its keys: kind, source, params)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the expression has an unknown key 'sorce' (its keys: kind, source, params)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the expression has an unknown key 'sorce' (its keys: kind, source, params)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > a misspelled slider key 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo {param: 'm.a'} has an unknown key 'mn' (its keys: param, default, min, max)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo {param: 'm.a'} has an unknown key 'mn' (its keys: param, default, min, max)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo {param: 'm.a'} has an unknown key 'mn' (its keys: param, default, min, max)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo {param: 'm.a'} has an unknown key 'mn' (its keys: param, default, min, max)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
 exports[`spectrum diagnostics > albedo -0.1 1`] = `
 {
   "rgb": {
@@ -57,16 +173,16 @@ exports[`spectrum diagnostics > albedo 1.5 1`] = `
 }
 `;
 
-exports[`spectrum diagnostics > albedo slider max -1 1`] = `
+exports[`spectrum diagnostics > albedo slider default above its max 1`] = `
 {
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': albedo parameter max components must be >= 0",
+  - Material 'm': albedo parameter default must be <= max",
     },
     "validator": {
       "errors": [
-        "Material 'm': albedo parameter max components must be >= 0",
+        "Material 'm': albedo parameter default must be <= max",
       ],
       "warnings": [],
     },
@@ -74,10 +190,43 @@ exports[`spectrum diagnostics > albedo slider max -1 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo parameter default must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter default must be <= max",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > albedo slider max -1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo parameter default must be <= max
   - Material 'm': albedo parameter max components must be >= 0",
     },
     "validator": {
       "errors": [
+        "Material 'm': albedo parameter default must be <= max",
+        "Material 'm': albedo parameter max components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'm': albedo parameter default must be <= max
+  - Material 'm': albedo parameter max components must be >= 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo parameter default must be <= max",
         "Material 'm': albedo parameter max components must be >= 0",
       ],
       "warnings": [],
@@ -115,16 +264,16 @@ exports[`spectrum diagnostics > albedo slider max not a number 1`] = `
 }
 `;
 
-exports[`spectrum diagnostics > blackbody and Cauchy keys together 1`] = `
+exports[`spectrum diagnostics > an unknown key inside a Gaussian 1`] = `
 {
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+  - Material 'm': albedo: Gaussian has an unknown key 'flor' (its keys: center, width, peak, floor)",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+        "Material 'm': albedo: Gaussian has an unknown key 'flor' (its keys: center, width, peak, floor)",
       ],
       "warnings": [],
     },
@@ -132,11 +281,69 @@ exports[`spectrum diagnostics > blackbody and Cauchy keys together 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+  - Material 'm': albedo: Gaussian has an unknown key 'flor' (its keys: center, width, peak, floor)",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission carries the keys of more than one kind of value (Cauchy, blackbody)",
+        "Material 'm': albedo: Gaussian has an unknown key 'flor' (its keys: center, width, peak, floor)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > an unknown key inside a Sellmeier 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier has an unknown key 'D' (its keys: B, C)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier has an unknown key 'D' (its keys: B, C)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Sellmeier has an unknown key 'D' (its keys: B, C)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Sellmeier has an unknown key 'D' (its keys: B, C)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > blackbody and Cauchy keys together 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the Cauchy value has an unknown key 'blackbody' (its keys: cauchy)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the Cauchy value has an unknown key 'blackbody' (its keys: cauchy)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the Cauchy value has an unknown key 'blackbody' (its keys: cauchy)",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the Cauchy value has an unknown key 'blackbody' (its keys: cauchy)",
       ],
       "warnings": [],
     },
@@ -149,11 +356,11 @@ exports[`spectrum diagnostics > blackbody and param keys together 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission carries the keys of more than one kind of value (blackbody, {param})",
+  - Light 0 (point): emission: the blackbody value has unknown keys 'param', 'default' (its keys: blackbody)",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission carries the keys of more than one kind of value (blackbody, {param})",
+        "Light 0 (point): emission: the blackbody value has unknown keys 'param', 'default' (its keys: blackbody)",
       ],
       "warnings": [],
     },
@@ -161,11 +368,11 @@ exports[`spectrum diagnostics > blackbody and param keys together 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission carries the keys of more than one kind of value (blackbody, {param})",
+  - Light 0 (point): emission: the blackbody value has unknown keys 'param', 'default' (its keys: blackbody)",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission carries the keys of more than one kind of value (blackbody, {param})",
+        "Light 0 (point): emission: the blackbody value has unknown keys 'param', 'default' (its keys: blackbody)",
       ],
       "warnings": [],
     },
@@ -294,11 +501,11 @@ exports[`spectrum diagnostics > blackbody kelvin below range 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
       ],
       "warnings": [],
     },
@@ -306,11 +513,11 @@ exports[`spectrum diagnostics > blackbody kelvin below range 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
       ],
       "warnings": [],
     },
@@ -323,11 +530,11 @@ exports[`spectrum diagnostics > blackbody kelvin slider default above range 1`] 
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
       ],
       "warnings": [],
     },
@@ -335,11 +542,11 @@ exports[`spectrum diagnostics > blackbody kelvin slider default above range 1`] 
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+  - Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody kelvin requires finite values in [1000, 40000], including defaults and bounds",
+        "Light 0 (point): emission: blackbody kelvin must be in [1000, 40000]",
       ],
       "warnings": [],
     },
@@ -381,11 +588,11 @@ exports[`spectrum diagnostics > blackbody negative scale 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+  - Light 0 (point): emission: blackbody scale components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+        "Light 0 (point): emission: blackbody scale components must be >= 0",
       ],
       "warnings": [],
     },
@@ -393,11 +600,11 @@ exports[`spectrum diagnostics > blackbody negative scale 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Light 0 (point): emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+  - Light 0 (point): emission: blackbody scale components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Light 0 (point): emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+        "Light 0 (point): emission: blackbody scale components must be >= 0",
       ],
       "warnings": [],
     },
@@ -410,11 +617,11 @@ exports[`spectrum diagnostics > blackbody negative scale on a non-emitting model
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+  - Material 'glass': emission: blackbody scale components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+        "Material 'glass': emission: blackbody scale components must be >= 0",
       ],
       "warnings": [],
     },
@@ -422,11 +629,11 @@ exports[`spectrum diagnostics > blackbody negative scale on a non-emitting model
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+  - Material 'glass': emission: blackbody scale components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Material 'glass': emission: blackbody scale requires finite values in [0, Infinity], including defaults and bounds",
+        "Material 'glass': emission: blackbody scale components must be >= 0",
       ],
       "warnings": [],
     },
@@ -735,11 +942,11 @@ exports[`spectrum diagnostics > expression and blackbody keys together 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+  - Material 'm': emission: the blackbody value has unknown keys 'kind', 'source' (its keys: blackbody)",
     },
     "validator": {
       "errors": [
-        "Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+        "Material 'm': emission: the blackbody value has unknown keys 'kind', 'source' (its keys: blackbody)",
       ],
       "warnings": [],
     },
@@ -747,11 +954,11 @@ exports[`spectrum diagnostics > expression and blackbody keys together 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+  - Material 'm': emission: the blackbody value has unknown keys 'kind', 'source' (its keys: blackbody)",
     },
     "validator": {
       "errors": [
-        "Material 'm': emission carries the keys of more than one kind of value (blackbody, expression)",
+        "Material 'm': emission: the blackbody value has unknown keys 'kind', 'source' (its keys: blackbody)",
       ],
       "warnings": [],
     },
@@ -781,6 +988,35 @@ exports[`spectrum diagnostics > expression as sky color 1`] = `
     "validator": {
       "errors": [
         "environment.color cannot be a GLSL expression — a constant sky takes a constant, a {param} or a blackbody; a formula sky is \`type: 'procedural'\`",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression parameter default above its max 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Expression at 'materials.m.albedo': params[0] parameter default must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Expression at 'materials.m.albedo': params[0] parameter default must be <= max",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Expression at 'materials.m.albedo': params[0] parameter default must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Expression at 'materials.m.albedo': params[0] parameter default must be <= max",
       ],
       "warnings": [],
     },
@@ -939,11 +1175,11 @@ exports[`spectrum diagnostics > gaussian peak above 1 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+  - Material 'm': albedo: Gaussian peak must be in [0, 1]",
     },
     "validator": {
       "errors": [
-        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+        "Material 'm': albedo: Gaussian peak must be in [0, 1]",
       ],
       "warnings": [],
     },
@@ -951,11 +1187,11 @@ exports[`spectrum diagnostics > gaussian peak above 1 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+  - Material 'm': albedo: Gaussian peak must be in [0, 1]",
     },
     "validator": {
       "errors": [
-        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+        "Material 'm': albedo: Gaussian peak must be in [0, 1]",
       ],
       "warnings": [],
     },
@@ -968,11 +1204,11 @@ exports[`spectrum diagnostics > gaussian zero width 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+  - Material 'm': albedo: Gaussian width must be > 0",
     },
     "validator": {
       "errors": [
-        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+        "Material 'm': albedo: Gaussian width must be > 0",
       ],
       "warnings": [],
     },
@@ -980,11 +1216,11 @@ exports[`spectrum diagnostics > gaussian zero width 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+  - Material 'm': albedo: Gaussian width must be > 0",
     },
     "validator": {
       "errors": [
-        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+        "Material 'm': albedo: Gaussian width must be > 0",
       ],
       "warnings": [],
     },
@@ -1014,6 +1250,35 @@ exports[`spectrum diagnostics > glass tint -0.2 1`] = `
     "validator": {
       "errors": [
         "Material 'glass': transmittance components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > kelvin slider default above its max 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: blackbody kelvin parameter default must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: blackbody kelvin parameter default must be <= max",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: blackbody kelvin parameter default must be <= max",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: blackbody kelvin parameter default must be <= max",
       ],
       "warnings": [],
     },
@@ -1200,11 +1465,11 @@ exports[`spectrum diagnostics > sellmeier negative B 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+  - Material 'glass': ior: Sellmeier B components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+        "Material 'glass': ior: Sellmeier B components must be >= 0",
       ],
       "warnings": [],
     },
@@ -1212,11 +1477,11 @@ exports[`spectrum diagnostics > sellmeier negative B 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+  - Material 'glass': ior: Sellmeier B components must be >= 0",
     },
     "validator": {
       "errors": [
-        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+        "Material 'glass': ior: Sellmeier B components must be >= 0",
       ],
       "warnings": [],
     },
@@ -1257,24 +1522,28 @@ exports[`spectrum diagnostics > sellmeier wrong length 1`] = `
 {
   "rgb": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'glass': ior: Sellmeier B must be a finite vec3
+  - Material 'glass': ior: Sellmeier C must be a finite vec3",
     },
     "validator": {
       "errors": [
-        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+        "Material 'glass': ior: Sellmeier B must be a finite vec3",
+        "Material 'glass': ior: Sellmeier C must be a finite vec3",
       ],
       "warnings": [],
     },
   },
   "spectral": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+      "threw": "CompilationError: Compilation failed (2 errors):
+  - Material 'glass': ior: Sellmeier B must be a finite vec3
+  - Material 'glass': ior: Sellmeier C must be a finite vec3",
     },
     "validator": {
       "errors": [
-        "Material 'glass': ior: Sellmeier requires constant finite nonnegative B and C triples (C in micrometres squared)",
+        "Material 'glass': ior: Sellmeier B must be a finite vec3",
+        "Material 'glass': ior: Sellmeier C must be a finite vec3",
       ],
       "warnings": [],
     },

@@ -28,7 +28,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, validatePropertyValue, constraintViolation, slotDomain } from './propertyValidation.js';
+import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -140,7 +140,7 @@ export function validate(
             bag.error('invalid-setting', `Light ${i} (${light.kind}): emission cannot be a GLSL expression — a light takes a constant, a {param} or a blackbody`).add();
         } else {
             const emissionRow = d.params.find((r) => r.role !== undefined)!;   // every light kind has one
-            validatePropertyValue(e, { shape: 'spectrum', role: emissionRow.role }, `Light ${i} (${light.kind}): emission`, bag);
+            for (const message of valueProblems(e, { shape: 'spectrum', role: emissionRow.role }, `Light ${i} (${light.kind}): emission`)) bag.error('invalid-setting', message).add();
         }
         // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
         // radius): the kind DESCRIPTOR declares its rules; the Validator emits them —
@@ -266,7 +266,7 @@ export function validate(
         // any other model's emission is still checked against the emission domain before the
         // rule below decides whether it is a phantom light or ignored.
         if (e !== undefined && !(MATERIAL_MODELS[mat.model]?.properties ?? []).some((f) => f.source === EMISSION_KEY)) {
-            validatePropertyValue(e, { shape: 'spectrum', role: SETTING_ROLES.materialEmission }, `Material '${name}': emission`, bag);
+            for (const message of valueProblems(e, { shape: 'spectrum', role: SETTING_ROLES.materialEmission }, `Material '${name}': emission`)) bag.error('invalid-setting', message).add();
         }
         // Emission on a model whose emission dispatch returns zero — one rule, one diagnostic.
         // A CONSTANT nonzero emission (incl. a constant blackbody) that the light registry would
@@ -907,7 +907,7 @@ export function validate(
         if (isGlslExpression(env.color)) {
             bag.error('invalid-setting', 'environment.color cannot be a GLSL expression — a constant sky takes a constant, a {param} or a blackbody; a formula sky is `type: \'procedural\'`').add();
         } else {
-            validatePropertyValue(env.color, { shape: 'spectrum', role: SETTING_ROLES.sky }, 'environment.color', bag);
+            for (const message of valueProblems(env.color, { shape: 'spectrum', role: SETTING_ROLES.sky }, 'environment.color')) bag.error('invalid-setting', message).add();
         }
     }
     if (env && env.type !== 'none') {
@@ -1200,28 +1200,29 @@ export function validate(
                     continue;
                 }
                 const spectrum = row.glslType === 'Spectrum';
-                // Per-instance values lie in the row's domain, like any other value there.
+                // Per-instance values lie in the row's domain, like any other value there. The
+                // first bad entry is reported; a domain problem names the role it comes from.
                 const role = row.role;
                 const domain = slotDomain({ constraint: row.constraint, role });
                 const roleNote = role === undefined ? '' : ` (${role})`;
+                const entryProblem = (v: unknown, shape: 'scalar' | 'spectrum'): string | null => {
+                    const shapeProblem = constantProblem(v, shape, undefined);
+                    if (shapeProblem !== null) return shapeProblem;
+                    const domainProblem = constantProblem(v, shape, domain);
+                    return domainProblem === null ? null : `${domainProblem}${roleNote}`;
+                };
                 if (arr instanceof Float32Array) {
-                    // Packed arm (fable-instance-clouds §4): N floats or 3N interleaved.
+                    // Packed arm (fable-instance-clouds §4): N floats or 3N interleaved, each
+                    // checked as a number.
                     const expected = (spectrum ? 3 : 1) * count;
                     if (arr.length !== expected) {
                         bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) has ${arr.length} floats — a ${spectrum ? 'Spectrum' : 'float'} row over ${count} placements needs ${expected}`)
                             .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     } else {
-                        let ok = true;
-                        for (let j = 0; j < arr.length; j++) if (!Number.isFinite(arr[j])) { ok = false; break; }
-                        if (!ok) {
-                            bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) contains a non-finite value`)
+                        const j = arr.findIndex((v) => entryProblem(v, 'scalar') !== null);
+                        if (j !== -1) {
+                            bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) [${j}] ${entryProblem(arr[j], 'scalar')}`)
                                 .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                        } else if (domain !== undefined) {
-                            const j = arr.findIndex((v) => constraintViolation(v, domain) !== null);
-                            if (j !== -1) {
-                                bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) [${j}] ${constraintViolation(arr[j], domain)}${roleNote}`)
-                                    .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                            }
                         }
                     }
                     continue;
@@ -1230,18 +1231,12 @@ export function validate(
                     bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} has ${arr.length} entries for ${count} placements — the arrays must be parallel`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                 }
-                const bad = (arr as Array<number | number[]>).findIndex((v) =>
-                    typeof v === 'number' ? !Number.isFinite(v)
-                        : !(spectrum && isVec3(v) && v.every((c) => Number.isFinite(c))));
-                if (bad !== -1) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${bad}] must be a finite ${spectrum ? 'number or vec3' : 'number'}`)
+                const shape = spectrum ? 'spectrum' : 'scalar';
+                const entries = arr as unknown[];
+                const j = entries.findIndex((v) => entryProblem(v, shape) !== null);
+                if (j !== -1) {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${j}] ${entryProblem(entries[j], shape)}`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                } else if (domain !== undefined) {
-                    const j = (arr as Array<number | number[]>).findIndex((v) => constraintViolation(v, domain) !== null);
-                    if (j !== -1) {
-                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${j}] ${constraintViolation((arr as Array<number | number[]>)[j], domain)}${roleNote}`)
-                            .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
-                    }
                 }
             }
             // Exclusivity: the fill for this materialId becomes element-dependent, so sharing
@@ -1709,26 +1704,27 @@ function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');
 }
 
-/** Recursive {param} path collector — mirrors validateFinite's walk so future
- *  Value<> fields are covered without a per-field list. */
 /**
- * Recursive sweep over GLSL expressions with declared params (heterogeneous D4).
- * Shape: `param` a string, `default` a finite number (v1: float params only). Inertness:
- * a declared param whose derived uniform never appears in the source drives nothing —
- * the C5 class. Finiteness of defaults also rides validateFinite; the shape check here
- * gives the authoring-time message.
+ * Recursive sweep over GLSL expressions with declared params. Each parameter is a slider of a
+ * float, checked like every other slider (`numberProblems`). It has no domain of its own: the
+ * formula's result must lie in the setting's domain, which is the author's contract. A declared
+ * param whose derived uniform never appears in the source drives nothing, which is warned.
  */
 function validateExpressionParams(value: unknown, path: string, bag: DiagnosticBag): void {
     if (value === null || typeof value !== 'object') return;
     if (isGlslExpression(value)) {
-        for (const p of value.params ?? []) {
-            if (typeof p.param !== 'string' || p.param.length === 0
-                || typeof p.default !== 'number' || !Number.isFinite(p.default)) {
-                bag.error('invalid-setting',
-                    `Expression at '${path}': params entries must be { param: string, default: finite number } (v1: float params only)`)
-                    .add();
-                continue;
-            }
+        const params: unknown = value.params;
+        if (params !== undefined && !Array.isArray(params)) {
+            bag.error('invalid-setting', `Expression at '${path}': params must be a list of sliders { param, default, min?, max? }`).add();
+            return;
+        }
+        for (const [index, p] of (value.params ?? []).entries()) {
+            const label = `Expression at '${path}': params[${index}]`;
+            const problems = isValueParam(p as never)
+                ? numberProblems(p, 'scalar', undefined, label, true)
+                : [`${label} must be a slider { param, default, min?, max? }`];
+            for (const message of problems) bag.error('invalid-setting', message).add();
+            if (problems.length > 0) continue;
             if (!value.source.includes(paramToUniform(p.param))) {
                 bag.warning('invalid-setting',
                     `Expression at '${path}' declares param '${p.param}' but its uniform '${paramToUniform(p.param)}' never appears in the source — the slider drives nothing`)
@@ -1745,6 +1741,8 @@ function validateExpressionParams(value: unknown, path: string, bag: DiagnosticB
     for (const [k, v] of Object.entries(value)) validateExpressionParams(v, `${path}.${k}`, bag);
 }
 
+/** Recursive {param} path collector — mirrors validateFinite's walk so future
+ *  Value<> fields are covered without a per-field list. */
 function collectParamPaths(value: unknown, out: Set<string>): void {
     if (value === null || typeof value !== 'object') return;
     if (isValueParam(value)) {

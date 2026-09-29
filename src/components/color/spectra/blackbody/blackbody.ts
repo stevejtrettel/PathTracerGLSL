@@ -2,7 +2,7 @@ import type { Vec3, BlackbodyValue, ValueParam } from '../../../../compiler/type
 import type { SpectrumKind, EmitContext } from '../spectrumKind.js';
 import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
 import { spectralData } from '../../spectral/data.js';
-import { isValueParam, valueParamProblems } from '../../../param.js';
+import { isValueParam } from '../../../param.js';
 import { formatFloat, paramToUniform } from '../../../glsl-format.js';
 import blackbodyGLSL from './blackbody.glsl?raw';
 
@@ -49,7 +49,7 @@ export function isBlackbody(v: unknown): v is BlackbodyValue {
 }
 
 /** The `blackbody` entry if it is an object. The census runs before validation, so it must
- *  tolerate a malformed value; `validate` reports it. */
+ *  tolerate a malformed value; the compiler's check of `fields` reports it. */
 function dials(v: BlackbodyValue): Partial<BlackbodyValue['blackbody']> | undefined {
     const b: unknown = v.blackbody;
     return typeof b === 'object' && b !== null && !Array.isArray(b) ? b as Partial<BlackbodyValue['blackbody']> : undefined;
@@ -83,26 +83,9 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
         const { kelvin, scale } = dials(v) ?? {};
         return [...(isValueParam(kelvin) ? [kelvin.param] : []), ...(isValueParam(scale) ? [scale.param] : [])];
     },
-    validate(v, label, report) {
-        const b = dials(v);
-        if (b === undefined) {
-            report(`${label}: blackbody must be an object { kelvin, scale? }`);
-            return;
-        }
-        const unknown = Object.keys(b).filter(k => k !== 'kelvin' && k !== 'scale');
-        if (unknown.length > 0)
-            report(`${label}: blackbody takes kelvin and scale; unknown ${unknown.length === 1 ? 'key' : 'keys'} ${unknown.map(k => `'${k}'`).join(', ')}`);
-        const { kelvin, scale = 1 } = b;
-        const checkDial = (dial: unknown, name: string, min: number, max: number) => {
-            const parameter = isValueParam(dial as never) ? dial as { param: unknown; default?: unknown; min?: unknown; max?: unknown } : null;
-            for (const problem of parameter ? valueParamProblems(parameter) : [])
-                report(`${label}: blackbody ${name} ${problem}`);
-            const values = parameter ? [parameter.default, ...[parameter.min, parameter.max].filter(x => x !== undefined)] : [dial];
-            if (values.some(x => typeof x !== 'number' || !Number.isFinite(x) || x < min || x > max))
-                report(`${label}: blackbody ${name} requires finite values in [${min}, ${max}], including defaults and bounds`);
-        };
-        checkDial(kelvin, 'kelvin', ...blackbodyTemperatureRange);
-        checkDial(scale, 'scale', 0, Infinity);
+    fields: {
+        kelvin: { domain: { kind: 'closed-interval', min: blackbodyTemperatureRange[0], max: blackbodyTemperatureRange[1] }, slider: true },
+        scale: { domain: { kind: 'nonnegative' }, slider: true, optional: true },
     },
     toRGB(v, _role, params) {
         const { kelvin, scale } = v.blackbody;

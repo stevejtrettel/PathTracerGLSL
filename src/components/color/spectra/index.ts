@@ -15,11 +15,6 @@ const NAMED_KINDS: readonly SpectrumKind[] = [cauchyKind, sellmeierKind, blackbo
 /** Every kind, in lookup order: the first whose `is` accepts a value is its kind. */
 export const SPECTRUM_KINDS: readonly SpectrumKind[] = [...NAMED_KINDS, rgbKind];
 
-/** Every named kind whose keys the value carries; more than one is a malformed value. */
-export function namedKindsClaiming(value: unknown): SpectrumKind[] {
-    return NAMED_KINDS.filter(k => k.is(value));
-}
-
 /** The named kind that claims the value, if any. */
 export function namedKindOf(value: unknown): SpectrumKind | undefined {
     return NAMED_KINDS.find(k => k.is(value));

@@ -88,13 +88,33 @@ describe('spectrum kinds', () => {
         expect(new Set(codes).size).toBe(codes.length);
     });
 
+    // One value of each named kind, with every key its numbers can have.
+    const examples: Record<string, unknown> = {
+        blackbody: { blackbody: { kelvin: 3000, scale: 2 } },
+        cauchy: { cauchy: [1.5, 0.004] },
+        sellmeier: { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } },
+        gaussian: { gaussian: { center: 610, width: 25, peak: 0.85, floor: 0.04 } },
+    };
+
+    it('every named kind has an example; its value is { <id>: … }, and its declared fields name every key', () => {
+        // The checker reads a named kind's numbers at the key `<id>` and reports any other key
+        // beside it; where the numbers sit in an object, `fields` names their keys.
+        const named = SPECTRUM_KINDS.filter((k) => k !== rgbKind);
+        expect(Object.keys(examples).sort()).toEqual(named.map((k) => k.id).sort());
+        for (const kind of named) {
+            const value = examples[kind.id] as Record<string, unknown>;
+            expect(kind.is(value), kind.id).toBe(true);
+            expect(Object.keys(value), kind.id).toEqual([kind.id]);
+            const numbers = value[kind.id];
+            if (typeof numbers === 'object' && numbers !== null && !Array.isArray(numbers)) {
+                expect(Object.keys(kind.fields ?? {}).sort(), kind.id).toEqual(Object.keys(numbers).sort());
+            } else {
+                expect(kind.fields, kind.id).toBeUndefined();
+            }
+        }
+    });
+
     it('the named kinds are disjoint and plain values are the rgb kind', () => {
-        const examples: Record<string, unknown> = {
-            blackbody: { blackbody: { kelvin: 3000, scale: 2 } },
-            cauchy: { cauchy: [1.5, 0.004] },
-            sellmeier: { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } },
-            gaussian: { gaussian: { center: 610, width: 25, peak: 0.85, floor: 0.04 } },
-        };
         for (const [id, value] of Object.entries(examples)) {
             expect(SPECTRUM_KINDS.filter((k) => k !== rgbKind && k.is(value)).map((k) => k.id)).toEqual([id]);
         }

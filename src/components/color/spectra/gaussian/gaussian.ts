@@ -51,13 +51,12 @@ export const gaussianKind: SpectrumKind<GaussianValue> = {
     is: isGaussian,
     roles: ['reflectance'],
     liveParams: () => [],
-    validate(v, label, report) {
-        const { center, width, peak, floor = 0 } = (v.gaussian ?? {}) as Partial<GaussianValue['gaussian']>;
-        const finite = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
-        if (!finite(center) || !finite(width) || !(width > 0) || !finite(peak) || !finite(floor)
-            || peak < 0 || peak > 1 || floor < 0 || floor > 1) {
-            report(`${label}: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]`);
-        }
+    // Wavelengths in nm; peak and floor are reflectances.
+    fields: {
+        center: {},
+        width: { domain: { kind: 'positive' } },
+        peak: { domain: { kind: 'closed-interval', min: 0, max: 1 } },
+        floor: { domain: { kind: 'closed-interval', min: 0, max: 1 }, optional: true },
     },
     toRGB: v => gaussianStandIn(v),
     // A reflectance is never emission.

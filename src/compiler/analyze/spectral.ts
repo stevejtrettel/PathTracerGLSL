@@ -6,8 +6,8 @@ import { MATERIAL_MODELS } from '../../components/materials/index.js';
 /** Where the spectral model narrows a role's domain. Every spectrum slot is already checked
  *  against its role's domain in both colour models (propertyValidation.ts); the spectral lift
  *  adds two limits on plain values: reflectance at most 1 (the bounded lift), and the media
- *  ceilings its tracking bound is certified for (spectral README, "Tracking bound"). Named
- *  kinds check their own numbers. */
+ *  ceilings its tracking bound is certified for (spectral README, "Tracking bound"). A named
+ *  kind's numbers are checked against the domains it declares (propertyValidation.ts). */
 export function spectralLimitations(scene: SceneDescription): string[] {
     const reasons: string[] = [];
     // Every component of a plain constant, a slider default and both slider bounds is at most
