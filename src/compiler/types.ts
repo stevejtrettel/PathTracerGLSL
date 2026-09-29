@@ -601,9 +601,8 @@ export interface EstimatorDescription {
     /** OVERRIDE of the env-vs-finite selection probability P(sample env) in two-stage NEE.
      *  ESTIMATOR section, variance-only by construction (selection pdfs match on every
      *  side — sampler, lighting_pdf, miss-MIS weight — so it can never move the converged
-     *  image; it trades noise between the env and finite-light techniques). Absent = the
-     *  derived power partition Φ_env/(Φ_env + ΣΦ_light), live via a compute closure
-     *  (impl-plan-env-power-selection: the env joins selection like any other light).
+     *  image; it trades noise between the env and finite-light techniques). Absent = the value
+     *  the selection method derives (envSelectionProbability, generate/features/lighting.ts).
      *  Must be strictly inside (0, 1); Validator-enforced. */
     envSelectWeight?: number;
     /** null = off. Unbiased by construction (random termination WITH compensation) — the

@@ -35,15 +35,11 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     const uniforms: FeatureContribution['uniforms'] = [];
     const parameters: FeatureContribution['parameters'] = {};
 
-    // Environment as a light (T3): the env joins selection through a TWO-STAGE draw —
-    // stage 0 picks env-vs-finite with probability u_envSelectProb, stage 1 is the baked
-    // CDF (rescaled). The two-stage shape is the exact FACTORIZATION of an (N+1)-entry
-    // power CDF (env mass p vs finite mass 1−p, then the finite CDF within), so since
-    // impl-plan-env-power-selection the env is selection-commensurable with every other
-    // light: u_envSelectProb is a DERIVED uniform — the power partition Φ_env/(Φ_env+ΣΦ),
-    // recomputed live from env intensity, the loaded table's luminance mass, and driven
-    // emissions (the u_light_cdf closure's sibling). An authored estimator.envSelectWeight
-    // overrides it with a constant (+ the slider), Validator-checked (0,1).
+    // Environment as a light: the env joins selection through a TWO-STAGE draw — stage 0
+    // picks env-vs-finite with probability u_envSelectProb, stage 1 is the baked CDF
+    // (rescaled). u_envSelectProb is a DERIVED uniform whose value the selection method
+    // defines (envSelectionProbability). An authored estimator.envSelectWeight overrides it
+    // with a constant (+ the slider), Validator-checked (0,1).
     const envSamplable = plan.program.environmentSamplable;
     // The uniform exists iff the selection draw is LIVE (finite lights split mass with
     // the env — the environmentSelectionLive decision). Env-only programs fold the
@@ -446,8 +442,7 @@ function sampleCall(l: PlannedLight, xiExpr: string): string {
 }
 
 // ============================================================================
-// Env selection probability — the DERIVED power partition (impl-plan-env-power-selection):
-// the env is one more entry in the power CDF; the two-stage draw is its factorization.
+// Env selection probability: the sky's share of NEE light samples, by selection method.
 // ============================================================================
 
 /** Plan-time scene-radius estimate from descriptor KINDS: over analytic + SDF objects and
@@ -470,8 +465,12 @@ function sceneRadiusEstimate(plan: RenderPlan): number {
     return r;
 }
 
-/** P(select env) in the two-stage NEE draw, derived like every other light's selection:
- *  'uniform' → 1/(N+1); 'power' → Φ_env/(Φ_env + ΣΦ_light) with pbrt's infinite-light
+/** P(select env) in the two-stage NEE draw, by selection method:
+ *  - 'uniform' → 1/(N+1);
+ *  - 'bvh' → 1/2, the env against the whole tree, as in pbrt-v4's light-tree sampler: the
+ *    tree weighs the finite lights, and a fixed half bounds the cost of a mismatch, where a
+ *    power estimate would need every instanced lamp and the scene's extent;
+ *  - 'power' → Φ_env/(Φ_env + ΣΦ_light) with pbrt's infinite-light
  *  power Φ_env = 4π²r²·L̄·intensity. L̄: constant env = spectrum average of the (live)
  *  color; tabulated envs = the loaded table's luminance mass (env.totalWeight, the CDF
  *  builder's total with constants dropped) converted per chart — L̄ = 1 before the table
@@ -483,6 +482,7 @@ export function envSelectionProbability(plan: RenderPlan, params: Record<string,
     const lighting = plan.program.estimator.lighting;
     if (lighting === null) return 0.5;   // unreachable: selection is live only under NEE
     if (lighting.selection === 'uniform') return clampP(1 / (plan.lights.length + 1));
+    if (lighting.selection === 'bvh') return 0.5;
 
     const env = plan.program.environment;
     const intensity = (params['env.intensity'] as number)

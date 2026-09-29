@@ -416,9 +416,8 @@ export function validate(
         }
     }
 
-    // Env selection override (impl-plan-env-power-selection): a probability — an authored
-    // value outside (0,1) ships an invalid selection draw (silent estimator wrongness, the
-    // audit-H3 class). Inert-knob warning when nothing splits selection mass (C5 class).
+    // Env selection override: a probability — an authored value outside (0,1) ships an
+    // invalid selection draw. Warn when nothing splits selection mass (an inert knob).
     const envW = strategy.estimator.envSelectWeight;
     if (envW !== undefined) {
         if (typeof envW !== 'number' || !Number.isFinite(envW) || envW <= 0 || envW >= 1) {
@@ -429,7 +428,7 @@ export function validate(
             || !features.environment.samplable
             || features.lighting.totalLightCount === 0) {
             bag.warning('invalid-setting',
-                'estimator.envSelectWeight controls nothing here (needs NEE, a samplable environment, AND finite lights to split selection mass with) — the knob is inert; absent it would derive from the power partition anyway')
+                'estimator.envSelectWeight controls nothing here (needs NEE, a samplable environment, AND finite lights to split selection mass with) — the knob is inert')
                 .add();
         }
     }

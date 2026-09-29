@@ -248,7 +248,7 @@ export type LightingDesc =
         /** LIGHT_SELECTIONS registry id (fable-light-bvh §2) — Validator-gatekept. */
         selection: string;
         /** Authored OVERRIDE of the env selection probability (estimator.envSelectWeight,
-         *  Validator-checked (0,1)). Absent = derived power partition (the closure). */
+         *  Validator-checked (0,1)). Absent = derived by the selection method (the closure). */
         envSelectWeight?: number;
     };
 

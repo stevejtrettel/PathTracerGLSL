@@ -24,6 +24,8 @@ import type { RenderPlan } from '../../src/compiler/plan/types.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import type { BlackbodyValue } from '../../src/compiler/types.js';
 import { isBlackbody } from '../../src/components/color/values.js';
+import { spectralPackedScene, spectralPackedReference, packedStrategy } from '../witnesses/scenes/spectralPacked.js';
+import { sceneSuite } from '../../pages/registry.js';
 
 const BLACKBODY: BlackbodyValue = { blackbody: { kelvin: 3000, scale: 5 } };
 
@@ -315,5 +317,33 @@ describe('env selection with batch lights only (bvh)', () => {
             expect(fragment).toContain('u_envSelectProb');
             expect(fragment).toMatch(/uniform float u_envSelectProb;/);
         }
+    });
+});
+
+// The sky's share of light samples. Under the light tree the tree chooses among the lamps and
+// the sky gets half the samples, whatever the lamps are (pbrt-v4's light-tree sampler);
+// instanced lamps and the same lamps written out as spheres therefore agree. 'power' keeps its
+// power estimate.
+describe("the sky's share of light samples", () => {
+    const share = (s: SceneDescription, st: RenderStrategy): number => {
+        const r = new Compiler().compileScene(s, [st]).renderers[0];
+        const u = r.uniforms.find((x) => x.uniform === 'u_envSelectProb')!;
+        const defaults = Object.fromEntries(Object.entries(r.parameters ?? {}).map(([k, m]) => [k, m.default]));
+        return u.compute(defaults) as number;
+    };
+
+    it('is 1/2 under the light tree, for instanced lamps and for the same lamps as spheres', () => {
+        const st = packedStrategy('nee', 'bvh');
+        expect(share(spectralPackedScene, st)).toBe(0.5);
+        expect(share(spectralPackedReference, st)).toBe(0.5);
+    });
+
+    it('is 1/2 in instance-lights-sky (64 instanced lamps)', () => {
+        const entry = sceneSuite['instance-lights-sky'] as { scene: SceneDescription; strategies: RenderStrategy[] };
+        for (const st of entry.strategies) expect(share(entry.scene, st)).toBe(0.5);
+    });
+
+    it('keeps the power estimate under power selection', () => {
+        expect(share(spectralPackedReference, packedStrategy('nee', 'power'))).toBeCloseTo(0.2199713952983425, 12);
     });
 });
