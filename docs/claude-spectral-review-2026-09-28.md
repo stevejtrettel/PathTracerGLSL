@@ -13,8 +13,10 @@ Part 1 describes the system. Part 2 is the review.
 "a named kind" uses of `BlackbodyValue` with a `NamedSpectrumValue` union. The cast in B2
 (plan/values.ts) now reads `as NamedSpectrumValue`. The findings otherwise stand as written.
 
-**Bug-fix status.** A1, A2, A4, A5 and A6 are fixed (docs/claude-spectral-bugfix-plan.md; see
-the CHANGELOG entry). A3 waits for the owner.
+**Bug-fix status.** A1, A2, A4, A5 and A6 are fixed (docs/claude-spectral-bugfix-plan.md). A3
+is fixed differently from what §A suggests: under the light tree the sky now gets a fixed half
+of the light samples, as in pbrt-v4 (docs/claude-lamp-power-plan.md). See the CHANGELOG
+entries.
 
 ---
 

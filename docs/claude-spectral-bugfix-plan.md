@@ -118,7 +118,12 @@ Radiometric messages stay identical.
 - The design items B1–B7 are not touched.
 - The kind contract (`SpectrumKind`) does not change.
 
-## Held for the owner: A3
+## A3, decided separately
+
+A3 was later fixed by a simpler rule, a fixed half for the sky under the light tree, in
+docs/claude-lamp-power-plan.md. What follows is the option first considered here, not taken.
+
+### Held for the owner: A3
 
 The sky-versus-lights split under the light tree ignores instanced lights (lighting.ts:508).
 It costs variance only.

@@ -4,6 +4,51 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — the sky's share of light samples under the light tree
+
+Under light-tree selection, next-event estimation now gives the sky a fixed half of the light
+samples and the tree the other half. This is the rule of pbrt-v4's light-tree sampler
+(lightsamplers.h:267) ([plan](docs/claude-lamp-power-plan.md), review item A3).
+
+Before, the share was a power estimate that left out instanced lamps, and the scene-size guess
+it used left out instanced objects. `instance-lights-sky` sent 0.99 of its light samples to the
+sky, and the twin scenes `spectral-packed` and `spectral-packed-ref` disagreed (0.405 and
+0.220). A fixed half bounds the cost of a mismatch at about twice the noise. The 'uniform' and
+'power' rules are unchanged. The share affects noise only; sampler and MIS weights read the
+same number.
+
+**The change:** one line in `envSelectionProbability`. The comments that described the share as
+always a power partition now defer to that function (lighting.ts, compiler/types.ts,
+plan/types.ts, Planner.ts, Validator.ts).
+
+**Verification:**
+- Tests written first:
+  - the two twins agree (failed at 0.405 against 0.220);
+  - `instance-lights-sky` is 1/2 (failed at 0.99);
+  - 'power' is unchanged (0.220).
+- The digest differs only in the sky-share values of the 10 light-tree renderers with a sky, in
+  5 scenes; shaders and everything else are identical. The values:
+
+  | Scene | Before | After |
+  |---|---|---|
+  | `spectral-packed` | 0.405 | 0.5 |
+  | `spectral-packed-ref` | 0.220 | 0.5 |
+  | `spectral-blackbody-tree` | 0.342 | 0.5 |
+  | `spectral-materials` | 0.397 | 0.5 |
+  | `instance-lights-sky` | 0.99 | 0.5 |
+
+  The same scenes' 'power' renderers are unchanged.
+- Full test run: 108 files, 4,054 tests.
+- GPU: `npm run witness -- spectral-packed spectral-packed-ref spectral-blackbody-tree
+  spectral-materials instance-lights-sky`, 7 of 7 checks. The twin scenes now render identical
+  images: they draw the same samples.
+- An independent review of the diff found no bug.
+
+**Known, not changed.** The Validator's "envSelectWeight controls nothing here" warning counts
+only ordinary lights. So it fires falsely when a scene's only lamps are instanced (Validator.ts,
+envSelectWeight check). Instanced lamps' power is still computed by the App while it builds the
+tree (review B6).
+
 ## 2026-09-28 — spectral review and five bug fixes
 
 A code review of the spectral work ([review](docs/claude-spectral-review-2026-09-28.md): how the
