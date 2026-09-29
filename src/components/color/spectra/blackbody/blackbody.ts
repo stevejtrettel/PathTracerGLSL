@@ -157,9 +157,10 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
                 ctx.parameters[kelvin.param] = {
                     type: 'float', default: kelvin.default, name: 'Kelvin', unit: 'K',
                     group: seg.length > 1 ? seg[0] : undefined, triggersReset: true,
-                    // The default slider spans the domain's minimum to 12000 K, a UI choice
-                    // inside the domain; an authored min/max overrides either end.
-                    range: [kelvin.min ?? blackbodyTemperatureRange[0], kelvin.max ?? 12000],
+                    // The default slider spans the domain's minimum to 12000 K (a UI choice
+                    // inside the domain), widened to reach a higher default; an authored
+                    // min/max overrides either end.
+                    range: [kelvin.min ?? blackbodyTemperatureRange[0], kelvin.max ?? Math.max(12000, kelvin.default!)],
                 };
             }
         }

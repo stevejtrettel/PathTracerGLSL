@@ -1,6 +1,6 @@
 // Malformed blackbody values are reported by the Validator in both color models. The census and
 // the Validator never throw on them, and a compile stops with a CompilationError rather than
-// crashing later.
+// crashing later. The kelvin slider's range contains its default.
 
 import { describe, it, expect } from 'vitest';
 import { Compiler } from '../../src/compiler/Compiler.js';
@@ -53,3 +53,20 @@ describe('malformed blackbody values', () => {
     }
 });
 
+describe('kelvin slider', () => {
+    const range = (kelvin: object) => {
+        const s = scene();
+        s.lights[0].emission = { blackbody: { kelvin } } as never;
+        return new Compiler().compileScene(s, [strategy('spectral')]).renderers[0].parameters!['lamp.k'].range!;
+    };
+
+    it('spans the default UI range when the default lies in it', () => {
+        expect(range({ param: 'lamp.k', default: 3000 })).toEqual([1000, 12000]);
+    });
+
+    it('reaches a default above that range', () => {
+        const [lo, hi] = range({ param: 'lamp.k', default: 20000 });
+        expect(lo).toBeLessThanOrEqual(20000);
+        expect(hi).toBeGreaterThanOrEqual(20000);
+    });
+});
