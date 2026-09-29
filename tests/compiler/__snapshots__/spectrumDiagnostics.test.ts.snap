@@ -788,6 +788,210 @@ exports[`spectrum diagnostics > expression as sky color 1`] = `
 }
 `;
 
+exports[`spectrum diagnostics > gaussian as light emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian as material emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': emission: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': emission: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': emission: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian as medium sigma_a 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.sigma_a cannot be a Gaussian value — media take a constant, a {param} or an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.sigma_a cannot be a Gaussian value — media take a constant, a {param} or an expression",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'fog': medium.sigma_a cannot be a Gaussian value — media take a constant, a {param} or an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'fog': medium.sigma_a cannot be a Gaussian value — media take a constant, a {param} or an expression",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian as surface ior 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': ior: Gaussian is a reflectance form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': ior: Gaussian is a reflectance form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian outside the RGB gamut 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+        "Material 'm': albedo: its RGB stand-in (-0.204, 0.651, 0.018) lies outside [0, 1]; RGB renders clip it, spectral renders are exact",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [
+        "Material 'm': albedo: its RGB stand-in (-0.204, 0.651, 0.018) lies outside [0, 1]; RGB renders clip it, spectral renders are exact",
+      ],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian peak above 1 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > gaussian zero width 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: Gaussian requires finite center and width > 0 (nanometres), and peak and floor in [0, 1]",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
 exports[`spectrum diagnostics > glass tint -0.2 1`] = `
 {
   "rgb": {

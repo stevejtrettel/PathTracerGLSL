@@ -71,6 +71,14 @@ const cases: Record<string, Mutation> = {
     'sellmeier pole inside the visible range': set((s) => { s.materials.glass.ior = { sellmeier: { B: [1, 0, 0], C: [0.25, 0, 0] } }; }),
     'sellmeier negative B': set((s) => { s.materials.glass.ior = { sellmeier: { B: [-1, 0, 0], C: [0.01, 0, 0] } }; }),
     'sellmeier wrong length': set((s) => { s.materials.glass.ior = { sellmeier: { B: [1, 0], C: [0.01, 0] } }; }),
+    // The Gaussian reflectance band.
+    'gaussian peak above 1': set((s) => { s.materials.m.albedo = { gaussian: { center: 600, width: 20, peak: 1.2 } }; }),
+    'gaussian zero width': set((s) => { s.materials.m.albedo = { gaussian: { center: 600, width: 0, peak: 0.8 } }; }),
+    'gaussian as material emission': set((s) => { s.materials.m.emission = { gaussian: { center: 600, width: 20, peak: 0.8 } }; }),
+    'gaussian as light emission': set((s) => { s.lights[0].emission = { gaussian: { center: 600, width: 20, peak: 0.8 } }; }),
+    'gaussian as medium sigma_a': set((s) => { s.materials.fog.medium.sigma_a = { gaussian: { center: 600, width: 20, peak: 0.8 } }; }),
+    'gaussian as surface ior': set((s) => { s.materials.glass.ior = { gaussian: { center: 600, width: 20, peak: 0.8 } }; }),
+    'gaussian outside the RGB gamut': set((s) => { s.materials.m.albedo = { gaussian: { center: 530, width: 25, peak: 0.9, floor: 0.02 } }; }),
     // Light shape checks with and without a blackbody.
     'zero-area quad light, RGB emission': set((s) => { s.lights.push(quad([0, 0, 0], 5)); }),
     'zero-area quad light, blackbody emission': set((s) => { s.lights.push(quad([0, 0, 0], blackbody(3000))); }),

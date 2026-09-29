@@ -36,6 +36,7 @@ import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
+import { spectralShowcaseScene, spectralShowcaseStrategies } from './spectralShowcaseScene.js';
 import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
 import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
 import { grinScene, grinNeeStrategy, grinPtStrategy, glassGrinScene, glassGrinStrategy, maxwellScene, maxwellStrategy } from './grinScene.js';
@@ -127,6 +128,14 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'DEMO — the FIRST triangle meshes (impl-plan-meshes v0): a flat-shaded icosahedron (20 faces, per-face geometric normals — visible facets) beside a smooth icosphere (80 faces, per-vertex normals → barycentric-smooth), both on an analytic quad floor, one point light. Brute-force traversal (no BVH yet); transforms are ray-into-local.',
         expected:
             'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+    },
+    'spectral-showcase': {
+        scene: spectralShowcaseScene,
+        strategies: posed([0.3, 2.8, 9.0], [0.2, -0.4, 0.2], ...spectralShowcaseStrategies),
+        exercises:
+            'DEMO — spectral still life: an N-SF11 flint prism throwing a 5800 K beam\'s rainbow on a card; a white (D65) pool and a 2700 K blackbody pool, each with a Gaussian-band sphere beside its RGB twin (metamerism); saturated Gaussian colors, including a notch magenta; an 1800 K ember. Key 1 spectral, key 2 the RGB preview',
+        expected:
+            'under the white pool the band sphere and its twin match, under the warm pool they differ (spectral only; identical in the RGB preview); the rainbow on the card converges slowly; the RGB preview clips the out-of-gamut cyan with a compile warning',
     },
     hearth: {
         scene: hearthScene,

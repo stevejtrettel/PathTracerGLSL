@@ -11,7 +11,7 @@ import { compiledJson } from '../helpers/compiledJson.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 import { indexReferenceNM } from '../../src/components/color/values.js';
 import { sellmeierIndex } from '../../src/components/color/spectra/sellmeier/sellmeier.js';
-import { N_BK7 } from '../../src/authoring/opticalGlass.js';
+import { N_BK7, N_SF11 } from '../../src/authoring/opticalGlass.js';
 const compiler = new Compiler();
 const spectral: RenderStrategy = { ...minimalStrategy, measurement: { ...minimalStrategy.measurement, color: 'spectral' } };
 const fixture = (): SceneDescription => ({ ...structuredClone(minimalScene), materials: {
@@ -88,6 +88,11 @@ describe('Cauchy authoring and dispersion planning', () => {
 
 describe('Sellmeier authoring', () => {
     // Independent rounded indices and spectral lines from the SCHOTT datasheet.
+    it('N-SF11 reproduces its catalog n_d and Abbe number', () => {
+        const [nd, nF, nC] = [587.5618, 486.1327, 656.2725].map((lambda) => sellmeierIndex(N_SF11, lambda));
+        expect(Math.abs(nd - 1.78472)).toBeLessThan(0.000005);
+        expect(Math.abs((nd - 1) / (nF - nC) - 25.68)).toBeLessThan(0.01);
+    });
     for (const [lambda, n] of [[365.0146, 1.53627], [404.6561, 1.53024], [435.8343, 1.52668],
         [486.1327, 1.52238], [546.0740, 1.51872], [587.5618, 1.51680], [656.2725, 1.51432], [706.5188, 1.51289]]) {
         it(`matches the N-BK7 tabulated index at ${lambda} nm`, () => {

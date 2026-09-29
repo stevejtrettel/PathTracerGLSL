@@ -305,7 +305,10 @@ export type IndexProperty = ScalarProperty | SpectralIndex;
 
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
-export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
+
+/** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
+export type NamedSpectrumValue = BlackbodyValue | GaussianValue;
 
 /** Authored temperature and reference brightness, preserved through scene planning.
  * RGB evaluates the signed projection of the same normalized Planck spectrum. */
@@ -315,6 +318,13 @@ export interface BlackbodyValue {
         /** Fixed reference CIE Y of the emission, in renderer-relative units. Default 1. */
         scale?: Value<number>;
     };
+}
+
+/** A Gaussian reflectance band, wavelengths in nm: floor + (peak − floor)·exp(−½((λ − center)/width)²).
+ *  `width` is the standard deviation; floor and peak lie in [0, 1] (floor above peak is a notch).
+ *  Reflectance only; constants. */
+export interface GaussianValue {
+    gaussian: { center: number; width: number; peak: number; floor?: number };
 }
 
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty

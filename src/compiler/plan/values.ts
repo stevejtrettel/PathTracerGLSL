@@ -5,7 +5,7 @@
 // for pt ≡ pt-nee).
 
 import { namedKindOf } from '../../components/color/spectra/index.js';
-import type { Vec3, MaterialProperty, GlslExpression, ValueParam, BlackbodyValue, SpectralIndex } from '../types.js';
+import type { Vec3, MaterialProperty, GlslExpression, ValueParam, NamedSpectrumValue, SpectralIndex } from '../types.js';
 import { isGlslExpression, isValueParam } from '../types.js';
 
 /** An index formula (Cauchy, Sellmeier) in a slot that is not an index slot. */
@@ -16,11 +16,11 @@ function isIndexFormula(value: unknown): value is SpectralIndex {
 /** A spectrum-valued property: a scalar broadcasts to vec3; blackbody, {param}, and
  *  GLSL spellings pass through (a {param}'s scalar default also
  *  broadcasts), and an absent value takes the fallback. */
-export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | BlackbodyValue {
+export function resolveColorProperty(value: MaterialProperty | undefined, fallback: Vec3): Vec3 | GlslExpression | ValueParam<Vec3> | NamedSpectrumValue {
     if (value === undefined) return fallback;
     if (isIndexFormula(value)) throw new Error('Spectral index reached a non-index property');
     if (isGlslExpression(value)) return value;
-    if (namedKindOf(value)) return value as BlackbodyValue;
+    if (namedKindOf(value)) return value as NamedSpectrumValue;
     if (isValueParam(value)) {
         // Scalar spectra intentionally broadcast. Do the same for a parameter default so
         // the generated vec3 uniform can never receive a scalar on its initial upload.

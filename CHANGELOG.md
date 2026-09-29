@@ -4,6 +4,39 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — Gaussian reflectance, N-SF11 glass and a spectral showcase scene
+
+Built the [showcase plan](docs/claude-spectral-showcase-plan.md): the first spectrum kind added
+since the one-spectrum-type work, and a scene made to be rendered spectrally.
+
+- **`gaussian`**, a reflectance band `{ gaussian: { center, width, peak, floor? } }` in nm
+  (`width` the standard deviation; `floor` above `peak` is a notch). Spectral programs evaluate
+  it exactly; RGB programs use its RGB stand-in, daylight reflected by the band and divided by
+  the same projection of a perfect white, clipped to [0, 1] with a compile warning when a
+  saturated band falls outside the RGB gamut. Adding it took one folder, one registry line and
+  the new `NamedSpectrumValue` union (which also replaces three places that said
+  `BlackbodyValue` for "a named kind").
+- **Daylight on the CPU:** `spectral/d65.ts`, the same float32 D65 samples as `curves.bin`,
+  with a test that they agree exactly.
+- **N-SF11**, a dense flint glass, beside N-BK7 (SCHOTT catalog coefficients, cited; the test
+  reproduces n_d = 1.78472 and V_d = 25.68).
+- **`spectral-showcase`** (demos/spectralShowcaseScene.ts): an N-SF11 prism throwing a 5800 K
+  beam's rainbow on a card; a white (D65) spot and a 2700 K blackbody spot, each lighting a
+  Gaussian-band sphere beside its RGB twin (they match under the white light and differ under
+  the warm one, in spectral renders only); a red, a cyan and a notch-magenta band; an 1800 K
+  ember. Key 1 is the spectral render, key 2 the RGB preview.
+
+Verification: the Gaussian's stand-in agrees with an independent 0.25 nm quadrature of the
+shipped curves to 1e-6, and a white reflector gives (1, 1, 1) to 1e-12; seven diagnostics cases
+(out-of-domain numbers, the band in emission, medium and index slots, the gamut warning); the
+digest leaves all 265 existing scenes identical and adds the three new ones; the full test run,
+106 files and 4,033 tests. GPU (`npm run witness -- spectral-gaussian-plane
+spectral-blackbody-softbeam`): the Gaussian plane matches its stand-in within 0.0006 in spectral
+(PT and MIS) and RGB renders. The blackbody softbeam's NEE/MIS check passes but is weak: in its
+setup both estimators take nearly the same samples, so it shows the beam compiles and renders
+cleanly, not that its brightness is right (the Planck evaluation itself is checked by the
+blackbody witnesses). The showcase itself has not been rendered here.
+
 ## 2026-09-28 — one spectrum type, step 4 parked (plan only)
 
 Wrote and reviewed a design for step 4 ([bindings](docs/claude-spectrum-bindings.md)): one

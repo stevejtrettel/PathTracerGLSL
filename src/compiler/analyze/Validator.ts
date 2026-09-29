@@ -1,6 +1,7 @@
 // compiler/analyze/Validator.ts
 
 import { spectralLimitations } from './spectral.js';
+import { rgbPreviewWarnings } from './rgbPreview.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
@@ -860,6 +861,9 @@ export function validate(
         }
         for (const reason of colorId === 'spectral' ? spectralLimitations(scene) : []) {
             bag.error('invalid-setting', reason).add();
+        }
+        for (const warning of colorId === 'rgb' ? rgbPreviewWarnings(scene) : []) {
+            bag.warning('invalid-setting', warning).add();
         }
     }
 

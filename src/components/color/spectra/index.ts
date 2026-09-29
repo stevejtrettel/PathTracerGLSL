@@ -7,9 +7,10 @@ import { rgbKind } from './rgb/rgb.js';
 import { blackbodyKind } from './blackbody/blackbody.js';
 import { cauchyKind } from './cauchy/cauchy.js';
 import { sellmeierKind } from './sellmeier/sellmeier.js';
+import { gaussianKind } from './gaussian/gaussian.js';
 
-// Index formulas first, then blackbody: the order in which a program links their GLSL.
-const NAMED_KINDS: readonly SpectrumKind[] = [cauchyKind, sellmeierKind, blackbodyKind];
+// Index formulas first, then blackbody: the order in which a program links their GLSL helpers.
+const NAMED_KINDS: readonly SpectrumKind[] = [cauchyKind, sellmeierKind, blackbodyKind, gaussianKind];
 
 /** Every kind, in lookup order: the first whose `is` accepts a value is its kind. */
 export const SPECTRUM_KINDS: readonly SpectrumKind[] = [...NAMED_KINDS, rgbKind];

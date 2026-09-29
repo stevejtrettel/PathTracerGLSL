@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -442,7 +442,7 @@ export function isAttributeValue(v: unknown): v is AttributeValue {
 
 /** A schema-resolved property value: constant, expression, live param (§2.8), or a
  *  per-instance attribute reference. */
-export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue | SpectralIndex | AttributeValue;
+export type ResolvedProperty = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | NamedSpectrumValue | SpectralIndex | AttributeValue;
 
 /**
  * Resolved interior medium (§3.5) — sigma_a/sigma_s/model are the RTE partition CORE, read

@@ -28,14 +28,14 @@
 // keeps its own idiom because it is not a name swap: the light selection CDF (a float[] fed by
 // computeSelectPdf). The environment's intensity/rotation are the deliberate always-live controls.
 
-import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type BlackbodyValue, type ParameterMetadata } from '../types.js';
+import { isValueParam, isGlslExpression, type Vec3, type ValueParam, type GlslExpression, type NamedSpectrumValue, type ParameterMetadata } from '../types.js';
 import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../plan/types.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
 
 /** A parameter-surface value: constant, driven ({param}), or a spatial expression
  *  (surface properties and medium coefficients). */
-export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | BlackbodyValue;
+export type ParamValue = Vec3 | number | GlslExpression | ValueParam<Vec3 | number> | NamedSpectrumValue;
 
 /**
  * USE SITE. What the emitted GLSL reads for a value:
