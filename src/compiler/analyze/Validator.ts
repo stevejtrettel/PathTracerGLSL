@@ -27,7 +27,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, validatePropertyValue, constraintViolation, roleDomain } from './propertyValidation.js';
+import { validateSceneProperties, validatePropertyValue, constraintViolation, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -1199,9 +1199,10 @@ export function validate(
                     continue;
                 }
                 const spectrum = row.glslType === 'Spectrum';
-                // Per-instance values lie in the row's role domain, like any other value there.
+                // Per-instance values lie in the row's domain, like any other value there.
                 const role = row.semantic === 'radiometric' ? row.role : undefined;
-                const domain = roleDomain(role);
+                const domain = slotDomain({ constraint: row.constraint, role });
+                const roleNote = role === undefined ? '' : ` (${role})`;
                 if (arr instanceof Float32Array) {
                     // Packed arm (fable-instance-clouds §4): N floats or 3N interleaved.
                     const expected = (spectrum ? 3 : 1) * count;
@@ -1217,7 +1218,7 @@ export function validate(
                         } else if (domain !== undefined) {
                             const j = arr.findIndex((v) => constraintViolation(v, domain) !== null);
                             if (j !== -1) {
-                                bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) [${j}] ${constraintViolation(arr[j], domain)} (${role})`)
+                                bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} (packed) [${j}] ${constraintViolation(arr[j], domain)}${roleNote}`)
                                     .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                             }
                         }
@@ -1237,7 +1238,7 @@ export function validate(
                 } else if (domain !== undefined) {
                     const j = (arr as Array<number | number[]>).findIndex((v) => constraintViolation(v, domain) !== null);
                     if (j !== -1) {
-                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${j}] ${constraintViolation((arr as Array<number | number[]>)[j], domain)} (${role})`)
+                        bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key}[${j}] ${constraintViolation((arr as Array<number | number[]>)[j], domain)}${roleNote}`)
                             .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     }
                 }

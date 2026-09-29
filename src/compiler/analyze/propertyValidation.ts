@@ -107,8 +107,7 @@ export function validatePropertyValue(
         return;
     }
 
-    // The role's domain applies when the row declares none of its own.
-    const domain = contract.constraint ?? roleDomain(contract.role);
+    const domain = slotDomain(contract);
     let authored: unknown = value;
     let parameterMin: unknown;
     let parameterMax: unknown;
@@ -157,6 +156,11 @@ export function validatePropertyValue(
 export function roleDomain(role: PropertyValueContract['role']): RowConstraint | undefined {
     if (role === undefined) return undefined;
     return role === 'index' ? { kind: 'positive' } : { kind: 'nonnegative' };
+}
+
+/** The domain a slot's values must lie in: the row's own constraint, or else its role's. */
+export function slotDomain(contract: Pick<PropertyValueContract, 'constraint' | 'role'>): RowConstraint | undefined {
+    return contract.constraint ?? roleDomain(contract.role);
 }
 
 /** A slider bound (min or max) must lie in the slot's domain too: the slider can reach it. */

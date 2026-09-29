@@ -661,6 +661,16 @@ describe('Validator — instance attributes', () => {
         expect(bag.getErrors().some(e => /feeds the derived field/.test(e.message))).toBe(true);
     });
 
+    it('checks per-instance values against the row\'s own constraint, as for the material (checker uv_scale > 0)', () => {
+        const withTiles = (uvScale: unknown) => run(s => {
+            s.materials.tiles = { model: 'checker' };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'tiles' }, placements, attributes: { uv_scale: uvScale } } as never);
+        });
+        expect(withTiles([4, 2]).hasErrors()).toBe(false);
+        expect(withTiles([-1, 2]).getErrors().some(e => /attributes\.uv_scale\[0\] must be > 0$/.test(e.message))).toBe(true);
+        expect(withTiles(new Float32Array([2, -1])).getErrors().some(e => /attributes\.uv_scale \(packed\) \[1\] must be > 0$/.test(e.message))).toBe(true);
+    });
+
     it('rejects length mismatch and non-finite entries', () => {
         expect(run(batch({ albedo: [[0.8, 0.2, 0.2]] })).getErrors().some(e => /2 placements.*must be parallel|1 entries for 2 placements/.test(e.message))).toBe(true);
         expect(run(batch({ albedo: [[0.8, 0.2, NaN], 0.5] })).getErrors().some(e => /albedo\[0\] must be a finite/.test(e.message))).toBe(true);
