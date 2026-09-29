@@ -7,7 +7,8 @@
 import { emitSpectrum, glslValue } from '../color.js';
 import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
-import { SETTING_ROLES, type Vec3, type BlackbodyValue } from '../../types.js';
+import type { Vec3, BlackbodyValue } from '../../types.js';
+import type { RadiometricRole } from '../../../components/descriptors.js';
 import { namedKindOf, kindById } from '../../../components/color/spectra/index.js';
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
@@ -15,7 +16,7 @@ import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
-import { EMISSION_KEY } from '../../../components/materials/index.js';
+import { EMISSION_KEY, MATERIAL_MODELS } from '../../../components/materials/index.js';
 import { PRIMITIVES } from '../../../components/geometry/index.js';
 import type { LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
@@ -92,9 +93,11 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     const batchArms: BatchLightArm[] = instanceLights.map((il) => {
         const b = plan.instanceBatches.find((x) => x.ordinal === il.ordinal);
         if (b === undefined) throw new Error(`lighting: instanceLights ordinal ${il.ordinal} has no planned batch`);
-        const le = plan.materials[b.materialId]?.values[EMISSION_KEY];
+        const mat = plan.materials[b.materialId];
+        const le = mat?.values[EMISSION_KEY];
         if (!Array.isArray(le) && namedKindOf(le) === undefined && !isAttributeValue(le)) throw new Error(`lighting: batch ${il.ordinal} light arm needs a constant radiometric form or attribute emission (eligibility should have guaranteed it)`);
-        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le as BlackbodyValue | AttributeValue };
+        const emissionRow = MATERIAL_MODELS[mat.model]!.properties.find((r) => r.source === EMISSION_KEY)!;
+        return { base: il.base, count: il.count, region: b.index, placementsBase: b.slot.placementsBase, le: Array.isArray(le) ? le as Vec3 : le as BlackbodyValue | AttributeValue, leRole: emissionRow.role as RadiometricRole };
     });
 
     // Per-kind sampler libraries for the kinds present (registry-driven, R1b; declared
@@ -687,13 +690,14 @@ type LightTreeSlotBaked = {
  *  [base, base+count), the batch's region, its placement-record base (the record IS
  *  the sphere-light row: center.xyz, radius), and Le — a baked constant, or the
  *  minted per-instance emission attribute ref (base/slot/count into records). */
-interface BatchLightArm { base: number; count: number; region: number; placementsBase: number; le: Vec3 | BlackbodyValue | AttributeValue }
+interface BatchLightArm { base: number; count: number; region: number; placementsBase: number; le: Vec3 | BlackbodyValue | AttributeValue; leRole: RadiometricRole }
 
 /** The batch instance's SphereLight ctor from its placement record (params tier);
  *  attribute Le fetches the SAME records texel the hit-side fill reads (one truth). */
 function batchSphereExpr(a: BatchLightArm, indexExpr: string, wl: string, color: 'rgb' | 'spectral'): { fetch: string; ctor: string } {
-    // The batch material's emission, per instance or constant, at this instance's index.
-    const leExpr = emitSpectrum(a.le, SETTING_ROLES.materialEmission, { wl, color, instance: `(${indexExpr})` });
+    // The batch material's emission, per instance or constant, at this instance's index; the
+    // same row, role and binding the hit-side material fill emits.
+    const leExpr = emitSpectrum(a.le, a.leRole, { wl, color, instance: `(${indexExpr})` });
     return {
         fetch: `vec4 rec = texelFetch(u_data_records, data_texel1d(uint(${a.placementsBase} + (${indexExpr}))), 0);`,
         ctor: `SphereLight(rec.xyz, rec.w, ${leExpr})`,

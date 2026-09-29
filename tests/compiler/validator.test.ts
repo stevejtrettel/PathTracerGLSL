@@ -621,6 +621,18 @@ describe('Validator — mesh/instancing validation batch', () => {
     });
 });
 
+// A medium key that is not a spectrum setting stays one, even when its name is a property every
+// object has (toString): an expression there is rejected like any phase parameter's.
+describe('Validator — medium settings', () => {
+    it('does not read a built-in object property as a medium setting', () => {
+        const bag = run(s => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1, majorant: 1, toString: { kind: 'glsl', source: '1.0' } } as never };
+            s.objects.push({ type: 'sphere', parameters: { center: [3, 0, 0], radius: 1 }, material: 'fog' });
+        });
+        expect(bag.getErrors().some(e => /medium\.toString cannot be a GLSL expression/.test(e.message))).toBe(true);
+    });
+});
+
 // Per-instance attributes (fable-instance-attributes): the fourth storage class's rules.
 describe('Validator — instance attributes', () => {
     const placements = [{ position: [0, 1, 0] as [number, number, number] }, { position: [2, 1, 0] as [number, number, number] }];

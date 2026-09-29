@@ -11,13 +11,15 @@ function emitColor(rgb: string, role: RadiometricRole, wl: string): string {
 }
 
 /** A value whose numbers a GLSL expression computes (the expression binding): an image lookup,
- *  a procedural formula, a clamped field, a packed light-table payload. */
+ *  a procedural formula, a clamped field, a packed light-table payload, a derived uniform. The
+ *  source is used as written: parenthesize a compound expression that a factor multiplies. */
 export function glslValue(source: string): GlslExpression {
     return { kind: 'glsl', source };
 }
 
 /** Where a spectrum is emitted: the GLSL expression of the wavelength carrier, the program's
- *  color model, a scalar strength multiplying the value (the sky's intensity), and the GLSL
+ *  color model, a scalar strength multiplying the value (the sky's intensity; the RGB kind
+ *  writes `numbers * factor`, so compound numbers must come parenthesized), and the GLSL
  *  expression of the instance index when one is in scope (a per-instance value needs it). */
 export interface SpectrumSite {
     wl: string;
@@ -27,7 +29,7 @@ export interface SpectrumSite {
 }
 
 /** What a spectrum kind needs from the compiler to emit a value in this role. */
-export function spectrumContext(role: SpectrumRole, site: SpectrumSite): EmitContext {
+function spectrumContext(role: SpectrumRole, site: SpectrumSite): EmitContext {
     return {
         role, wl: site.wl, spectral: site.color === 'spectral', factor: site.factor,
         bind: (value, format) => emitValue(value as ParamValue, format, { instance: site.instance }),

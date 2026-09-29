@@ -88,9 +88,9 @@ export function attributeTexel(instance: number, slot: number, rows: number): nu
     return instance * rows + slot;
 }
 
-/** The GLSL fetch of an attribute record: `instanceExpr` is the GLSL expression of the
- *  instance index, parenthesized by the caller when it is compound. */
-export function attributeFetch(base: number, slot: number, rows: number, instanceExpr: string): string {
+/** The GLSL fetch of an attribute record, from the batch's attribute base: `instanceExpr` is
+ *  the GLSL expression of the instance index, parenthesized by the caller when it is compound. */
+export function attributeFetch(instanceExpr: string, slot: number, rows: number, base: number): string {
     return `texelFetch(u_data_records, data_texel1d(uint(${base} + ${instanceExpr} * ${rows} + ${slot})), 0)`;
 }
 

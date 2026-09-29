@@ -4,7 +4,7 @@ export { isValueParam, hasConstantNonzeroEmission } from '../components/color/va
 import { emissionMayBeNonzero } from '../components/color/values.js';
 
 import type { SceneDataPlan } from './sceneData.js';
-import type { SpectrumRole } from '../components/descriptors.js';
+import type { SpectrumRole, RadiometricRole } from '../components/descriptors.js';
 
 // ============================================================================
 // Utility types
@@ -463,22 +463,21 @@ export interface MediumDescription {
 }
 
 /** The roles of the spectrum settings that no descriptor row declares: a medium's absorption,
- *  scattering, glow and index; the sky's radiance (a constant color, an image or a formula); a
- *  light's authored emission; and a material's emission (its `emission` key, which a batch's
- *  lamps also read). Every reader takes these settings' roles from here. */
+ *  scattering, glow and index; the sky's radiance (a constant color, an image or a formula);
+ *  and the emission of a material whose model has no emission row. Every reader of these
+ *  settings takes their roles from here. */
 export const SETTING_ROLES = {
     medium: { sigma_a: 'coefficient', sigma_s: 'coefficient', emission: 'emission', ior: 'index' },
     sky: 'emission',
-    lightEmission: 'emission',
     materialEmission: 'emission',
 } as const satisfies {
     medium: Record<'sigma_a' | 'sigma_s' | 'emission' | 'ior', SpectrumRole>;
-    sky: SpectrumRole; lightEmission: SpectrumRole; materialEmission: SpectrumRole;
+    sky: RadiometricRole; materialEmission: RadiometricRole;
 };
 
-/** A medium setting's role, or undefined for a setting that holds an ordinary number. */
+/** A medium setting's role, or undefined for a key that is not a spectrum setting. */
 export function mediumSettingRole(key: string): SpectrumRole | undefined {
-    return (SETTING_ROLES.medium as Record<string, SpectrumRole>)[key];
+    return Object.hasOwn(SETTING_ROLES.medium, key) ? SETTING_ROLES.medium[key as keyof typeof SETTING_ROLES.medium] : undefined;
 }
 
 export interface MaterialDescription {

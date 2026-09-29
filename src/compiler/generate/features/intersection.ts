@@ -12,7 +12,6 @@ import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
-import { emitValue, type ParamValue } from '../values.js';
 import { emitIndex } from '../color.js';
 import { modelTransmission, modelIndexRow } from '../../../components/materials/index.js';
 import {
@@ -1583,7 +1582,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
     lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
     for (const mat of materials) {
         if (mat.medium?.ior !== undefined) {
-            lines.push(`    if (mat == ${mat.id}) return ${emitValue(mat.medium.ior as ParamValue, formatFloat)};   // '${mat.name}' — deflecting: the medium's n(p)`);
+            lines.push(`    if (mat == ${mat.id}) return ${emitIndex(mat.medium.ior as IndexProperty, color)};   // '${mat.name}' — deflecting: the medium's n(p)`);
             continue;
         }
         if (!modelTransmission(mat.model)) continue;
@@ -1646,7 +1645,7 @@ function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[],
         // case, ≈ 1.0 under the v1 continuous-wall contract, and exact linkage keeps ior_of
         // out of programs with no transmission).
         if (mat.medium?.ior !== undefined) {
-            lines.push(`    if (region == ${obj.index}) return ${emitValue(mat.medium.ior as ParamValue, formatFloat)};   // '${mat.name}' — deflecting: the medium's n(p)`);
+            lines.push(`    if (region == ${obj.index}) return ${emitIndex(mat.medium.ior as IndexProperty, color)};   // '${mat.name}' — deflecting: the medium's n(p)`);
             continue;
         }
         // Non-transmissive materials are PINNED to 1.0 (fall through to the default), even if the

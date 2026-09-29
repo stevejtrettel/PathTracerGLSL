@@ -59,6 +59,7 @@ describe('spectrum kinds', () => {
         for (const file of tsFiles(SRC)) {
             if (relative(SRC, file) === 'compiler/generate/color.ts') continue;
             readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+                if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;   // prose may name the lift
                 if (/\bemitColor\(|color_lift_/.test(line)) found.push(`${relative(SRC, file)}:${i + 1}`);
             });
         }

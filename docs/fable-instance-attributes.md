@@ -140,8 +140,10 @@ would need per-instance derived slots (precompute-and-ship an extra table column
   (`isAttributeValue`); `PlannedInstanceBatch.attributeRows` (slot order).
 - **One truths:** `instanceAttributeRows` (components/intersection/instancing) = the slot
   order shared by Planner and App; `packInstanceBatch` reorders attrs by the SAME TLAS
-  permutation as placements; `emitAttributeValue` (values.ts, the fourth storage class's
-  one legal emitter — `emitValue` throws on attributes as a backstop).
+  permutation as placements; `attributeTexel` and its GLSL twin `attributeFetch`
+  (components/intersection/instancing) are the record address, used by the packer, the App
+  and `emitValue`, which reads a per-instance value wherever the instance index is in scope
+  (the material fill and the batch light arm) and throws where none is.
 - **Codegen:** `scene_material_properties(int id, vec3 p, int element)` (both call sites:
   the pt walk + kernel.glsl's emission fetch); attribute rows emit the element-indexed
   `texelFetch` on `u_inst_k_attrs`; the materials feature declares the extern (exact

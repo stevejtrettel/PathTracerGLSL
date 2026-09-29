@@ -140,7 +140,8 @@ export function validate(
         } else if (isGlslExpression(e)) {
             bag.error('invalid-setting', `Light ${i} (${light.kind}): emission cannot be a GLSL expression — a light takes a constant, a {param} or a blackbody`).add();
         } else {
-            validatePropertyValue(e, { shape: 'spectrum', role: SETTING_ROLES.lightEmission }, `Light ${i} (${light.kind}): emission`, bag);
+            const emissionRow = d.params.find((r) => r.role !== undefined)!;   // every light kind has one
+            validatePropertyValue(e, { shape: 'spectrum', role: emissionRow.role }, `Light ${i} (${light.kind}): emission`, bag);
         }
         // Kind-specific degeneracy (near-zero quad area → Inf pdfs; non-positive sphere
         // radius): the kind DESCRIPTOR declares its rules; the Validator emits them —

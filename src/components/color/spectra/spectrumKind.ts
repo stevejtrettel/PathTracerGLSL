@@ -5,7 +5,7 @@
 //
 // Kinds import only types from the compiler (the components purity rule). The operations the
 // compiler owns reach them through the two contexts below: binding a number as a literal, a
-// uniform or an expression; the colour model's RGB lift; minting a slider.
+// uniform, an expression or a per-instance value; the color model's RGB lift; minting a slider.
 
 import type { Vec3, ParameterMetadata } from '../../../compiler/types.js';
 import type { PlannedUniform } from '../../../compiler/plan/types.js';
@@ -22,7 +22,8 @@ export interface EmitContext {
     spectral: boolean;
     /** A scalar strength multiplying the value (the constant sky's u_envIntensity). */
     factor?: string;
-    /** The compiler's binding of a plain number or triple: a literal, uniform or expression. */
+    /** The compiler's binding of a plain number or triple: a literal, a uniform, an expression
+     *  or a per-instance value. */
     bind(value: unknown, format: (x: never) => string): string;
     /** The colour model's lift of an RGB expression in this context's role. */
     lift(rgb: string): string;

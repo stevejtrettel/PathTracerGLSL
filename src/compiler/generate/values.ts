@@ -61,7 +61,7 @@ export function emitValue(v: ParamValue, format: (x: never) => string, options: 
             throw new Error('emitValue: a per-instance value reached a site with no instance index in scope');
         }
         const { base, slot, count, shape } = v.attribute;
-        const fetch = attributeFetch(base, slot, count, options.instance);
+        const fetch = attributeFetch(options.instance, slot, count, base);
         return shape === 'vec3' ? `${fetch}.xyz` : `${fetch}.x`;
     }
     if (namedKindOf(v)) {
