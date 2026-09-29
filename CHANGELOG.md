@@ -4,6 +4,14 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — one spectrum type, step 4 parked (plan only)
+
+Wrote and reviewed a design for step 4 ([bindings](docs/claude-spectrum-bindings.md)): one
+owner for the four ways a number reaches the GPU, and per-instance numbers inside a spectrum
+kind (a temperature per star). The owner decided that temperature and brightness stay
+decoupled (no `thermal` kind), and parked step 4 until a scene needs per-instance
+temperatures. No code changed.
+
 ## 2026-09-28 — one spectrum type, step 3: the kinds' folder and one plan field
 
 The spectrum kinds now live in `components/color/spectra/`

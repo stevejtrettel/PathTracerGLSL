@@ -349,7 +349,10 @@ readers. The `IndexForm` type is gone, and the scan test's allow-list is empty. 
 unchanged in every suite scene; source maps differ only in the moved paths (a path-normalized
 digest compares identical).
 
-### Step 4: bindings in one place (own plan)
+### Step 4: bindings in one place (parked)
+
+Parked by the owner on Sep 28: see [the bindings design](claude-spectrum-bindings.md), whose
+status line records the decision (temperature and brightness stay decoupled).
 
 One owner for constants, sliders, expressions and attributes, including the attribute address
 (written three times today) and its GLSL at a hit versus in a light-selection loop. Per-instance
