@@ -1,8 +1,8 @@
 # Spectra in every slot
 
 **Status:** proposal (September 28, 2026), for the owner. Part 1 is the model, Part 2 the build
-steps. Steps 1 and 2 were approved and built on Sep 28 (see the CHANGELOG); later steps each
-need their own plan and approval.
+steps. Steps 1–3 were approved and built on Sep 28 (see the CHANGELOG); later steps each need
+their own plan and approval.
 
 This builds on the approved [one-spectrum-type spec](claude-spectrum-spec.md), whose §1–3 stand
 unchanged. It would replace that spec's §4 ("numbers can be live") and its step 4, and the
@@ -527,6 +527,95 @@ RGB by hand.
   - The reviewer also compiled 216 renderers outside the suite (RGB and spectral; power, tree
     and uniform selection; per-instance float rows; a 500-instance cloud under the light
     tree; every sky; every kind of fog). All were identical apart from the bug above.
+
+
+## Step 3 in full: a kind never asks whether the render is RGB or spectral
+
+**Approved** by the owner (Sep 28), who allowed shader-text changes that improve the system.
+
+**Problem (read Sep 28).** Four kinds branch on the render mode:
+- blackbody's `emit` and `mint` (blackbody.ts:137, :148, :151);
+- Cauchy (cauchy.ts:39);
+- Sellmeier (sellmeier.ts:53);
+- Gaussian (gaussian.ts:74).
+
+Each writes its own RGB version, so there are two answers to "what does an RGB render show":
+- **Gaussian** has `toRGB` (unclipped) and a clipped copy in `emit`.
+- **Blackbody** has `toRGB` and `emitRGB` (a GLSL product of its scale and a per-temperature
+  uniform).
+
+**`EmitContext.factor`** exists for one caller, the sky's intensity. The RGB kind applies it
+inside the RGB lift and blackbody outside it.
+
+**The rule after step 3.**
+- **One evaluation per kind.** A kind's `emit` is its spectrum at the path's wavelengths, and
+  nothing else.
+- **The compiler owns the RGB stand-in.** In an RGB render it uses the kind's stand-in `toRGB`:
+  - a fixed value becomes a literal;
+  - a slider-driven value becomes one uniform that the CPU recomputes from `toRGB` whenever
+    one of its sliders moves (Part 1's "function of sliders" binding);
+  - a reflectance stand-in is clipped to [0, 1]. That is the rule the Validator's preview
+    warning already states.
+
+  The stand-in then goes through the RGB kind, exactly like a typed color.
+- **Sky brightness multiplies the finished spectrum,** L = k·K(θ), for every sky form, at the
+  call site. `factor` leaves the kind contract.
+
+**What changes:**
+1. **The contracts.** `EmitContext` loses `spectral` and `factor`, and `MintContext` loses
+   `spectral`.
+2. **The kinds.**
+   - Blackbody loses its RGB branch in `emit` (`emitRGB`) and the RGB case of its temperature
+     uniform.
+   - Cauchy, Sellmeier and Gaussian lose their render-mode branches. An index kind that does
+     not vary with wavelength still returns its constant: that depends on its own numbers, not
+     on the render.
+3. **`rgbStandIn(value, role)` states what an RGB program shows for a value.** It lives beside
+   `projectRGB` in components/color/values.ts, and `projectRGB` is its emission case. It is used
+   by `emitSpectrum` and `emitIndex` in RGB programs, and by the preview warning.
+4. **Minting in an RGB program.** For a named kind, the compiler keeps the kind's sliders and
+   replaces the uniforms that only its wavelength evaluation reads with the one stand-in
+   uniform. That uniform is named from the value's contents, so identical values share it.
+5. **environment.ts** multiplies the sky's intensity outside the spectrum, in all three sky
+   forms.
+
+**Expected differences (to be confirmed by the digest):**
+- **Shader text** of every scene with a sky: intensity moves outside the RGB lift. In RGB
+  renders the values are identical, since the lift is the identity. In spectral renders they
+  agree up to rounding, since the lift is 1-homogeneous.
+- **Shader text, uniforms and closures** of RGB renderers with a slider-driven blackbody: one
+  stand-in uniform replaces `scale × u_<kelvin>_blackbody`. Values agree up to float32
+  rounding.
+
+Nothing else should change.
+
+**Verification:**
+- The digest, before and after, shows exactly the expected differences.
+- The full test run. Tests that pin the old RGB uniform (blackbodyPreservation.test.ts) are
+  updated to the stand-in.
+- **GPU:** the sky and blackbody witnesses the digest names, both color models, plus
+  `witness:blackbody` and `witness:spectral`.
+- **Review:** an independent review.
+
+### As built (Sep 28), and what the independent review changed
+
+- **Where the rule lives.** `rgbStandIn` sits beside `projectRGB` in components/color/values.ts,
+  and `projectRGB` is its emission case. The preview warning fires exactly when `rgbStandIn`
+  differs from `toRGB`.
+- **Naming and the sky.** The stand-in uniform is named with a 32-bit hash of the value and role,
+  in generate/values.ts. The sky's L = k·K is one helper in environment.ts.
+- **One regression found and fixed.** In RGB programs a kind's slider metadata was rewritten at
+  every use, so a shared temperature slider lost the range its first declaration gave. Sliders
+  are now merged first-wins, as everywhere else, with a test that fails on the old code.
+- **The output differences are exactly the predicted ones.**
+  - Sky lines: the intensity now multiplies the finished spectrum. Blackbody spectral skies are
+    byte-identical.
+  - `hearth`, the only suite scene with an RGB slider-driven blackbody, now reads one stand-in
+    uniform.
+  - Slider metadata is unchanged everywhere.
+- **Checks.** Full test run (4,059). GPU: the spectral skies, image, procedural and compensated
+  skies, the blackbody twin and the RGB sky pass 16 of 16 checks, and `witness:blackbody` passes
+  48 Planck probes.
 
 ---
 

@@ -4,6 +4,47 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — a spectrum kind never asks whether the render is RGB (spectra-in-every-slot, step 3)
+
+This is step 3 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md). The owner
+allowed shader-text changes that improve the system.
+
+- **A kind only evaluates itself at wavelengths.** Blackbody, Cauchy, Sellmeier and Gaussian no
+  longer branch on the render mode, and `EmitContext.spectral` and `MintContext.spectral` are
+  gone.
+- **The compiler decides what an RGB program shows for each value: `rgbStandIn`** (beside
+  `projectRGB`, which is its emission case).
+  - It is the kind's `toRGB`, with a reflectance clipped to [0, 1]. That is the rule the
+    preview warning states, and it now fires exactly when the clip changes a value.
+  - A constant stand-in is a literal. A slider-driven one is one uniform the CPU recomputes from
+    `toRGB` when a slider moves. The kind's sliders stay, and the uniforms only its wavelength
+    evaluation reads are not declared.
+  - Gaussian's private clipped copy and blackbody's `emitRGB` are gone.
+- **The sky's intensity multiplies the finished spectrum** (L = k·K) in all three sky forms,
+  through one helper. `EmitContext.factor`, used only by the sky and applied differently by
+  different kinds, is gone.
+
+**What the output shows:**
+- **Every sky's shader text changes.** The intensity is now outside the RGB lift. RGB values are
+  identical; spectral ones agree to rounding, since the lift is exactly 1-homogeneous for k ≥ 0.
+- **Blackbody spectral skies are byte-identical.**
+- **`hearth`, the one suite scene with an RGB slider-driven blackbody,** reads one stand-in
+  uniform instead of `scale × u_<kelvin>_blackbody`.
+- **Slider metadata is unchanged** in every scene.
+
+**Verification:**
+- A line-level diff of all 495 renderers against step 2 shows only those differences.
+- The full test run passes (108 files, 4,059 tests). The GLSL snapshot was updated, sky lines
+  only, and two tests that pinned the old RGB blackbody uniform now check the stand-in.
+- **GPU:** the spectral, procedural, image-constant, compensated and missed-cap skies, the
+  blackbody twin and the RGB sky pass 16 of 16 checks, and `witness:blackbody` passes 48 Planck
+  probes. That run preceded a final removal of redundant parentheses around one call in the
+  sky text; the values are unaffected.
+- **Independent review.** It confirmed the claims, including the homogeneity argument and that
+  stand-in uniforms are declared wherever they are read. It found one regression, now fixed with
+  a test that fails on the old code: in RGB programs a shared temperature slider lost the range
+  its first declaration gave.
+
 ## 2026-09-28 — every spectrum setting goes through one path (spectra-in-every-slot, step 2)
 
 Step 2 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) is a refactor in
