@@ -1,5 +1,10 @@
 # Design review after the spectral build (September 28, 2026)
 
+**Status (later on Sep 28):** Part 2 (value forms) and item 3.1 (the emission rule) are
+addressed by the one-spectrum-type work ([spec](claude-spectrum-spec.md), steps 0–3; commits
+b65c763 … 3794fc8, each with a CHANGELOG entry). Of Part 9's order, items 1–3 are done (the
+uncommitted work became 02ae534 and d35daee). Everything else below is still open, as written.
+
 **What this is.** A review of the design of the whole renderer as it stands after the
 spectral work (commits f9a0ed0 … 9e8f895, Sep 26–27, plus the uncommitted Sep 27–28 work in
 the working tree). The question it answers: is this code simple, understandable and robust

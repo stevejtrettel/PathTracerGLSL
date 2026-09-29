@@ -998,6 +998,11 @@ control and packed-emitter cases must keep one answer at all reader sites.
 
 #### Authoring design checkpoint (Sep 28)
 
+**Update (Sep 28, later):** the interface question below is answered by
+[claude-spectrum-spec.md](claude-spectrum-spec.md), built as its steps 0–3 (one spectrum type
+with kinds in `components/color/spectra/`). The sampled-curve questions (spelling, storage,
+normalization, CPU access to the reconstruction table) remain open; that spec's §9 lists them.
+
 **Audit scope:** the shape/strength work and the existing routes it must extend. This is
 not a fresh audit of every transport, media or dispersion proof. No production changes
 are part of this checkpoint.

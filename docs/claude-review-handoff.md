@@ -1,6 +1,9 @@
 # Handoff — where the Sep 25 review stands, and what comes next
 
-**Status:** current as of the scene-once records commit (Sep 26, 2026). This page is for resuming work after
+**Status:** current as of the scene-once records commit (Sep 26, 2026), except the scene-once
+step 4 line, corrected Sep 28. Later work (the spectral build, the Sep 28 design review and the
+spectrum spec) is recorded in CHANGELOG.md and docs/claude-design-review-2026-09-28.md; batch 6
+and the items below were not resumed. This page is for resuming work after
 a context break. Update it or delete it when the review is done. Nothing here overrides
 [claude-review-2026-09-25.md](claude-review-2026-09-25.md), which has the findings; this page
 covers the state, the working rules and the next step.
@@ -133,8 +136,8 @@ open" below.
 - **From batch 4:**
   - The scene/program restructure: **steps 0–3 done Sep 26** (docs/claude-scene-once-plan.md,
     CHANGELOG "plan the scene once"), including batch 4's item 2 option (b). Step 4 (colour
-    conversion becomes a renderer step) waits for the spectral design, which another instance
-    is writing. Step 5 (split Planner.ts into files) is the owner's call.
+    conversion becomes a renderer step) was built on Sep 27 as spectral stage S0c (CHANGELOG
+    "authored blackbody preservation"). Step 5 (split Planner.ts into files) is the owner's call.
   - A `{param}` emission on a model that cannot emit gets two warnings (predates batch 4).
 - **The fp spawn margin** (review 1.11, suspected). It needs a measurement plan before any fix.
   Batch 3 measured two effects of the spawn offset itself in its witnesses: pt sees a light

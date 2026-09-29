@@ -85,6 +85,15 @@ How a program is assembled:
   (`planProgram`), and places the scene in the shared layout once (`placeScene`). Anything the
   renderers share must not depend on any renderer's settings;
   `tests/compiler/compileOrder.test.ts` checks that strategy order changes nothing.
+- **Spectrum values have kinds** (components/color/spectra/, whose README is the contract):
+  plain RGB (numbers, triples, `{param}`, expressions, per-instance attributes), blackbody,
+  Cauchy and Sellmeier. A kind answers every question the compiler asks about its values
+  (allowed roles, live sliders, its own checks, RGB stand-in, GLSL). Outside that folder nothing
+  tests for a particular kind (tests/components/spectrumKinds.test.ts). The slot's role
+  (reflectance, coefficient, emission, index) sets the domain, checked the same way in RGB and
+  spectral programs; the spectral model adds only reflectance ≤ 1 and the media ceilings.
+  Temperature and brightness are decoupled: `kelvin` sets a blackbody's color, `scale` its
+  brightness.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.
@@ -174,9 +183,12 @@ How a program is assembled:
   Adding a witness = one fixture in `tests/witnesses/scenes/` + one registry entry; gate
   policy and the standing failures are in tests/witnesses/README.md.
 - A change that must not alter the compiled output (a refactor): `npm run digest` before and
-  after, then `--compare`. It covers shader text, uniforms, parameters, source maps, the
+  after, then `--compare`. It covers shader text, uniforms, what each uniform's compute closure
+  returns (at the defaults and at one moved parameter set), parameters, source maps, the
   scene-data plan's packed contents and warnings, for every suite scene except the 7 async
-  data scenes.
+  data scenes. It compiles only valid scenes and not the App's packing: for diagnostics see
+  tests/compiler/spectrumDiagnostics.test.ts (a snapshot of what the compiler says about
+  invalid spectrum values, in both color models); for packing, tests/app/sceneData.test.ts.
 - CI (`.github/workflows/ci.yml`) runs typecheck + vitest (incl. glslang) on every push;
   the witness sweep is a manual job.
 - The generated-GLSL snapshot diff is large and mostly source-map line numbers: review it
@@ -226,7 +238,9 @@ through glass; MIS with delta tracking; equiangular sampling of area lights; sph
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: Float-sampler precision outside the two spectral tables still needs
+**Known open defects**: 221 of the 265 synchronous suite scenes warn that the transport
+feature provides `light_query_medium` with nothing requiring it (dead generated code; an
+exact-linkage gap, not yet investigated). Float-sampler precision outside the two spectral tables still needs
 a portability audit (many declarations use GLSL's default lowp; SwiftShader does not expose
 reduced-precision failures). cube-cloud-ref does not finish under SwiftShader (tests/witnesses/
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
