@@ -3,7 +3,7 @@ import type { SpectrumKind, EmitContext } from '../spectrumKind.js';
 import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
 import { spectralData } from '../../spectral/data.js';
 import { isValueParam, valueParamProblems } from '../../../param.js';
-import { formatFloat, formatVec3, paramToUniform } from '../../../glsl-format.js';
+import { formatFloat, paramToUniform } from '../../../glsl-format.js';
 import blackbodyGLSL from './blackbody.glsl?raw';
 
 export const blackbodyTemperatureRange = [1000, 40000] as const;
@@ -55,26 +55,14 @@ function dials(v: BlackbodyValue): Partial<BlackbodyValue['blackbody']> | undefi
     return typeof b === 'object' && b !== null && !Array.isArray(b) ? b as Partial<BlackbodyValue['blackbody']> : undefined;
 }
 
-/** The temperature-derived uniform excludes scale, so emitters sharing a temperature share
- *  only their chroma and normalization; each use keeps its own brightness. Spectral programs
- *  read (kelvin, normalization) as a vec2, RGB programs the normalized RGB as a vec3. */
+/** A live temperature's uniform: (kelvin, normalization), computed on the CPU. It excludes
+ *  scale, so emitters sharing a temperature slider share it and keep their own brightness. */
 function temperatureUniform(kelvin: ValueParam<number>): string {
     return `${paramToUniform(kelvin.param)}_blackbody`;
 }
 
-/** The RGB stand-in as GLSL: a folded constant when both numbers are constant, otherwise
- *  the scale times the temperature's normalized RGB. */
-function emitRGB(v: BlackbodyValue, ctx: EmitContext): string {
-    const { kelvin, scale = 1 } = v.blackbody;
-    if (blackbodyKind.liveParams(v).length === 0) return formatVec3(blackbodyRGB(kelvin as number, scale as number));
-    const intensity = ctx.bind(scale, formatFloat);
-    return isValueParam(kelvin)
-        ? `(${intensity} * ${temperatureUniform(kelvin)})`
-        : `(${intensity} * ${formatVec3(blackbodyColor(kelvin).rgb)})`;
-}
-
-/** Planck's spectrum at the carrier's wavelengths (blackbody.glsl). */
-function emitSpectral(v: BlackbodyValue, ctx: EmitContext): string {
+/** Planck's spectrum at the carrier's wavelengths (blackbody.glsl), times the scale. */
+function emitPlanck(v: BlackbodyValue, ctx: EmitContext): string {
     const { kelvin, scale = 1 } = v.blackbody;
     const intensity = ctx.bind(scale, formatFloat);
     if (isValueParam(kelvin)) {
@@ -133,22 +121,16 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
     },
     glsl: { origin: 'components/color/spectra/blackbody/blackbody.glsl', source: blackbodyGLSL },
     dispersive: () => false,
-    emit(v, ctx) {
-        const expr = ctx.spectral ? emitSpectral(v, ctx) : ctx.lift(emitRGB(v, ctx));
-        return ctx.factor ? `${expr} * ${ctx.factor}` : expr;
-    },
+    emit: emitPlanck,
     mint(v, ctx) {
         const { kelvin, scale = 1 } = v.blackbody;
         if (isValueParam(kelvin)) {
             const name = temperatureUniform(kelvin);
             if (!ctx.seen.has(name)) {
                 ctx.seen.add(name);
-                const project = (temperature: number) => {
-                    const normalized = blackbodyColor(temperature);
-                    return ctx.spectral ? [temperature, normalized.normalization] : normalized.rgb;
-                };
+                const project = (temperature: number) => [temperature, blackbodyColor(temperature).normalization];
                 ctx.uniforms.push({
-                    name, type: ctx.spectral ? 'vec2' : 'vec3',
+                    name, type: 'vec2',
                     parameterPath: kelvin.param,
                     default: project(kelvin.default!),
                     compute: p => project((p[kelvin.param] as number) ?? kelvin.default!),

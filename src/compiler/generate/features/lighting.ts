@@ -160,7 +160,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
                 // (e.g. a future driven cone angle) mints a float, not a mistyped vec3.
                 const spec = LIGHT_KINDS[l.kind]?.params.find((p) => p.name === row);
                 const isVec3 = (spec?.shape ?? 'vec3') === 'vec3';
-                mintValueUniform(v as ParamValue, isVec3 ? 'vec3' : 'float', isVec3 ? 'color' : 'float', uniforms, parameters, seen, isVec3, plan.program.measurement.color);   // E2: light radiometrics are HDR
+                mintValueUniform(v as ParamValue, isVec3 ? 'vec3' : 'float', isVec3 ? 'color' : 'float', uniforms, parameters, seen, isVec3, plan.program.measurement.color, spec?.role);   // E2: light radiometrics are HDR
             }
         }
         // Selection CDF + per-light select-pdf as CPU-computed float arrays (>1 light only;

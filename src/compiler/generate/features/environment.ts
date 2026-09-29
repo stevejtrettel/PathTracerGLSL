@@ -112,20 +112,23 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
     // The samplable decision is Planner-resolved (T2: single source of truth for lighting,
     // transport, and this feature — they must agree or the estimators diverge).
     const samplable = plan.program.environmentSamplable;
+    /** The sky's radiance, whatever its form: its spectrum times the intensity, L = k·K(θ). */
+    const skyRadiance = (value: ParamValue) =>
+        `${emitSpectrum(value, SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color })} * u_envIntensity`;
 
     if (env.type === 'constant') {
         const intensity = env.intensity;   // C2: plan-resolved, no re-defaulting
         // Sky color is a SCENE_VALUE (Model B): a constant bakes inline, a {param} becomes a
         // path-named uniform. Intensity is an always-live control (the owner-pinned exception),
         // under the SAME reserved `env.` path + u_envIntensity name as every other env kind.
-        const colorExpr = emitSpectrum(env.color as ParamValue, SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' });
+        const colorExpr = skyRadiance(env.color as ParamValue);
         const uniforms: PlannedUniform[] = [
             { name: 'u_envIntensity', type: 'float', parameterPath: 'env.intensity', default: intensity },
         ];
         const parameters: Record<string, ParameterMetadata> = {
             'env.intensity': { type: 'float', default: intensity, range: [0, 5], name: 'Sky intensity', group: 'Environment', triggersReset: true },
         };
-        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true, plan.program.measurement.color);   // no-op if constant; sky radiance is HDR (E2)
+        mintValueUniform(env.color as ParamValue, 'vec3', 'color', uniforms, parameters, new Set(), true, plan.program.measurement.color, SETTING_ROLES.sky);   // no-op if constant; sky radiance is HDR (E2)
         const blocks = [{ origin: ORIGIN, source: radianceFn(`return ${colorExpr};`) }];
         if (samplable) blocks.push({ origin: 'generated:environment-sampler', source: constantSampler(colorExpr) });
         if (plan.program.environmentPdf) blocks.push({ origin: 'generated:environment-pdf', source: CONSTANT_PDF });
@@ -156,7 +159,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const blocks = [
             EQUIRECT_MAP,
             { origin: ORIGIN, source: '// Image radiance: the equirect map read through equirect_uv (sampler-chart-independent)\n'
-                + radianceFn(`return ${emitSpectrum(glslValue('texture(u_envMap, equirect_uv(dir)).rgb'), SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' })};`) },
+                + radianceFn(`return ${skyRadiance(glslValue('texture(u_envMap, equirect_uv(dir)).rgb'))};`) },
         ];
         const textures = [{ name: 'u_envMap', source: 'extern:env_map' }];
         if (samplable) {
@@ -209,7 +212,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             // and the CDF (baked unrotated, sampled through the chart) agree under rotation.
             // GLSL params are value copies: reassigning `dir` scopes the rotation to the
             // formula without touching the author's expression.
-            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${emitSpectrum(glslValue(`(${env.glsl.source})`), SETTING_ROLES.sky, { wl: 'wl', color: plan.program.measurement.color, factor: 'u_envIntensity' })};`) },
+            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${skyRadiance(glslValue(`(${env.glsl.source})`))};`) },
         ];
         // Procedural radiance always uses the matrix rotation → always ships u_envRotCS.
         uniforms.push(rotCsUniform(rotation));

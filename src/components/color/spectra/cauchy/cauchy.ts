@@ -36,7 +36,8 @@ export const cauchyKind: SpectrumKind<CauchyIndex> = {
     glsl: { origin: 'components/color/spectra/cauchy/cauchy.glsl', source: cauchyGLSL },
     dispersive: v => v.cauchy[1] !== 0 || (v.cauchy[2] ?? 0) !== 0,
     emit(v, ctx) {
-        if (!ctx.spectral || !cauchyKind.dispersive(v)) return formatFloat(cauchyIndex(v, indexReferenceNM));
+        // Without B and C the index is A at every wavelength.
+        if (!cauchyKind.dispersive(v)) return formatFloat(cauchyIndex(v, indexReferenceNM));
         const [a, b, c = 0] = v.cauchy;
         return `cauchy_index(${formatVec3([a, b, c])}, ${ctx.wl}.lambda.x)`;
     },

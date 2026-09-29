@@ -18,10 +18,6 @@ export interface EmitContext {
     role: SpectrumRole;
     /** GLSL expression of the wavelength carrier. */
     wl: string;
-    /** True when the program evaluates spectra at wavelengths; false in RGB programs. */
-    spectral: boolean;
-    /** A scalar strength multiplying the value (the constant sky's u_envIntensity). */
-    factor?: string;
     /** The compiler's binding of a plain number or triple: a literal, a uniform, an expression
      *  or a per-instance value. */
     bind(value: unknown, format: (x: never) => string): string;
@@ -30,7 +26,6 @@ export interface EmitContext {
 }
 
 export interface MintContext {
-    spectral: boolean;
     uniforms: PlannedUniform[];
     parameters: Record<string, ParameterMetadata>;
     /** Uniform names and parameter paths already minted; shared sliders are minted once. */
@@ -61,12 +56,15 @@ export interface SpectrumKind<V = unknown> {
     mayBeNonzero(value: V): boolean;
     /** Whether, as an index, it varies with wavelength (and so forces the hero collapse). */
     dispersive(value: V): boolean;
-    /** GLSL for the value at ctx.wl: a Spectrum for radiometric roles, a float for index. */
+    /** GLSL for the value at ctx.wl: a Spectrum for radiometric roles, a float for index, as a
+     *  single operand (a call or a parenthesized expression). An RGB program never calls it for
+     *  a named kind: it shows the kind's stand-in (toRGB). */
     emit(value: V, ctx: EmitContext): string;
     /** GLSL helpers the kind's `emit` calls when a program evaluates it spectrally or
      *  dispersively (ProgramDescription.spectrumKinds); linked once. */
     glsl?: { origin: string; source: string };
-    /** Uniforms and sliders the kind derives from its live numbers. */
+    /** The sliders of its live numbers, and the uniforms its `emit` reads. An RGB program keeps
+     *  the sliders and reads the kind only through its stand-in's uniform. */
     mint?(value: V, ctx: MintContext): void;
     /** Light-table rows keep the kind whole in the row header: `code` tags the header's
      *  second float, `header` supplies its last two, and `read` evaluates them in GLSL. */

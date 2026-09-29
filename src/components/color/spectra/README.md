@@ -30,7 +30,10 @@ about its values:
 - `dispersive` says whether, as an index, it varies with wavelength (which forces the one-time
   hero collapse);
 - `emit` writes its GLSL at the ray's wavelengths, `glsl` holds the helpers it calls, and
-  `mint` adds the uniforms and sliders it derives (blackbody's temperature);
+  `mint` adds its sliders and the uniforms its `emit` reads (blackbody's temperature). A kind
+  never asks whether the program is RGB or spectral. An RGB program never calls its `emit`: it
+  shows the kind's stand-in (`toRGB`, a reflectance clipped to [0, 1]) through the `rgb` kind,
+  keeps the kind's sliders, and carries a live stand-in in one uniform the CPU recomputes;
 - `packed` lets a light-table row keep it whole in the row header (blackbody).
 
 Kinds import only types from the compiler. The operations the compiler owns (binding a number as

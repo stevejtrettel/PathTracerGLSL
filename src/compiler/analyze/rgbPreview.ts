@@ -1,5 +1,6 @@
 import type { SceneDescription, Vec3 } from '../types.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
+import { rgbStandIn } from '../../components/color/values.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
 /** Where an RGB program cannot show a named spectrum exactly: a reflectance whose RGB stand-in
@@ -17,8 +18,9 @@ export function rgbPreviewWarnings(scene: SceneDescription): string[] {
             let invalid = false;
             kind.validate?.(value, '', () => { invalid = true; });
             if (invalid) continue;
-            const rgb = kind.toRGB(value, 'reflectance', {}) as Vec3;
-            if (rgb.some((c) => c < 0 || c > 1)) {
+            const rgb = kind.toRGB(value, row.role, {}) as Vec3;
+            const shown = rgbStandIn(value, row.role) as Vec3;
+            if (rgb.some((c, i) => c !== shown[i])) {
                 warnings.push(`Material '${name}': ${row.source}: its RGB stand-in (${rgb.map((c) => c.toFixed(3)).join(', ')}) lies outside [0, 1]; RGB renders clip it, spectral renders are exact`);
             }
         }

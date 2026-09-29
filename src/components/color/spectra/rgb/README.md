@@ -8,8 +8,11 @@ wavelength.
 **RGB programs** use the value exactly as authored: the color model's lift is the identity.
 **Spectral programs** lift the RGB triple at the ray's wavelengths by the slot's role
 (`color_lift_reflectance`, `_coefficient`, `_emission`; see the
-[spectral color model](../../spectral/README.md)). Arithmetic an author writes (an expression, a
-sky's intensity factor) happens in RGB, before the lift.
+[spectral color model](../../spectral/README.md)). Arithmetic an author writes in an expression
+happens in RGB, before the lift; a sky's intensity multiplies the finished spectrum.
+
+An RGB program also shows every named kind through this kind: its stand-in (`toRGB`, with a
+reflectance clipped to [0, 1]) is an RGB value like any other.
 
 **Domain:** the slot's role; nonnegative for reflectance, coefficient and emission, positive for
 an index. The spectral model also limits reflectance to [0, 1], because its bounded lift cannot

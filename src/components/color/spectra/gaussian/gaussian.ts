@@ -3,7 +3,7 @@ import type { SpectrumKind } from '../spectrumKind.js';
 import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
 import { d65Curve } from '../../spectral/d65.js';
 import { spectralData } from '../../spectral/data.js';
-import { formatFloat, formatVec3 } from '../../../glsl-format.js';
+import { formatFloat } from '../../../glsl-format.js';
 
 export function isGaussian(value: unknown): value is GaussianValue {
     return typeof value === 'object' && value !== null && 'gaussian' in value;
@@ -43,12 +43,6 @@ export function gaussianStandIn(v: GaussianValue): Vec3 {
     return [num[0] / den[0], num[1] / den[1], num[2] / den[2]];
 }
 
-/** The stand-in an RGB program uses: clipped to [0, 1], since a reflectance outside that range
- *  would create or negate energy (the Validator warns when this clips). */
-export function gaussianPreviewRGB(v: GaussianValue): Vec3 {
-    return gaussianStandIn(v).map(c => Math.min(1, Math.max(0, c))) as Vec3;
-}
-
 /** `{ gaussian: { center, width, peak, floor? } }`: a reflectance band in nm (spec §2 of
  *  docs/claude-spectral-showcase-plan.md). Reflectance only; constants. */
 export const gaussianKind: SpectrumKind<GaussianValue> = {
@@ -71,7 +65,6 @@ export const gaussianKind: SpectrumKind<GaussianValue> = {
     mayBeNonzero: () => false,
     dispersive: () => false,
     emit(v, ctx) {
-        if (!ctx.spectral) return ctx.lift(formatVec3(gaussianPreviewRGB(v)));
         const { center, width, peak, floor = 0 } = v.gaussian;
         // The square is written as a product: pow() of a negative base is undefined in GLSL.
         const shift = `(${ctx.wl}.lambda - ${formatFloat(center)})`;

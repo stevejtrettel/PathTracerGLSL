@@ -33,6 +33,8 @@ import { isAttributeValue, type PlannedUniform, type AttributeValue } from '../p
 import { paramToUniform } from '../../components/glsl-format.js';
 import { attributeFetch } from '../../components/intersection/instancing/instancing.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
+import type { SpectrumRole } from '../../components/descriptors.js';
+import { rgbStandIn } from '../../components/color/values.js';
 
 /** A parameter-surface value: constant, driven ({param}), a spatial expression (surface
  *  properties and medium coefficients) or a per-instance attribute. */
@@ -91,6 +93,8 @@ export function mintValueUniform(
      *  quantities so the panel renders chroma × intensity, never an LDR swatch. */
     hdr = false,
     color: 'rgb' | 'spectral' = 'rgb',
+    /** The setting's role; a named kind in an RGB program needs it for its stand-in. */
+    role?: SpectrumRole,
 ): void {
     // Expression-declared params (heterogeneous D4): each declared slider becomes a live FLOAT
     // uniform named from its path, exactly like a ValueParam — the expression source references
@@ -111,11 +115,35 @@ export function mintValueUniform(
     }
     const kind = namedKindOf(prop);
     if (kind) {
-        // A named kind mints what it derives from its own sliders (blackbody: the temperature
-        // uniform); its plain numbers come back here through ctx.mint.
+        if (color === 'spectral') {
+            // The kind mints its sliders and the uniforms its evaluation reads (blackbody: the
+            // temperature uniform); its plain numbers come back here through ctx.mint.
+            kind.mint?.(prop, {
+                uniforms, parameters, seen,
+                mint: (value, t, m, h) => mintValueUniform(value as ParamValue, t, m, uniforms, parameters, seen, h),
+            });
+            return;
+        }
+        // An RGB program reads a named kind only through its stand-in (rgbStandIn). The kind's
+        // sliders stay, first declaration winning as for every slider; the uniforms only its
+        // wavelength evaluation would read are not declared.
+        const sliders: Record<string, ParameterMetadata> = {};
         kind.mint?.(prop, {
-            spectral: color === 'spectral', uniforms, parameters, seen,
-            mint: (value, t, m, h) => mintValueUniform(value as ParamValue, t, m, uniforms, parameters, seen, h),
+            uniforms: [], parameters: sliders, seen: new Set(),
+            mint: (value, t, m, h) => mintValueUniform(value as ParamValue, t, m, [], sliders, new Set(), h),
+        });
+        for (const [path, meta] of Object.entries(sliders)) parameters[path] ??= meta;
+        const deps = kind.liveParams(prop);
+        if (deps.length === 0) return;   // a constant stand-in is a literal
+        if (role === undefined) throw new Error(`mintValueUniform: a live ${kind.label} value in an RGB program needs its setting's role`);
+        const name = standInUniform(prop, role);
+        if (seen.has(name)) return;
+        seen.add(name);
+        uniforms.push({
+            name, type: role === 'index' ? 'float' : 'vec3',
+            parameterPath: deps[0], parameterPaths: deps,
+            default: rgbStandIn(prop, role),
+            compute: (p) => rgbStandIn(prop, role, p),
         });
         return;
     }
@@ -153,4 +181,21 @@ export function mintValueUniform(
 
 function capitalize(s: string): string {
     return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+/** The uniform that carries a slider-driven stand-in in an RGB program, recomputed on the CPU
+ *  when one of the kind's sliders moves. Named from the value and the role, so identical values
+ *  share it. */
+export function standInUniform(value: unknown, role: SpectrumRole): string {
+    return `u_standin_${fnv1a(`${role}:${JSON.stringify(value)}`)}`;
+}
+
+/** 32-bit FNV-1a of a string, as 8 hex digits. */
+function fnv1a(s: string): string {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16).padStart(8, '0');
 }

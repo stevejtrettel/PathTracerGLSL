@@ -178,6 +178,11 @@ interface EmitContext {
 // MintContext carries the uniform and parameter lists and the compiler's `mint` for plain sliders.
 ```
 
+*Later:* step 3 of [spectra in every slot](claude-spectrum-fields.md) removed `spectral` and
+`factor` from `EmitContext` and `spectral` from `MintContext`: a kind only evaluates at
+wavelengths, and an RGB program shows its stand-in.
+
+
 Kinds import only types from the compiler (the components purity rule); the compiler's own
 operations (binding, lifting, minting a slider) reach them through the two contexts.
 

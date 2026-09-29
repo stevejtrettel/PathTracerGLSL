@@ -209,7 +209,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 f.glslType === 'Spectrum' ? 'vec3' : 'float',
                 isRadiometric(f.role) ? 'color' : 'float',
                 uniforms, parameters, seen,
-                f.source === EMISSION_KEY, plan.program.measurement.color,
+                f.source === EMISSION_KEY, plan.program.measurement.color, f.role,
             );
         }
         if (mat.medium !== null) {

@@ -64,6 +64,17 @@ describe('kelvin slider', () => {
         expect(range({ param: 'lamp.k', default: 3000 })).toEqual([1000, 12000]);
     });
 
+    it('a shared temperature slider keeps the range its first declaration gives, in both color models', () => {
+        for (const color of ['rgb', 'spectral'] as const) {
+            const s = scene();
+            s.materials.m.emission = { blackbody: { kelvin: { param: 'lamp.k', default: 3000, min: 2000, max: 5000 } } } as never;
+            s.materials.m2 = { model: 'lambert', albedo: 0.5, emission: { blackbody: { kelvin: { param: 'lamp.k', default: 3000 }, scale: 2 } } } as never;
+            s.objects.push({ type: 'sphere', parameters: { center: [3, 0, 0], radius: 1 }, material: 'm2' });
+            const params = new Compiler().compileScene(s, [strategy(color)]).renderers[0].parameters!;
+            expect(params['lamp.k'].range, color).toEqual([2000, 5000]);
+        }
+    });
+
     it('reaches a default above that range', () => {
         const [lo, hi] = range({ param: 'lamp.k', default: 20000 });
         expect(lo).toBeLessThanOrEqual(20000);

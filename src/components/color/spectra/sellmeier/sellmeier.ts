@@ -50,7 +50,8 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
     glsl: { origin: 'components/color/spectra/sellmeier/sellmeier.glsl', source: sellmeierGLSL },
     dispersive: v => v.sellmeier.B.some((b, i) => b !== 0 && v.sellmeier.C[i] !== 0),
     emit(v, ctx) {
-        if (!ctx.spectral || !sellmeierKind.dispersive(v)) return formatFloat(sellmeierIndex(v, indexReferenceNM));
+        // Every term with B = 0 or C = 0 is constant in wavelength; then so is the index.
+        if (!sellmeierKind.dispersive(v)) return formatFloat(sellmeierIndex(v, indexReferenceNM));
         const { B, C } = v.sellmeier;
         return `sellmeier_index(${formatVec3(B)}, ${formatVec3(C)}, ${ctx.wl}.lambda.x)`;
     },

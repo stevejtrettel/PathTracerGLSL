@@ -27,7 +27,6 @@ export const rgbKind: SpectrumKind = {
     dispersive: () => false,
     emit(v, ctx) {
         if (ctx.role === 'index') return ctx.bind(v, formatFloat);
-        const rgb = ctx.bind(v, formatSpectrum);
-        return ctx.lift(ctx.factor ? `${rgb} * ${ctx.factor}` : rgb);
+        return ctx.lift(ctx.bind(v, formatSpectrum));
     },
 };

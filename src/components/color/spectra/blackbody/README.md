@@ -76,14 +76,20 @@ brightness would be a different control.
 
 ## Constants, uniforms and packed data
 
-The scene plan retains the authored form. `generate/values.ts` owns its constant/live
-split. Constant temperature folds the normalization/RGB projection. A live temperature
-mints one temperature-derived binding: RGB gets normalized `vec3`; spectral gets
-`vec2(temperature, normalization)`. Only the temperature parameter is a dependency.
-Scale is a separate literal or ordinary float uniform at every use site. Two emitters
-sharing a temperature therefore retain independent intensities; sharing only an intensity
-also leaves their temperatures independent. Hit and sampled-light readers use the same
-`emitSpectrum` path, with the incoming wavelength carrier in spectral mode.
+The scene plan retains the authored form.
+
+**Spectral programs** evaluate Planck's law at the wavelengths. A constant temperature folds its
+normalization into a literal. A live temperature mints one uniform,
+`vec2(temperature, normalization)`, that depends on the temperature slider only. Scale is a
+separate literal or float uniform at every use, so two emitters sharing a temperature keep
+independent brightnesses.
+
+**RGB programs** show the blackbody by its RGB stand-in, `toRGB` (scale times the normalized
+RGB of the temperature), as they show every named kind (`rgbStandIn`, color/values.ts):
+- a constant value is a literal;
+- a live one is one uniform the CPU recomputes from both sliders when either moves.
+
+Hit and sampled-light readers use the same `emitSpectrum` path.
 
 `ProgramDescription.blackbody` records whether the spectral program uses original Planck
 forms, linking the static GLSL evaluator and the corresponding packed readers.

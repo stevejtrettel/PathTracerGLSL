@@ -8,6 +8,7 @@ import { spectralData } from '../../src/components/color/spectral/data.js';
 import { gaussianKind, gaussianReflectance, gaussianStandIn } from '../../src/components/color/spectra/gaussian/gaussian.js';
 import type { GaussianValue } from '../../src/compiler/types.js';
 import type { EmitContext } from '../../src/components/color/spectra/spectrumKind.js';
+import { rgbStandIn } from '../../src/components/color/values.js';
 
 const bytes = readFileSync(new URL('../../src/components/color/spectral/data/curves.bin', import.meta.url));
 const curves = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
@@ -48,14 +49,15 @@ describe('gaussian reflectance kind', () => {
         const [r, g, b] = gaussianStandIn(band(540, 25, 0.04, 0.85));
         expect(r).toBeGreaterThan(g); expect(b).toBeGreaterThan(g);
     });
-    const ctx = (spectral: boolean): EmitContext => ({
-        role: 'reflectance', wl: 'wl', spectral, bind: () => { throw new Error('no binding'); },
+    const ctx: EmitContext = {
+        role: 'reflectance', wl: 'wl', bind: () => { throw new Error('no binding'); },
         lift: (rgb) => `color_lift_reflectance(${rgb}, wl)`,
-    });
-    it('emits the band in spectral programs and the clipped stand-in in RGB programs', () => {
-        expect(gaussianKind.emit(band(600, 20, 0.8, 0.1), ctx(true)))
+    };
+    it('emits the band at the wavelengths; an RGB program shows its stand-in clipped to [0, 1]', () => {
+        expect(gaussianKind.emit(band(600, 20, 0.8, 0.1), ctx))
             .toBe('(Spectrum(0.1) + 0.7000000000000001 * exp(-0.00125 * (wl.lambda - 600.0) * (wl.lambda - 600.0)))');
-        const rgb = gaussianKind.emit(band(530, 25, 0.9, 0.02), ctx(false));
-        expect(rgb).toMatch(/^color_lift_reflectance\(vec3\(0\.0, /);   // the negative red is clipped
+        const shown = rgbStandIn(band(530, 25, 0.9, 0.02), 'reflectance') as number[];
+        expect(shown[0]).toBe(0);   // the negative red is clipped
+        expect(shown.every((c) => c >= 0 && c <= 1)).toBe(true);
     });
 });

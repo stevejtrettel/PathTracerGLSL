@@ -55,16 +55,28 @@ describe('blackbody renderer bindings', () => {
             expect(() => compiler.compile(scene, strategy('spectral', 'power'))).toThrow(/kelvin/);
         });
     }
-    for (const color of ['rgb', 'spectral'] as const) it(`shares temperature without merging intensity: ${color}`, () => {
+    const sharedTemperature = () => {
         const scene = blackbodyFixture('point', { blackbody: { kelvin: { param: 'lamp.kelvin', default: 3200 }, scale: 4 } });
         scene.materials.lamp.emission = { blackbody: { kelvin: { param: 'lamp.kelvin', default: 3200 }, scale: 1 } };
-        const renderer = compiler.compile(scene, strategy(color, 'power'));
+        return scene;
+    };
+    it('shares temperature without merging intensity: spectral', () => {
+        const renderer = compiler.compile(sharedTemperature(), strategy('spectral', 'power'));
         const bindings = renderer.uniforms.filter(u => u.uniform === 'u_lamp_kelvin_blackbody');
         expect(bindings).toHaveLength(1);
         expect(bindings[0].parameters).toEqual(['lamp.kelvin']);
         const source = [...renderer.shaders.values()].find(s => s.fragment.includes('transport_trace'))!.fragment;
         expect(source).toContain('(4.0 * ');
         expect(source).toContain('(1.0 * ');
+    });
+    it('shares temperature without merging intensity: rgb (one stand-in per brightness, both on the slider)', () => {
+        const renderer = compiler.compile(sharedTemperature(), strategy('rgb', 'power'));
+        const standIns = renderer.uniforms.filter(u => u.uniform.startsWith('u_standin_'));
+        expect(standIns).toHaveLength(2);
+        for (const u of standIns) expect(u.parameters).toEqual(['lamp.kelvin']);
+        const params = { 'lamp.kelvin': 5000 };
+        const values = standIns.map(u => u.compute!(params) as number[]).sort((a, b) => a[1] - b[1]);
+        values[1].forEach((c, i) => expect(c).toBeCloseTo(4 * values[0][i], 12));
     });
 });
 

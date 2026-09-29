@@ -58,12 +58,15 @@ describe('driven blackbody bindings and selection update together', () => {
             } };
             const scene = blackbodyFixture(site, form);
             const renderer = compiler.compile(scene, minimalStrategy);
-            const rgb = renderer.uniforms.find(u => u.uniform === 'u_lamp_kelvin_blackbody')!;
-            expect(rgb.compute({})).toEqual(blackbodyRGB(3200));
+            // An RGB program shows the blackbody by its stand-in: one uniform the CPU recomputes
+            // from both sliders; the sliders themselves stay in the panel.
+            const rgb = renderer.uniforms.find(u => u.uniform.startsWith('u_standin_'))!;
+            expect(rgb.parameters).toEqual(['lamp.kelvin', 'lamp.scale']);
+            expect(rgb.compute({})).toEqual(blackbodyRGB(3200, 5));
+            expect(Object.keys(renderer.parameters ?? {})).toEqual(expect.arrayContaining(['lamp.kelvin', 'lamp.scale']));
             for (const [kelvin, scale] of [[6500, 2], [2100, 0], [10000, 8]]) {
                 const params = { 'lamp.kelvin': kelvin, 'lamp.scale': scale };
-                expect(rgb.compute!(params)).toEqual(blackbodyRGB(kelvin));
-                expect(renderer.uniforms.find(u => u.uniform === 'u_lamp_scale')!.parameters).toEqual(['lamp.scale']);
+                expect(rgb.compute!(params)).toEqual(blackbodyRGB(kelvin, scale));
                 const constantScene = blackbodyFixture(site, blackbodyRGB(kelvin, scale));
                 const plan = planRenderers(analyze(constantScene), constantScene, [minimalStrategy], new DiagnosticBag('test')).plans[0];
                 const select = renderer.uniforms.find(u => u.uniform === 'u_light_selpdf');
