@@ -1,7 +1,8 @@
 # Spectra in every slot
 
-**Status:** proposal (September 28, 2026), for the owner. Part 1, the model, is on this page;
-Part 2, the wiring and build steps, follows once Part 1 is agreed.
+**Status:** proposal (September 28, 2026), for the owner. Part 1 is the model, Part 2 the build
+steps. Step 1 was approved and built on Sep 28 (see the CHANGELOG); later steps each need their
+own plan and approval.
 
 This builds on the approved [one-spectrum-type spec](claude-spectrum-spec.md), whose §1–3 stand
 unchanged. It would replace that spec's §4 ("numbers can be live") and its step 4, and the
@@ -141,7 +142,7 @@ These facts come from the Sep 28 review and the independent check of this note:
 
   The GRIN index binds its value directly. So media take no named kind.
 - **The role is split across two fields** and re-derived in four places. In three of them it is
-  taken from the kind instead of the slot (plan/values.ts:13, Planner.ts:1016, lighting.ts:342).
+  taken from the kind instead of the slot (plan/values.ts:13, Planner.ts:1016, lighting.ts:338).
 - **Each named kind implements RGB rendering itself.**
 - **The bindings are spread out.** Per-instance values are read at three sites, and the
   CPU-derived binding exists only inside blackbody and a few fields.
@@ -151,8 +152,9 @@ These facts come from the Sep 28 review and the independent check of this note:
 Media are where the decision "any spectrum" first bites. There are two ways to write a medium
 that varies in space:
 - **An RGB field (today):** a formula returns RGB σ per point. The RGB is clamped to the
-  authored ceiling, then lifted. The tracking bound, 4 × ceiling, holds because the RGB lift is
-  at most twice the largest channel.
+  authored ceiling, then lifted. In spectral renders the tracking bound is 4 × ceiling. σ_a and
+  σ_s each stay under the ceiling after the clamp, and the RGB lift of each is at most twice its
+  largest channel.
 - **A spectrum times a scalar density (pbrt's grid medium):** σ(x, λ) = d(x)·σ̂(λ), where σ̂ is
   any spectrum and d a scalar formula with a ceiling. The bound is the ceiling times σ̂'s maximum
   over wavelength. Emission works the same way; a flame is d(x) × blackbody.
@@ -209,6 +211,189 @@ Source read on Sep 28: pbrt-v4 at `b4ce968`, Mitsuba 3 at `fd9c9ce`. Paths are r
 
 ---
 
+# Part 2: the steps
+
+Notation, from Part 1:
+- K is a kind (RGB, blackbody, Gaussian band, Cauchy, Sellmeier) and θ its numbers.
+- θ(x) says what those numbers depend on (x is the sliders, the instance or the point).
+- r is the slot's role (emission, reflectance, coefficient, index).
+- K_r(θ)(λ) is the spectrum the slot sees at wavelength λ. K̄_r(θ) is its RGB stand-in, used in
+  RGB renders.
+
+Each step makes one sentence of Part 1 true in the code. Each is small and approved separately,
+with its own detailed plan before any code. Step 1 is written out in full below.
+
+A **refactor** leaves every scene's compiled output byte-identical, which the digest shows. Any
+other step says exactly what changes and how it is checked.
+
+| Step | What becomes true | Kind of step |
+|---|---|---|
+| 1 | **Every material and light setting states its role in one place,** and no code guesses a role from the value. | refactor |
+| 2 | **Every spectrum setting goes through one path:** compute its numbers θ(x) (fixed, slider, formula, per instance, image), then evaluate K_r at the path's wavelengths. Fog settings and the sky get the same role declarations as materials. | refactor |
+| 3 | **A kind never asks whether the render is RGB or spectral.** RGB renders use its RGB stand-in K̄_r(θ). Numbers computed on the CPU, like a blackbody's brightness normalization, all arrive the same way. | small change: in RGB renders with a blackbody on a slider, shader text changes and values agree up to rounding; checked on the GPU |
+| 4 | **Each value is checked once:** against its role's allowed range, its kind's own rules and its slider's structure. | stricter checks (listed below) |
+| 5 | **Fog takes any spectrum.** | feature |
+| 6 | **HSV colors.** | feature |
+
+**Step 2** removes the 11 places that convert RGB on their own, and the three places that read
+per-instance values. The light table stops needing each emission kind to opt in: every emission
+kind states how its table row reads, and RGB's row is the plain color. Two traps must come out
+byte-identical, and the digest will show whether they do:
+- the default color is written `vec3(0.8)` today, while the general path writes
+  `vec3(0.8, 0.8, 0.8)`;
+- the fog's density clamp sits between computing the numbers and evaluating the kind, so a
+  fog's spectrum is K_r(clamp(θ(x))). The one path needs that stage.
+
+**Step 4 makes these errors that pass today:**
+- a key the kind doesn't know, inside or next to a named kind
+  (`{ blackbody: { kelvin: 3000 }, scale: 5 }`);
+- a slider default outside its own min and max.
+
+The four checkers it merges are the shared value check (`validatePropertyValue`), the
+spectral-only limits (analyze/spectral.ts), blackbody's own slider check, and the per-instance
+check in the Validator. The spectral model's extra limit, reflectance at most 1, becomes a
+stated fact of that color model.
+
+**Step 5, the physics.** A fog's absorption, scattering and glow share one density d(x):
+
+    σ_a(x, λ) = d(x)·K_a(λ),  σ_s(x, λ) = d(x)·K_s(λ),  ε(x, λ) = d(x)·K_ε(λ)
+
+- **One density for all three.** The ratio of glow to extinction, ε/σ_t, is a property of the
+  material, and today's density clamp already keeps it fixed. So a flame is a density formula
+  times a blackbody glow, with its smoke absorption scaled by the same d.
+- **Tracking bound:** ceil(d) · max over λ of (K_a + K_s)(λ).
+- **What changes in the bound code:** the color model's bound (`mediumBound`) now builds in the
+  RGB conversion's factor of 2. It splits into two pieces: the kind's own maximum over
+  wavelength, and the color model's rounding allowance.
+- **RGB fog formulas stay as they are.** The coefficient conversion scales exactly, so
+  d·K(θ) = K(d·θ) for RGB. The density form is needed only for non-RGB spectra.
+
+A "transmittance" kind belongs to this step if wanted. It holds the color a fog shows through a
+given depth, converted per wavelength (Part 1 §3). It would also fix the subsurface helper.
+
+**Step 6.** `hsv(h, s, v)` gives RGB of the same role:
+- an authoring helper for fixed and per-instance colors;
+- a GLSL helper that formulas can call.
+
+These need nothing from the other steps. A hue slider on a lamp needs step 3's CPU-computed
+numbers.
+
+**Small cleanups, any time:**
+- `MaterialProperties.wl` and `MediumProperties.wl` are written and never read.
+- `formatSpectrum` has no caller (the owner's call).
+- The Validator's false "envSelectWeight controls nothing" warning when a scene's only lamps are
+  instanced.
+
+**Not in this plan:**
+- per-instance spectra (per-instance stays RGB);
+- a blackbody temperature given by a formula;
+- formulas of wavelength (§8 question 3);
+- a single film formula for RGB and spectral renders, with the wavelengths owned by the color
+  model. That would be a separate design; it is not a sentence of Part 1.
+
+## Step 1 in full: every material and light setting states its role in one place
+
+**Problem (read Sep 28; line numbers at commit bd39f8b).**
+- **Rows spell the role across two fields.** A setting in a material, light or phase descriptor
+  (a "row") is one of three things (components/descriptors.ts:42–53):
+  - `semantic: 'radiometric', role: …` (17 rows);
+  - `semantic: 'index'` (2);
+  - `semantic: 'geometric'` (26).
+
+  materials/index.ts:35–36 writes the same spelling for derived fields.
+- **18 places in src read the two fields:**
+  - materials/index.ts:80;
+  - compiler/sceneData.ts:154;
+  - generate/schema.ts:25, :45;
+  - Planner.ts:924;
+  - rgbPreview.ts:12;
+  - lighting.ts:407, :727;
+  - materials.ts:209, :233, :392, :394, :602;
+  - analyze/spectral.ts:26, :48;
+  - propertyValidation.ts:42, :72;
+  - Validator.ts:1202.
+
+  Four of them rebuild the role with a ternary: three-way at propertyValidation.ts:42 and :72,
+  two-way at Validator.ts:1202 and lighting.ts:727. schema.ts:18 has its own copy of the field.
+- **Six places compare a value's kind against a role typed out as a literal**
+  (`roles.includes('…')`, untruncated search):
+  - **Three guess the setting's role from the value:**
+    - plan/values.ts:13, a backstop throw;
+    - Planner.ts:1016;
+    - lighting.ts:338.
+  - **Three restate a role they already know:**
+    - Planner.ts:924;
+    - lighting.ts:96;
+    - rgbPreview.ts:15.
+- **A GPU probe script reads the old field and is not type-checked.** scripts/witness-spectral-
+  bindings.ts:93 and :157 read it, and tsconfig includes only src, tests and pages. After a
+  rename, line 93 would crash and line 157 would silently skip every probe.
+
+**Rule after this step.**
+- A row that holds a spectrum has one field, `role`: emission, reflectance, coefficient or
+  index. A row holding an ordinary number (roughness, uv scale, a phase parameter) has none.
+- No code compares a value's kind against a literal role.
+
+**What changes:**
+1. **descriptors.ts.**
+   - `PropertySchema` rows get `role?: SpectrumRole`, and light rows get
+     `role?: RadiometricRole`, since lights have no index setting. `semantic` and
+     `ColorSemantic` go.
+   - `SpectrumRole` moves here from the kinds' contract, which imports it.
+   - One predicate, `isRadiometric(role)`, answers "light or a multiplier of light, as
+     opposed to an index".
+   - `MaterialDerivedSpec` (descriptors.ts:82–84) already works this way.
+2. **The 45 rows and materials/index.ts:35–36 change spelling.**
+   - `semantic: 'radiometric', role: X` becomes `role: X`;
+   - `semantic: 'index'` becomes `role: 'index'`;
+   - `semantic: 'geometric'` is deleted.
+3. **The 18 reads and schema.ts:18 read `role`.**
+   - Six sites need "is it radiometric", not "does it have a role", so they use
+     `isRadiometric`: materials.ts:209, :233, :392, :394, :602 and schema.ts:45.
+   - The two ternaries go.
+4. **The six literal comparisons read the setting instead.**
+   - Resolution is called only for radiometric settings, so plan/values.ts:13's backstop goes
+     (validation already rejects an index kind there).
+   - Planner.ts:1016 asks each setting's role which named kinds a program evaluates at
+     wavelengths.
+   - lighting.ts:338 converts rows that have a role.
+   - The three restatements test the setting's role, and where needed only whether the value
+     is a named kind. Whether a kind may sit in a setting stays in validation, compared against
+     the setting's own role (propertyValidation.ts:102).
+5. **Outside the type checker:**
+   - scripts/witness-spectral-bindings.ts:93 and :157;
+   - the tests that build rows (lightsContract.test.ts:18, spectrumKinds.test.ts:69,
+     spectralMaterials.test.ts:22, blackbodyPreservation.test.ts:24);
+   - the documents that pin the row shape: fable-module-anatomy.md:49,
+     materials/README.md:59 and cauchy/README.md:27.
+
+**Unchanged.**
+- Every shader, uniform, parameter and diagnostic.
+- The settings with no descriptor row yet. They still write their role at the call:
+  - a light's authored emission (Validator.ts:142, lighting.ts:312);
+  - a model with no emission row (Validator.ts:268);
+  - the sky (environment.ts:120, :158, :211; Validator.ts:908);
+  - the fog's four settings;
+  - Planner.ts:55 and dataTenants.ts:213.
+
+  Step 2 declares them.
+- The redundant `glslType` of spectrum rows. It always follows from the role (17 radiometric
+  rows are `Spectrum` or `vec3`, 2 index rows are `float`); removing it is a separate question.
+
+**Verification, written first.**
+- **Scan test (fails today).** tests/components/spectrumKinds.test.ts forbids
+  `roles.includes('` outside the kinds' folder. Today it finds six; after, none. It catches
+  only that spelling. The rest of the rule is carried by the type, since `role` is the only
+  field, and by review.
+- **Digest before and after.** All 268 synchronous scenes are identical in every part: shaders,
+  uniforms, closure values, parameters, source maps, scene data and warnings. Before the
+  comparison, one deliberately edited role must show up in it.
+- **Snapshots:** the diagnostics snapshot is unchanged.
+- **Static checks:** `npx tsc --noEmit` and the full `npx vitest run`.
+- **GPU:** `npm run witness:spectral-bindings`, because the script is edited and nothing else
+  checks it. No render witnesses are needed, since shaders are identical.
+- **Review:** an independent review of the diff.
+
 ## Appendix A: the independent review of the first draft
 
 | Finding | Change |
@@ -227,3 +412,27 @@ Source read on Sep 28: pbrt-v4 at `b4ce968`, Mitsuba 3 at `fd9c9ce`. Paths are r
 
 The review found no slot whose role is not a property of the slot, and no conflict with the
 measurement/estimator invariant, the trace-loop contract or the components purity rule.
+
+## Appendix B: the independent review of Part 2's first draft
+
+| Finding | Change |
+|---|---|
+| A GPU probe script reads `semantic` and is not type-checked (tsconfig covers src, tests, pages); after a rename it would crash or silently skip its probes | step 1, item 5; the script is run in verification |
+| Medium and sky settings do not fit the material row shape (the GRIN index is neither a field nor a region table; a present `ior` switches GRIN on) | their declarations move to step 2, which rewrites that code anyway |
+| "Every reader takes the role from the slot" was not true after step 1: settings without rows still write literal roles | step 1's rule narrowed; the remaining sites listed under "Unchanged", for step 2 |
+| Six reads need "is it radiometric", not "has a role"; `SpectrumRole` belongs in descriptors.ts; lights take only radiometric roles; schema.ts has its own copy of the field | step 1, items 1 and 3 |
+| Stale line numbers (lighting.ts:338, :96), 47 rows (45 plus 2), two different ternaries, and tests and documents that pin the row shape | corrected; step 1, item 5 |
+| Step 7's RGB film formula was wrong (RGB is counting measure over three channels, not p = 1), the step changes RGB text, and it is not a sentence of Part 1 | dropped from this plan |
+| Step 3 changes RGB shader text, so it is not a refactor | relabeled, with a GPU check |
+| Step 2's byte-identity has two traps: the `vec3(0.8)` spelling of defaults and the fog clamp between numbers and evaluation | named in the step |
+| Step 5 (was 4) needed its physics stated: one density for absorption, scattering and glow (keeps ε/σ_t), the bound on K_a + K_s, splitting `mediumBound`, and that RGB needs no density form | stated |
+| Step 4 (was 5) did not say what becomes an error or name the checkers, and it rewrites a check the media step would edit | both stated; moved before the media step |
+| The hue slider needs step 3; the transmittance kind was listed as a cleanup | step 6 says so; the kind moved into step 5 |
+| Notation and code words in the owner-facing lines | notation defined; lines reworded |
+
+The reviewer confirmed:
+- that `semantic` can be removed (no production code reads `'geometric'`);
+- the 18 reads, the 11 direct conversions and the six literal comparisons;
+- that a byte-identical step 1 is possible;
+- that a types-only medium declaration would respect the purity rule.
+

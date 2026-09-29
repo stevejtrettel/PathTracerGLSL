@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-28 — spectrum settings state their role in one field (spectra-in-every-slot, step 1)
+
+This is the first step of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) (Part
+2). It is a refactor, and every scene's compiled output is unchanged.
+
+**The rule.** A material, light or phase row that holds a spectrum now has one field, `role`
+(emission, reflectance, coefficient or index). A row holding an ordinary number has none.
+
+**What changed:**
+- **One field instead of two.** Rows used to spell the role across two fields
+  (`semantic: 'radiometric', role: …`, `semantic: 'index'` or `semantic: 'geometric'`). The
+  45 descriptor rows and the derived-field rows are respelled.
+- **Where the types live.** `SpectrumRole` and the predicate `isRadiometric` ("light or a
+  multiplier of light, as opposed to an index") now live in components/descriptors.ts.
+- **The reads.** The 18 places that read the old fields now read `role`, and the rebuilt
+  ternaries are gone.
+- **No role from the value any more.** Six places compared a value's kind against a role written
+  out as a literal. They now read the setting's role:
+  - the backstop `isIndexFormula` in plan/values.ts is gone;
+  - `resolveLightValues` walks the light kind's rows;
+  - the list of kinds a spectral program evaluates asks each setting's role.
+- **Updated to match:** the probe script `witness-spectral-bindings`, which the type checker
+  does not cover, and the documents that pin the row shape (fable-module-anatomy.md, the
+  materials and Cauchy READMEs).
+
+**Verification:**
+- A scan test forbidding `roles.includes('…')` outside the kinds' folder failed first, on the six
+  sites.
+- The digest is identical for all 268 synchronous scenes. First, a deliberately wrong role was
+  shown to change 260 of them.
+- The independent reviewer also found the seven async scenes, and the App's packing of them,
+  identical, as well as 23 edge-case scenes, valid and invalid, in three color and estimator
+  setups.
+- The full test run passes (108 files, 4,055 tests).
+- `witness:spectral-bindings` passes with 69 probes, the same count as before the change.
+- Older dated documents that quote the old spelling (the spectral design and implementation
+  plan, fable-component-system.md, fable-geometry-materials-target.md) are left as history.
+
 ## 2026-09-28 — the sky's share of light samples under the light tree
 
 Under light-tree selection, next-event estimation now gives the sky a fixed half of the light
