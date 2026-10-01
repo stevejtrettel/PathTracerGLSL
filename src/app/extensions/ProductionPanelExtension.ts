@@ -289,8 +289,8 @@ export class ProductionPanelExtension extends UIExtension {
         const buttons: string[] = [];
 
         if (info.state === 'complete') {
-            buttons.push(this.createButton('Export PNG', 'exportPNG', 'success'));
-            buttons.push(this.createButton('Export HDR', 'exportHDR', 'success'));
+            buttons.push(this.createButton('Export PNG', 'savePNG', 'success'));
+            buttons.push(this.createButton('Export HDR', 'saveHDR', 'success'));
             buttons.push(this.createButton('Close', 'close', ''));
         } else if (info.state === 'paused') {
             buttons.push(this.createButton('Resume', 'resume', 'primary'));
@@ -324,11 +324,12 @@ export class ProductionPanelExtension extends UIExtension {
             case 'cancel':
                 this.app.stop();
                 break;
-            case 'exportPNG':
-                this.app.exportPNG().catch((err) => console.error('PNG export failed:', err));
+            // PNG: the picture on screen, as shown. HDR: the raw radiance.
+            case 'savePNG':
+                this.app.save(this.app.getDisplayedPicture(), 'png').catch((err) => console.error('PNG save failed:', err));
                 break;
-            case 'exportHDR':
-                this.app.exportHDR();
+            case 'saveHDR':
+                this.app.save('radiance', 'hdr').catch((err) => console.error('HDR save failed:', err));
                 break;
             case 'close':
                 // Close triggers stop, which triggers layout/resolution restore

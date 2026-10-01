@@ -657,7 +657,7 @@ async function runCheck(browser, registry, sceneId, spec, check) {
                 app.stop();
                 app.pinResetSalt(salt);   // the tiled job keeps a pin that is already set
                 app.selectRendererByStrategy(sid);
-                await app.renderTiled({ width: w, height: h, spp: n, format: 'both', tileSize: tile });
+                await app.renderTiled({ width: w, height: h, spp: n, tileSize: tile, save: [{ picture: 'radiance', format: 'hdr' }, { picture: 'radiance', format: 'png' }] });
             }, [strategyId, W, H, spp, tileSize, WITNESS_SALT]);
             await waitFor(() => named(/^render_.*\.hdr$/) && named(/^render_.*\.png$/), "the tiled render's files");
             await page.evaluate(async ([w, h, n, salt]) => {
@@ -666,8 +666,8 @@ async function runCheck(browser, registry, sceneId, spec, check) {
                 app.pinResetSalt(salt);
                 app.resize(w, h);
                 await app.renderProduction(n);
-                app.exportHDR('one-piece.hdr');
-                await app.exportPNG('one-piece.png');
+                await app.save('radiance', 'hdr', 'one-piece.hdr');
+                await app.save('radiance', 'png', 'one-piece.png');
             }, [W, H, spp, WITNESS_SALT]);
             await waitFor(() => files.has('one-piece.hdr') && files.has('one-piece.png'), "the one-piece render's files");
             const secs = ((Date.now() - t0) / 1000).toFixed(1);
@@ -847,8 +847,8 @@ async function recordCase(browser, c, dir) {
                 const px = app.readExport(name);
                 floats[name] = Array.from(new Uint32Array(px.buffer, px.byteOffset, px.length));
             }
-            app.renderLdr();
-            const ldr = Array.from(app.readExport('ldr'));
+            // The main picture through its view mapping, as a PNG would hold it.
+            const ldr = Array.from(app.capture({ picture: app.getPictures()[0], format: 'png' }).pixels);
             return {
                 glErrors: window.__drainGlErrors(),
                 rendererId: app.getActiveRendererId(),
@@ -899,7 +899,7 @@ async function recordTiledCase(browser, c, dir) {
         const got = await page.evaluate(async ([w, h, n, tile]) => {
             const app = window.app;
             window.__drainGlErrors();
-            await app.renderTiled({ width: w, height: h, spp: n, format: 'both', tileSize: tile });
+            await app.renderTiled({ width: w, height: h, spp: n, tileSize: tile, save: [{ picture: 'radiance', format: 'hdr' }, { picture: 'radiance', format: 'png' }] });
             return { strategyId: app.getActiveStrategy()?.id ?? null, salt: app.getResetSalt(), glErrors: window.__drainGlErrors() };
         }, [c.size[0], c.size[1], c.spp, c.tileSize]);
         if (got.glErrors.length) throw new Error(`WebGL errors during the tiled render: ${got.glErrors.join(', ')}`);

@@ -19,9 +19,11 @@ function fakeApp(opts: { profiling?: boolean; hasLayout?: boolean } = {}) {
         resize: vi.fn((w: number, h: number) => log.push(`resize:${w}x${h}`)),
         enableProfiling: vi.fn(() => log.push('enableProfiling')),
         disableProfiling: vi.fn(() => log.push('disableProfiling')),
-        exportPNG: vi.fn(() => log.push('exportPNG')),
-        exportHDR: vi.fn(() => log.push('exportHDR')),
-        exportAllAOVs: vi.fn(() => log.push('exportAOVs')),
+        getPictureFormats: () => ({ radiance: ['hdr', 'png'] }),
+        saveAll: vi.fn((requests: { picture: string; format: string }[]) => {
+            log.push(`save:${requests.map((r) => `${r.picture}.${r.format}`).join(',')}`);
+            return Promise.resolve();
+        }),
         quickSave: vi.fn(() => log.push('quickSave')),
     };
     return app;
@@ -39,15 +41,15 @@ const mk = (app: ReturnType<typeof fakeApp>, coord: ReturnType<typeof fakeCoordi
     ({ orch: new ProductionOrchestrator(app as unknown as App, coord as unknown as RenderCoordinator, store), store });
 
 describe('ProductionOrchestrator — happy path', () => {
-    it('locks params, resets accumulation, auto-exports, then unlocks', async () => {
+    it('locks params, resets accumulation, saves the declared list, then unlocks', async () => {
         const app = fakeApp();
         const coord = fakeCoordinator(() => Promise.resolve());
         const { orch, store } = mk(app, coord);
 
-        await orch.renderProduction(100, { autoExportHDR: true });
+        await orch.renderProduction(100, { save: [{ picture: 'radiance', format: 'hdr' }, { picture: 'radiance', format: 'png' }] });
 
         expect(coord.resetAccumulation).toHaveBeenCalledWith('production_start');
-        expect(app.exportHDR).toHaveBeenCalled();
+        expect(app.log).toContain('save:radiance.hdr,radiance.png');
         expect(store.isLocked()).toBe(false); // settled → unlocked
     });
 });
@@ -77,15 +79,15 @@ describe('ProductionOrchestrator — phase guards', () => {
 });
 
 describe('ProductionOrchestrator — ordering & profiling', () => {
-    it('auto-export runs before exitProduction restores resolution', async () => {
+    it('saving runs before exitProduction restores resolution', async () => {
         const app = fakeApp();
         const coord = fakeCoordinator(() => Promise.resolve());
         const { orch } = mk(app, coord);
 
-        await orch.renderProduction(100, { width: 800, height: 600, autoExportHDR: true });
+        await orch.renderProduction(100, { width: 800, height: 600, save: [{ picture: 'radiance', format: 'hdr' }] });
         orch.exitProduction();
 
-        const exportIdx = app.log.indexOf('exportHDR');
+        const exportIdx = app.log.indexOf('save:radiance.hdr');
         const restoreIdx = app.log.lastIndexOf('resize:400x300'); // restore to original size
         expect(exportIdx).toBeGreaterThanOrEqual(0);
         expect(restoreIdx).toBeGreaterThan(exportIdx);
@@ -157,21 +159,29 @@ describe('ProductionOrchestrator — tiled session', () => {
     });
 });
 
-describe('ProductionOrchestrator — auto-export', () => {
-    it('reads every buffer before awaiting any encode', async () => {
-        const app = fakeApp();
-        let releasePNG!: () => void;
-        app.exportPNG.mockImplementation(() => { app.log.push('exportPNG'); return new Promise<void>((r) => { releasePNG = r; }) as never; });
-        const coord = fakeCoordinator(() => Promise.resolve());
-        const { orch } = mk(app, coord);
+describe('ProductionOrchestrator — the save list', () => {
+    for (const [label, request, message] of [
+        ['an unknown picture', { picture: 'albedo', format: 'png' }, /Cannot save 'albedo'/],
+        ['an undeclared format', { picture: 'radiance', format: 'exr' }, /Cannot save 'radiance' as exr/],
+    ] as const) {
+        it(`rejects ${label} before anything renders or locks`, async () => {
+            const app = fakeApp();
+            const coord = fakeCoordinator(() => Promise.resolve());
+            const { orch, store } = mk(app, coord);
 
-        const done = orch.renderProduction(10, { autoExportPNG: true, autoExportHDR: true, autoExportAllAOVs: true });
-        await vi.waitFor(() => expect(app.exportPNG).toHaveBeenCalled());
-        // The PNG is still encoding: the HDR and the AOVs must already have been read.
-        expect(app.exportHDR).toHaveBeenCalled();
-        expect(app.exportAllAOVs).toHaveBeenCalled();
-        releasePNG();
-        await done;
+            await expect(orch.renderProduction(10, { save: [{ picture: 'radiance', format: 'hdr' }, request as never] })).rejects.toThrow(message);
+            expect(coord.startProduction).not.toHaveBeenCalled();
+            expect(app.resize).not.toHaveBeenCalled();
+            expect(app.saveAll).not.toHaveBeenCalled();
+            expect(store.isLocked()).toBe(false);
+        });
+    }
+
+    it('saves nothing when no list is given', async () => {
+        const app = fakeApp();
+        const { orch } = mk(app, fakeCoordinator(() => Promise.resolve()));
+        await orch.renderProduction(10);
+        expect(app.saveAll).not.toHaveBeenCalled();
     });
 });
 

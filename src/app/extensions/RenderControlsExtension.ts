@@ -202,14 +202,16 @@ export class RenderControlsExtension extends UIExtension {
 
             if (tiled) {
                 const [width, height] = size ?? this.app.getCanvasSize();
-                this.app.renderTiled({ width, height, spp: samples, format: 'both', tileSize }).catch(reportFailure);
+                this.app.renderTiled({
+                    width, height, spp: samples, tileSize,
+                    save: [{ picture: 'radiance', format: 'hdr' }, { picture: 'radiance', format: 'png' }],
+                }).catch(reportFailure);
                 return;
             }
             this.app.renderProduction(samples, {
                 width: size?.[0],
                 height: size?.[1],
-                autoExportPNG: true,
-                autoExportAllAOVs: true,
+                save: [{ picture: 'radiance', format: 'png' }],
                 autoSave: true
             }).then(() => {
                 // Completion dialog will be triggered by render.complete event

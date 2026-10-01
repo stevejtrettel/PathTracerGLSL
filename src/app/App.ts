@@ -10,7 +10,7 @@ import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packSceneData } from './sceneData.js';
 import type { PackedChannel } from '../components/data/pack.js';
 import { channelExtern, NODESQ_EXTERN, type DataChannel } from '../components/data/channels.js';
-import type { RenderStrategy } from '../compiler/types.js';
+import type { RenderStrategy, PictureFormat } from '../compiler/types.js';
 import { resolveMeasurement } from '../compiler/plan/measurement.js';
 import { Engine } from '../engine/Engine.js';
 import { RenderCoordinator, type ProgressInfo } from './RenderCoordinator.js';
@@ -25,7 +25,8 @@ import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents, shouldResetAccumulation } from './events.js';
 import { saveHDRFile, savePNGFile, type RenderStamp } from './utils/file-export.js';
-import { ExportError, SessionError } from '../errors/RenderErrors.js';
+import { validateSaves, type SaveRequest, type Captured } from './capture.js';
+import { SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
 import { TiledRenderer, type TiledRenderConfig } from './TiledRenderer.js';
 import { ErrorOverlay } from './ui/ErrorOverlay.js';
@@ -737,12 +738,16 @@ export class App {
     // it (a fresh page shows the main picture). Held by NAME; the display program receives its
     // index in the active renderer's picture list on the reserved channel 'renderer.picture'.
 
-    /** The active renderer's pictures, in planned order; the first is the main picture. */
-    getPictures(): string[] {
-        return Object.entries(this.engine.getActiveRenderer()?.exportTargets ?? {})
+    /** The active renderer's pictures, in planned order (the export targets that carry picture
+     *  facts), each with the file formats it declares. The first is the main picture. */
+    getPictureFormats(): Record<string, PictureFormat[]> {
+        return Object.fromEntries(Object.entries(this.engine.getActiveRenderer()?.exportTargets ?? {})
             .filter(([, target]) => target.picture !== undefined)
-            .map(([name]) => name);
+            .map(([name, target]) => [name, target.picture!.formats]));
     }
+
+    /** The active renderer's pictures, in planned order; the first is the main picture. */
+    getPictures(): string[] { return Object.keys(this.getPictureFormats()); }
 
     /** The picture on screen. */
     getDisplayedPicture(): string {
@@ -765,150 +770,57 @@ export class App {
         this.engine.setParameter('renderer.picture', Math.max(0, this.getPictures().indexOf(this.getDisplayedPicture())));
     }
     readExport(name: string): Float32Array | Uint8Array { return this.engine.readExport(name); }
-    /** Render the display on demand into the 'ldr' buffer; call before readExport('ldr'). */
-    renderLdr(): void { this.engine.renderView(); }
     getCanvasSize(): [number, number] { return this.engine.getCanvasSize(); }
     getCanvas(): HTMLCanvasElement { return this.gl.canvas as HTMLCanvasElement; }
 
-    /** Resolves once the file is handed to the browser. The pixels are read synchronously
-     *  (before the first await), so a render continuing afterwards cannot change them. */
-    async exportPNG(filename?: string): Promise<void> {
-        const exports = this.getAvailableExports();
-        if (!exports.includes('ldr')) {
-            throw new ExportError('LDR export not available for current renderer', {
-                availableExports: exports
-            });
-        }
+    // -- Saving --
+    // One operation: save picture P in format F (app/capture.ts). Everything else — the Save
+    // button, production and tiled renders — names what to save and goes through it.
 
-        try {
-            const [width, height] = this.getCanvasSize();
-            this.renderLdr();   // on-demand: tonemap + dither → 'ldr' buffer (impl-plan-display B)
-            const pixels = this.readExport('ldr') as Uint8Array;
-            const name = filename || this._generateExportFilename('screenshot', 'png');
-            await savePNGFile(pixels, width, height, name, this.buildRenderStamp());
-            console.log(`Exported PNG: ${name}`);
-        } catch (error) {
-            if (error instanceof ExportError) throw error;
-            throw new ExportError('Failed to export PNG', { error });
+    /** Read one picture NOW, synchronously, in one format: its float export for 'hdr', or the
+     *  picture drawn through its view mapping into the 'ldr' buffer for 'png' — a one-draw
+     *  override of the displayed picture, so the screen is untouched. */
+    capture(request: SaveRequest): Captured {
+        validateSaves(this.getPictureFormats(), [request]);
+        if (request.format === 'hdr') return { format: 'hdr', pixels: this.readExport(request.picture) as Float32Array };
+        this.engine.renderView('ldr', { 'renderer.picture': this.getPictures().indexOf(request.picture) });
+        return { format: 'png', pixels: this.readExport('ldr') as Uint8Array };
+    }
+
+    /** Save one picture. Resolves once the file is handed to the browser. */
+    async save(picture: string, format: PictureFormat, filename?: string): Promise<void> {
+        await this.saveAll([{ picture, format }], filename);
+    }
+
+    /** Save a list of pictures. The whole list is validated first; then every picture and its
+     *  stamp are READ before any encoding is awaited, so a render continuing (or a stop, which
+     *  resizes and clears) cannot change what a later file holds. `filename` applies when the
+     *  list has one entry. */
+    async saveAll(requests: readonly SaveRequest[], filename?: string): Promise<void> {
+        validateSaves(this.getPictureFormats(), requests);
+        const [width, height] = this.getCanvasSize();
+        const captured = requests.map((request) => ({
+            request,
+            image: this.capture(request),
+            stamp: this.buildRenderStamp(request.picture),
+        }));
+        for (const { request, image, stamp } of captured) {
+            const name = (requests.length === 1 && filename) || this._generateExportFilename(request.picture, request.format);
+            if (image.format === 'hdr') saveHDRFile(image.pixels, width, height, name, stamp);
+            else await savePNGFile(image.pixels, width, height, name, stamp);
+            console.log(`Saved ${request.picture} (${request.format}): ${name}`);
         }
     }
 
-    exportHDR(filename?: string): void {
-        const exports = this.getAvailableExports();
-        if (!exports.includes('radiance')) {
-            throw new ExportError('HDR export not available for current renderer', {
-                availableExports: exports
-            });
-        }
-
-        try {
-            const [width, height] = this.getCanvasSize();
-            const pixels = this.readExport('radiance') as Float32Array;
-            const name = filename || this._generateExportFilename('radiance', 'hdr');
-            saveHDRFile(pixels, width, height, name, this.buildRenderStamp());
-            console.log(`Exported HDR: ${name}`);
-        } catch (error) {
-            if (error instanceof ExportError) throw error;
-            throw new ExportError('Failed to export HDR', { error });
-        }
-    }
-
-    async exportAOV(aovName: string, filename?: string): Promise<void> {
-        await this.captureAOV(aovName, filename)();
-    }
-
-    /** Read one AOV buffer (and build its stamp) NOW, synchronously; the returned function
-     *  encodes and saves what was read. Separating the two lets exportAllAOVs read every AOV
-     *  before encoding any. */
-    private captureAOV(aovName: string, filename?: string): () => Promise<void> {
-        const exports = this.getAvailableExports();
-        if (!exports.includes(aovName)) {
-            throw new ExportError(`AOV '${aovName}' not available`, {
-                requestedAOV: aovName,
-                availableExports: exports
-            });
-        }
-
-        try {
-            const [width, height] = this.getCanvasSize();
-            const pixels = this.readExport(aovName);
-            const stamp = this.buildRenderStamp();
-            return async () => {
-                try {
-                    if (pixels instanceof Float32Array) {
-                        const name = filename || this._generateExportFilename(aovName, 'hdr');
-                        saveHDRFile(pixels, width, height, name, stamp);
-                        console.log(`Exported AOV (HDR): ${name}`);
-                    } else {
-                        const name = filename || this._generateExportFilename(aovName, 'png');
-                        await savePNGFile(pixels, width, height, name, stamp);
-                        console.log(`Exported AOV (PNG): ${name}`);
-                    }
-                } catch (error) {
-                    throw new ExportError(`Failed to export AOV '${aovName}'`, { aovName, error });
-                }
-            };
-        } catch (error) {
-            if (error instanceof ExportError) throw error;
-            throw new ExportError(`Failed to export AOV '${aovName}'`, { aovName, error });
-        }
-    }
-
-    async exportAllAOVs(): Promise<void> {
-        const exports = this.getAvailableExports();
-        const aovs = exports.filter(e => e !== 'radiance' && e !== 'ldr');
-
-        // E1: an empty AOV set is the NORMAL case for standard renderers (only
-        // hdr/ldr/±variance targets exist) — a no-op, never a throw: the old
-        // ExportError fired mid-production-flow and skipped autoSave, reporting a
-        // successful render as "Production render failed".
-        if (aovs.length === 0) {
-            console.log('No AOVs to export (standard renderer: hdr/ldr only)');
-            return;
-        }
-
-        console.log(`Exporting ${aovs.length} AOVs...`);
-        const errors: Array<{ aov: string; error: any }> = [];
-
-        // Read every AOV before encoding any: encoding is async, and a render continuing (or a
-        // stop clearing the buffer) between two reads would otherwise mix frames in one export.
-        const saves: Array<{ aov: string; save: () => Promise<void> }> = [];
-        for (const aov of aovs) {
-            try {
-                saves.push({ aov, save: this.captureAOV(aov) });
-            } catch (error) {
-                errors.push({ aov, error });
-                console.error(`Failed to export AOV '${aov}':`, error);
-            }
-        }
-        for (const { aov, save } of saves) {
-            try {
-                await save();
-            } catch (error) {
-                errors.push({ aov, error });
-                console.error(`Failed to export AOV '${aov}':`, error);
-            }
-        }
-
-        if (errors.length > 0) {
-            throw new ExportError(`Failed to export ${errors.length} of ${aovs.length} AOVs`, {
-                errors,
-                totalAOVs: aovs.length,
-                failedAOVs: errors.length
-            });
-        }
-
-        console.log('AOV export complete');
-    }
-
-    /** The reproducibility stamp embedded in every export (and readable by tooling).
-     *  A tiled render supplies the full image's resolution and spp: the canvas and the
-     *  sample count describe only the last tile. */
-    buildRenderStamp(image?: { resolution: [number, number]; spp: number }): RenderStamp {
+    /** The reproducibility stamp embedded in every saved file of `picture` (and readable by
+     *  tooling). A tiled render supplies the full image's resolution and spp: the canvas and
+     *  the sample count describe only the last tile. */
+    buildRenderStamp(picture: string, image?: { resolution: [number, number]; spp: number }): RenderStamp {
         const [width, height] = image?.resolution ?? this.getCanvasSize();
         const scene = this.rendererManager.getScene();
         const strategy = this.rendererManager.getActiveStrategy();
         return {
+            picture,
             // Data scenes append the .inst provenance — the scene id alone does not
             // determine a data-built image (fable-instance-clouds §7).
             scene: scene == null ? 'unknown' : scene.provenance !== undefined ? `${scene.id} [${scene.provenance}]` : scene.id,

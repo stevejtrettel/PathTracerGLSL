@@ -4,6 +4,55 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 5b of the outputs plan: one save operation, declared lists
+
+[Step 5 plan](docs/claude-outputs-step5-plan.md), second commit (saving).
+
+**What changed:**
+- **One operation:** `app.save(picture, format, filename?)`, with `app.saveAll(list)` for
+  several. `'hdr'` writes the picture's float values; `'png'` draws the picture through its
+  view mapping into `ldr` (a one-draw override, so the screen and the displayed picture are
+  unchanged). A format must be one the picture declares; an unknown picture or an undeclared
+  format is an error naming what the renderer keeps.
+- **Capture is shared** (`app/capture.ts`, `App.capture`): `save` and the tiled renderer read
+  pixels the same way. `saveAll` reads every picture and its stamp before awaiting any
+  encode.
+- **The stamp records the picture** (`picture=` in the `.hdr` header, `pathtracer:picture` in
+  the PNG).
+- **Declared lists:**
+  - `renderProduction(N, { save: [{ picture, format }, …] })` replaces `autoExportPNG`,
+    `autoExportHDR` and `autoExportAllAOVs`;
+  - `renderTiled({ …, save: [...] })` replaces `format: 'hdr' | 'png' | 'both'`; files are
+    named `render_<date>_<picture>_<W>x<H>_<spp>spp.<format>`;
+  - both validate the whole list before rendering, and the production check runs before
+    anything is locked or resized.
+- **Deleted:** `exportPNG`, `exportHDR`, `exportAOV`, `exportAllAOVs` (with its "every export
+  except radiance and ldr" rule), `App.renderLdr`, and the `a` "export all AOVs" key.
+- **Callers:**
+  - the panel's Export PNG and the `x` key save the picture on screen; Export HDR and `X`
+    save the raw radiance;
+  - the production dialog saves the radiance PNG (the same files as before), and the tiled
+    job saves the radiance HDR and PNG;
+  - the witness tiled check and the frames tool go through `save` lists and `capture`.
+- **Docs:** production-rendering.md has a Saving section; architecture.md's production flow
+  and the witness README now name `save`.
+
+**Measured:**
+- **Typecheck and tests:** `tsc` clean; vitest 111 files and 4130 tests. New: `validateSaves`
+  rejects an unknown picture and an undeclared format; `App.saveAll` validates before reading
+  and reads every picture before awaiting an encode; the production orchestrator rejects a
+  bad list before rendering or locking; both file formats carry `picture`.
+- **Digest** against 5a: 268 of 268 scenes identical (saving is App code only).
+- **Frames** against 5a: 18 of 18 identical, including the tiled payloads, which now go
+  through the shared capture.
+- **Witness** `cornell-area`: all 3 exact checks pass, including tiled ≡ one piece (HDR 0 of
+  76800 bytes differ, PNG 0 of 57720), with both sides saved through `save`.
+- **Browser check** (furnace variance renderer, after a finished 8-sample render showing
+  radiance): `save('variance', 'png')` downloads a file whose stamp says `variance` and whose
+  pixels equal the variance capture. Afterwards the displayed picture is still radiance, the
+  render canvas is pixel-identical to before, the sample count stays 8 and the salt 1234, and
+  there are no page errors.
+
 ## 2026-09-30 — Step 5a of the outputs plan: any picture on screen, switched live
 
 [Step 5 plan](docs/claude-outputs-step5-plan.md), first commit (viewing).

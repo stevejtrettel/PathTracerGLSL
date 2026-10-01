@@ -19,7 +19,7 @@ app.start();
 
 // Later: Start production render
 await app.renderProduction(1000);  // Render 1000 samples
-await app.exportPNG();
+await app.save('radiance', 'png');
 ```
 
 ## Production Render API
@@ -32,10 +32,14 @@ await app.renderProduction(1000);
 
 // With options
 await app.renderProduction(5000, {
-    autoSave: true,        // Save session on completion
-    autoExportPNG: true,   // Export PNG on completion
-    autoExportHDR: true    // Export HDR on completion
+    autoSave: true,        // Save the session on completion
+    save: [                // The pictures to save on completion, one file each
+        { picture: 'radiance', format: 'png' },
+        { picture: 'radiance', format: 'hdr' },
+    ],
 });
+// The list is checked before rendering starts: an unknown picture, or a format the
+// picture does not declare, is an error.
 ```
 
 ### Extending a Render
@@ -81,8 +85,8 @@ app.getRenderState()  // 'rendering', 'paused', 'complete', 'stopped'
 
 For images larger than the screen (8K stills, posters), render in tiles. The image is split
 into tiles; the canvas is resized to one tile at a time; each tile is rendered to the full
-sample count and read back; the tiles are stitched on the CPU into ONE HDR and/or PNG file
-carrying the full image's stamp. Tiles bound the work in one draw call (a whole 8K frame of a
+sample count and read back; the tiles are stitched on the CPU into one file per requested save,
+each carrying the full image's stamp. Tiles bound the work in one draw call (a whole 8K frame of a
 heavy scene can outlast the GPU watchdog) and the GPU memory the accumulation needs.
 
 ```typescript
@@ -90,10 +94,10 @@ await app.renderTiled({
     width: 7680,
     height: 4320,
     spp: 2000,
-    format: 'both',      // 'hdr' | 'png' | 'both'
     tileSize: 1024,      // optional; rounded up to a multiple of 64
+    save: [{ picture: 'radiance', format: 'hdr' }, { picture: 'radiance', format: 'png' }],
 });
-// Saves render_<date>_7680x4320_2000spp.hdr / .png, then resumes interactive rendering.
+// Saves render_<date>_radiance_7680x4320_2000spp.hdr / .png, then resumes interactive rendering.
 ```
 
 The production dialog offers the same thing ("Render in tiles"; on by default for 8K; a
@@ -111,9 +115,9 @@ witness check `kind: 'tiled'` (tests/witnesses/README.md) tests this on `cornell
 HDR pixel bytes and the PNG image data. The other cameras of the cornell camera family were
 checked once by hand in headless Chromium.
 
-**Memory.** The stitched image is kept at 4 bytes per pixel per format (RGBE for HDR, RGBA
-for PNG): 133 MB each at 7680×4320. Both are allocated before the first tile, so a size the
-browser cannot hold fails immediately.
+**Memory.** Each requested save is kept stitched at 4 bytes per pixel (RGBE for HDR, RGBA for
+PNG): 133 MB each at 7680×4320. All are allocated before the first tile, so a size the browser
+cannot hold fails immediately.
 
 **Stopping** (`app.stop()`, or Cancel in the panel) discards the job; nothing is saved, and
 there is no resume.
@@ -123,26 +127,28 @@ use a fast GPU fully (a 512² tile at 60 fps is 16M samples/s). Prefer the defau
 larger unless a single frame of the scene is slow. Keep the tab visible: browsers stop
 animation frames in background tabs.
 
-## Export
+## Saving
 
-After rendering:
+A renderer keeps a list of **pictures**: `radiance` first, then any statistic its strategy
+asks for (`variance` with `accumulation: { type: 'average', variance: true }`).
+`app.getPictures()` lists them; `app.getPictureFormats()` says which file formats each can be
+saved in. One operation saves one picture in one format:
 
 ```typescript
-// Export PNG (8-bit, tonemapped; encoding is async)
-await app.exportPNG();
-await app.exportPNG('my-render.png');
-
-// Export HDR (32-bit float, linear)
-app.exportHDR();
-app.exportHDR('my-render.hdr');
-
-// Export specific AOV
-await app.exportAOV('albedo');
-await app.exportAOV('normal', 'normals.png');
-
-// Export all AOVs
-await app.exportAllAOVs();
+await app.save('radiance', 'hdr');                  // the raw float values (Radiance .hdr)
+await app.save('radiance', 'png');                  // drawn through the view (exposure, tonemap, sRGB)
+await app.save('variance', 'png', 'variance.png');  // any picture, whatever the screen shows
+await app.saveAll([{ picture: 'radiance', format: 'hdr' }, { picture: 'variance', format: 'hdr' }]);
 ```
+
+Every file carries the reproducibility stamp, including `picture`, the picture it holds. The
+pixels and stamps are read before any encoding is awaited, so a render continuing (or a stop)
+cannot change a file. `app.capture({ picture, format })` returns the pixels without saving
+(bottom row first).
+
+`app.showPicture(name)` changes what the screen shows (the `m` key cycles); it does not
+reset the render. The panel's Export PNG button and the `x` key save the picture on screen;
+Export HDR and `X` save the raw radiance.
 
 ## Events
 
@@ -245,7 +251,7 @@ panel?.hide();
 
 ### Render Mode System
 
-Production renders are managed by `ProductionRenderManager` (layout switching, resolution, auto-export) which delegates the actual render loop to `RenderCoordinator`:
+Production renders are managed by `ProductionOrchestrator` (layout switching, resolution, saving the declared pictures) which delegates the actual render loop to `RenderCoordinator`:
 
 ```typescript
 type RenderMode = 'interactive' | 'production';

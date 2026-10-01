@@ -1,21 +1,23 @@
 // app/ProductionOrchestrator.ts — Consolidates production render lifecycle
 //
 // Owns the full production sequence: lock params → resize → switch layout →
-// reset accumulation → render → auto-export → restore layout/resolution → unlock.
+// reset accumulation → render → save the declared pictures → restore layout/resolution → unlock.
 
 import type { App } from './App.js';
 import type { RenderCoordinator, ProgressInfo } from './RenderCoordinator.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { LayoutMode } from './layout/index.js';
 import type { Tile } from './tiling.js';
+import { validateSaves, type SaveRequest } from './capture.js';
 
 export interface ProductionOptions {
     width?: number;
     height?: number;
+    /** Save the session file when the render completes. */
     autoSave?: boolean;
-    autoExportPNG?: boolean;
-    autoExportHDR?: boolean;
-    autoExportAllAOVs?: boolean;
+    /** The pictures to save when the render completes, each in one format (app/capture.ts).
+     *  Validated before rendering starts. */
+    save?: SaveRequest[];
 }
 
 /**
@@ -60,6 +62,8 @@ export class ProductionOrchestrator {
     }
 
     async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
+        const save = options?.save ?? [];
+        validateSaves(this.app.getPictureFormats(), save);
         const run = this.beginProduction(options);
         try {
             await this.coordinator.startProduction({
@@ -72,17 +76,11 @@ export class ProductionOrchestrator {
                 }
             });
 
-            // Auto-export runs here — still at target resolution, before exitProduction ever
+            // Saving runs here — still at target resolution, before exitProduction ever
             // restores — so a completed render is saved before it can be discarded on return
-            // to interactive. Every buffer is READ before the first await: each export reads
-            // its pixels synchronously when called and only its encoding is async, so starting
-            // them all and then waiting means a stop during an encode (which resizes and clears
-            // the buffer) cannot change what the later exports save.
-            const saves: Promise<void>[] = [];
-            if (options?.autoExportPNG) { console.log('Auto-exporting PNG...'); saves.push(this.app.exportPNG()); }
-            if (options?.autoExportHDR) { console.log('Auto-exporting HDR...'); this.app.exportHDR(); }
-            if (options?.autoExportAllAOVs) { console.log('Auto-exporting all AOVs...'); saves.push(this.app.exportAllAOVs()); }
-            await Promise.all(saves);
+            // to interactive. saveAll reads every picture before its first await, so a stop
+            // during an encode (which resizes and clears the buffers) cannot change a file.
+            if (save.length > 0) await this.app.saveAll(save);
             if (options?.autoSave) { console.log('Auto-saving session...'); this.app.quickSave(); }
         } finally {
             // Render settled (completed or stopped): unlock + restore profiling, but

@@ -16,9 +16,8 @@ import { AppEvents } from '../events.js';
  *   \       : Pause/resume
  *   p/P     : Start production render (prompts for samples)
  *   Escape  : Stop rendering
- *   x       : Export PNG screenshot
- *   X       : Export HDR
- *   a/A     : Export all AOVs
+ *   x       : Save the picture on screen as PNG
+ *   X       : Save the raw radiance as HDR
  *   j/J     : Quick save session
  *   o/O     : Load session from file
  *   m/M     : Cycle the displayed picture (radiance, variance, …)
@@ -49,8 +48,7 @@ export class AppShortcutsExtension implements Extension {
         console.log('  \\       : Pause/resume');
         console.log('  p       : Production render');
         console.log('  Escape  : Stop');
-        console.log('  x/X     : Export PNG/HDR');
-        console.log('  a       : Export AOVs');
+        console.log('  x/X     : Save PNG (on screen) / HDR (radiance)');
         console.log('  j/o     : Save/load session');
         console.log('  m       : Cycle the displayed picture');
     }
@@ -121,23 +119,16 @@ export class AppShortcutsExtension implements Extension {
                 this.app.stop();
                 break;
 
-            // x: Export PNG screenshot
+            // x: Save the picture on screen as PNG
             case 'x':
                 e.preventDefault();
-                this.app.exportPNG().catch((err) => console.error('PNG export failed:', err));
+                this.app.save(this.app.getDisplayedPicture(), 'png').catch((err) => console.error('PNG save failed:', err));
                 break;
 
-            // X (shift+x): Export HDR
+            // X (shift+x): Save the raw radiance as HDR
             case 'X':
                 e.preventDefault();
-                this.app.exportHDR();
-                break;
-
-            // a/A: Export all AOVs
-            case 'a':
-            case 'A':
-                e.preventDefault();
-                this.app.exportAllAOVs().catch((err) => console.error('AOV export failed:', err));
+                this.app.save('radiance', 'hdr').catch((err) => console.error('HDR save failed:', err));
                 break;
 
             // m/M: Cycle the displayed picture

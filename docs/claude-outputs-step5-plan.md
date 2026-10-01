@@ -1,7 +1,8 @@
 # Step 5: viewing and saving (outputs and accumulation plan)
 
 **Date:** 2026-09-30
-**Status:** Proposed; awaiting owner approval. No code yet.
+**Status:** Built 2026-09-30 in two commits (5a viewing, 5b saving). Every prediction held;
+the results are in the CHANGELOG.
 Part of `claude-outputs-accumulation.md` §3–§5 and §9. Baselines at commit `24dced1`:
 `.digest/step4-commit-frames`, and `.digest/step4c.json` with `.digest/step4c-keep`.
 

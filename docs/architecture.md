@@ -627,13 +627,13 @@ Manages the production render lifecycle — everything beyond just "render N sam
 - Switch layout mode for production (e.g. fullscreen → centered)
 - Resize canvas for custom resolution
 - Lock/unlock parameters
-- Auto-export (PNG, HDR, AOVs) on completion
+- Save the declared pictures on completion (`save: [{ picture, format }]`)
 - Restore layout and resolution when done
 - Handle `extendProduction()` for adding samples
 
 **Key Methods**:
 ```typescript
-renderProduction(targetSamples: number, options?: { width?, height?, autoSave?, autoExportPNG?, autoExportHDR?, autoExportAllAOVs? }): Promise<void>
+renderProduction(targetSamples: number, options?: { width?, height?, autoSave?, save?: SaveRequest[] }): Promise<void>
 extendProduction(additionalSamples: number): Promise<void>
 ```
 
@@ -954,7 +954,7 @@ Next frame renders with new renderer
 ### Production Render Flow
 
 ```
-User: await app.renderProduction(1000, { autoExportPNG: true })
+User: await app.renderProduction(1000, { save: [{ picture: 'radiance', format: 'png' }] })
   ↓
 App delegates to ProductionOrchestrator.renderProduction()
   ↓
@@ -964,7 +964,7 @@ ProductionOrchestrator:
   3. parameterStore.lock()
   4. coordinator.resetAccumulation('production_start')
   5. await coordinator.startProduction({ targetSamples: 1000 })
-  6. [On complete] Auto-export if requested
+  6. [On complete] Save the declared pictures
   7. parameterStore.unlock()
   8. Restore previous layout and resolution
   ↓
@@ -984,8 +984,8 @@ RenderCoordinator.startProduction():
   ↓
 Promise resolves → ProductionOrchestrator continues
   ↓
-Auto-export (if requested):
-  - exportPNG(), exportHDR(), exportAllAOVs()
+Save the declared pictures (if any):
+  - app.saveAll(save)
   ↓
 Restore layout + unlock parameters
   ↓

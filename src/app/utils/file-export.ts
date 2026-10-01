@@ -3,12 +3,14 @@
 /**
  * Reproducibility stamp — everything needed to re-produce an exported image:
  * the scene, the full strategy JSON, the live parameters (camera pose etc.),
- * the sample count, the RNG salt, and the code revision. Written into the
+ * the sample count, the RNG salt, the code revision, and which picture the file holds. Written into the
  * Radiance header as comment lines and into PNG as tEXt chunks.
  * `measurement` is the strategy's measurement section with every default filled in: what
  * the image is an estimate of, including the truncations the author left at their defaults.
  */
 export interface RenderStamp {
+    /** The picture this file holds (a name from the renderer's picture list). */
+    picture: string;
     scene: string;
     strategy: unknown;
     measurement: unknown;
@@ -25,6 +27,7 @@ function stampEntries(stamp: RenderStamp): Array<[string, string]> {
     // (PNG tEXt is Latin-1): JSON.stringify emits no newlines, and escapeAscii
     // handles the rest.
     return [
+        ['picture', stamp.picture],
         ['scene', stamp.scene],
         ['strategy', JSON.stringify(stamp.strategy)],
         ['measurement', JSON.stringify(stamp.measurement)],

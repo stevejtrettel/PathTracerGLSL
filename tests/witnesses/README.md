@@ -263,7 +263,7 @@ The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY rend
 
 `kind: 'tiled'` checks that tiling does not change the image. In one page, the runner
 renders the scene with `app.renderTiled` (HDR and PNG), then in one piece at the same
-size, spp and pinned salt, saved through `exportHDR`/`exportPNG`. It catches the four
+size, spp and pinned salt, saved through `app.save`. It catches the four
 downloads and requires the HDR pixel bytes (everything after the resolution line) and
 the PNGs' inflated image data to be identical, byte for byte. The headers are not
 compared, since the stamps carry the date. `tileSize` (a multiple of 64, the blue-noise

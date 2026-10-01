@@ -41,7 +41,7 @@ try {
     });
     assert.deepEqual(after, before, 'restored image');
     assert.equal(requests.length, 2, 'context restore uses retained immutable bytes');
-    const stamp = await page.evaluate(() => window.app.buildRenderStamp());
+    const stamp = await page.evaluate(() => window.app.buildRenderStamp('radiance'));
     assert.equal(stamp.measurement.sensor, 'cie1931');
     assert.equal(stamp.measurement.colorModelVersion, 'jh-cie1931-d65-v1');
     assert.equal(stamp.strategy.estimator.wavelengths, 'uniform');
