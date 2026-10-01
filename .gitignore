@@ -29,4 +29,4 @@ test-data/
 *.sln
 *.sw?
 .witness-cache/
-
+.digest/

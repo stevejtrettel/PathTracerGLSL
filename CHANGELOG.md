@@ -4,6 +4,67 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 0 of the outputs plan: exact comparison tools
+
+[Step 0 plan](docs/claude-outputs-step0-plan.md) of
+[the outputs plan](docs/claude-outputs-accumulation.md). No renderer code changed: `git diff`
+for `src`, `tests`, `demos` and `pages` is empty.
+
+**What was added:**
+- **`npm run frames -- record <dir>`** (a mode of `tools/witness.mjs`). It renders 8 fixed
+  cases fresh on SwiftShader at the pinned salt, bypassing the witness caches:
+  - average;
+  - variance, zero by design (the furnace);
+  - variance, noisy (Cornell);
+  - oneshot;
+  - spectral;
+  - fog;
+  - GRIN;
+  - a 150×100 render in 3×2 tiles.
+
+  For each case it keeps every float export, the LDR bytes, and what the App reports after
+  the render. For the tiled case it keeps the encoded `.hdr` and `.png` payloads, with
+  their headers.
+- **`npm run frames -- compare <a> <b> [--rename old=new]`.** It reads files only. It
+  requires both records to be complete and valid against the case list, with no
+  non-finite values. Then every picture must be bit-for-bit equal.
+- **`npm run digest -- <out> --keep <dir>`.** It keeps the exact text behind every hash.
+  `--compare` prints a `git diff --no-index` line for each part that differs.
+- **Smaller additions:** `.digest/` in `.gitignore`, and the commands in CLAUDE.md.
+
+**Measured:**
+- **Typecheck:** `tsc` clean.
+- **Tests:** vitest 109 files and 4095 tests, the same before and after.
+- **Repeatability:** two fresh records are bit-identical (18 of 18 pictures), both before
+  and after the review fixes.
+- **The variance cases:** the furnace's variance is exactly 0 (12288 of 12288 channels),
+  which is why the noisy Cornell case exists. Its variance is nonzero in 12066 of 12288
+  channels.
+- **Each negative check fails as it should:**
+  - one changed float is reported as 1 pixel, difference 1e-3;
+  - metadata-only changes pass;
+  - a NaN fails;
+  - a missing file, a wrong salt, missing cases and a truncated encoded file are each
+    refused;
+  - `--rename` works, and a rename collision is caught.
+- **The digest:** the new script's hashes equal the original script's on 268 of 268
+  scenes. A kept run takes about 4 s and about 82 MB.
+- **Timing:** a fresh record took 23–37 s. One run took 338 s for unexplained reasons
+  (images identical; timing only).
+
+**The review** was by an independent agent (ChatGPT). It found four ways the tool could
+pass when it shouldn't, all fixed and measured:
+1. **Records were checked only against each other,** not against the required cases. The
+   reviewer showed matching broken records passing: empty manifests, the same case removed
+   from both, the main picture removed from both, and both salts set to 999.
+2. **The tiled capture dropped its file headers,** and the PNG had no length check. Both
+   PNG payloads truncated to zero bytes passed.
+3. **A failed GPU readback could look valid,** because WebGL errors weren't checked (1286
+   left finite zeros). A mutant tool now fails on exactly this.
+4. **`--keep` could overwrite an earlier digest's evidence.**
+
+All the reviewer's constructions are now refused, and the unchanged control still passes.
+
 ## 2026-09-29 — Outputs and accumulation: design and plan (documentation only)
 
 The OIDN work was paused for a redesign of the renderer's output side, because the

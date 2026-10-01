@@ -17,7 +17,10 @@ npx tsc --noEmit       # typecheck
 npm run witness        # GPU numeric tests (~45 min); `-- <scene…>` filters, `-- --list` lists
 npm run dump:shaders   # generated shaders → generated-shaders/ (`-- --scene <module>` for one)
 npm run digest -- <out.json>              # digest of every suite scene's compiled output
+npm run digest -- <out.json> --keep .digest/<name>   # …and keep each part's text to read diffs
 npm run digest -- --compare <a> <b>       # which scenes and parts differ between two digests
+npm run frames -- record <dir>            # render fixed cases fresh (SwiftShader, pinned salt), keep pictures
+npm run frames -- compare <a> <b>         # bit-exact picture comparison of two records (no browser)
 ```
 
 - The glslang static-compile tests (`tests/compiler/glsl-compile.test.ts` and a few others)

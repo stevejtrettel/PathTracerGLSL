@@ -17,6 +17,8 @@
 //   npm run witness -- --spp-scale 3 het-const   # run these at 3× each spec's spp
 //   npm run witness -- --perf           # PERF checks only, on the REAL GPU (see below)
 //   npm run witness -- --perf --headed  # perf with a visible window (guaranteed real GPU)
+//   npm run frames -- record <dir>      # render the fixed FRAME_CASES fresh and keep their pictures
+//   npm run frames -- compare <a> <b> [--rename old=new]   # bit-exact comparison of two records
 //
 // --spp-scale <x> multiplies every witness's spp (a one-time convergence probe: a twin
 // whose means agree but whose display-space RMSE just misses at the spec spp will fall as
@@ -31,7 +33,7 @@
 // rerun with --headed. Perf frames are never cached (milliseconds are machine state,
 // not pure functions of the inputs). Run perf alone on a quiet machine.
 
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -718,6 +720,385 @@ function differingBytes(a, b) {
 }
 
 // ---------------------------------------------------------------------------
+// Frames: exact before/after comparison of rendered pictures (docs/claude-outputs-step0-plan.md).
+//
+// `record` renders each FRAME_CASE fresh (it never reads or writes the frame or variance caches)
+// at the pinned WITNESS_SALT and keeps every float export the renderer offers, the LDR bytes, and
+// what the App reports after the render; the tiled case keeps the encoded payloads of the files a
+// tiled render saves. `compare` reads two records from disk (no browser, no dev server) and passes
+// only if both are complete, describe the same renders, contain no non-finite values, and every
+// picture is bit-for-bit equal. These cases are regression coverage for themselves, not for scenes
+// they do not render.
+// `pictures` is the exact set of float exports each case must record (an update to a renderer's
+// exports updates this list); the tiled case records encoded files instead.
+const FRAME_CASES = [
+    { id: 'average', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    // Every furnace sample is the same number, so its variance is zero by design…
+    { id: 'variance-zero', scene: 'furnace', strategy: 1, size: [64, 64], spp: 8, pictures: ['hdr', 'variance'] },
+    // …so a noisy scene with variance forced on covers the variance update; record checks it is nonzero.
+    { id: 'variance-noisy', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr', 'variance'], forceVariance: true },
+    { id: 'oneshot', scene: 'cornell-oneshot', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    { id: 'spectral', scene: 'spectral-materials', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    { id: 'medium', scene: 'fog-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    { id: 'grin', scene: 'grin-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    // 150×100 in 64px tiles = 3×2 tiles with partial edges (tile sizes round up to 64, app/tiling.ts).
+    { id: 'tiled', scene: 'cornell-area', strategy: 0, size: [150, 100], spp: 8, tileSize: 64 },
+];
+
+/** Check one case's meta.json against what the case requires: the scene, size, sample count,
+ *  pinned salt, tile size, and (after `renames`) exactly the declared pictures, or, for the tiled
+ *  case, file headers that match the size. Throws with the first mismatch. */
+function validateCaseMeta(c, meta, renames = new Map()) {
+    const want = { case: c.id, scene: c.scene, size: c.size, spp: c.spp, salt: WITNESS_SALT, tileSize: c.tileSize };
+    for (const [key, value] of Object.entries(want)) {
+        if (JSON.stringify(meta[key]) !== JSON.stringify(value)) {
+            throw new Error(`${c.id}: ${key} is ${JSON.stringify(meta[key])}, the case requires ${JSON.stringify(value)}`);
+        }
+    }
+    if (c.tileSize !== undefined) {
+        const [W, H] = c.size;
+        if (JSON.stringify(meta.hdrResolution) !== JSON.stringify([W, H])) throw new Error(`${c.id}: the .hdr is ${JSON.stringify(meta.hdrResolution)}, not ${W}×${H}`);
+        const png = meta.png ?? {};
+        if (png.width !== W || png.height !== H || png.bitDepth !== 8 || !(png.colorType in PNG_CHANNELS)) {
+            throw new Error(`${c.id}: the .png header ${JSON.stringify(png)} does not match an 8-bit ${W}×${H} image`);
+        }
+        return;
+    }
+    const names = Object.keys(meta.pictures ?? {}).map(n => renames.get(n) ?? n).sort();
+    if (JSON.stringify(names) !== JSON.stringify([...c.pictures].sort())) {
+        throw new Error(`${c.id}: records pictures ${JSON.stringify(names)}, the case requires ${JSON.stringify(c.pictures)}`);
+    }
+}
+
+/** Channels per PNG color type (the encoder writes 8-bit samples). */
+const PNG_CHANNELS = { 0: 1, 2: 3, 4: 2, 6: 4 };
+
+function gitRevision() {
+    try {
+        const hash = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+        return execSync('git status --porcelain', { encoding: 'utf8' }).trim() ? `${hash}-dirty` : hash;
+    } catch { return 'unknown'; }
+}
+
+/** Bytes of a typed array, as a Node Buffer (for writing). */
+const bytesOf = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength);
+
+/** Drain the page's WebGL error flags (in page context). Engine.readBuffer does not check them,
+ *  and a failed readPixels can leave finite zeros behind with no exception, so every capture
+ *  clears the flags before rendering and requires none afterwards. */
+const drainGlErrors = () => {
+    const gl = window.app.getCanvas().getContext('webgl2');
+    const errors = [];
+    for (let e = gl.getError(); e !== gl.NO_ERROR && errors.length < 16; e = gl.getError()) errors.push(e);
+    return errors;
+};
+
+/** Open the lab on a scene, stop its loop, pin the salt, and select the case's renderer at its
+ *  size. Returns the strategy id actually selected. */
+async function openCase(page, c) {
+    await page.goto(`${BASE_URL}/lab.html?scene=${c.scene}&witness`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
+    const known = await page.evaluate(sid => sid in (window.sceneSuite ?? {}), c.scene);
+    if (!known) throw new Error(`scene '${c.scene}' not in the page's registry (stale dev server? restart it)`);
+    await page.evaluate(`window.__drainGlErrors = ${drainGlErrors}`);
+    return page.evaluate(async ([sid, idx, w, h, salt, forceVariance]) => {
+        const app = window.app;
+        const entry = window.sceneSuite[sid];
+        if (!entry.strategies[idx]) throw new Error(`${sid}: no strategy at index ${idx}`);
+        app.stop();
+        app.pinResetSalt(salt);
+        let strategyId = entry.strategies[idx].id;
+        if (forceVariance) {
+            // The witness runner's way of turning variance on (renderVarianceOnce above).
+            const strategy = JSON.parse(JSON.stringify(entry.strategies[idx]));
+            strategy.estimator.accumulation = { type: 'variance' };
+            strategy.id = `${strategy.id}__var`;
+            await app.initialize({ scene: entry.scene, strategies: [strategy], initialParameters: entry.initialParameters });
+            strategyId = strategy.id;
+        }
+        app.selectRendererByStrategy(strategyId);
+        app.resize(w, h);
+        return strategyId;
+    }, [c.scene, c.strategy, c.size[0], c.size[1], WITNESS_SALT, c.forceVariance === true]);
+}
+
+/** Render one ordinary case and write its pictures and meta.json to dir/<case id>. */
+async function recordCase(browser, c, dir) {
+    const page = await browser.newPage();
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(String(e)));
+    try {
+        const strategyId = await openCase(page, c);
+        await page.evaluate(() => window.__drainGlErrors());
+        await page.evaluate(n => {
+            window.__witnessDone = false; window.__witnessError = null;
+            window.app.renderProduction(n)
+                .then(() => { window.__witnessDone = true; })
+                .catch(e => { window.__witnessError = String(e); });
+        }, c.spp);
+        await waitForRender(page);
+        // Everything is read back as integers (the float bits), so -0, NaN payloads and every
+        // last bit survive the trip out of the page exactly.
+        const got = await page.evaluate(() => {
+            const app = window.app;
+            const exports = app.getAvailableExports().filter(name => name !== 'ldr');
+            const floats = {};
+            for (const name of exports) {
+                const px = app.readExport(name);
+                floats[name] = Array.from(new Uint32Array(px.buffer, px.byteOffset, px.length));
+            }
+            app.renderLdr();
+            const ldr = Array.from(app.readExport('ldr'));
+            return {
+                glErrors: window.__drainGlErrors(),
+                rendererId: app.getActiveRendererId(),
+                strategyId: app.getActiveStrategy()?.id ?? null,
+                size: app.getCanvasSize(),
+                spp: app.getStats().samples,
+                salt: app.getResetSalt(),
+                floats,
+                ldr,
+            };
+        });
+        if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);
+        if (got.glErrors.length) throw new Error(`WebGL errors during the render or readback: ${got.glErrors.join(', ')}`);
+        if (got.strategyId !== strategyId) throw new Error(`the page rendered strategy '${got.strategyId}', not '${strategyId}'`);
+        const caseDir = join(dir, c.id);
+        mkdirSync(caseDir, { recursive: true });
+        const pictures = {};
+        for (const [name, bits] of Object.entries(got.floats)) {
+            const f32 = new Float32Array(new Uint32Array(bits).buffer);
+            pictures[name] = { file: `${name}.f32`, nonFinite: f32.filter(v => !Number.isFinite(v)).length };
+            writeFileSync(join(caseDir, `${name}.f32`), bytesOf(f32));
+        }
+        writeFileSync(join(caseDir, 'ldr.u8'), Buffer.from(got.ldr));
+        const meta = {
+            case: c.id, scene: c.scene, strategyId: got.strategyId, rendererId: got.rendererId,
+            size: got.size, spp: got.spp, salt: got.salt,
+            pictures, ldr: 'ldr.u8', git: gitRevision(), date: new Date().toISOString(),
+        };
+        validateCaseMeta(c, meta);   // what the App reports must be what the case asked for
+        writeFileSync(join(caseDir, 'meta.json'), JSON.stringify(meta, null, 1));
+        return meta;
+    } finally {
+        await page.close();
+    }
+}
+
+/** Render the tiled case and keep the encoded payloads of the .hdr and .png it saves. */
+async function recordTiledCase(browser, c, dir) {
+    const page = await browser.newPage();
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(String(e)));
+    const files = new Map();
+    const saving = [];
+    page.on('download', (d) => { saving.push(d.path().then((p) => files.set(d.suggestedFilename(), readFileSync(p)))); });
+    const named = (re) => [...files.keys()].find((k) => re.test(k));
+    try {
+        const strategyId = await openCase(page, c);
+        const got = await page.evaluate(async ([w, h, n, tile]) => {
+            const app = window.app;
+            window.__drainGlErrors();
+            await app.renderTiled({ width: w, height: h, spp: n, format: 'both', tileSize: tile });
+            return { strategyId: app.getActiveStrategy()?.id ?? null, salt: app.getResetSalt(), glErrors: window.__drainGlErrors() };
+        }, [c.size[0], c.size[1], c.spp, c.tileSize]);
+        if (got.glErrors.length) throw new Error(`WebGL errors during the tiled render: ${got.glErrors.join(', ')}`);
+        const t0 = Date.now();
+        for (;;) {
+            await Promise.all(saving);
+            if (named(/^render_.*\.hdr$/) && named(/^render_.*\.png$/)) break;
+            if (Date.now() - t0 > 60_000) throw new Error(`tiled record: the files never arrived (have: ${[...files.keys()].join(', ') || 'none'})`);
+            await new Promise((r) => setTimeout(r, 200));
+        }
+        if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);
+        if (got.strategyId !== strategyId) throw new Error(`the page rendered strategy '${got.strategyId}', not '${strategyId}'`);
+        const caseDir = join(dir, c.id);
+        mkdirSync(caseDir, { recursive: true });
+        const hdrFile = files.get(named(/^render_.*\.hdr$/));
+        const pngFile = files.get(named(/^render_.*\.png$/));
+        writeFileSync(join(caseDir, 'hdr-payload.bin'), hdrPixels(hdrFile));
+        writeFileSync(join(caseDir, 'png-image.bin'), pngImageData(pngFile));
+        // The structure the stripped payloads need to be read: the .hdr resolution line and the
+        // .png IHDR (width, height, bit depth, color type). The size and sample count are the
+        // request's; the tiled job's own stamp records them, and the headers confirm the size.
+        const res = /\n-Y (\d+) \+X (\d+)\n/.exec(hdrFile.toString('latin1'));
+        const meta = {
+            case: c.id, scene: c.scene, strategyId: got.strategyId,
+            size: c.size, spp: c.spp, tileSize: c.tileSize, salt: got.salt,
+            hdrResolution: res ? [Number(res[2]), Number(res[1])] : null,
+            png: pngFile.toString('latin1', 12, 16) === 'IHDR'
+                ? { width: pngFile.readUInt32BE(16), height: pngFile.readUInt32BE(20), bitDepth: pngFile[24], colorType: pngFile[25] }
+                : null,
+            encoded: { hdr: 'hdr-payload.bin', png: 'png-image.bin' }, git: gitRevision(), date: new Date().toISOString(),
+        };
+        validateCaseMeta(c, meta);
+        writeFileSync(join(caseDir, 'meta.json'), JSON.stringify(meta, null, 1));
+        return meta;
+    } finally {
+        await page.close();
+    }
+}
+
+async function framesRecord(dir) {
+    if (existsSync(join(dir, 'manifest.json'))) throw new Error(`${dir} already holds a record; choose a new directory`);
+    await ensureServer();
+    const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+    const t0 = Date.now();
+    try {
+        const cases = [];
+        for (const c of FRAME_CASES) {
+            const t = Date.now();
+            const meta = c.tileSize !== undefined ? await recordTiledCase(browser, c, dir) : await recordCase(browser, c, dir);
+            const bad = Object.entries(meta.pictures ?? {}).filter(([, p]) => p.nonFinite > 0);
+            if (bad.length) throw new Error(`${c.id}: non-finite values in ${bad.map(([n, p]) => `${n} (${p.nonFinite})`).join(', ')}`);
+            if (c.forceVariance) {
+                const v = new Float32Array(new Uint8Array(readFileSync(join(dir, c.id, meta.pictures.variance.file))).buffer);
+                if (!v.some((x, i) => i % 4 !== 3 && x > 0)) throw new Error(`${c.id}: the variance is zero everywhere — this case must be noisy`);
+            }
+            cases.push(c.id);
+            process.stdout.write(`  recorded ${c.id} (${c.scene}) in ${((Date.now() - t) / 1000).toFixed(1)}s\n`);
+        }
+        // Written last: a record without a manifest is incomplete, and compare refuses it.
+        writeFileSync(join(dir, 'manifest.json'), JSON.stringify({ cases, git: gitRevision(), date: new Date().toISOString() }, null, 1));
+        console.log(`frames: ${cases.length} cases recorded in ${dir} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+    } finally {
+        await browser.close();
+        cleanup();
+    }
+}
+
+/** Read a record and check it on its own against FRAME_CASES: exactly the fixed cases, each
+ *  meeting its requirements (validateCaseMeta; `renames` map old picture names to current ones).
+ *  Two records that merely agree with each other are not enough. */
+function readRecord(dir, renames = new Map()) {
+    const manifestPath = join(dir, 'manifest.json');
+    if (!existsSync(manifestPath)) throw new Error(`${dir}: no manifest.json — not a complete record`);
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const want = FRAME_CASES.map(c => c.id);
+    if (JSON.stringify([...(manifest.cases ?? [])].sort()) !== JSON.stringify([...want].sort())) {
+        throw new Error(`${dir}: records cases ${JSON.stringify(manifest.cases)}, the tool requires ${JSON.stringify(want)}`);
+    }
+    const cases = new Map();
+    for (const c of FRAME_CASES) {
+        const metaPath = join(dir, c.id, 'meta.json');
+        if (!existsSync(metaPath)) throw new Error(`${dir}: case '${c.id}' has no meta.json`);
+        const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+        try { validateCaseMeta(c, meta, renames); } catch (e) { throw new Error(`${dir}: ${e.message}`); }
+        cases.set(c.id, meta);
+    }
+    return cases;
+}
+
+/** A file's bytes, checked against the size its case implies. */
+function readSized(path, bytes) {
+    if (!existsSync(path)) throw new Error(`missing file ${path}`);
+    const buf = readFileSync(path);
+    if (bytes !== undefined && buf.length !== bytes) throw new Error(`${path}: ${buf.length} bytes, expected ${bytes} (truncated?)`);
+    return buf;
+}
+
+/** Compare two float pictures bitwise: changed pixels, the largest finite difference, and the
+ *  non-finite count on each side. */
+function comparePicture(aBuf, bBuf) {
+    const a = new Float32Array(new Uint8Array(aBuf).buffer), b = new Float32Array(new Uint8Array(bBuf).buffer);
+    const ua = new Uint32Array(a.buffer), ub = new Uint32Array(b.buffer);
+    let changed = 0, maxDiff = 0, nfA = 0, nfB = 0;
+    for (let p = 0; p < a.length; p += 4) {
+        let differs = false;
+        for (let c = 0; c < 4; c++) {
+            const i = p + c;
+            if (!Number.isFinite(a[i])) nfA++;
+            if (!Number.isFinite(b[i])) nfB++;
+            if (ua[i] !== ub[i]) {
+                differs = true;
+                if (Number.isFinite(a[i]) && Number.isFinite(b[i])) maxDiff = Math.max(maxDiff, Math.abs(a[i] - b[i]));
+            }
+        }
+        if (differs) changed++;
+    }
+    return { changed, pixels: a.length / 4, maxDiff, nfA, nfB };
+}
+
+/** `renames` apply to the first (older) record's picture names. */
+function framesCompare(dirA, dirB, renames) {
+    const A = readRecord(dirA, renames), B = readRecord(dirB);
+    const ids = [...new Set([...A.keys(), ...B.keys()])];
+    const missing = ids.filter(id => !A.has(id) || !B.has(id));
+    if (missing.length) throw new Error(`cases missing from one record: ${missing.join(', ')}`);
+    const rows = [];
+    let failures = 0;
+    for (const id of ids) {
+        const a = A.get(id), b = B.get(id);
+        for (const key of ['scene', 'strategyId', 'size', 'spp', 'salt', 'tileSize']) {
+            if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
+                throw new Error(`${id}: not comparable — ${key} is ${JSON.stringify(a[key])} vs ${JSON.stringify(b[key])}`);
+            }
+        }
+        const metaNotes = ['rendererId', 'git', 'date'].filter(k => a[k] !== b[k]).map(k => `${k} differs`);
+        const [W, H] = a.size;
+        if (a.encoded) {
+            for (const kind of ['hdr', 'png']) {
+                // RGBE is 4 bytes a pixel; the PNG's inflated rows are one filter byte plus
+                // width × channels bytes (8-bit samples, validated in validateCaseMeta).
+                const bytes = kind === 'hdr' ? W * H * 4 : H * (1 + PNG_CHANNELS[a.png.colorType] * W);
+                const bufA = readSized(join(dirA, id, a.encoded[kind]), bytes);
+                const bufB = readSized(join(dirB, id, b.encoded[kind]), bytes);
+                const n = differingBytes(bufA, bufB);
+                if (n > 0) failures++;
+                rows.push([id, `${kind} (encoded)`, n === 0, n === 0 ? `identical (${bufA.length} bytes)` : `encoded bytes differ: ${n} of ${Math.max(bufA.length, bufB.length)}`, metaNotes]);
+            }
+            continue;
+        }
+        // Picture names in A, renamed where asked; a rename onto an existing name is a collision.
+        const namesA = new Map();
+        for (const name of Object.keys(a.pictures)) {
+            const to = renames.get(name) ?? name;
+            if (namesA.has(to)) throw new Error(`${id}: --rename collision on '${to}'`);
+            namesA.set(to, name);
+        }
+        const namesB = Object.keys(b.pictures);
+        const onlyOne = [...new Set([...namesA.keys(), ...namesB])].filter(n => !namesA.has(n) || !namesB.includes(n));
+        if (onlyOne.length) throw new Error(`${id}: the records keep different pictures (${onlyOne.join(', ')})`);
+        for (const name of namesB) {
+            const bytes = W * H * 4 * 4;
+            const r = comparePicture(readSized(join(dirA, id, a.pictures[namesA.get(name)].file), bytes), readSized(join(dirB, id, b.pictures[name].file), bytes));
+            const ok = r.changed === 0 && r.nfA === 0 && r.nfB === 0;
+            if (!ok) failures++;
+            const detail = r.nfA || r.nfB ? `non-finite values: ${r.nfA} vs ${r.nfB}`
+                : r.changed === 0 ? `identical (${r.pixels} px)` : `${r.changed} of ${r.pixels} px differ, largest difference ${r.maxDiff.toExponential(3)}`;
+            rows.push([id, name, ok, detail, metaNotes]);
+        }
+        const ldrA = readSized(join(dirA, id, a.ldr), W * H * 4), ldrB = readSized(join(dirB, id, b.ldr), W * H * 4);
+        const n = differingBytes(ldrA, ldrB);
+        if (n > 0) failures++;
+        rows.push([id, 'ldr', n === 0, n === 0 ? 'identical' : `${n} of ${ldrA.length} bytes differ`, metaNotes]);
+    }
+    for (const [id, name, ok, detail, notes] of rows) {
+        console.log(`${(ok ? GREEN : RED)((ok ? 'SAME' : 'DIFF').padEnd(5))} ${id.padEnd(15)} ${name.padEnd(16)} ${DIM(detail + (notes.length ? `  (${notes.join(', ')})` : ''))}`);
+    }
+    console.log(`\n${rows.length - failures} of ${rows.length} pictures identical`);
+    process.exitCode = failures === 0 ? 0 : 1;
+}
+
+async function framesMain(args) {
+    const [cmd, ...rest] = args;
+    if (cmd === 'record' && rest.length === 1) return framesRecord(rest[0]);
+    if (cmd === 'compare') {
+        const renames = new Map();
+        const paths = [];
+        for (let i = 0; i < rest.length; i++) {
+            if (rest[i] === '--rename') {
+                const m = /^([^=]+)=([^=]+)$/.exec(rest[++i] ?? '');
+                if (!m) throw new Error('--rename needs old=new');
+                renames.set(m[1], m[2]);
+            } else paths.push(rest[i]);
+        }
+        if (paths.length === 2) return framesCompare(paths[0], paths[1], renames);
+    }
+    throw new Error('usage: npm run frames -- record <dir> | compare <a> <b> [--rename old=new]');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 const GREEN = s => `\x1b[32m${s}\x1b[0m`;
 const RED = s => `\x1b[31m${s}\x1b[0m`;
@@ -859,7 +1240,8 @@ async function main() {
     }
 }
 
-main().catch(err => {
+const framesAt = argv.indexOf('--frames');
+(framesAt >= 0 ? framesMain(argv.slice(framesAt + 1)) : main()).catch(err => {
     console.error(err);
     cleanup();
     process.exit(1);

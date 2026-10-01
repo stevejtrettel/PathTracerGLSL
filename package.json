@@ -11,6 +11,7 @@
     "dump:shaders": "vite-node scripts/dump-shaders.ts",
     "digest": "vite-node scripts/digest-compiled.ts",
     "witness": "node tools/witness.mjs",
+    "frames": "node tools/witness.mjs --frames",
     "witness:color": "node tools/witness-color.mjs",
     "witness:wavelengths": "vite-node scripts/witness-wavelengths.ts",
     "witness:spectral": "vite-node scripts/witness-spectral.ts",
