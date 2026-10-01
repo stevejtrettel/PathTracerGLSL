@@ -37,6 +37,7 @@ import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
+import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
 
@@ -693,44 +694,44 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
 // ============================================================================
 
 function planPipeline(program: ProgramDescription): PlannedPipeline {
-    // Variance accumulation adds a second-moment attachment to the SAME double_buffer
-    // (MRT): mean and moment then ping-pong in lockstep by construction — one swap flips
-    // both attachments, so they can never desynchronize. The display pass still reads
-    // attachment 0 (the mean); the moment is instrumentation, exported via readBuffer.
-    const variance = program.estimator.accumulation.variance === true;
+    // Every picture is an attachment of the SAME double_buffer (MRT): one swap flips them all,
+    // so they can never desynchronize. One picture keeps the plain single-target form.
+    const pictures = planPictures(program);
+    const main = pictures[0];
+    const many = pictures.length > 1;
 
     return {
+        pictures,
         framebuffers: [
-            variance
-                ? { id: 'accumulation', type: 'double_buffer', format: ['rgba32f', 'rgba32f'] }
-                : { id: 'accumulation', type: 'double_buffer', format: 'rgba32f' },
+            { id: ACCUMULATION_BUFFER, type: 'double_buffer', format: many ? pictures.map(() => 'rgba32f' as const) : 'rgba32f' },
             { id: 'screen', type: 'screen' },
-            // On-demand LDR export target (impl-plan-display Stage 4 / Option B): the
-            // display pass is re-run into this rgba8 buffer ONLY when exporting a PNG —
-            // zero cost on the normal display→screen path (allocated, not rendered).
+            // On-demand LDR export target: the display pass is re-run into this rgba8 buffer
+            // ONLY when exporting a PNG — zero cost on the normal display→screen path.
             { id: 'ldr', type: 'texture', format: 'rgba8' },
         ],
         passes: [
             {
                 role: 'pathtracer',
-                inputs: variance
-                    ? { 'u_previous': 'accumulation_previous', 'u_previousMoment': 'accumulation_previous:1' }
-                    : { 'u_previous': 'accumulation_previous' },
-                output: variance
-                    ? ['accumulation_current:0', 'accumulation_current:1']
-                    : 'accumulation_current',
+                // Each picture's previous-frame value, bound only when the mode reads history.
+                inputs: Object.fromEntries(pictures
+                    .filter((p) => p.previous !== null)
+                    .map((p) => [p.previous!, bufferRef(pictureBuffer(p, 'previous'))])),
+                // MRT outputs name every attachment explicitly, in list order.
+                output: many
+                    ? pictures.map((p) => `${ACCUMULATION_BUFFER}_current:${p.attachment}`)
+                    : bufferRef(pictureBuffer(main, 'current')),
             },
             {
                 role: 'display',
                 // Encoding tonemaps dither the 8-bit write → they bind the global
                 // blue-noise tile; 'none' (raw probe path) does not.
                 inputs: tonemapModel(program.view.tonemap.type).encodesToDisplay
-                    ? { 'u_radiance': 'accumulation_current', 'u_blueNoise': 'extern:blue_noise' }
-                    : { 'u_radiance': 'accumulation_current' },
+                    ? { 'u_radiance': bufferRef(pictureBuffer(main, 'current')), 'u_blueNoise': 'extern:blue_noise' }
+                    : { 'u_radiance': bufferRef(pictureBuffer(main, 'current')) },
                 output: 'screen',
             },
         ],
-        swaps: [{ buffers: ['accumulation'] }],
+        swaps: [{ buffers: [ACCUMULATION_BUFFER] }],
     };
 }
 

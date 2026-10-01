@@ -72,9 +72,44 @@ describe('validateCompiledRenderer — passes', () => {
         const r = validRenderer(); r.pipeline.passes[0].output = ['accumulation_current:0', 'screen:1'];
         expect(errorCodes(r)).toContain('pass-mrt-multiple-buffers');
     });
-    it('warns on a color attachment outside 0-7', () => {
-        const r = validRenderer(); r.pipeline.passes[0].output = 'accumulation_current:8';
-        expect(warningCodes(r)).toContain('pass-invalid-attachment');
+    it('flags an attachment the framebuffer does not have', () => {
+        const r = validRenderer(); r.pipeline.passes[0].output = 'accumulation_current:1';   // one format
+        expect(errorCodes(r)).toContain('pass-invalid-attachment');
+        const input = validRenderer(); input.pipeline.passes[0].inputs = { textures: { u_previous: 'accumulation_previous:2' } };
+        expect(errorCodes(input)).toContain('pass-invalid-attachment');
+        const exported = validRenderer(); exported.exportTargets = { radiance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1 } };
+        expect(errorCodes(exported)).toContain('pass-invalid-attachment');
+        const mrt = validRenderer();
+        mrt.pipeline.framebuffers[0].format = ['rgba32f', 'rgba32f'];
+        mrt.pipeline.passes[0].output = ['accumulation_current:0', 'accumulation_current:1'];
+        mrt.exportTargets = { radiance: { bufferId: 'accumulation_previous', format: 'float' }, variance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1 } };
+        expect(errorCodes(mrt)).not.toContain('pass-invalid-attachment');
+    });
+    it('flags _current/_previous on a framebuffer that is not a double_buffer', () => {
+        const r = validRenderer();
+        r.pipeline.framebuffers.push({ id: 'ldr', type: 'texture', format: 'rgba8' });
+        r.exportTargets = { ldr: { bufferId: 'ldr_previous', format: 'byte' } };
+        expect(errorCodes(r)).toContain('buffer-invalid-qualifier');
+    });
+});
+
+describe('validateCompiledRenderer — LDR recipe', () => {
+    const withLdr = () => {
+        const r = validRenderer();
+        r.pipeline.framebuffers.push({ id: 'ldr', type: 'texture', format: 'rgba8' });
+        r.ldrRecipe = { passId: 'p-display', inputs: { u_radiance: 'accumulation_previous' }, output: 'ldr' };
+        return r;
+    };
+    it('a recipe re-running an existing pass into an existing buffer is valid', () => {
+        expect(validateCompiledRenderer(withLdr()).hasErrors()).toBe(false);
+    });
+    it('flags a recipe naming a missing pass, output or input buffer', () => {
+        const pass = withLdr(); pass.ldrRecipe!.passId = 'display-pass';
+        expect(errorCodes(pass)).toContain('recipe-invalid');
+        const out = withLdr(); out.ldrRecipe!.output = 'ghost';
+        expect(errorCodes(out)).toContain('recipe-invalid');
+        const input = withLdr(); input.ldrRecipe!.inputs = { u_radiance: 'ghost_previous' };
+        expect(errorCodes(input)).toContain('recipe-invalid');
     });
 });
 

@@ -1,9 +1,15 @@
 // compiler/generate/PipelineBuilder.ts
 
 import type { RenderPipeline, CompiledRenderer } from '../types.js';
-import type { RenderPlan, PlannedUniform } from '../plan/types.js';
+import type { RenderPlan, PlannedUniform, PlannedPicture } from '../plan/types.js';
+import { pictureBuffer, bufferRef } from '../plan/pictures.js';
 import type { PlannedTexture } from './features/types.js';
 import type { UniformBinding } from '../types.js';
+
+/** A pass's engine id, from its planned role. */
+function passId(role: string): string {
+    return `${role}-pass`;
+}
 
 export function buildPipeline(rendererId: string, plan: RenderPlan, externTextures: PlannedTexture[] = []): RenderPipeline {
     const planned = plan.pipeline;
@@ -26,7 +32,7 @@ export function buildPipeline(rendererId: string, plan: RenderPlan, externTextur
             format: fb.format,
         })),
         passes: planned.passes.map(pass => ({
-            id: `${pass.role}-pass`,
+            id: passId(pass.role),
             shader: roleToShader[pass.role] ?? `${rendererId}-${pass.role}`,
             inputs: { textures: pass.role === 'pathtracer' ? { ...pass.inputs, ...externInputs } : pass.inputs },
             output: pass.output,
@@ -59,29 +65,26 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     return bindings;
 }
 
-/** The on-demand LDR recipe (E5): the display-pass re-run facts, shipped as DATA so the
- *  engine stays blind — this file owns the pass-id/buffer/input names, so it declares them. */
-export function buildLdrRecipe(): NonNullable<CompiledRenderer['ldrRecipe']> {
+/** The on-demand LDR recipe: the display-pass re-run facts, shipped as DATA so the engine
+ *  stays blind. The display's input is re-aimed at the main picture's AFTER-frame buffer
+ *  (pictureBuffer), so the LDR bytes match exactly what that picture's export reads. */
+export function buildLdrRecipe(main: PlannedPicture): NonNullable<CompiledRenderer['ldrRecipe']> {
     return {
-        passId: 'display-pass',
-        // Display's radiance input re-aimed at the POST-SWAP accumulation buffer, so the
-        // LDR bytes match exactly what HDR export reads (impl-plan-display Stage 4).
-        inputs: { u_radiance: 'accumulation_previous' },
+        passId: passId('display'),
+        inputs: { u_radiance: bufferRef(pictureBuffer(main, 'previous')) },
         output: 'ldr',
     };
 }
 
-export function buildExportTargets(variance = false): CompiledRenderer['exportTargets'] {
-    return {
-        // 'previous', not 'current': exports run after renderFrame(), and the postFrame
-        // swap has already flipped the ping-pong index — post-swap, the freshly written
-        // frame lives in 'accumulation_previous'. Reading 'current' exports frame N-1.
-        'radiance': { bufferId: 'accumulation_previous', format: 'float' },
-        // LDR = the tonemapped + dithered display, rendered on demand into the 'ldr' buffer
-        // (Engine.renderLdr) just before readExport('ldr'). See impl-plan-display Stage 4.
-        'ldr': { bufferId: 'ldr', format: 'byte' },
-        // The second-moment attachment (variance occupant): per-channel sample variance
-        // v = M2/n; variance of the MEAN = v/n (readers divide). Same post-swap rule.
-        ...(variance ? { 'variance': { bufferId: 'accumulation_previous', format: 'float' as const, attachment: 1 } } : {}),
-    };
+/** One float export per picture, named by the picture and read where its newest value is
+ *  after the frame (pictureBuffer explains why that is `_previous`); then the LDR output,
+ *  rendered on demand into the 'ldr' buffer (Engine.renderLdr) just before readExport('ldr'). */
+export function buildExportTargets(pictures: PlannedPicture[]): CompiledRenderer['exportTargets'] {
+    const targets: NonNullable<CompiledRenderer['exportTargets']> = {};
+    for (const p of pictures) {
+        const { bufferId, attachment } = pictureBuffer(p, 'previous');
+        targets[p.name] = { bufferId, format: 'float', ...(attachment > 0 ? { attachment } : {}) };
+    }
+    targets.ldr = { bufferId: 'ldr', format: 'byte' };
+    return targets;
 }

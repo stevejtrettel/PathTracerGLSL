@@ -1,7 +1,7 @@
 // compiler/generate/ShaderBuilder.ts
 
 import type { ShaderProgram } from '../types.js';
-import type { PlannedUniform, ProgramDescription } from '../plan/types.js';
+import type { PlannedUniform, PlannedPicture, ProgramDescription } from '../plan/types.js';
 import type { PlannedTexture } from './features/types.js';
 import type { ShaderBlock, BlockMapping } from './ShaderIR.js';
 import { assembleBlocks } from './ShaderIR.js';
@@ -21,7 +21,7 @@ export interface ShaderBuildResult {
     sourceMaps: Map<string, BlockMapping[]>;
 }
 
-export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['view']['tonemap'], varianceOutputs = false): ShaderBuildResult {
+export function buildShaders(merged: MergedContributions, rendererId: string, tonemap: ProgramDescription['view']['tonemap'], pictures: PlannedPicture[]): ShaderBuildResult {
     const shaders = new Map<string, ShaderProgram>();
     const sourceMaps = new Map<string, BlockMapping[]>();
 
@@ -32,7 +32,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     ]);
 
     // Pathtracer fragment — from the feature contributions merged in section order (§2.10)
-    const ptAssembled = assembleBlocks(buildPathtracerBlocks(merged, varianceOutputs));
+    const ptAssembled = assembleBlocks(buildPathtracerBlocks(merged, pictures));
     const mainShaderId = `${rendererId}-main`;
     shaders.set(mainShaderId, {
         vertex: vertexAssembled.source,
@@ -56,9 +56,9 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
 // Pathtracer Fragment Shader (block assembly)
 // ============================================================================
 
-function buildPathtracerBlocks(merged: MergedContributions, varianceOutputs: boolean): ShaderBlock[] {
+function buildPathtracerBlocks(merged: MergedContributions, pictures: PlannedPicture[]): ShaderBlock[] {
     return [
-        { origin: 'generated:header', source: buildHeader(merged.defines, varianceOutputs) },
+        { origin: 'generated:header', source: buildHeader(merged.defines, pictures) },
         { origin: 'generated:uniforms', source: buildUniformDeclarations(merged.uniforms, merged.textures) },
         ...merged.blocks,
     ];
@@ -128,16 +128,16 @@ function buildDisplayMain(model: TonemapDescriptor): string {
 
 const FRAGMENT_PREAMBLE = '#version 300 es\nprecision highp float;\nprecision highp int;';
 
-function buildHeader(defines: Record<string, string>, varianceOutputs = false): string {
+function buildHeader(defines: Record<string, string>, pictures: PlannedPicture[]): string {
     const lines: string[] = [];
     lines.push(FRAGMENT_PREAMBLE);
     lines.push('');
-    if (varianceOutputs) {
-        // MRT for the variance accumulation occupant: mean + second moment.
-        lines.push('layout(location = 0) out vec4 fragColor;');
-        lines.push('layout(location = 1) out vec4 fragMoment;');
+    // One fragment output per picture, at its attachment's location (MRT when there are more
+    // than one); a single picture keeps the plain declaration.
+    if (pictures.length > 1) {
+        for (const p of pictures) lines.push(`layout(location = ${p.attachment}) out vec4 ${p.output};`);
     } else {
-        lines.push(`out vec4 fragColor;`);
+        lines.push(`out vec4 ${pictures[0].output};`);
     }
     lines.push('');
 
@@ -175,9 +175,8 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
         lines.push(`uniform ${precision}${t.samplerType ?? 'sampler2D'} ${t.name};`);
     }
 
-    // The accumulator's ping-pong inputs (u_previous / u_previousMoment) are declared by
-    // the accumulation feature — exact linkage: the occupant that reads them declares them
-    // (oneshot reads neither and so declares neither).
+    // Each picture's previous-frame sampler is declared by the accumulation feature, from the
+    // planned picture list — exact linkage: only a mode that reads history declares any.
 
     return lines.join('\n');
 }

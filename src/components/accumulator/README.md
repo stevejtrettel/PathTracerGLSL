@@ -32,8 +32,8 @@ Does it change what the number converges to, how fast, or only how it's shown?
 The frame-spanning state: the accumulation ping-pong buffers
 (`accumulation_current/_previous` — reserved suffixes) and therefore the *pipeline* the
 compiler generates, not just shader text. NOTE the export semantics: **HDR export reads
-`accumulation_previous`** (post-frame swap — see `PipelineBuilder` before "correcting"
-it).
+`accumulation_previous`** (post-frame swap — see `pictureBuffer` in
+`compiler/plan/pictures.ts` before "correcting" it).
 
 ## How the compiler consumes it
 

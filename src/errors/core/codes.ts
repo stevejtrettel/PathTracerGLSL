@@ -242,7 +242,17 @@ export const VALIDATION_ERRORS = {
     'pass-invalid-attachment': {
         code: 'pass-invalid-attachment',
         category: 'validation' as const,
-        description: 'Render pass uses a color attachment outside the valid range 0-7'
+        description: 'A pass, export or recipe uses a color attachment its framebuffer does not have'
+    },
+    'buffer-invalid-qualifier': {
+        code: 'buffer-invalid-qualifier',
+        category: 'validation' as const,
+        description: 'A _current/_previous reference names a framebuffer that is not a double_buffer'
+    },
+    'recipe-invalid': {
+        code: 'recipe-invalid',
+        category: 'validation' as const,
+        description: 'The LDR recipe references a pass or framebuffer the pipeline does not have'
     },
     'pass-invalid-texture': {
         code: 'pass-invalid-texture',

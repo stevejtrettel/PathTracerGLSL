@@ -149,8 +149,8 @@ How a program is assembled:
 - **Shader ids** are prefixed with the renderer id (`${rendererId}-main`, renderer id =
   `${strategy.id}-${scene.id}`): the engine's program map is flat and collisions silently
   overwrite.
-- **HDR export reads `accumulation_previous`** (post-swap) — read the comment in
-  PipelineBuilder.ts before "fixing" it.
+- **Exports read `accumulation_previous`** (post-swap) — read the comment on `pictureBuffer`
+  (compiler/plan/pictures.ts) before "fixing" it.
 - Fullscreen triangle via `gl_VertexID` (no VAO). Framebuffer suffixes `_current` /
   `_previous` are reserved.
 - New design docs written by a model are prefixed `claude-…`. Existing `fable-…` docs keep

@@ -34,7 +34,7 @@ export function validateCompiledRenderer(
 
     // Validate each pass
     for (const pass of renderer.pipeline.passes) {
-        validatePass(pass, renderer, framebufferIds, diagnostics);
+        validatePass(pass, renderer, framebufferConfigs, diagnostics);
     }
 
     // Validate swap instructions
@@ -49,7 +49,12 @@ export function validateCompiledRenderer(
 
     // Validate export targets
     if (renderer.exportTargets) {
-        validateExports(renderer.exportTargets, framebufferIds, diagnostics);
+        validateExports(renderer.exportTargets, framebufferConfigs, diagnostics);
+    }
+
+    // Validate the on-demand LDR recipe
+    if (renderer.ldrRecipe) {
+        validateLdrRecipe(renderer, framebufferConfigs, diagnostics);
     }
 
     // Validate uniforms
@@ -109,10 +114,47 @@ function validateStructure(
 /**
  * Validate a single render pass
  */
+/**
+ * Check one buffer reference against the pipeline's framebuffers: the buffer exists, a
+ * `_current`/`_previous` qualifier names a double_buffer (a single texture has no pair), and
+ * the attachment index is one of the buffer's formats. `attachment` is given separately for
+ * export targets, which carry it as a field instead of a `:N` suffix.
+ */
+function checkBufferRef(
+    where: string,
+    ref: string,
+    attachmentField: number | undefined,
+    configs: Map<string, FramebufferConfig>,
+    unknownCode: 'pass-invalid-output' | 'pass-invalid-texture' | 'export-invalid-buffer' | 'recipe-invalid',
+    bag: DiagnosticBag
+): void {
+    const { bufferId, attachment: suffix } = parseBufferRef(ref);
+    const config = configs.get(bufferId);
+    if (config === undefined) {
+        bag.error(unknownCode, `${where} references unknown framebuffer '${ref}'`)
+            .suggest(`Available framebuffers: ${[...configs.keys()].join(', ')}`)
+            .add();
+        return;
+    }
+    const bare = ref.replace(/:\d+$/, '');
+    if ((bare.endsWith('_current') || bare.endsWith('_previous')) && config.type !== 'double_buffer') {
+        bag.error('buffer-invalid-qualifier',
+            `${where} uses '${ref}', but '${bufferId}' is a ${config.type}, not a double_buffer — it has no _current/_previous pair`)
+            .add();
+    }
+    const attachment = attachmentField ?? suffix ?? 0;
+    const count = Array.isArray(config.format) ? config.format.length : 1;
+    if (attachment < 0 || attachment >= count) {
+        bag.error('pass-invalid-attachment',
+            `${where} uses attachment ${attachment} of '${bufferId}', which has ${count}`)
+            .add();
+    }
+}
+
 function validatePass(
     pass: RenderPass,
     renderer: CompiledRenderer,
-    framebufferIds: Set<string>,
+    framebufferConfigs: Map<string, FramebufferConfig>,
     bag: DiagnosticBag
 ): void {
     // Check shader exists
@@ -128,23 +170,8 @@ function validatePass(
     const baseBuffers = new Set<string>();
 
     for (const output of outputs) {
-        const { bufferId, attachment } = parseBufferRef(output);
-
-        if (!framebufferIds.has(bufferId)) {
-            bag.error('pass-invalid-output',
-                `Pass '${pass.id}' outputs to unknown framebuffer '${bufferId}'`)
-                .suggest(`Available framebuffers: ${[...framebufferIds].join(', ')}`)
-                .add();
-        }
-
-        baseBuffers.add(bufferId);
-
-        // Check attachment index is reasonable (0-7 for MRT)
-        if (attachment !== undefined && (attachment < 0 || attachment > 7)) {
-            bag.warning('pass-invalid-attachment',
-                `Pass '${pass.id}' uses attachment ${attachment}, but valid range is 0-7`)
-                .add();
-        }
+        checkBufferRef(`Pass '${pass.id}' output`, output, undefined, framebufferConfigs, 'pass-invalid-output', bag);
+        baseBuffers.add(parseBufferRef(output).bufferId);
     }
 
     // MRT outputs must all reference same base framebuffer
@@ -171,14 +198,7 @@ function validatePass(
                 continue;
             }
 
-            const { bufferId } = parseBufferRef(bufferRef);
-
-            if (!framebufferIds.has(bufferId)) {
-                bag.error('pass-invalid-texture',
-                    `Pass '${pass.id}' binds texture '${uniformName}' from unknown buffer '${bufferId}'`)
-                    .suggest(`Available framebuffers: ${[...framebufferIds].join(', ')}`)
-                    .add();
-            }
+            checkBufferRef(`Pass '${pass.id}' texture '${uniformName}'`, bufferRef, undefined, framebufferConfigs, 'pass-invalid-texture', bag);
         }
     }
 }
@@ -233,20 +253,31 @@ function validateSwaps(
  */
 function validateExports(
     exports: Record<string, { bufferId: string; attachment?: number }>,
-    framebufferIds: Set<string>,
+    framebufferConfigs: Map<string, FramebufferConfig>,
     bag: DiagnosticBag
 ): void {
     for (const [exportName, target] of Object.entries(exports)) {
-        // Parse buffer reference to extract base buffer ID
-        // Export targets may use _current/_previous qualifiers (e.g., 'accumulation_current')
-        const { bufferId: baseBufferId } = parseBufferRef(target.bufferId);
+        checkBufferRef(`Export '${exportName}'`, target.bufferId, target.attachment, framebufferConfigs, 'export-invalid-buffer', bag);
+    }
+}
 
-        if (!framebufferIds.has(baseBufferId)) {
-            bag.error('export-invalid-buffer',
-                `Export '${exportName}' references unknown buffer '${target.bufferId}'`)
-                .suggest(`Available framebuffers: ${[...framebufferIds].join(', ')}`)
-                .add();
-        }
+/**
+ * Validate the on-demand LDR recipe: it re-runs a pass of this pipeline, into a buffer of it,
+ * with its inputs re-aimed at buffers of it.
+ */
+function validateLdrRecipe(
+    renderer: CompiledRenderer,
+    framebufferConfigs: Map<string, FramebufferConfig>,
+    bag: DiagnosticBag
+): void {
+    const recipe = renderer.ldrRecipe!;
+    if (!renderer.pipeline.passes.some((p) => p.id === recipe.passId)) {
+        bag.error('recipe-invalid', `The LDR recipe re-runs pass '${recipe.passId}', which the pipeline does not have`).add();
+    }
+    checkBufferRef('The LDR recipe output', recipe.output, undefined, framebufferConfigs, 'recipe-invalid', bag);
+    for (const [uniformName, ref] of Object.entries(recipe.inputs)) {
+        if (ref.startsWith('extern:')) continue;
+        checkBufferRef(`The LDR recipe input '${uniformName}'`, ref, undefined, framebufferConfigs, 'recipe-invalid', bag);
     }
 }
 

@@ -4,6 +4,52 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 3 of the outputs plan: one planned picture list
+
+[Step 3 plan](docs/claude-outputs-step3-plan.md). The Planner builds one ordered list of the
+pictures a program keeps (`PlannedPipeline.pictures`: the main picture, then the requested
+statistic). Everything that names a picture's storage is generated from it:
+- the accumulation buffer's formats;
+- the path-tracer outputs, and its previous-frame inputs;
+- the sampler declarations;
+- the fragment outputs;
+- the exports;
+- the display input and the LDR recipe.
+
+**The facts behind the list:**
+- **Picture names are data:** the main picture's names (export, fragment output, previous
+  sampler) live in a table keyed by `measurement.response` (`compiler/plan/pictures.ts`),
+  and the variance statistic's live in its accumulator descriptor (replacing
+  `readsMoment`).
+- **One function, `pictureBuffer`,** answers where a picture's newest value is, during the
+  frame or after the swap.
+
+**Removed:**
+- the variance booleans in the Generator, ShaderBuilder and PipelineBuilder;
+- `oneshot`'s dead `u_previous` input;
+- the hard-coded `'display-pass'` in the LDR recipe.
+
+**New checks:**
+- **The Generator** rejects more than 4 pictures, the WebGL2 draw-buffer floor.
+- **`validateCompiledRenderer`** checks every buffer reference the same way (in pass
+  outputs, pass inputs, exports and the LDR recipe):
+  - attachments must exist, replacing the old 0–7 warning;
+  - `_current`/`_previous` only on a double buffer;
+  - the recipe's pass and buffers must exist.
+
+**Measured:**
+- **Typecheck and tests:** `tsc` clean; vitest 110 files and 4115 tests. New: a table test
+  of the generated pipeline over `average`, `average + variance` and `oneshot`, the
+  draw-buffer floor, and the validator cases.
+- **Digest** against step 2's commit:
+  - every shader is identical in all 268 scenes;
+  - exactly 2 renderer structures differ, as predicted: `cornell-oneshot` loses its dead
+    input, and `furnace-var` lists its exports as radiance, variance, ldr. With those two
+    changes applied, both are byte-identical to the old ones.
+- **Snapshots:** both unchanged.
+- **Frames:** 18 of 18 bit-identical, including `oneshot`.
+- **Witness:** `furnace` passes 3 of 3.
+
 ## 2026-09-30 — Step 2 of the outputs plan: variance is an option of `average`
 
 [Step 2 plan](docs/claude-outputs-step2-plan.md). Variance is declared as

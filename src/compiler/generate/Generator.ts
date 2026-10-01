@@ -19,8 +19,17 @@ export function generate(
     // shaders, uniform bindings, and parameter metadata are all built from.
     const merged = collectFeatures(plan, bag);
 
-    const variance = plan.program.estimator.accumulation.variance === true;
-    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, variance);
+    const pictures = plan.pipeline.pictures;
+    const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, pictures);
+
+    // WebGL2 guarantees 4 draw buffers (MAX_DRAW_BUFFERS ≥ 4), and every picture is one of
+    // them. Past the floor the engine would fail at load; reject it here with the roster.
+    const DRAW_BUFFER_FLOOR = 4;
+    if (pictures.length > DRAW_BUFFER_FLOOR) {
+        bag.error('invalid-setting',
+            `The render keeps ${pictures.length} pictures (${pictures.map((p) => p.name).join(', ')}) — over the guaranteed WebGL2 floor of ${DRAW_BUFFER_FLOOR} draw buffers (MAX_DRAW_BUFFERS)`)
+            .add();
+    }
 
     // The sampler BUDGET (fable-data-rail §5): count the REAL roster in each assembled
     // program against the WebGL2 spec floor of 16 fragment units — an over-budget program
@@ -49,7 +58,7 @@ export function generate(
         { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
     ]);
     const parameters = merged.parameters;
-    const exportTargets = buildExportTargets(variance);
+    const exportTargets = buildExportTargets(pictures);
 
     // Convert BlockMapping[] to SourceMap objects, including assembled source
     const sourceMaps = new Map<string, SourceMap>();
@@ -73,7 +82,7 @@ export function generate(
         uniforms,
         parameters,
         exportTargets,
-        ldrRecipe: buildLdrRecipe(),   // E5: the display re-run as data — the engine reads, never knows
+        ldrRecipe: buildLdrRecipe(pictures[0]),   // the display re-run as data — the engine reads, never knows
         sourceMaps,
     };
 }

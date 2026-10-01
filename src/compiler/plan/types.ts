@@ -264,7 +264,20 @@ export type TonemapDesc = DisplayDescription;
 // Planned Pipeline — how the GPU program executes
 // ============================================================================
 
+/** One per-pixel picture the program keeps: its names (components/accumulator PictureFacts)
+ *  and its attachment of the accumulation buffer. `previous` is null when the mode does not
+ *  read history, so nothing binds or declares that sampler. */
+export interface PlannedPicture {
+    name: string;
+    output: string;
+    previous: string | null;
+    attachment: number;
+}
+
 export interface PlannedPipeline {
+    /** The pictures, in order: the main picture (attachment 0), then the requested statistic.
+     *  The layout, outputs, inputs and exports below are built from this list. */
+    pictures: PlannedPicture[];
     // format array = MRT (one attachment per entry); output array = the MRT pass's
     // draw buffers (`id:N` refs). Mirrors the engine-facing FramebufferConfig/RenderPass.
     framebuffers: Array<{ id: string; type: 'screen' | 'double_buffer' | 'texture'; format?: FramebufferFormat | FramebufferFormat[] }>;

@@ -13,14 +13,23 @@ import averageGLSL from './average/average.glsl?raw';
 import varianceGLSL from './variance/variance.glsl?raw';
 import oneshotGLSL from './oneshot/oneshot.glsl?raw';
 
+/** The names one per-pixel picture goes by: its export, the fragment output that writes it,
+ *  and the sampler that reads its previous-frame value (bound only when the mode reads
+ *  history). The compiler builds the picture list, layout and exports from these facts. */
+export interface PictureFacts {
+    name: string;
+    output: string;
+    previous: string;
+}
+
 /** A statistic a mode can record alongside its pictures, switched on by the strategy field
  *  of the same name (`accumulation: { type: 'average', variance: true }`). It never changes
  *  the mode's pictures. Its GLSL lives in the folder named by its key. */
 export interface AccumulatorStatistic {
     /** ?raw source of the main() that updates the mode's pictures and this statistic. */
     glsl: string;
-    /** Reads the previous second moment (u_previousMoment — the second MRT attachment). */
-    readsMoment: boolean;
+    /** The picture this statistic adds. */
+    picture: PictureFacts;
 }
 
 export interface AccumulatorDescriptor {
@@ -37,7 +46,10 @@ export interface AccumulatorDescriptor {
 
 export const ACCUMULATORS: Record<string, AccumulatorDescriptor> = {
     // Welford's update is the running mean's companion: only the equal-weight mean has it.
-    average: { type: 'average', glsl: averageGLSL, readsPrevious: true, statistics: { variance: { glsl: varianceGLSL, readsMoment: true } } },
+    average: {
+        type: 'average', glsl: averageGLSL, readsPrevious: true,
+        statistics: { variance: { glsl: varianceGLSL, picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment' } } },
+    },
     oneshot: { type: 'oneshot', glsl: oneshotGLSL, readsPrevious: false, statistics: {} },
 };
 

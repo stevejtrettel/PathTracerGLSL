@@ -21,13 +21,12 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
     const statName = requestedStatistic(plan.program.estimator.accumulation);
     const stat = statName === null ? null : d.statistics[statName];
 
-    // The occupant's ping-pong inputs, declared HERE because the occupant reads them
-    // (exact linkage, from the registry FACTS): oneshot reads neither and declares
-    // neither — its programs carry no dead sampler. The moment texture binds as the
-    // pathtracer pass input 'accumulation_previous:1'.
-    const inputDecls: string[] = [];
-    if (d.readsPrevious) inputDecls.push('uniform sampler2D u_previous;');
-    if (stat?.readsMoment) inputDecls.push('uniform sampler2D u_previousMoment;');
+    // Each picture's previous-frame sampler, declared HERE because main() reads it — the same
+    // planned list the pass inputs are bound from, so declaration and binding cannot differ.
+    // A mode that reads no history (oneshot) has none: its programs carry no dead sampler.
+    const inputDecls = plan.pipeline.pictures
+        .filter((p) => p.previous !== null)
+        .map((p) => `uniform sampler2D ${p.previous};`);
 
     return {
         ...emptyContribution('accumulation'),
