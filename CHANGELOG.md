@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 4 of the outputs plan: a generated accumulation `main()`
+
+[Step 4 plan](docs/claude-outputs-step4-plan.md). The three hand-written mains (`average`,
+`variance`, `oneshot`) repeated the same camera setup. They are replaced by one generated
+`main()`, built from the planned picture list. It does four things in order:
+1. traces one camera sample (the setup, verbatim);
+2. fetches each picture's previous value when the mode reads history;
+3. calls each picture's update rule in list order;
+4. writes every picture.
+
+The arithmetic is static GLSL, one rule per folder, operation for operation as before:
+- `average_update`, the running mean;
+- `variance_update`, Welford, normalized;
+- `oneshot_update`, the latest sample.
+
+The descriptors name these rules (`update`), and each planned picture carries its role (main
+or statistic) and its rule. The accumulator README states the three signatures.
+
+**Measured:**
+- **Frames (the gate):** 18 of 18 pictures bit-identical against step 3's commit.
+- **Digest:**
+  - closures, scene data, data reads and warnings are identical everywhere;
+  - the 495 `shaders` parts differ only from the accumulation blocks on, and every display
+    shader is unchanged;
+  - the 495 `rest` parts differ only in their source maps.
+- **Tests:** vitest 110 files and 4118 tests. That includes the glslang compile of every
+  program, and the test pinning the camera lines and the two draws. The table test now also
+  checks that each configuration's `main()` calls exactly its rules and writes each output
+  once.
+- **Snapshot:** the GLSL snapshot (47 cases) changed only in accumulation blocks and
+  source-map structure, classified line by line.
+- **Witness:** `furnace` and `two-light` pass 5 of 5.
+- **Leftovers:** `git grep "void main" -- src/components/accumulator` finds 0 hits.
+
+**One run stalled:** the first full vitest run stalled with idle processes for over 10
+minutes. It was stopped, and an immediate rerun finished normally. The cause is unknown (the
+run was not under `caffeinate`), and nothing points at the code.
+
 ## 2026-09-30 — Step 3 of the outputs plan: one planned picture list
 
 [Step 3 plan](docs/claude-outputs-step3-plan.md). The Planner builds one ordered list of the

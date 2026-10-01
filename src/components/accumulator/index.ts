@@ -1,7 +1,7 @@
 // Accumulator registry (estimator pick-one family — the progressive-integration axis).
-// An accumulator occupant = one folder (the main() that folds the traced sample into
-// the accumulation target) + one line below (D3: the type→path if-chain in
-// generate/features/accumulation.ts is dead — the hasLambert pattern's last twin).
+// An accumulator occupant = one folder (the static update rule that folds a traced sample
+// into a picture) + one line below. The accumulation main() is generated from the planned
+// picture list and calls these rules (generate/features/accumulation.ts).
 //
 // Descriptors declare FACTS about one occupant — including which ping-pong INPUTS it
 // reads, so the feature declares exactly those samplers (exact linkage: oneshot reads
@@ -26,8 +26,12 @@ export interface PictureFacts {
  *  of the same name (`accumulation: { type: 'average', variance: true }`). It never changes
  *  the mode's pictures. Its GLSL lives in the folder named by its key. */
 export interface AccumulatorStatistic {
-    /** ?raw source of the main() that updates the mode's pictures and this statistic. */
+    /** ?raw source defining `update`. */
     glsl: string;
+    /** The GLSL function that updates this statistic's picture:
+     *  `vec3 f(vec3 previous, vec3 mainPrevious, vec3 mainNew, vec3 x, int n)` — its previous
+     *  value, the main picture's previous and new values, the sample, and the samples so far. */
+    update: string;
     /** The picture this statistic adds. */
     picture: PictureFacts;
 }
@@ -36,9 +40,12 @@ export interface AccumulatorDescriptor {
     /** Registry key — `estimator.accumulation.type` (Validator-gated; 'exponential'
      *  stays reserved-rejected until built). */
     type: string;
-    /** ?raw source providing the accumulating main(). */
+    /** ?raw source defining `update`. */
     glsl: string;
-    /** Reads the previous-frame accumulation (u_previous). */
+    /** The GLSL function that updates the main picture: `vec3 f(vec3 previous, vec3 x, int n)`
+     *  for a mode that reads history, `vec3 f(vec3 x)` for one that does not. */
+    update: string;
+    /** Reads each picture's previous-frame value (its `previous` sampler). */
     readsPrevious: boolean;
     /** The statistics this mode supports, keyed by their strategy field. */
     statistics: Record<string, AccumulatorStatistic>;
@@ -47,10 +54,12 @@ export interface AccumulatorDescriptor {
 export const ACCUMULATORS: Record<string, AccumulatorDescriptor> = {
     // Welford's update is the running mean's companion: only the equal-weight mean has it.
     average: {
-        type: 'average', glsl: averageGLSL, readsPrevious: true,
-        statistics: { variance: { glsl: varianceGLSL, picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment' } } },
+        type: 'average', glsl: averageGLSL, update: 'average_update', readsPrevious: true,
+        statistics: {
+            variance: { glsl: varianceGLSL, update: 'variance_update', picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment' } },
+        },
     },
-    oneshot: { type: 'oneshot', glsl: oneshotGLSL, readsPrevious: false, statistics: {} },
+    oneshot: { type: 'oneshot', glsl: oneshotGLSL, update: 'oneshot_update', readsPrevious: false, statistics: {} },
 };
 
 /** The statistic a strategy's accumulation switches on (at most one: each statistic's

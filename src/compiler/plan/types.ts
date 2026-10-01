@@ -272,6 +272,11 @@ export interface PlannedPicture {
     output: string;
     previous: string | null;
     attachment: number;
+    /** 'main' is the measured picture; a 'statistic' is computed from it (its update reads the
+     *  main picture's previous and new values). */
+    role: 'main' | 'statistic';
+    /** The GLSL update rule (components/accumulator descriptors state its signature). */
+    update: string;
 }
 
 export interface PlannedPipeline {

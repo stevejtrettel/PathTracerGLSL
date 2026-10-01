@@ -1376,8 +1376,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -1394,17 +1402,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -1687,9 +1689,14 @@ void main() {
         "startLine": 1203,
       },
       {
-        "endLine": 1232,
+        "endLine": 1214,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1204,
+      },
+      {
+        "endLine": 1234,
+        "origin": "generated:accumulation-main",
+        "startLine": 1215,
       },
     ],
   },
@@ -2920,8 +2927,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -2938,17 +2953,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -3216,9 +3225,14 @@ void main() {
         "startLine": 958,
       },
       {
-        "endLine": 987,
+        "endLine": 969,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 959,
+      },
+      {
+        "endLine": 989,
+        "origin": "generated:accumulation-main",
+        "startLine": 970,
       },
     ],
   },
@@ -4634,8 +4648,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -4652,17 +4674,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -4935,9 +4951,14 @@ void main() {
         "startLine": 1132,
       },
       {
-        "endLine": 1161,
+        "endLine": 1143,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1133,
+      },
+      {
+        "endLine": 1163,
+        "origin": "generated:accumulation-main",
+        "startLine": 1144,
       },
     ],
   },
@@ -6303,8 +6324,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -6321,17 +6350,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -6569,9 +6592,14 @@ void main() {
         "startLine": 1082,
       },
       {
-        "endLine": 1111,
+        "endLine": 1093,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1083,
+      },
+      {
+        "endLine": 1113,
+        "origin": "generated:accumulation-main",
+        "startLine": 1094,
       },
     ],
   },
@@ -8130,8 +8158,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -8148,17 +8184,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -8451,9 +8481,14 @@ void main() {
         "startLine": 1275,
       },
       {
-        "endLine": 1304,
+        "endLine": 1286,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1276,
+      },
+      {
+        "endLine": 1306,
+        "origin": "generated:accumulation-main",
+        "startLine": 1287,
       },
     ],
   },
@@ -9979,8 +10014,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -9997,17 +10040,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -10290,9 +10327,14 @@ void main() {
         "startLine": 1242,
       },
       {
-        "endLine": 1271,
+        "endLine": 1253,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1243,
+      },
+      {
+        "endLine": 1273,
+        "origin": "generated:accumulation-main",
+        "startLine": 1254,
       },
     ],
   },
@@ -11716,8 +11758,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -11734,17 +11784,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -11992,9 +12036,14 @@ void main() {
         "startLine": 1151,
       },
       {
-        "endLine": 1180,
+        "endLine": 1162,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1152,
+      },
+      {
+        "endLine": 1182,
+        "origin": "generated:accumulation-main",
+        "startLine": 1163,
       },
     ],
   },
@@ -13607,8 +13656,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -13625,17 +13682,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -13938,9 +13989,14 @@ void main() {
         "startLine": 1347,
       },
       {
-        "endLine": 1376,
+        "endLine": 1358,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1348,
+      },
+      {
+        "endLine": 1378,
+        "origin": "generated:accumulation-main",
+        "startLine": 1359,
       },
     ],
   },
@@ -15519,8 +15575,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -15537,17 +15601,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -15840,9 +15898,14 @@ void main() {
         "startLine": 1313,
       },
       {
-        "endLine": 1342,
+        "endLine": 1324,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1314,
+      },
+      {
+        "endLine": 1344,
+        "origin": "generated:accumulation-main",
+        "startLine": 1325,
       },
     ],
   },
@@ -17307,8 +17370,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -17325,17 +17396,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -17618,9 +17683,14 @@ void main() {
         "startLine": 1203,
       },
       {
-        "endLine": 1232,
+        "endLine": 1214,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1204,
+      },
+      {
+        "endLine": 1234,
+        "origin": "generated:accumulation-main",
+        "startLine": 1215,
       },
     ],
   },
@@ -18994,8 +19064,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -19012,17 +19090,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -19300,9 +19372,14 @@ void main() {
         "startLine": 1079,
       },
       {
-        "endLine": 1108,
+        "endLine": 1090,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1080,
+      },
+      {
+        "endLine": 1110,
+        "origin": "generated:accumulation-main",
+        "startLine": 1091,
       },
     ],
   },
@@ -20391,8 +20468,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -20409,17 +20494,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -20647,9 +20726,14 @@ void main() {
         "startLine": 804,
       },
       {
-        "endLine": 833,
+        "endLine": 815,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 805,
+      },
+      {
+        "endLine": 835,
+        "origin": "generated:accumulation-main",
+        "startLine": 816,
       },
     ],
   },
@@ -22307,8 +22391,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -22325,17 +22417,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -22633,9 +22719,14 @@ void main() {
         "startLine": 1381,
       },
       {
-        "endLine": 1410,
+        "endLine": 1392,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1382,
+      },
+      {
+        "endLine": 1412,
+        "origin": "generated:accumulation-main",
+        "startLine": 1393,
       },
     ],
   },
@@ -24559,8 +24650,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -24577,17 +24676,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -24950,9 +25043,14 @@ void main() {
         "startLine": 1640,
       },
       {
-        "endLine": 1669,
+        "endLine": 1651,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1641,
+      },
+      {
+        "endLine": 1671,
+        "origin": "generated:accumulation-main",
+        "startLine": 1652,
       },
     ],
   },
@@ -26837,8 +26935,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -26855,17 +26961,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -27218,9 +27318,14 @@ void main() {
         "startLine": 1601,
       },
       {
-        "endLine": 1630,
+        "endLine": 1612,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1602,
+      },
+      {
+        "endLine": 1632,
+        "origin": "generated:accumulation-main",
+        "startLine": 1613,
       },
     ],
   },
@@ -28904,8 +29009,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -28922,17 +29035,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -29230,9 +29337,14 @@ void main() {
         "startLine": 1400,
       },
       {
-        "endLine": 1429,
+        "endLine": 1411,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1401,
+      },
+      {
+        "endLine": 1431,
+        "origin": "generated:accumulation-main",
+        "startLine": 1412,
       },
     ],
   },
@@ -31136,8 +31248,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -31154,17 +31274,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -31517,9 +31631,14 @@ void main() {
         "startLine": 1620,
       },
       {
-        "endLine": 1649,
+        "endLine": 1631,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1621,
+      },
+      {
+        "endLine": 1651,
+        "origin": "generated:accumulation-main",
+        "startLine": 1632,
       },
     ],
   },
@@ -32693,8 +32812,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -32711,17 +32838,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -32974,9 +33095,14 @@ void main() {
         "startLine": 905,
       },
       {
-        "endLine": 934,
+        "endLine": 916,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 906,
+      },
+      {
+        "endLine": 936,
+        "origin": "generated:accumulation-main",
+        "startLine": 917,
       },
     ],
   },
@@ -34033,8 +34159,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -34051,17 +34185,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -34279,9 +34407,14 @@ void main() {
         "startLine": 795,
       },
       {
-        "endLine": 824,
+        "endLine": 806,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 796,
+      },
+      {
+        "endLine": 826,
+        "origin": "generated:accumulation-main",
+        "startLine": 807,
       },
     ],
   },
@@ -35352,12 +35485,33 @@ Radiance transport_trace(Ray ray) {
 }
 uniform sampler2D u_previous;
 uniform sampler2D u_previousMoment;
-// Main function: progressive mean + per-channel running sample variance (Welford).
-// Attachment 0 (fragColor) = the running mean — the IDENTICAL update to
-// accumulate_average; the mean is untouched by instrumentation.
-// Attachment 1 (fragMoment) = population variance of the SAMPLES, v = M2/n.
-// Variance of the accumulated MEAN ≈ v/n — readers divide (they know n).
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous, u_previousMoment
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
+
+// The variance statistic of the running mean (Welford, normalized form). The picture holds
+// v = M2/n, the per-channel population variance of the samples; the variance of the
+// accumulated MEAN is ≈ v/n, and readers divide (they know n). With v = M2/n both updates have
+// the running-average shape: mean' = mix(mean, x, 1/(n+1)) and
+// v' = mix(v, (x − mean)·(x − mean'), 1/(n+1)). The cross product (x − mean)·(x − mean') is the
+// cancellation-free form; the naive E[x²] − mean² collapses in fp32 on nearly-converged pixels.
+// The first sample (n = 0) has no spread: v = 0.
+// Provides: variance_update().
+
+vec3 variance_update(vec3 previous, vec3 mean_previous, vec3 mean_new, vec3 x, int n) {
+    if (n == 0) return vec3(0.0);
+    float new_weight = 1.0 / (float(n) + 1.0);
+    vec3 delta = x - mean_previous;
+    vec3 delta_new = x - mean_new;
+    return mix(previous, delta * delta_new, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -35374,28 +35528,14 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-        fragMoment = vec4(0.0, 0.0, 0.0, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        vec3 prev_var = texelFetch(u_previousMoment, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        // Welford in normalized form: with v = M2/n, both updates are the same
-        // running-average shape — mean' = mix(mean, x, 1/n') and
-        // v' = mix(v, delta·delta', 1/n') where delta = x − mean, delta' = x − mean'.
-        // The delta·delta' cross product is the cancellation-free form; the naive
-        // E[x²] − mean² collapses in fp32 exactly on nearly-converged pixels.
-        vec3 mean_new = mix(previous, color, new_weight);
-        vec3 delta = color - previous;
-        vec3 delta_new = color - mean_new;
-        fragColor = vec4(mean_new, 1.0);
-        fragMoment = vec4(mix(prev_var, delta * delta_new, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 variance_previous = texelFetch(u_previousMoment, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    vec3 variance_new = variance_update(variance_previous, radiance_previous, radiance_new, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+    fragMoment = vec4(variance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -35613,9 +35753,19 @@ void main() {
         "startLine": 796,
       },
       {
-        "endLine": 841,
-        "origin": "components/accumulator/variance/variance.glsl",
+        "endLine": 808,
+        "origin": "components/accumulator/average/average.glsl",
         "startLine": 798,
+      },
+      {
+        "endLine": 825,
+        "origin": "components/accumulator/variance/variance.glsl",
+        "startLine": 809,
+      },
+      {
+        "endLine": 848,
+        "origin": "generated:accumulation-main",
+        "startLine": 826,
       },
     ],
   },
@@ -36911,8 +37061,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -36929,17 +37087,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -37207,9 +37359,14 @@ void main() {
         "startLine": 1034,
       },
       {
-        "endLine": 1063,
+        "endLine": 1045,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1035,
+      },
+      {
+        "endLine": 1065,
+        "origin": "generated:accumulation-main",
+        "startLine": 1046,
       },
     ],
   },
@@ -38377,8 +38534,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -38395,17 +38560,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -38658,9 +38817,14 @@ void main() {
         "startLine": 905,
       },
       {
-        "endLine": 934,
+        "endLine": 916,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 906,
+      },
+      {
+        "endLine": 936,
+        "origin": "generated:accumulation-main",
+        "startLine": 917,
       },
     ],
   },
@@ -39804,8 +39968,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -39822,17 +39994,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -40075,9 +40241,14 @@ void main() {
         "startLine": 874,
       },
       {
-        "endLine": 903,
+        "endLine": 885,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 875,
+      },
+      {
+        "endLine": 905,
+        "origin": "generated:accumulation-main",
+        "startLine": 886,
       },
     ],
   },
@@ -41548,8 +41719,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -41566,17 +41745,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -41864,9 +42037,14 @@ void main() {
         "startLine": 1191,
       },
       {
-        "endLine": 1220,
+        "endLine": 1202,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1192,
+      },
+      {
+        "endLine": 1222,
+        "origin": "generated:accumulation-main",
+        "startLine": 1203,
       },
     ],
   },
@@ -43523,8 +43701,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -43541,17 +43727,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -43889,9 +44069,14 @@ void main() {
         "startLine": 1377,
       },
       {
-        "endLine": 1406,
+        "endLine": 1388,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1378,
+      },
+      {
+        "endLine": 1408,
+        "origin": "generated:accumulation-main",
+        "startLine": 1389,
       },
     ],
   },
@@ -45655,8 +45840,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -45673,17 +45866,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -46026,9 +46213,14 @@ void main() {
         "startLine": 1482,
       },
       {
-        "endLine": 1511,
+        "endLine": 1493,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1483,
+      },
+      {
+        "endLine": 1513,
+        "origin": "generated:accumulation-main",
+        "startLine": 1494,
       },
     ],
   },
@@ -47446,8 +47638,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -47464,17 +47664,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -47747,9 +47941,14 @@ void main() {
         "startLine": 1126,
       },
       {
-        "endLine": 1155,
+        "endLine": 1137,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1127,
+      },
+      {
+        "endLine": 1157,
+        "origin": "generated:accumulation-main",
+        "startLine": 1138,
       },
     ],
   },
@@ -49377,8 +49576,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -49395,17 +49602,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -49708,9 +49909,14 @@ void main() {
         "startLine": 1318,
       },
       {
-        "endLine": 1347,
+        "endLine": 1329,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1319,
+      },
+      {
+        "endLine": 1349,
+        "origin": "generated:accumulation-main",
+        "startLine": 1330,
       },
     ],
   },
@@ -51061,8 +51267,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -51079,17 +51293,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -51362,9 +51570,14 @@ void main() {
         "startLine": 1057,
       },
       {
-        "endLine": 1086,
+        "endLine": 1068,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1058,
+      },
+      {
+        "endLine": 1088,
+        "origin": "generated:accumulation-main",
+        "startLine": 1069,
       },
     ],
   },
@@ -52712,8 +52925,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -52730,17 +52951,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -53018,9 +53233,14 @@ void main() {
         "startLine": 1068,
       },
       {
-        "endLine": 1097,
+        "endLine": 1079,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1069,
+      },
+      {
+        "endLine": 1099,
+        "origin": "generated:accumulation-main",
+        "startLine": 1080,
       },
     ],
   },
@@ -54831,8 +55051,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -54849,17 +55077,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -55202,9 +55424,14 @@ void main() {
         "startLine": 1519,
       },
       {
-        "endLine": 1548,
+        "endLine": 1530,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1520,
+      },
+      {
+        "endLine": 1550,
+        "origin": "generated:accumulation-main",
+        "startLine": 1531,
       },
     ],
   },
@@ -56469,8 +56696,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -56487,17 +56722,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -56765,9 +56994,14 @@ void main() {
         "startLine": 978,
       },
       {
-        "endLine": 1007,
+        "endLine": 989,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 979,
+      },
+      {
+        "endLine": 1009,
+        "origin": "generated:accumulation-main",
+        "startLine": 990,
       },
     ],
   },
@@ -58061,8 +58295,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -58079,17 +58321,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -58332,9 +58568,14 @@ void main() {
         "startLine": 1014,
       },
       {
-        "endLine": 1043,
+        "endLine": 1025,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1015,
+      },
+      {
+        "endLine": 1045,
+        "origin": "generated:accumulation-main",
+        "startLine": 1026,
       },
     ],
   },
@@ -59812,8 +60053,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -59830,17 +60079,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -60128,9 +60371,14 @@ void main() {
         "startLine": 1198,
       },
       {
-        "endLine": 1227,
+        "endLine": 1209,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1199,
+      },
+      {
+        "endLine": 1229,
+        "origin": "generated:accumulation-main",
+        "startLine": 1210,
       },
     ],
   },
@@ -61642,8 +61890,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -61660,17 +61916,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -61958,9 +62208,14 @@ void main() {
         "startLine": 1215,
       },
       {
-        "endLine": 1244,
+        "endLine": 1226,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1216,
+      },
+      {
+        "endLine": 1246,
+        "origin": "generated:accumulation-main",
+        "startLine": 1227,
       },
     ],
   },
@@ -63465,8 +63720,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -63483,17 +63746,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -63776,9 +64033,14 @@ void main() {
         "startLine": 1187,
       },
       {
-        "endLine": 1216,
+        "endLine": 1198,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1188,
+      },
+      {
+        "endLine": 1218,
+        "origin": "generated:accumulation-main",
+        "startLine": 1199,
       },
     ],
   },
@@ -65600,8 +65862,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -65618,17 +65888,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -65926,9 +66190,14 @@ void main() {
         "startLine": 1519,
       },
       {
-        "endLine": 1548,
+        "endLine": 1530,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1520,
+      },
+      {
+        "endLine": 1550,
+        "origin": "generated:accumulation-main",
+        "startLine": 1531,
       },
     ],
   },
@@ -67177,8 +67446,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -67195,17 +67472,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -67448,9 +67719,14 @@ void main() {
         "startLine": 953,
       },
       {
-        "endLine": 982,
+        "endLine": 964,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 954,
+      },
+      {
+        "endLine": 984,
+        "origin": "generated:accumulation-main",
+        "startLine": 965,
       },
     ],
   },
@@ -68992,8 +69268,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -69010,17 +69294,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -69308,9 +69586,14 @@ void main() {
         "startLine": 1237,
       },
       {
-        "endLine": 1266,
+        "endLine": 1248,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1238,
+      },
+      {
+        "endLine": 1268,
+        "origin": "generated:accumulation-main",
+        "startLine": 1249,
       },
     ],
   },
@@ -70812,8 +71095,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -70830,17 +71121,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -71118,9 +71403,14 @@ void main() {
         "startLine": 1183,
       },
       {
-        "endLine": 1212,
+        "endLine": 1194,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1184,
+      },
+      {
+        "endLine": 1214,
+        "origin": "generated:accumulation-main",
+        "startLine": 1195,
       },
     ],
   },
@@ -72810,8 +73100,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -72828,17 +73126,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -73151,9 +73443,14 @@ void main() {
         "startLine": 1378,
       },
       {
-        "endLine": 1407,
+        "endLine": 1389,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1379,
+      },
+      {
+        "endLine": 1409,
+        "origin": "generated:accumulation-main",
+        "startLine": 1390,
       },
     ],
   },
@@ -74350,8 +74647,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -74368,17 +74673,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -74631,9 +74930,14 @@ void main() {
         "startLine": 905,
       },
       {
-        "endLine": 934,
+        "endLine": 916,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 906,
+      },
+      {
+        "endLine": 936,
+        "origin": "generated:accumulation-main",
+        "startLine": 917,
       },
     ],
   },
@@ -75983,8 +76287,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -76001,17 +76313,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -76264,9 +76570,14 @@ void main() {
         "startLine": 1088,
       },
       {
-        "endLine": 1117,
+        "endLine": 1099,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1089,
+      },
+      {
+        "endLine": 1119,
+        "origin": "generated:accumulation-main",
+        "startLine": 1100,
       },
     ],
   },
@@ -77739,8 +78050,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -77757,17 +78076,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -78050,9 +78363,14 @@ void main() {
         "startLine": 1209,
       },
       {
-        "endLine": 1238,
+        "endLine": 1220,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1210,
+      },
+      {
+        "endLine": 1240,
+        "origin": "generated:accumulation-main",
+        "startLine": 1221,
       },
     ],
   },
@@ -79301,8 +79619,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -79319,17 +79645,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -79592,9 +79912,14 @@ void main() {
         "startLine": 987,
       },
       {
-        "endLine": 1016,
+        "endLine": 998,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 988,
+      },
+      {
+        "endLine": 1018,
+        "origin": "generated:accumulation-main",
+        "startLine": 999,
       },
     ],
   },
@@ -80843,8 +81168,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -80861,17 +81194,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -81134,9 +81461,14 @@ void main() {
         "startLine": 987,
       },
       {
-        "endLine": 1016,
+        "endLine": 998,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 988,
+      },
+      {
+        "endLine": 1018,
+        "origin": "generated:accumulation-main",
+        "startLine": 999,
       },
     ],
   },
@@ -82791,8 +83123,16 @@ Radiance transport_trace(Ray ray) {
     return s.radiance;
 }
 uniform sampler2D u_previous;
-// Main function with progressive accumulation
-// Requires: u_pixelOffset, u_sampleCount, u_resetSalt, u_previous
+// The running mean — the \`average\` mode's update rule. After n samples have been folded in,
+// the next sample x enters with weight 1/(n+1); the first (n = 0) is written as is, so the
+// just-cleared \`previous\` is never used.
+// Provides: average_update().
+
+vec3 average_update(vec3 previous, vec3 x, int n) {
+    if (n == 0) return x;
+    float new_weight = 1.0 / (float(n) + 1.0);
+    return mix(previous, x, new_weight);
+}
 
 void main() {
     vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
@@ -82809,17 +83149,11 @@ void main() {
     Radiance L = transport_trace(ray);
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);
 
-    if (u_sampleCount == 0) {
-        fragColor = vec4(color, 1.0);
-    } else {
-        ivec2 coord = ivec2(gl_FragCoord.xy);
-        vec3 previous = texelFetch(u_previous, coord, 0).rgb;
-        float n = float(u_sampleCount);
-        float new_weight = 1.0 / (n + 1.0);
-        fragColor = vec4(mix(previous, color, new_weight), 1.0);
-    }
-}
-",
+    ivec2 coord = ivec2(gl_FragCoord.xy);
+    vec3 radiance_previous = texelFetch(u_previous, coord, 0).rgb;
+    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);
+    fragColor = vec4(radiance_new, 1.0);
+}",
       "vertex": "#version 300 es
 // Fullscreen triangle vertex shader
 // Uses gl_VertexID trick — no VAO needed, draw 3 vertices
@@ -83117,9 +83451,14 @@ void main() {
         "startLine": 1382,
       },
       {
-        "endLine": 1411,
+        "endLine": 1393,
         "origin": "components/accumulator/average/average.glsl",
         "startLine": 1383,
+      },
+      {
+        "endLine": 1413,
+        "origin": "generated:accumulation-main",
+        "startLine": 1394,
       },
     ],
   },

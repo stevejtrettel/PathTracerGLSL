@@ -21,11 +21,13 @@ export function planPictures(program: ProgramDescription): PlannedPicture[] {
     const accumulation = program.estimator.accumulation;
     const mode = ACCUMULATORS[accumulation.type];
     const statistic = requestedStatistic(accumulation);
-    const facts: PictureFacts[] = [
-        RESPONSE_PICTURES[program.measurement.response],
-        ...(statistic === null ? [] : [mode.statistics[statistic].picture]),
+    const entries: Array<{ facts: PictureFacts; role: PlannedPicture['role']; update: string }> = [
+        { facts: RESPONSE_PICTURES[program.measurement.response], role: 'main', update: mode.update },
+        ...(statistic === null ? [] : [{ facts: mode.statistics[statistic].picture, role: 'statistic' as const, update: mode.statistics[statistic].update }]),
     ];
-    return facts.map((f, attachment) => ({ ...f, previous: mode.readsPrevious ? f.previous : null, attachment }));
+    return entries.map(({ facts, role, update }, attachment) => ({
+        ...facts, previous: mode.readsPrevious ? facts.previous : null, attachment, role, update,
+    }));
 }
 
 /**

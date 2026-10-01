@@ -1,8 +1,9 @@
 # Progressive average — what it computes and why
 
 The outer sum of Monte Carlo: the converged pixel is E[sample], and this occupant
-maintains the running mean incrementally — `main()` draws ONE new path estimate per
-frame and folds it in as `mix(previous, color, 1/(n+1))`, the numerically stable
+maintains the running mean incrementally — the generated `main()` draws ONE new path
+estimate per frame, and `average_update` folds it in as `mix(previous, x, 1/(n+1))`, the
+numerically stable
 running-average update (algebraically identical to (n·prev + new)/(n+1)).
 
 What the code pins:

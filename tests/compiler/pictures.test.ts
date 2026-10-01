@@ -22,6 +22,7 @@ const cases = [
         output: 'accumulation_current',
         previous: { u_previous: 'accumulation_previous' },
         outputs: ['out vec4 fragColor;'],
+        calls: ['vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);'],
         exports: { radiance: { bufferId: 'accumulation_previous', format: 'float' } },
     },
     {
@@ -31,6 +32,10 @@ const cases = [
         output: ['accumulation_current:0', 'accumulation_current:1'],
         previous: { u_previous: 'accumulation_previous', u_previousMoment: 'accumulation_previous:1' },
         outputs: ['layout(location = 0) out vec4 fragColor;', 'layout(location = 1) out vec4 fragMoment;'],
+        calls: [
+            'vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);',
+            'vec3 variance_new = variance_update(variance_previous, radiance_previous, radiance_new, color, u_sampleCount);',
+        ],
         exports: {
             radiance: { bufferId: 'accumulation_previous', format: 'float' },
             variance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1 },
@@ -43,6 +48,7 @@ const cases = [
         output: 'accumulation_current',
         previous: {},
         outputs: ['out vec4 fragColor;'],
+        calls: ['vec3 radiance_new = oneshot_update(color);'],
         exports: { radiance: { bufferId: 'accumulation_previous', format: 'float' } },
     },
 ] as const;
@@ -74,6 +80,17 @@ describe('the planned picture list generates the pipeline', () => {
                 expect(mainShader.match(/\bout vec4 /g)).toHaveLength(c.outputs.length);
             });
 
+            it('generates one main() that updates and writes each picture by its rule', () => {
+                const mainFn = mainShader.slice(mainShader.lastIndexOf('void main()'));
+                expect(mainShader.match(/void main\(\)/g)).toHaveLength(1);
+                for (const call of c.calls) expect(mainFn).toContain(call);
+                expect(mainFn.match(/_update\(/g)).toHaveLength(c.calls.length);
+                for (const line of c.outputs) {
+                    const output = line.match(/out vec4 (\w+);/)![1];
+                    expect(mainFn.match(new RegExp(`\\b${output} = vec4\\(`, 'g'))).toHaveLength(1);
+                }
+            });
+
             it('exports each picture after the frame, then the LDR output', () => {
                 expect(Object.keys(r.exportTargets!)).toEqual([...Object.keys(c.exports), 'ldr']);
                 for (const [name, target] of Object.entries(c.exports)) expect(r.exportTargets![name]).toEqual(target);
@@ -93,7 +110,7 @@ describe('the WebGL2 draw-buffer floor', () => {
         const features = analyze(minimalScene);
         const { plans } = planRenderers(features, minimalScene, [minimalStrategy], new DiagnosticBag('compiler'));
         const plan = plans[0];
-        const extra = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, output: `frag_${name}`, previous: null, attachment: i + 1 }));
+        const extra = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, output: `frag_${name}`, previous: null, attachment: i + 1, role: 'statistic' as const, update: 'unused' }));
         const bag = new DiagnosticBag('compiler');
         generate({ ...plan, pipeline: { ...plan.pipeline, pictures: [...plan.pipeline.pictures, ...extra] } }, minimalScene, minimalStrategy, bag);
         expect(bag.getErrors().some((e) => /5 pictures.*4 draw buffers/.test(e.message))).toBe(true);

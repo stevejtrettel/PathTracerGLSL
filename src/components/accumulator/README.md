@@ -37,11 +37,20 @@ compiler generates, not just shader text. NOTE the export semantics: **HDR expor
 
 ## How the compiler consumes it
 
-An occupant's `<id>.glsl` is the accumulation `main()` (the fragment that blends the new
-sample with history). The Generator's `features/accumulation.ts` selects it by
-`estimator.accumulation.type` and declares `u_sampleCount` / `u_pixelOffset`.
-`accumulation` is validated in BOTH `Validator.ts` AND the feature — the glsl-compile
-test caught a missed second gate once; keep both in sync when adding an occupant.
+An occupant's `<id>.glsl` is a static **update rule** — the arithmetic that folds one sample
+into one picture — and its descriptor names it (`update`). The accumulation `main()` is
+generated (`features/accumulation.ts`) from the planned picture list: it traces one camera
+sample, fetches each picture's previous value when the mode reads history, calls each
+picture's rule in list order (the main picture first, so a statistic can read its new value),
+and writes every picture to its output. The rules' signatures:
+
+- a mode that reads history: `vec3 <mode>_update(vec3 previous, vec3 x, int n)`;
+- a mode that does not: `vec3 <mode>_update(vec3 x)`;
+- a statistic: `vec3 <stat>_update(vec3 previous, vec3 mainPrevious, vec3 mainNew, vec3 x, int n)`.
+
+`n` is the number of samples already folded in (`u_sampleCount`); every rule must handle
+`n = 0`, when the previous values are the just-cleared buffer. The type is validated in BOTH
+`Validator.ts` AND the feature's backstop — keep both registry-gated when adding an occupant.
 
 The downstream display transfer (tonemap curve → screen/PNG) is a SEPARATE family,
 `tonemap/` (view). The shared `gl_VertexID` fullscreen-triangle vertex shader is
