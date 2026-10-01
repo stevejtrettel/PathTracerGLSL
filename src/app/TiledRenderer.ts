@@ -21,8 +21,8 @@ import type { EventBus } from './EventBus.js';
 import type { ProductionOrchestrator } from './ProductionOrchestrator.js';
 import { AppEvents } from './events.js';
 import { planTiles, placeTile } from './tiling.js';
-import { floatToRGBE, hdrHeader, encodePNG, downloadBlob } from './utils/file-export.js';
-import { validateSaves, type SaveRequest } from './capture.js';
+import { floatToRGBE, saveImageFile, type RenderStamp } from './utils/file-export.js';
+import { snapshotSaves, validateSaves, type SaveRequest } from './capture.js';
 
 export interface TiledRenderConfig {
     /** Full image size in pixels. */
@@ -78,7 +78,8 @@ export class TiledRenderer {
      *  RenderStoppedError if stopped (nothing is saved). */
     async render(config: TiledRenderConfig): Promise<void> {
         if (this.job) throw new Error('A tiled render is already running');
-        const { width, height, spp, save } = config;
+        const { width, height, spp } = config;
+        const save = snapshotSaves(config.save);
         if (!Number.isInteger(spp) || spp < 1) throw new Error(`Tiled render: spp must be a positive integer (got ${spp})`);
         const plan = planTiles(width, height, config.tileSize ?? DEFAULT_TILE_SIZE);
         validateSaves(this.app.getPictureFormats(), save);
@@ -101,6 +102,7 @@ export class TiledRenderer {
         const started = performance.now();
         console.log(`Tiled render: ${width}×${height} at ${spp} spp, ${plan.cols}×${plan.rows} tiles of ${plan.size}px`);
 
+        const stamps: RenderStamp[] = [];
         try {
             this.emitProgress();
             await this.production.renderTiles([width, height], plan.tiles, spp, (tile, index) => {
@@ -108,6 +110,12 @@ export class TiledRenderer {
                     const captured = this.app.capture(request);
                     placeTile(pixels, width, height, tile,
                         captured.format === 'hdr' ? floatToRGBE(captured.pixels, tile.width, tile.height) : captured.pixels);
+                }
+                // Snapshot the full image while the final tile's render is still locked.
+                if (index === plan.tiles.length - 1) {
+                    for (const { request } of images) {
+                        stamps.push(this.app.buildRenderStamp(request.picture, { resolution: [width, height], spp }));
+                    }
                 }
                 job.completed.push([tile.col, tile.row]);
                 job.completedTiles++;
@@ -118,15 +126,11 @@ export class TiledRenderer {
 
             const timestamp = fileTimestamp();
             const files: string[] = [];
-            for (const { request: { picture, format }, pixels } of images) {
-                const stamp = this.app.buildRenderStamp(picture, { resolution: [width, height], spp });
+            for (const [index, { request: { picture, format }, pixels }] of images.entries()) {
                 const name = `render_${timestamp}_${picture}_${width}x${height}_${spp}spp.${format}`;
-                if (format === 'hdr') {
-                    downloadBlob(new Blob([hdrHeader(width, height, stamp), pixels] as BlobPart[], { type: 'application/octet-stream' }), name);
-                } else {
-                    const rowBytes = width * 4;
-                    downloadBlob(await encodePNG(width, height, (y) => pixels.subarray(y * rowBytes, (y + 1) * rowBytes), stamp), name);
-                }
+                const rowBytes = width * 4;
+                await saveImageFile(format, width, height,
+                    (y) => pixels.subarray(y * rowBytes, (y + 1) * rowBytes), name, stamps[index]);
                 files.push(name);
             }
             const elapsedSeconds = (performance.now() - started) / 1000;

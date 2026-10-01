@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { crc32 as zlibCrc32, inflateSync } from 'node:zlib';
-import { floatToRGBE, buildHDRFile, encodePNG, type RenderStamp } from '../../src/app/utils/file-export.js';
+import { floatToRGBE, buildHDRFile, encodePNG, saveImageFile, type RenderStamp } from '../../src/app/utils/file-export.js';
 import { HDRLoader } from '../../src/engine/loaders/hdr-loader.js';
 
 const testStamp: RenderStamp = {
@@ -202,5 +202,30 @@ describe('encodePNG', () => {
         expect(byKey['pathtracer:measurement']).toBe(JSON.stringify(testStamp.measurement));
         expect(chunks.findIndex(c => c.type === 'IDAT')).toBe(1 + texts.length);
         expect(decodeRGB(chunks, W, H)[0]).toBe(rgba[0]);
+    });
+});
+
+
+describe('shared image writer', () => {
+    it.each(['hdr', 'png'] as const)('preserves top-first %s rows and metadata', async (format) => {
+        const top = new Uint8Array([128, 0, 0, 129]);
+        const bottom = new Uint8Array([0, 128, 0, 129]);
+        let saved!: Blob;
+        vi.stubGlobal('document', {
+            createElement: () => ({ click() {} }),
+            body: { appendChild() {}, removeChild() {} },
+        });
+        vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => { saved = blob as Blob; return 'blob:test'; });
+        vi.spyOn(globalThis, 'setTimeout').mockReturnValue(0 as never);
+        try {
+            await saveImageFile(format, 1, 2, (y) => y === 0 ? top : bottom, `image.${format}`, testStamp);
+            const expected = format === 'hdr'
+                ? buildHDRFile(new Uint8Array([...bottom, ...top]), 1, 2, testStamp)
+                : new Uint8Array(await (await encodePNG(1, 2, (y) => y === 0 ? top : bottom, testStamp)).arrayBuffer());
+            expect(new Uint8Array(await saved.arrayBuffer())).toEqual(expected);
+        } finally {
+            vi.restoreAllMocks();
+            vi.unstubAllGlobals();
+        }
     });
 });

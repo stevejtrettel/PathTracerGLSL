@@ -8,7 +8,7 @@ import type { RenderCoordinator, ProgressInfo } from './RenderCoordinator.js';
 import type { ParameterStore } from './ParameterStore.js';
 import type { LayoutMode } from './layout/index.js';
 import type { Tile } from './tiling.js';
-import { validateSaves, type SaveRequest } from './capture.js';
+import { snapshotSaves, validateSaves, type SaveRequest } from './capture.js';
 
 export interface ProductionOptions {
     width?: number;
@@ -62,7 +62,7 @@ export class ProductionOrchestrator {
     }
 
     async renderProduction(targetSamples: number, options?: ProductionOptions): Promise<void> {
-        const save = options?.save ?? [];
+        const save = snapshotSaves(options?.save ?? []);
         validateSaves(this.app.getPictureFormats(), save);
         const run = this.beginProduction(options);
         try {

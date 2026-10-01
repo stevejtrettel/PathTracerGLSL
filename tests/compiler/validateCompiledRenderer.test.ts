@@ -85,6 +85,11 @@ describe('validateCompiledRenderer — passes', () => {
         mrt.exportTargets = { radiance: { bufferId: 'accumulation_previous', format: 'float' }, variance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1 } };
         expect(errorCodes(mrt)).not.toContain('pass-invalid-attachment');
     });
+    it.each([0.5, NaN, Infinity, -1])('rejects invalid export attachment %s', (attachment) => {
+        const r = validRenderer();
+        r.exportTargets!.radiance.attachment = attachment;
+        expect(errorCodes(r)).toContain('pass-invalid-attachment');
+    });
     it('flags _current/_previous on a framebuffer that is not a double_buffer', () => {
         const r = validRenderer();
         r.pipeline.framebuffers.push({ id: 'ldr', type: 'texture', format: 'rgba8' });

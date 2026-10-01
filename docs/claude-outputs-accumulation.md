@@ -3,7 +3,8 @@
 **Date:** 2026-09-29; build record updated 2026-10-01.
 **Status:** Steps 0–5 are built and committed (`d6fc27b` … `40e764a`). Steps 6 (AOVs) and 7
 (OIDN) are not started; each still needs its own written plan and the owner's approval.
-Steps 1–5 have had **no independent code review yet** (see "The build so far").
+Steps 1–5 received an independent code review on 2026-10-01; its small cleanup is
+described in `claude-outputs-review-cleanup-plan.md` and the CHANGELOG.
 
 The plan sections (§1–§10) are kept as approved. What was built, where the code differs from
 their text, the loose ends and what comes next are in **"The build so far"** at the end.
@@ -331,6 +332,13 @@ step has its own (`step<N>-commit-frames`, `step<N>c.json`).
 
 ### What exists now
 
+The independent review checked steps 1–5, including the accumulation arithmetic,
+after-frame reads and the engine's view recipe. Its cleanup snapshots save requests
+at startup and tiled stamps in the final tile callback, allows m/M during production,
+shares the final file writer, uses pictureBuffer for MRT outputs, and rejects non-integer
+attachments. Verification results are recorded in the cleanup's CHANGELOG entry.
+The table above records the evidence and review status at each original commit.
+
 - **The picture list** (`compiler/plan/pictures.ts`): `planPictures` builds the ordered
   list (the main picture from `measurement.response`, then the statistic the accumulator
   descriptor declares); `pictureBuffer` is the one answer to where a picture's newest value
@@ -351,6 +359,9 @@ step has its own (`step<N>-commit-frames`, `step<N>c.json`).
   format it declares; `'png'` goes through the view mapping. Production
   (`renderProduction(N, { save })`) and tiled (`renderTiled({ …, save })`) renders take
   declared lists, validated before rendering. Every file's stamp names its picture.
+  Save requests are copied before rendering; tiled stamps are captured before the final
+  tile's production session unlocks. Ordinary and tiled saves use `saveImageFile` with
+  top-first rows (RGBE for HDR, RGBA for PNG).
 - **Checks:** `validateCompiledRenderer` checks every buffer reference (attachments,
   `_current`/`_previous` only on double buffers, the recipe's pass and buffers). Tests:
   `tests/compiler/pictures.test.ts` (a table test over average, average + variance and
@@ -370,9 +381,10 @@ step has its own (`step<N>-commit-frames`, `step<N>c.json`).
    declares the radiance PNG (the files it saved before); the tiled job declares the radiance
    HDR and PNG.
 4. **§10, reviews:** the owner chose one external reviewer instead of two fresh reviewers per
-   diff. Only step 0 has recorded review findings; steps 2–5 have had no independent review,
-   and step 4 no numerics review. Witness runs were the targeted ones in the table, by the
-   owner's instruction to keep them minimal.
+   diff. At the original commits only step 0 had recorded review findings. The subsequent
+   independent review of steps 1–5 checked the accumulation arithmetic and led to the
+   cleanup recorded above. Witness runs were the targeted ones in the table, by the owner's
+   instruction to keep them minimal.
 5. **§10, the table test** covers the three accumulation configurations; the AOV rows wait
    for step 6.
 
@@ -393,7 +405,7 @@ step has its own (`step<N>-commit-frames`, `step<N>c.json`).
 
 ### What comes next, in order
 
-1. **Independent review of steps 1–5** (the guide below).
+1. **Independent review of steps 1–5:** done; the small cleanup is recorded above.
 2. **Step 6, AOVs (albedo, normal).** Its plan must first pass the §6 gate: tell arrival
    from medium/GRIN termination, define the guides' meaning in scattering media under every
    estimator, and keep programs without AOVs byte-identical. It also adds

@@ -1,5 +1,7 @@
 // app/utils/file-export.ts
 
+import type { PictureFormat } from '../../compiler/types.js';
+
 /**
  * Reproducibility stamp — everything needed to re-produce an exported image:
  * the scene, the full strategy JSON, the live parameters (camera pose etc.),
@@ -108,15 +110,6 @@ export function buildHDRFile(rgbeData: Uint8Array, width: number, height: number
         offset += width * 4;
     }
     return fileData;
-}
-
-/**
- * Save HDR file
- */
-export function saveHDRFile(pixels: Float32Array, width: number, height: number, filename: string, stamp?: RenderStamp): void {
-    const rgbe = floatToRGBE(pixels, width, height);
-    const hdrFile = buildHDRFile(rgbe, width, height, stamp);
-    downloadBlob(new Blob([hdrFile as BlobPart], { type: 'application/octet-stream' }), filename);
 }
 
 /** Hand a blob to the browser as a download. The object URL is released a minute later,
@@ -248,12 +241,21 @@ async function readChunks(stream: ReadableStream<Uint8Array>): Promise<Uint8Arra
     }
 }
 
-/**
- * Save a PNG from RGBA bytes stored bottom row first (the readPixels order).
- */
-export async function savePNGFile(pixels: Uint8Array, width: number, height: number, filename: string, stamp?: RenderStamp): Promise<void> {
-    const rowBytes = width * 4;
-    const blob = await encodePNG(width, height,
-        (y) => pixels.subarray((height - 1 - y) * rowBytes, (height - y) * rowBytes), stamp);
-    downloadBlob(blob, filename);
+/** Save top-first four-byte rows: RGBE for HDR, RGBA for PNG. Both ordinary
+ *  captures and stitched tiles use this writer; their callers supply the row order. */
+export async function saveImageFile(
+    format: PictureFormat,
+    width: number,
+    height: number,
+    row: (y: number) => Uint8Array,
+    filename: string,
+    stamp: RenderStamp,
+): Promise<void> {
+    if (format === 'hdr') {
+        const parts: BlobPart[] = [hdrHeader(width, height, stamp) as BlobPart];
+        for (let y = 0; y < height; y++) parts.push(row(y) as BlobPart);
+        downloadBlob(new Blob(parts, { type: 'application/octet-stream' }), filename);
+    } else {
+        downloadBlob(await encodePNG(width, height, row, stamp), filename);
+    }
 }

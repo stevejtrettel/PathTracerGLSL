@@ -71,8 +71,7 @@ export const ACCUMULATORS: Record<string, AccumulatorDescriptor> = {
     oneshot: { type: 'oneshot', glsl: oneshotGLSL, update: 'oneshot_update', readsPrevious: false, statistics: {} },
 };
 
-/** The statistic a strategy's accumulation switches on (at most one: each statistic's
- *  main() updates the mode's pictures too), or null. */
+/** The statistic a strategy's accumulation switches on (at most one), or null. */
 export function requestedStatistic(accumulation: { type: string; [key: string]: unknown }): string | null {
     const mode = ACCUMULATORS[accumulation.type];
     if (mode === undefined) return null;

@@ -250,3 +250,20 @@ describe('ProductionOrchestrator — session robustness (Sep 25 audit)', () => {
         expect(store.isLocked()).toBe(true);
     });
 });
+
+
+describe('production save declaration', () => {
+    it('owns its requests before rendering yields', async () => {
+        let finish!: () => void;
+        const app = fakeApp();
+        const coord = fakeCoordinator(() => new Promise<void>((resolve) => { finish = resolve; }));
+        const { orch } = mk(app, coord);
+        const save = [{ picture: 'radiance', format: 'png' as const }];
+        const done = orch.renderProduction(4, { save });
+        save[0].picture = 'unknown';
+        save.push({ picture: 'unknown', format: 'png' });
+        finish();
+        await done;
+        expect(app.saveAll).toHaveBeenCalledWith([{ picture: 'radiance', format: 'png' }]);
+    });
+});

@@ -5,6 +5,11 @@
 
 import type { PictureFormat } from '../compiler/types.js';
 
+/** Own the declaration across rendering and encoding awaits. */
+export function snapshotSaves(requests: readonly SaveRequest[]): SaveRequest[] {
+    return requests.map(({ picture, format }) => ({ picture, format }));
+}
+
 /** One picture to save, in one format. */
 export interface SaveRequest {
     picture: string;

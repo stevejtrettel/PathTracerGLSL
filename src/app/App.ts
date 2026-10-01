@@ -24,8 +24,8 @@ import type { AppConfig, StrategyPreset, CreateAppOptions, SessionData } from '.
 import { SESSION_VERSION } from './types.js';
 import type { Extension } from './types.js';
 import { AppEvents, shouldResetAccumulation } from './events.js';
-import { saveHDRFile, savePNGFile, type RenderStamp } from './utils/file-export.js';
-import { validateSaves, type SaveRequest, type Captured } from './capture.js';
+import { floatToRGBE, saveImageFile, type RenderStamp } from './utils/file-export.js';
+import { snapshotSaves, validateSaves, type SaveRequest, type Captured } from './capture.js';
 import { SessionError } from '../errors/RenderErrors.js';
 import { ProductionOrchestrator, type ProductionOptions } from './ProductionOrchestrator.js';
 import { TiledRenderer, type TiledRenderConfig } from './TiledRenderer.js';
@@ -797,17 +797,20 @@ export class App {
      *  resizes and clears) cannot change what a later file holds. `filename` applies when the
      *  list has one entry. */
     async saveAll(requests: readonly SaveRequest[], filename?: string): Promise<void> {
-        validateSaves(this.getPictureFormats(), requests);
+        const save = snapshotSaves(requests);
+        validateSaves(this.getPictureFormats(), save);
         const [width, height] = this.getCanvasSize();
-        const captured = requests.map((request) => ({
+        const captured = save.map((request) => ({
             request,
             image: this.capture(request),
             stamp: this.buildRenderStamp(request.picture),
+            name: (save.length === 1 && filename) || this._generateExportFilename(request.picture, request.format),
         }));
-        for (const { request, image, stamp } of captured) {
-            const name = (requests.length === 1 && filename) || this._generateExportFilename(request.picture, request.format);
-            if (image.format === 'hdr') saveHDRFile(image.pixels, width, height, name, stamp);
-            else await savePNGFile(image.pixels, width, height, name, stamp);
+        for (const { request, image, stamp, name } of captured) {
+            const pixels = image.format === 'hdr' ? floatToRGBE(image.pixels, width, height) : image.pixels;
+            const rowBytes = width * 4;
+            await saveImageFile(image.format, width, height,
+                (y) => pixels.subarray((height - 1 - y) * rowBytes, (height - y) * rowBytes), name, stamp);
             console.log(`Saved ${request.picture} (${request.format}): ${name}`);
         }
     }

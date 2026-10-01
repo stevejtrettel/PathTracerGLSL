@@ -718,7 +718,10 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
                     .map((p) => [p.previous!, bufferRef(pictureBuffer(p, 'previous'))])),
                 // MRT outputs name every attachment explicitly, in list order.
                 output: many
-                    ? pictures.map((p) => `${ACCUMULATION_BUFFER}_current:${p.attachment}`)
+                    ? pictures.map((p) => {
+                        const { bufferId, attachment } = pictureBuffer(p, 'current');
+                        return `${bufferId}:${attachment}`;
+                    })
                     : bufferRef(pictureBuffer(main, 'current')),
             },
             {

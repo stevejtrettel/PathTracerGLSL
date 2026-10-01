@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-10-01 — Outputs review: small cleanup before AOVs
+
+[Cleanup plan](docs/claude-outputs-review-cleanup-plan.md), approved by the owner after
+the independent review of steps 1–5. The review found four correctness gaps: tiled
+stamps built between asynchronous encodes, caller-owned save declarations retained
+across awaits, m/M rejected by the production keyboard lock, and fractional/NaN
+attachments accepted by the new validator. It also found separate MRT storage naming
+and final file-writing dispatch, and a statistic comment describing removed mains.
+
+All are addressed: save requests are copied at startup, ordinary filenames are fixed
+with their captures, tiled stamps are read in the final tile callback while parameters
+are locked, m/M remains available during production, and attachment indices must be
+integers within bounds. MRT outputs use pictureBuffer. One saveImageFile writer accepts
+top-first RGBE/RGBA rows from ordinary captures and stitched tiles; the old save wrappers
+are removed. The statistic comment explains the present. No transport, accumulation
+math, AOV implementation or compatibility layer changed.
+
+Measured:
+- `npx tsc --noEmit`: exit 0.
+- Initial focused Vitest run: 69 passed, 1 failed because the new tiled test extracted
+  the timestamp rather than the picture from the filename. Corrected the test's index.
+- `npx vitest run`: 113 files, **4140 tests passed** (62.07 s).
+- `npm run digest -- /tmp/pathtracer-cleanup-digest.json`, compared with
+  `.digest/step5c.json`: **268 of 268 scenes identical**, 7 async scenes skipped.
+- `npm run frames -- record /tmp/pathtracer-cleanup-frames`: 8 cases in 28.0 s;
+  compared with `.digest/step5-commit-frames`: **18 of 18 pictures identical**, including
+  the tiled HDR and PNG payloads. Git/date stamps differ as expected.
+- Regression coverage: mutation of production, ordinary and tiled save declarations;
+  all tiled stamps captured before unlock/encoding; production m/M; invalid attachment
+  numbers; shared HDR/PNG writer's exact payloads and row order.
+- `git diff --check`: clean. No witness sweep; sampling and transport are unchanged.
+- Re-checked independently before commit: `tsc` clean; the affected tests (17 files, 423
+  tests) pass; frames 18 of 18 and digest 268 of 268 identical against step 5; and
+  `npm run witness -- cornell-area` passes 3 of 3, including tiled ≡ one piece with both
+  saved through the shared writer (HDR 0 of 76800 bytes differ, PNG 0 of 57720).
+
+Step 6 still needs its own approved plan satisfying the media/GRIN expectation gate.
+
 ## 2026-10-01 — Outputs plan: build record for review
 
 [The outputs plan](docs/claude-outputs-accumulation.md) now ends with "The build so far": each

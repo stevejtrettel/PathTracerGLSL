@@ -144,7 +144,7 @@ function checkBufferRef(
     }
     const attachment = attachmentField ?? suffix ?? 0;
     const count = Array.isArray(config.format) ? config.format.length : 1;
-    if (attachment < 0 || attachment >= count) {
+    if (!Number.isInteger(attachment) || attachment < 0 || attachment >= count) {
         bag.error('pass-invalid-attachment',
             `${where} uses attachment ${attachment} of '${bufferId}', which has ${count}`)
             .add();
