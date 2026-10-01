@@ -56,6 +56,9 @@ export function generate(
     const uniforms = buildUniforms([
         ...merged.uniforms,
         { name: 'u_resolution', type: 'vec2', parameterPath: 'engine.resolution' },
+        // With more than one picture the display chooses one by index — the App's display state,
+        // on the reserved no-reset channel; 0 is the main picture.
+        ...(pictures.length > 1 ? [{ name: 'u_picture', type: 'int' as const, parameterPath: 'renderer.picture', default: 0 }] : []),
     ]);
     const parameters = merged.parameters;
     const exportTargets = buildExportTargets(pictures);
@@ -82,7 +85,7 @@ export function generate(
         uniforms,
         parameters,
         exportTargets,
-        ldrRecipe: buildLdrRecipe(pictures[0]),   // the display re-run as data — the engine reads, never knows
+        ldrRecipe: buildLdrRecipe(pictures),   // the display re-run as data — the engine reads, never knows
         sourceMaps,
     };
 }

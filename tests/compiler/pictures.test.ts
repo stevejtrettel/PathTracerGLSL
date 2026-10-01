@@ -4,6 +4,7 @@ import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { planRenderers } from '../../src/compiler/plan/Planner.js';
 import { generate } from '../../src/compiler/generate/Generator.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
+import { validateCompiledRenderer } from '../../src/errors/compiler/validation.js';
 import type { AccumulationDescription, CompiledRenderer } from '../../src/compiler/types.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 
@@ -23,7 +24,9 @@ const cases = [
         previous: { u_previous: 'accumulation_previous' },
         outputs: ['out vec4 fragColor;'],
         calls: ['vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);'],
-        exports: { radiance: { bufferId: 'accumulation_previous', format: 'float' } },
+        exports: { radiance: { bufferId: 'accumulation_previous', format: 'float', picture: { view: 'tonemap', formats: ['hdr', 'png'] } } },
+        display: { u_radiance: 'accumulation_current' },
+        recipe: { u_radiance: 'accumulation_previous' },
     },
     {
         label: 'average + variance',
@@ -37,9 +40,11 @@ const cases = [
             'vec3 variance_new = variance_update(variance_previous, radiance_previous, radiance_new, color, u_sampleCount);',
         ],
         exports: {
-            radiance: { bufferId: 'accumulation_previous', format: 'float' },
-            variance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1 },
+            radiance: { bufferId: 'accumulation_previous', format: 'float', picture: { view: 'tonemap', formats: ['hdr', 'png'] } },
+            variance: { bufferId: 'accumulation_previous', format: 'float', attachment: 1, picture: { view: 'tonemap', formats: ['hdr', 'png'] } },
         },
+        display: { u_radiance: 'accumulation_current', u_variance: 'accumulation_current:1' },
+        recipe: { u_radiance: 'accumulation_previous', u_variance: 'accumulation_previous:1' },
     },
     {
         label: 'oneshot (reads no history)',
@@ -49,7 +54,9 @@ const cases = [
         previous: {},
         outputs: ['out vec4 fragColor;'],
         calls: ['vec3 radiance_new = oneshot_update(color);'],
-        exports: { radiance: { bufferId: 'accumulation_previous', format: 'float' } },
+        exports: { radiance: { bufferId: 'accumulation_previous', format: 'float', picture: { view: 'tonemap', formats: ['hdr', 'png'] } } },
+        display: { u_radiance: 'accumulation_current' },
+        recipe: { u_radiance: 'accumulation_previous' },
     },
 ] as const;
 
@@ -96,9 +103,22 @@ describe('the planned picture list generates the pipeline', () => {
                 for (const [name, target] of Object.entries(c.exports)) expect(r.exportTargets![name]).toEqual(target);
             });
 
-            it('shows the main picture during the frame and re-aims the LDR recipe after it', () => {
-                expect(display.inputs?.textures?.u_radiance).toBe('accumulation_current');
-                expect(r.ldrRecipe).toEqual({ passId: 'display-pass', inputs: { u_radiance: 'accumulation_previous' }, output: 'ldr' });
+            it('binds every picture to the display during the frame, and re-aims each after it in the view recipe', () => {
+                const bound = Object.fromEntries(Object.entries(display.inputs?.textures ?? {}).filter(([, ref]) => !ref.startsWith('extern:')));
+                expect(bound).toEqual(c.display);
+                expect(r.ldrRecipe).toEqual({ passId: 'display-pass', inputs: c.recipe, output: 'ldr' });
+            });
+
+            it('chooses the displayed picture by u_picture only when there is more than one', () => {
+                const displayShader = r.shaders.get(`${r.id}-display`)!.fragment;
+                const many = Object.keys(c.display).length > 1;
+                for (const sampler of Object.keys(c.display)) expect(displayShader).toContain(`uniform sampler2D ${sampler};`);
+                expect(displayShader.includes('uniform int u_picture;')).toBe(many);
+                expect(r.uniforms.some((u) => u.uniform === 'u_picture' && u.parameters.includes('renderer.picture'))).toBe(many);
+            });
+
+            it('passes the compiled-renderer validation', () => {
+                expect(validateCompiledRenderer(r).hasErrors()).toBe(false);
             });
         });
     }
@@ -110,7 +130,7 @@ describe('the WebGL2 draw-buffer floor', () => {
         const features = analyze(minimalScene);
         const { plans } = planRenderers(features, minimalScene, [minimalStrategy], new DiagnosticBag('compiler'));
         const plan = plans[0];
-        const extra = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, output: `frag_${name}`, previous: null, attachment: i + 1, role: 'statistic' as const, update: 'unused' }));
+        const extra = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, output: `frag_${name}`, previous: null, attachment: i + 1, role: 'statistic' as const, update: 'unused', display: `u_${name}`, view: 'tonemap' as const, formats: [] }));
         const bag = new DiagnosticBag('compiler');
         generate({ ...plan, pipeline: { ...plan.pipeline, pictures: [...plan.pipeline.pictures, ...extra] } }, minimalScene, minimalStrategy, bag);
         expect(bag.getErrors().some((e) => /5 pictures.*4 draw buffers/.test(e.message))).toBe(true);

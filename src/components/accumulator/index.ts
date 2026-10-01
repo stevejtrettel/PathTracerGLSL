@@ -9,17 +9,22 @@
 // alongside its pictures (variance, for the running mean). Composition (MRT structure,
 // the variance export target) stays Planner decisions. Origins are DERIVED from the keys.
 
+import type { PictureView, PictureFormat } from '../../compiler/types.js';
 import averageGLSL from './average/average.glsl?raw';
 import varianceGLSL from './variance/variance.glsl?raw';
 import oneshotGLSL from './oneshot/oneshot.glsl?raw';
 
-/** The names one per-pixel picture goes by: its export, the fragment output that writes it,
- *  and the sampler that reads its previous-frame value (bound only when the mode reads
- *  history). The compiler builds the picture list, layout and exports from these facts. */
+/** One per-pixel picture: its export name, the fragment output that writes it, the sampler
+ *  that reads its previous-frame value (bound only when the mode reads history), the display
+ *  program's sampler for it, how it is shown, and how it can be saved. The compiler builds
+ *  the picture list, layout, exports and display from these facts. */
 export interface PictureFacts {
     name: string;
     output: string;
     previous: string;
+    display: string;
+    view: PictureView;
+    formats: PictureFormat[];
 }
 
 /** A statistic a mode can record alongside its pictures, switched on by the strategy field
@@ -56,7 +61,11 @@ export const ACCUMULATORS: Record<string, AccumulatorDescriptor> = {
     average: {
         type: 'average', glsl: averageGLSL, update: 'average_update', readsPrevious: true,
         statistics: {
-            variance: { glsl: varianceGLSL, update: 'variance_update', picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment' } },
+            variance: {
+                glsl: varianceGLSL, update: 'variance_update',
+                // Shown and saved like radiance: exposure scales it linearly (by k, not k²).
+                picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment', display: 'u_variance', view: 'tonemap', formats: ['hdr', 'png'] },
+            },
         },
     },
     oneshot: { type: 'oneshot', glsl: oneshotGLSL, update: 'oneshot_update', readsPrevious: false, statistics: {} },

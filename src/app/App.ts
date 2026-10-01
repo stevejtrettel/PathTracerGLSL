@@ -53,6 +53,8 @@ export class App {
     // (the finished image survives for export), so the CURRENT values can describe a
     // different image than the one on screen — export stamps use this snapshot instead.
     private imageParameters: Record<string, any> | null = null;
+    // The displayed picture, by name (see getPictures); null = the main picture.
+    private displayedPicture: string | null = null;
     // The configuration initialize() was given: what a WebGL context restore must rebuild.
     private config: AppConfig | null = null;
 
@@ -81,6 +83,7 @@ export class App {
         this.coordinator = new RenderCoordinator(this.engine, this.eventBus);
         this.eventBus.on(AppEvents.ACCUMULATION_RESET, () => { this.imageParameters = this.parameterStore.serialize(); });
         this.eventBus.on(AppEvents.RENDER_ERROR, (data) => this._showErrorOverlay(data.error));
+        this.eventBus.on(AppEvents.RENDERER_SWITCHED, () => this._applyDisplayedPicture());
         this.engine.onContextRestored = () => { void this._restoreAfterContextLoss(); };
 
         this.rendererManager = new RendererManager({
@@ -727,9 +730,43 @@ export class App {
     // -- Export --
 
     getAvailableExports(): string[] { return this.engine.getExportNames(); }
+
+    // -- The displayed picture --
+    // Display state, kept outside the parameter store: it changes only what is shown, so it
+    // never resets accumulation, the production lock does not apply, and sessions do not carry
+    // it (a fresh page shows the main picture). Held by NAME; the display program receives its
+    // index in the active renderer's picture list on the reserved channel 'renderer.picture'.
+
+    /** The active renderer's pictures, in planned order; the first is the main picture. */
+    getPictures(): string[] {
+        return Object.entries(this.engine.getActiveRenderer()?.exportTargets ?? {})
+            .filter(([, target]) => target.picture !== undefined)
+            .map(([name]) => name);
+    }
+
+    /** The picture on screen. */
+    getDisplayedPicture(): string {
+        const pictures = this.getPictures();
+        return this.displayedPicture !== null && pictures.includes(this.displayedPicture) ? this.displayedPicture : pictures[0];
+    }
+
+    /** Show `name` on screen, redrawing at once — on a finished or stopped render too. */
+    showPicture(name: string): void {
+        const pictures = this.getPictures();
+        if (!pictures.includes(name)) throw new Error(`No picture '${name}' (this renderer keeps: ${pictures.join(', ')})`);
+        this.displayedPicture = name;
+        this._applyDisplayedPicture();
+        if (this.engine.isRunning()) this.engine.renderView('screen');
+    }
+
+    /** Hand the displayed picture's index to the active renderer (after a switch, the same
+     *  name if this renderer keeps it, else the main picture). */
+    private _applyDisplayedPicture(): void {
+        this.engine.setParameter('renderer.picture', Math.max(0, this.getPictures().indexOf(this.getDisplayedPicture())));
+    }
     readExport(name: string): Float32Array | Uint8Array { return this.engine.readExport(name); }
     /** Render the display on demand into the 'ldr' buffer; call before readExport('ldr'). */
-    renderLdr(): void { this.engine.renderLdr(); }
+    renderLdr(): void { this.engine.renderView(); }
     getCanvasSize(): [number, number] { return this.engine.getCanvasSize(); }
     getCanvas(): HTMLCanvasElement { return this.gl.canvas as HTMLCanvasElement; }
 

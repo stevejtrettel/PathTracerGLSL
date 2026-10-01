@@ -10,6 +10,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > analytic-glass 1
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-analytic-glass",
@@ -1795,6 +1802,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > analytic-minimal
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-analytic-minimal",
@@ -3338,6 +3352,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtr
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-cornell",
@@ -5064,6 +5085,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + p
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-cornell-area",
@@ -6705,6 +6733,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + p
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-cornell-area",
@@ -8594,6 +8629,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + p
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-cornell-area",
@@ -10440,6 +10482,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-gla
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-cornell-area-glass",
@@ -12142,6 +12191,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-gla
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-cornell-area-glass",
@@ -14095,6 +14151,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-gla
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-cornell-area-glass",
@@ -16004,6 +16067,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-glass 1`
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-cornell-glass",
@@ -17789,6 +17859,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > cylinders + pt-n
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-cylinders",
@@ -19501,6 +19578,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > eta witness 1`] 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-eta",
@@ -20832,6 +20916,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt 1`
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-fog-area",
@@ -22832,6 +22923,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt-mi
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-fog-area",
@@ -25156,6 +25254,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt-ne
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-fog-area",
@@ -27431,6 +27536,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-panel + pt 1
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-fog-panel",
@@ -29450,6 +29562,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-panel + pt-n
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-fog-panel",
@@ -31744,6 +31863,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > fogcube witness 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-fogcube",
@@ -33201,6 +33327,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace + no-dir
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "furnace-furnace",
@@ -34513,11 +34646,25 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace + varian
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
     "variance": {
       "attachment": 1,
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "furnace-var-furnace",
@@ -34600,6 +34747,7 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace + varian
           "textures": {
             "u_blueNoise": "extern:blue_noise",
             "u_radiance": "accumulation_current",
+            "u_variance": "accumulation_current:1",
           },
         },
         "output": "screen",
@@ -34626,6 +34774,8 @@ precision highp int;
 out vec4 fragColor;
 uniform vec2 u_resolution;
 uniform sampler2D u_radiance;
+uniform sampler2D u_variance;
+uniform int u_picture;
 uniform sampler2D u_blueNoise;
 #define DISPLAY_EXPOSURE 1.0000000
 // display.glsl — shared display-pass math (compiler-owned, non-swappable).
@@ -34670,7 +34820,10 @@ vec3 reinhard_curve(vec3 x) {
 
 void main() {
     vec2 uv = gl_FragCoord.xy / u_resolution;
-    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;
+    vec3 picture;
+    if (u_picture == 1) picture = texture(u_variance, uv).rgb;
+    else picture = texture(u_radiance, uv).rgb;
+    vec3 color = safe_color(picture) * DISPLAY_EXPOSURE;
     color = reinhard_curve(color);
     color = clamp(linear_to_srgb(color), 0.0, 1.0);
     color += (blue_noise(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
@@ -35551,29 +35704,29 @@ void main() {
   "sourceMaps": {
     "furnace-var-furnace-display": [
       {
-        "endLine": 9,
+        "endLine": 11,
         "origin": "generated:display-header",
         "startLine": 1,
       },
       {
-        "endLine": 29,
+        "endLine": 31,
         "origin": "glsl/shared/display.glsl",
-        "startLine": 10,
+        "startLine": 12,
       },
       {
-        "endLine": 40,
+        "endLine": 42,
         "origin": "glsl/shared/noise.glsl",
-        "startLine": 30,
+        "startLine": 32,
       },
       {
-        "endLine": 49,
+        "endLine": 51,
         "origin": "components/tonemap/reinhard/reinhard.glsl",
-        "startLine": 41,
+        "startLine": 43,
       },
       {
-        "endLine": 57,
+        "endLine": 62,
         "origin": "generated:display-main",
-        "startLine": 50,
+        "startLine": 52,
       },
     ],
     "furnace-var-furnace-main": [
@@ -35850,6 +36003,13 @@ void main() {
       "type": "vec2",
       "uniform": "u_resolution",
     },
+    {
+      "parameters": [
+        "renderer.picture",
+      ],
+      "type": "int",
+      "uniform": "u_picture",
+    },
   ],
 }
 `;
@@ -35864,6 +36024,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-scatter 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "furnace-scatter-furnace-scatter",
@@ -37465,6 +37632,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-sky + pt
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-furnace-sky",
@@ -38930,6 +39104,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-sky + pt
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-furnace-sky",
@@ -40354,6 +40535,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > haze + pt 1`] = 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-haze",
@@ -42150,6 +42338,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > haze + pt-nee 1`
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-haze",
@@ -44182,6 +44377,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > instance-glass 1
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-instance-glass",
@@ -46326,6 +46528,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > marble demo (no 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-noscatter-marble",
@@ -48061,6 +48270,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > marble demo 1`] 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-marble",
@@ -50036,6 +50252,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + direct
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "direct-minimal",
@@ -51683,6 +51906,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + pathtr
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-minimal",
@@ -53346,6 +53576,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > mist demo 1`] = 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-mist",
@@ -55544,6 +55781,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > mixed backends 1
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-mixed",
@@ -57107,6 +57351,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > orb + pt 1`] = `
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-orb",
@@ -58681,6 +58932,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > orb + pt-nee 1`]
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-orb",
@@ -60484,6 +60742,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > proc-sky + pt-mi
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-comp-proc-sky",
@@ -62342,6 +62607,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > proc-sky + pt-ne
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-proc-sky",
@@ -64167,6 +64439,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > sdf-table + tabl
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "table-sdf-table-twin",
@@ -66303,6 +66582,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt 1`] = `
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-sky",
@@ -67839,6 +68125,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt-mis-oct
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-oct-sky",
@@ -69720,6 +70013,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt-nee 1`]
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-nee-sky",
@@ -71530,6 +71830,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky-lamp + pt-mi
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-sky-lamp",
@@ -73579,6 +73886,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > slab witness 1`]
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-slab",
@@ -75036,6 +75350,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > submerged witnes
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pathtracer-submerged",
@@ -76676,6 +76997,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + bvh 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "bvh-two-light",
@@ -78469,6 +78797,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + powe
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "power-two-light",
@@ -80018,6 +80353,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + unif
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "uniform-two-light",
@@ -81567,6 +81909,13 @@ exports[`generated GLSL snapshot (§2.10 refactor safety net) > veach + mis 1`] 
     "radiance": {
       "bufferId": "accumulation_previous",
       "format": "float",
+      "picture": {
+        "formats": [
+          "hdr",
+          "png",
+        ],
+        "view": "tonemap",
+      },
     },
   },
   "id": "pt-mis-veach-mis",

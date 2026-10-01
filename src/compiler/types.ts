@@ -1016,6 +1016,14 @@ export interface SourceBlockMapping {
  * Defines how to export a specific output (HDR, LDR, AOVs, etc.)
  * from a rendered frame.
  */
+/** How a picture is shown: 'tonemap' = the strategy's exposure, tone curve and display
+ *  encoding (radiometric pictures). Data mappings arrive with the pictures that need them. */
+export type PictureView = 'tonemap';
+
+/** The file formats a picture can be saved in: 'hdr' = its raw floats as Radiance RGBE (which
+ *  cannot store negative values), 'png' = 8-bit through its view mapping. */
+export type PictureFormat = 'hdr' | 'png';
+
 export interface ExportTarget {
     /** Which framebuffer to read from */
     bufferId: string;
@@ -1025,6 +1033,11 @@ export interface ExportTarget {
 
     /** Optional: number of channels (1=depth, 3=RGB, 4=RGBA). Default: 4 */
     channels?: 1 | 3 | 4;
+
+    /** Present when this export is one of the program's per-pixel pictures: how it is shown
+     *  (`view`) and the file formats it can be saved in (`formats`). The export targets that
+     *  carry it ARE the pictures, in planned order; the first is the main picture. */
+    picture?: { view: PictureView; formats: PictureFormat[] };
 
     /**
      * Which color attachment to read (for MRT framebuffers)
@@ -1081,7 +1094,7 @@ export interface CompiledRenderer {
      *  compiler names ('display-pass', 'u_radiance', 'accumulation_previous', 'ldr') —
      *  a silent-runtime-breakage class on any compiler rename; now the compiler, which
      *  owns those names, declares them. Absent ⇒ the renderer has no display pass
-     *  (bake renderers) and renderLdr errors honestly. */
+     *  (bake renderers) and renderView errors honestly. */
     ldrRecipe?: {
         /** The pipeline pass to re-run (the display pass's id). */
         passId: string;

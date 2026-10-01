@@ -103,8 +103,27 @@ ldrRecipe?: {
 The engine had memorized four compiler-side names (`display-pass`, `u_radiance`,
 `accumulation_previous`, `ldr`) for `renderLdr()` — a silent-runtime-breakage class on any
 compiler rename, and the only place the blindness rule was violated. The compiler (which
-owns those names in PipelineBuilder) now declares them; `Engine.renderLdr` consumes the
+owns those names in PipelineBuilder) now declares them; `Engine.renderView` consumes the
 recipe as data. Additive only — every existing field is unchanged.
+
+The recipe is the **view recipe**: every picture input of the display pass is re-aimed at its
+after-frame buffer, and `Engine.renderView(target?, parameters?)` re-runs it into the recipe's
+own output (`'ldr'`, for a PNG) or into `'screen'` to redraw without rendering; `parameters`
+override that one draw.
+
+**Extension (owner-approved Sep 29 2026 — docs/claude-outputs-accumulation.md §3):**
+`ExportTarget.picture?` marks an export as one of the program's per-pixel pictures:
+
+```typescript
+picture?: {
+  view: PictureView;          // how it is shown ('tonemap')
+  formats: PictureFormat[];   // the file formats it can be saved in ('hdr' | 'png')
+}
+```
+
+The export targets that carry it are the pictures, in planned order; the first is the main
+picture. Names are not repeated anywhere else. Optional — the environment bake's `table`
+export has none. Additive only.
 
 ---
 

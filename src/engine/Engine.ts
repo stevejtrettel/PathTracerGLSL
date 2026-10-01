@@ -204,31 +204,28 @@ export class Engine {
     }
 
     /**
-     * Render the display pass on demand into the 'ldr' scratch buffer, reading
-     * `accumulation_previous` (post-swap — the same frame HDR export reads), so
-     * `readExport('ldr')` returns the tonemapped + dithered LDR bytes. This is the ONLY
-     * cost of PNG export (impl-plan-display Stage 4 / Option B) — the normal render loop
-     * is untouched (display still → screen). Call immediately before readExport('ldr').
+     * Re-run the view recipe (the display pass, its inputs re-aimed at the finished frame) into
+     * `target` — the recipe's own output ('ldr', the scratch buffer `readExport('ldr')` reads)
+     * by default, or 'screen' to redraw without rendering. `parameters` override this one draw
+     * only (uniform uploads are re-checked every frame, so nothing lingers). No sample is
+     * traced, nothing is swapped or reset. The recipe is DATA the compiler shipped: this engine
+     * knows no pass, buffer or uniform names.
      */
-    renderLdr(): void {
-        if (this.state !== 'running') throw new Error(`Cannot render LDR in state: ${this.state}`);
+    renderView(target?: string, parameters: Record<string, unknown> = {}): void {
+        if (this.state !== 'running') throw new Error(`Cannot render the view in state: ${this.state}`);
         if (!this.activeRendererId) throw new Error('No active renderer');
         const renderer = this.renderers.get(this.activeRendererId)!;
-        // E5: the recipe is DATA the compiler shipped — this engine knows no pass,
-        // buffer, or uniform names (the four memorized names were a silent-runtime-
-        // breakage class on any compiler rename).
         const recipe = renderer.ldrRecipe;
-        if (!recipe) throw new Error('renderLdr: renderer ships no ldrRecipe (no display pass)');
+        if (!recipe) throw new Error('renderView: renderer ships no view recipe (no display pass)');
         const displayPass = renderer.pipeline.passes.find(p => p.id === recipe.passId);
-        if (!displayPass) throw new Error(`renderLdr: recipe pass '${recipe.passId}' not in pipeline`);
+        if (!displayPass) throw new Error(`renderView: recipe pass '${recipe.passId}' not in pipeline`);
 
         const sampleCount = this.sampleCounts.get(this.activeRendererId)!;
-        const parameters = this._buildParameters(sampleCount);
         this.renderExecutor.executePass({
             ...displayPass,
-            output: recipe.output,
+            output: target ?? recipe.output,
             inputs: { textures: { ...(displayPass.inputs?.textures ?? {}), ...recipe.inputs } },
-        }, parameters);
+        }, { ...this._buildParameters(sampleCount), ...parameters });
     }
 
     private _buildParameters(sampleCount: number): Record<string, any> {

@@ -4,6 +4,47 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 5a of the outputs plan: any picture on screen, switched live
+
+[Step 5 plan](docs/claude-outputs-step5-plan.md), first commit (viewing).
+
+**What changed:**
+- **Picture facts** now also state how each picture is shown (`view: 'tonemap'` for radiance
+  and variance) and which formats it can be saved in.
+- **The contract** carries them on the export targets (`ExportTarget.picture`, an
+  owner-approved extension recorded in `compiler-engine-contract.md`). The export targets
+  that carry it are the pictures, in order.
+- **The display program:**
+  - with one picture it is unchanged;
+  - with more it binds every picture and chooses one by `u_picture`, on the reserved
+    no-reset channel `renderer.picture`;
+  - the view recipe re-aims every picture input after the frame.
+- **The engine:** `Engine.renderLdr` becomes `renderView(target?, parameters?)`. It re-runs
+  the view recipe into `'ldr'` or onto `'screen'`, with one-draw overrides, and traces
+  nothing.
+- **The App** holds the displayed picture by name, as display state outside the parameter
+  store:
+  - `getPictures()`, `getDisplayedPicture()` and `showPicture(name)` (which redraws at once);
+  - after a renderer switch it re-resolves by name, falling back to the main picture.
+- **The `m` key** cycles the displayed picture.
+
+**Measured:**
+- **Typecheck and tests:** `tsc` clean; vitest 110 files and 4124 tests, including new
+  table-test checks (display bindings, the selector only for more than one picture, recipe
+  inputs, compiled-renderer validity).
+- **Snapshot:** the GLSL snapshot changed only by the picture facts (48 entries) and the
+  variance case's display selector.
+- **Digest** against step 4's commit:
+  - every structure differs only by its picture facts;
+  - the only shader change is the variance renderer's display;
+  - the only new uniform is its `u_picture`.
+- **Frames:** 18 of 18 bit-identical.
+- **Browser check** (furnace variance renderer, after a finished 8-sample render):
+  - switching to variance changes the screen (black, as the variance is zero);
+  - the sample count stays at 8 and the salt at 1234;
+  - switching back restores the exact original pixels;
+  - no WebGL errors.
+
 ## 2026-09-30 — Step 4 of the outputs plan: a generated accumulation `main()`
 
 [Step 4 plan](docs/claude-outputs-step4-plan.md). The three hand-written mains (`average`,

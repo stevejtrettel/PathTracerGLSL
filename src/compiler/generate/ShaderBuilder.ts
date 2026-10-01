@@ -41,7 +41,7 @@ export function buildShaders(merged: MergedContributions, rendererId: string, to
     sourceMaps.set(mainShaderId, ptAssembled.blockMap);
 
     // Display fragment
-    const displayAssembled = assembleBlocks(buildDisplayBlocks(tonemap));
+    const displayAssembled = assembleBlocks(buildDisplayBlocks(tonemap, pictures));
     const displayShaderId = `${rendererId}-display`;
     shaders.set(displayShaderId, {
         vertex: vertexAssembled.source,
@@ -68,7 +68,7 @@ function buildPathtracerBlocks(merged: MergedContributions, pictures: PlannedPic
 // Display Fragment Shader (block assembly)
 // ============================================================================
 
-function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): ShaderBlock[] {
+function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pictures: PlannedPicture[]): ShaderBlock[] {
     // The display shader is plan-driven (audit C2: it used to emit Reinhard unconditionally,
     // silently ignoring `display: { type: 'none' }` and `exposure`). Exposure is strategy
     // data, so it bakes as a constant — a strategy change recompiles anyway.
@@ -76,9 +76,10 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
     // 'none' is the raw probe path: exposure forced to 1.0 so a pixel IS the accumulator
     // value (§11). Every encoding occupant applies the requested exposure.
     const exposure = tonemap.type === 'none' ? 1.0 : (tonemap.exposure ?? 1.0);
-    // The display pass's resources are declared HERE, not in the tonemap occupants:
-    // u_radiance is the pass's texture input, u_resolution the engine builtin — occupants
-    // contain the tone CURVE only. safe_color + the sRGB OETF are the shared display math.
+    // The display pass's resources are declared HERE, not in the tonemap occupants: one
+    // sampler per picture (the pass's texture inputs), u_picture choosing among them when
+    // there is more than one, and the engine builtin u_resolution — occupants contain the
+    // tone CURVE only. safe_color + the sRGB OETF are the shared display math.
     // Blue-noise dither is applied only when we quantize to display bytes (the encode
     // path). 'none' (the §11 probe path) stays bit-exact — no dither, no u_blueNoise.
     const dither = model.encodesToDisplay;
@@ -87,7 +88,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
         '',
         'out vec4 fragColor;',
         'uniform vec2 u_resolution;',
-        'uniform sampler2D u_radiance;',
+        ...pictures.map((p) => `uniform sampler2D ${p.display};`),
+        ...(pictures.length > 1 ? ['uniform int u_picture;'] : []),
         ...(dither ? ['uniform sampler2D u_blueNoise;'] : []),
         `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
     ].join('\n');
@@ -97,14 +99,16 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap']): Sha
         ...(dither ? [{ origin: 'glsl/shared/noise.glsl', source: blueNoiseGLSL }] : []),
         // Origin DERIVED from the registry key (D2 — the path convention is the one truth).
         { origin: `components/tonemap/${model.type}/${model.type}.glsl`, source: model.glsl },
-        { origin: 'generated:display-main', source: buildDisplayMain(model) },
+        { origin: 'generated:display-main', source: buildDisplayMain(model, pictures) },
     ];
 }
 
 /** The composed display main() — policy/plumbing (generated), calling the occupant's
- *  static curve: exposure → curve → (sRGB encode + clamp + blue-noise dither, iff the
- *  occupant encodes to display bytes). */
-function buildDisplayMain(model: TonemapDescriptor): string {
+ *  static curve: the displayed picture → exposure → curve → (sRGB encode + clamp + blue-noise
+ *  dither, iff the occupant encodes to display bytes). Every picture is viewed through the
+ *  'tonemap' mapping (the only PictureView); with more than one picture, u_picture (its
+ *  index in the planned list) chooses which — GLSL ES 3.00 cannot index samplers dynamically. */
+function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]): string {
     // Dither in display-code space, right before the implicit 8-bit write: ±½ LSB of
     // blue noise, INDEPENDENT per channel (blue_noise returns a decorrelated RGB triple),
     // turns quantization banding into imperceptible high-frequency grain.
@@ -112,10 +116,20 @@ function buildDisplayMain(model: TonemapDescriptor): string {
         ? '    color = clamp(linear_to_srgb(color), 0.0, 1.0);\n'
         + '    color += (blue_noise(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);\n'
         : '';
+    const [main, ...rest] = pictures;
+    const fetch = (p: PlannedPicture) => `texture(${p.display}, uv).rgb`;
+    const pick = rest.length === 0
+        ? [`    vec3 color = safe_color(${fetch(main)}) * DISPLAY_EXPOSURE;`]
+        : [
+            '    vec3 picture;',
+            ...rest.map((p, i) => `    ${i === 0 ? 'if' : 'else if'} (u_picture == ${p.attachment}) picture = ${fetch(p)};`),
+            `    else picture = ${fetch(main)};`,
+            '    vec3 color = safe_color(picture) * DISPLAY_EXPOSURE;',
+        ];
     return [
         'void main() {',
         '    vec2 uv = gl_FragCoord.xy / u_resolution;',
-        '    vec3 color = safe_color(texture(u_radiance, uv).rgb) * DISPLAY_EXPOSURE;',
+        ...pick,
         `    color = ${model.curveFn}(color);`,
         `${encode}    fragColor = vec4(color, 1.0);`,
         '}',

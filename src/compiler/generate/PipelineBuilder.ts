@@ -65,25 +65,26 @@ export function buildUniforms(uniforms: PlannedUniform[]): UniformBinding[] {
     return bindings;
 }
 
-/** The on-demand LDR recipe: the display-pass re-run facts, shipped as DATA so the engine
- *  stays blind. The display's input is re-aimed at the main picture's AFTER-frame buffer
- *  (pictureBuffer), so the LDR bytes match exactly what that picture's export reads. */
-export function buildLdrRecipe(main: PlannedPicture): NonNullable<CompiledRenderer['ldrRecipe']> {
+/** The view recipe (the contract's `ldrRecipe`): the display pass re-run on demand — into
+ *  'ldr' for a PNG, or onto the screen to redraw — shipped as DATA so the engine stays blind.
+ *  Every picture input is re-aimed at its AFTER-frame buffer (pictureBuffer), so what it draws
+ *  matches exactly what that picture's export reads. */
+export function buildLdrRecipe(pictures: PlannedPicture[]): NonNullable<CompiledRenderer['ldrRecipe']> {
     return {
         passId: passId('display'),
-        inputs: { u_radiance: bufferRef(pictureBuffer(main, 'previous')) },
+        inputs: Object.fromEntries(pictures.map((p) => [p.display, bufferRef(pictureBuffer(p, 'previous'))])),
         output: 'ldr',
     };
 }
 
 /** One float export per picture, named by the picture and read where its newest value is
  *  after the frame (pictureBuffer explains why that is `_previous`); then the LDR output,
- *  rendered on demand into the 'ldr' buffer (Engine.renderLdr) just before readExport('ldr'). */
+ *  rendered on demand into the 'ldr' buffer (Engine.renderView) just before readExport('ldr'). */
 export function buildExportTargets(pictures: PlannedPicture[]): CompiledRenderer['exportTargets'] {
     const targets: NonNullable<CompiledRenderer['exportTargets']> = {};
     for (const p of pictures) {
         const { bufferId, attachment } = pictureBuffer(p, 'previous');
-        targets[p.name] = { bufferId, format: 'float', ...(attachment > 0 ? { attachment } : {}) };
+        targets[p.name] = { bufferId, format: 'float', ...(attachment > 0 ? { attachment } : {}), picture: { view: p.view, formats: p.formats } };
     }
     targets.ldr = { bufferId: 'ldr', format: 'byte' };
     return targets;

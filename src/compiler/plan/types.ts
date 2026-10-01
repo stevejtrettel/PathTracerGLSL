@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription, PictureView, PictureFormat } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -271,6 +271,9 @@ export interface PlannedPicture {
     name: string;
     output: string;
     previous: string | null;
+    display: string;
+    view: PictureView;
+    formats: PictureFormat[];
     attachment: number;
     /** 'main' is the measured picture; a 'statistic' is computed from it (its update reads the
      *  main picture's previous and new values). */

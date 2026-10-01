@@ -21,7 +21,7 @@ import { AppEvents } from '../events.js';
  *   a/A     : Export all AOVs
  *   j/J     : Quick save session
  *   o/O     : Load session from file
- *   m/M     : Cycle display mode (for AOV renderers)
+ *   m/M     : Cycle the displayed picture (radiance, variance, …)
  *
  * Note: This is for application commands, separate from KeyboardControls
  * which handles 6DOF camera navigation.
@@ -52,7 +52,7 @@ export class AppShortcutsExtension implements Extension {
         console.log('  x/X     : Export PNG/HDR');
         console.log('  a       : Export AOVs');
         console.log('  j/o     : Save/load session');
-        console.log('  m       : Cycle display mode');
+        console.log('  m       : Cycle the displayed picture');
     }
 
     uninstall(): void {
@@ -139,6 +139,17 @@ export class AppShortcutsExtension implements Extension {
                 e.preventDefault();
                 this.app.exportAllAOVs().catch((err) => console.error('AOV export failed:', err));
                 break;
+
+            // m/M: Cycle the displayed picture
+            case 'm':
+            case 'M': {
+                e.preventDefault();
+                const pictures = this.app.getPictures();
+                const next = pictures[(pictures.indexOf(this.app.getDisplayedPicture()) + 1) % pictures.length];
+                this.app.showPicture(next);
+                console.log(`Showing picture: ${next}`);
+                break;
+            }
 
             // j/J: Quick save session
             case 'j':

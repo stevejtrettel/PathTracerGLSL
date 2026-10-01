@@ -723,11 +723,13 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
             },
             {
                 role: 'display',
-                // Encoding tonemaps dither the 8-bit write → they bind the global
-                // blue-noise tile; 'none' (raw probe path) does not.
-                inputs: tonemapModel(program.view.tonemap.type).encodesToDisplay
-                    ? { 'u_radiance': bufferRef(pictureBuffer(main, 'current')), 'u_blueNoise': 'extern:blue_noise' }
-                    : { 'u_radiance': bufferRef(pictureBuffer(main, 'current')) },
+                // Every picture's newest value during the frame (the display picks one); encoding
+                // tonemaps dither the 8-bit write → they bind the global blue-noise tile, while
+                // 'none' (the raw probe path) does not.
+                inputs: {
+                    ...Object.fromEntries(pictures.map((p) => [p.display, bufferRef(pictureBuffer(p, 'current'))])),
+                    ...(tonemapModel(program.view.tonemap.type).encodesToDisplay ? { 'u_blueNoise': 'extern:blue_noise' } : {}),
+                },
                 output: 'screen',
             },
         ],

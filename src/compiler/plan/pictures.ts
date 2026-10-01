@@ -13,7 +13,7 @@ export const ACCUMULATION_BUFFER = 'accumulation';
 
 /** The main picture of each measurement response. */
 const RESPONSE_PICTURES: Record<ProgramDescription['measurement']['response'], PictureFacts> = {
-    radiance: { name: 'radiance', output: 'fragColor', previous: 'u_previous' },
+    radiance: { name: 'radiance', output: 'fragColor', previous: 'u_previous', display: 'u_radiance', view: 'tonemap', formats: ['hdr', 'png'] },
 };
 
 /** The program's pictures, in order, each with its attachment. */
