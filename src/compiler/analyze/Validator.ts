@@ -1018,10 +1018,18 @@ export function validate(
     }
 
     // Check for unsupported accumulation/tonemap types
-    if (ACCUMULATORS[strategy.estimator.accumulation.type] === undefined) {   // D3: registry-gated
-        bag.error('invalid-setting',
-            `Accumulation type '${strategy.estimator.accumulation.type}' not yet supported`)
+    const accumulation = strategy.estimator.accumulation;
+    const mode = ACCUMULATORS[accumulation.type];
+    if (mode === undefined) {   // registry-gated
+        bag.error('invalid-setting', accumulation.type === 'variance'
+            ? `Accumulation type 'variance' is not a mode: write { type: 'average', variance: true }`
+            : `Accumulation type '${accumulation.type}' not yet supported`)
             .add();
+    }
+    if (accumulation.variance !== undefined && typeof accumulation.variance !== 'boolean') {
+        bag.error('invalid-setting', `estimator.accumulation.variance must be true or false (got ${JSON.stringify(accumulation.variance)})`).add();
+    } else if (accumulation.variance === true && mode !== undefined && mode.statistics.variance === undefined) {
+        bag.error('invalid-setting', `Accumulation '${accumulation.type}' does not support variance`).add();
     }
     if (!isTonemapSupported(strategy.view.tonemap.type)) {
         bag.error('invalid-setting',

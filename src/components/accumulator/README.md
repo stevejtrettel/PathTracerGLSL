@@ -3,11 +3,16 @@
 **Taxonomy:** **estimator** — the outer `(1/N) Σ` of Monte Carlo (+ its instrumentation).
 **Kind:** pick-one. `estimator.accumulation.type` selects the occupant.
 
-Occupants: `average/` (plain unbiased mean — today's default), `variance/` (Welford;
-mean byte-identical to `average`, a second MRT attachment = per-channel sample variance,
-`variance` export target), `oneshot/` (non-accumulating live preview — writes
-`fragColor = color` each frame, never reads history). Exponential moving average is
-reserved.
+Occupants: `average/` (plain unbiased mean — today's default) and `oneshot/`
+(non-accumulating live preview — writes `fragColor = color` each frame, never reads
+history). Exponential moving average is reserved.
+
+**Statistics** are recorded alongside a mode's pictures and never change them. Each mode's
+descriptor lists the ones it supports; the strategy switches one on by its name, e.g.
+`accumulation: { type: 'average', variance: true }`. `average` supports `variance`
+(Welford; the mean byte-identical to plain `average`, a second MRT attachment holding the
+per-channel sample variance, exported as `variance`), whose GLSL is in `variance/`.
+`oneshot` supports none.
 
 ## The sorting rule (where the accumulation zoo goes)
 
@@ -15,9 +20,9 @@ Does it change what the number converges to, how fast, or only how it's shown?
 - Plain average — estimator, unbiased, converges. `average/`.
 - Exponential moving average — estimator, unbiased but non-convergent (variance floor);
   the interactive-preview occupant, reserved.
-- Variance/moment buffers — estimator instrumentation (extra outputs): `variance/`
-  (Welford; mean byte-identical to `average`, second MRT attachment = per-channel sample
-  variance, `variance` export target).
+- Variance/moment buffers — estimator instrumentation (extra outputs): the `variance`
+  statistic of `average` (Welford; mean byte-identical to `average`, second MRT attachment
+  = per-channel sample variance, `variance` export target).
 - Firefly clamping / median-of-means — BIASED: never hides here; a declared measurement
   truncation in the bias ledger, like `shadows: 'opaque-dielectrics'`.
 - Denoising — view (a display filter); the HDR export stays the raw estimator output.

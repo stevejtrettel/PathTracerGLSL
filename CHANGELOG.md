@@ -4,6 +4,44 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 2 of the outputs plan: variance is an option of `average`
+
+[Step 2 plan](docs/claude-outputs-step2-plan.md). Variance is declared as
+`accumulation: { type: 'average', variance: true }`, a statistic recorded alongside the
+mean, instead of a separate averaging mode.
+
+- **The registry:** each accumulator descriptor lists the statistics it supports. `average`
+  lists `variance`, whose GLSL stays in `variance/`; `oneshot` lists none.
+  `requestedStatistic` is the one function that says which statistic a strategy switches on.
+- **The Validator:**
+  - rejects `type: 'variance'`, with a hint saying what to write instead;
+  - rejects a non-boolean `variance`;
+  - rejects variance on a mode that doesn't support it.
+- **Migrated:**
+  - the furnace fixture;
+  - the witness runner's forced variance, the frame tool's noisy case, and the lab
+    page's cache digest (each now adds `variance: true` to the strategy's own mode);
+  - two tests;
+  - comments and witness labels;
+  - the accumulator README and the variance note;
+  - CLAUDE.md's Status line.
+
+The machinery behind it (the five places that test for variance, the hand-written mains)
+is unchanged until steps 3 and 4.
+
+**Measured:**
+- **Typecheck and tests:** `tsc` clean; vitest 109 files and 4096 tests (one new Validator
+  test).
+- **Digest** against step 1's commit: **268 of 268 scenes identical.**
+- **Snapshots:** the GLSL snapshot is unchanged. The program-description snapshot changes
+  only in `furnace-var`'s accumulation (`type: 'variance'` → `type: 'average',
+  variance: true`).
+- **Frames:** 18 of 18 bit-identical.
+- **Witness:** `furnace` and `two-light` pass 5 of 5. `two-light`'s χ² checks go through
+  the rewritten forced-variance path.
+- **Leftovers:** `git grep "type: 'variance'"` finds only the Validator test that asserts
+  it is rejected.
+
 ## 2026-09-30 — Step 1 of the outputs plan: the `hdr` export is now `radiance`
 
 [Step 1 plan](docs/claude-outputs-step1-plan.md). The color picture's export is named for

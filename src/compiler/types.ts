@@ -741,9 +741,11 @@ export type CameraDescription = CameraPose & {
     [key: string]: unknown;
 };
 
-/** Accumulation — OPEN (D2): `type` is an accumulator registry key ('average' /
- *  'variance' / 'oneshot'; 'exponential' reserved-rejected). */
-export type AccumulationDescription = { type: string; [key: string]: unknown };
+/** Accumulation — OPEN: `type` is an accumulator registry key ('average' / 'oneshot';
+ *  'exponential' reserved-rejected). `variance: true` also records the per-pixel sample
+ *  variance, a statistic that never changes the mean; only modes whose descriptor lists it
+ *  support it (today `average`). */
+export type AccumulationDescription = { type: string; variance?: boolean; [key: string]: unknown };
 
 /** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` is the
  *  shared display-glue control every curve honors. */

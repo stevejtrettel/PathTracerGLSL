@@ -6,7 +6,7 @@
 import type { RenderPlan } from '../../plan/types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
-import { ACCUMULATORS } from '../../../components/accumulator/index.js';
+import { ACCUMULATORS, requestedStatistic } from '../../../components/accumulator/index.js';
 
 export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): FeatureContribution {
     const type = plan.program.estimator.accumulation.type;
@@ -17,13 +17,17 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
         return { ...emptyContribution('accumulation'), blocks: [{ origin: `generated:main-${type}`, source: '// unsupported accumulation' }] };
     }
 
+    // A requested statistic brings its own main() (which updates the mode's pictures too).
+    const statName = requestedStatistic(plan.program.estimator.accumulation);
+    const stat = statName === null ? null : d.statistics[statName];
+
     // The occupant's ping-pong inputs, declared HERE because the occupant reads them
     // (exact linkage, from the registry FACTS): oneshot reads neither and declares
     // neither — its programs carry no dead sampler. The moment texture binds as the
     // pathtracer pass input 'accumulation_previous:1'.
     const inputDecls: string[] = [];
     if (d.readsPrevious) inputDecls.push('uniform sampler2D u_previous;');
-    if (d.readsMoment) inputDecls.push('uniform sampler2D u_previousMoment;');
+    if (stat?.readsMoment) inputDecls.push('uniform sampler2D u_previousMoment;');
 
     return {
         ...emptyContribution('accumulation'),
@@ -31,7 +35,9 @@ export function contributeAccumulation(plan: RenderPlan, bag: DiagnosticBag): Fe
             ...(inputDecls.length
                 ? [{ origin: 'generated:accumulation-inputs', source: inputDecls.join('\n') }]
                 : []),
-            { origin: `components/accumulator/${d.type}/${d.type}.glsl`, source: d.glsl },
+            stat !== null
+                ? { origin: `components/accumulator/${statName}/${statName}.glsl`, source: stat.glsl }
+                : { origin: `components/accumulator/${d.type}/${d.type}.glsl`, source: d.glsl },
         ],
         // Engine builtins declared where READ (the core.ts discipline).
         uniforms: [

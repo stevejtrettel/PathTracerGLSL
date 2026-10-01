@@ -19,7 +19,7 @@ export function generate(
     // shaders, uniform bindings, and parameter metadata are all built from.
     const merged = collectFeatures(plan, bag);
 
-    const variance = plan.program.estimator.accumulation.type === 'variance';
+    const variance = plan.program.estimator.accumulation.variance === true;
     const { shaders, sourceMaps: blockMaps } = buildShaders(merged, rendererId, plan.program.view.tonemap, variance);
 
     // The sampler BUDGET (fable-data-rail §5): count the REAL roster in each assembled

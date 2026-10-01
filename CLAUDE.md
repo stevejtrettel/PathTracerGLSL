@@ -217,7 +217,7 @@ How a program is assembled:
   expression coefficients under a declared majorant), volume emission, HG and Rayleigh phase
   functions, null interfaces, variable-index (GRIN) media.
 - Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
-  filter; accumulators average / variance / oneshot; seven tonemaps.
+  filter; accumulators average (with an optional variance statistic) / oneshot; seven tonemaps.
 - Output: exports carry reproducibility stamps; `app.renderTiled` renders any size in tiles
   and saves one stitched HDR/PNG (pixel-identical to a one-piece render at the same salt;
   the `cornell-area` witness checks this with a pinhole camera; other cameras were checked

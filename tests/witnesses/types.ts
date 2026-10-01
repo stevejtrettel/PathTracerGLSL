@@ -99,7 +99,7 @@ export type WitnessCheck =
     | {
           /**
            * Equal-spp noise comparison (the research numbers): each listed strategy
-           * re-renders with accumulation forced to the 'variance' occupant, and the
+           * re-renders with the variance statistic switched on (`variance: true`), and the
            * runner reports mean per-channel σ of the PIXEL MEAN (√(v/n)) over `region`,
            * relative to the region's mean radiance. Report-only unless
            * `assertFirstLowest` — then the FIRST listed strategy must measure lowest.

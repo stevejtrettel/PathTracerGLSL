@@ -136,10 +136,20 @@ describe('Validator', () => {
         expect(bag.getErrors().some(e => e.code === 'empty-scene')).toBe(true);
     });
 
-    it('rejects unsupported accumulation (allows average/variance)', () => {
+    it('rejects unsupported accumulation (allows average, average + variance, oneshot)', () => {
         const bag = run((_s, st) => { st.estimator.accumulation = { type: 'exponential', alpha: 0.1 }; });
         expect(bag.getErrors().some(e => e.code === 'invalid-setting' && /accumulation/i.test(e.message))).toBe(true);
-        expect(run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; }).isEmpty()).toBe(true);
+        expect(run((_s, st) => { st.estimator.accumulation = { type: 'average', variance: true }; }).isEmpty()).toBe(true);
+        expect(run((_s, st) => { st.estimator.accumulation = { type: 'oneshot' }; }).isEmpty()).toBe(true);
+    });
+
+    it('variance is an option of a mode that supports it, not a mode', () => {
+        const oneshot = run((_s, st) => { st.estimator.accumulation = { type: 'oneshot', variance: true }; });
+        expect(oneshot.getErrors().some(e => /'oneshot' does not support variance/.test(e.message))).toBe(true);
+        const asMode = run((_s, st) => { st.estimator.accumulation = { type: 'variance' }; });
+        expect(asMode.getErrors().some(e => /write \{ type: 'average', variance: true \}/.test(e.message))).toBe(true);
+        const notBoolean = run((_s, st) => { st.estimator.accumulation = { type: 'average', variance: 'yes' as unknown as boolean }; });   // a malformed authored value
+        expect(notBoolean.getErrors().some(e => /variance must be true or false/.test(e.message))).toBe(true);
     });
 
     it('rejects unsupported tonemap types (allows the built roster)', () => {

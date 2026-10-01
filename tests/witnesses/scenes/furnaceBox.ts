@@ -73,6 +73,6 @@ export const furnaceVarianceStrategy: RenderStrategy = {
     id: 'furnace-var',
     estimator: {
         ...furnaceStrategy.estimator,
-        accumulation: { type: 'variance' },
+        accumulation: { type: 'average', variance: true },
     },
 };

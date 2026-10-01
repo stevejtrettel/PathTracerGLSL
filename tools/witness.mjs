@@ -296,7 +296,7 @@ const frameCache = new Map(); // `${scene}#${strategyIdx}#${W}x${H}#${spp}` → 
 const varianceCache = new Map(); // same key → {mean, variance, W, H, spp}
 
 /**
- * Render one strategy with accumulation FORCED to the 'variance' occupant (a cloned
+ * Render one strategy with the variance statistic switched on (`variance: true`; a cloned
  * strategy re-initialized in-page — the registry entry holds the live scene object),
  * and read back both the mean and the second-moment attachment.
  *
@@ -348,7 +348,7 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
             app.stop();
             app.pinResetSalt(salt);   // WITNESS_SALT — see the renderFrame comment
             const strategy = JSON.parse(JSON.stringify(entry.strategies[idx]));
-            strategy.estimator.accumulation = { type: 'variance' };
+            strategy.estimator.accumulation = { ...strategy.estimator.accumulation, variance: true };
             strategy.id = `${strategy.id}__var`;
             // initialize() on the same scene adds this strategy and recompiles every loaded
             // renderer against the one shared scene-data layout; the base renderer stays
@@ -809,9 +809,9 @@ async function openCase(page, c) {
         app.pinResetSalt(salt);
         let strategyId = entry.strategies[idx].id;
         if (forceVariance) {
-            // The witness runner's way of turning variance on (renderVarianceOnce above).
+            // The witness runner's way of recording variance (renderVarianceOnce above).
             const strategy = JSON.parse(JSON.stringify(entry.strategies[idx]));
-            strategy.estimator.accumulation = { type: 'variance' };
+            strategy.estimator.accumulation = { ...strategy.estimator.accumulation, variance: true };
             strategy.id = `${strategy.id}__var`;
             await app.initialize({ scene: entry.scene, strategies: [strategy], initialParameters: entry.initialParameters });
             strategyId = strategy.id;

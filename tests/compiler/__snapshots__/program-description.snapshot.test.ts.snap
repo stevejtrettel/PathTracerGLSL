@@ -10972,7 +10972,8 @@ exports[`ProgramDescription structural snapshot (the link map) > furnace + furna
   "environmentSelectionLive": false,
   "estimator": {
     "accumulation": {
-      "type": "variance",
+      "type": "average",
+      "variance": true,
     },
     "envSampler": {
       "chart": "equirect",

@@ -285,15 +285,15 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy),
         exercises:
             'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer',
-        expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5); key 2 identical (the variance occupant must not touch the mean)',
+        expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5); key 2 identical (the variance statistic must not touch the mean)',
         witness: {
             spp: 48,
             checks: [
                 { kind: 'mean', value: 0.4, tol: 0.008, label: 'F-BOX 0.4' },
-                { kind: 'mean', value: 0.4, tol: 0.008, strategy: 1, label: 'F-BOX 0.4 (variance occupant)' },
+                { kind: 'mean', value: 0.4, tol: 0.008, strategy: 1, label: 'F-BOX 0.4 (variance statistic on)' },
                 // Same RNG stream + same mix() update ⇒ the two means should agree to
                 // fp32 noise, not just statistically — hence the near-zero gates.
-                { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance occupant mean untouched' },
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance statistic leaves the mean untouched' },
             ],
         },
     },

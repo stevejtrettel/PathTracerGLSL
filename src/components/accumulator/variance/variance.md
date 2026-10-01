@@ -1,6 +1,7 @@
 # Progressive mean + variance — what it computes and why
 
-The `average` occupant plus estimator instrumentation: alongside the running mean
+The `variance` statistic of the `average` mode (`accumulation: { type: 'average',
+variance: true }`) — estimator instrumentation: alongside the running mean
 (attachment 0, byte-identical update — the mean is NOT touched by instrumentation,
 which is this occupant's witness), a second render target accumulates the per-channel
 **population variance of the path samples**, v_n = M₂/n, via Welford's algorithm.
@@ -33,7 +34,7 @@ mantissa holds. The δ·δ′ cross product never subtracts two large near-equal
 
 ## Contract position
 
-Estimator section, like all accumulation occupants: it changes HOW the integral is
+Estimator section, like the accumulation modes: it changes HOW the integral is
 computed (adds instrumentation), never WHAT converges — the mean must equal
 `average`'s mean exactly (same RNG stream, same update). Anything biased (clamping)
 is NOT an accumulation variant but a declared measurement truncation (family README).
@@ -41,4 +42,4 @@ is NOT an accumulation variant but a declared measurement truncation (family REA
 The moment buffer is the second attachment of the SAME `accumulation` double_buffer
 (MRT), so one swap flips mean and moment together — they cannot desynchronize. The
 pipeline branch lives in `Planner.planPipeline`; the dual `layout(location=…)` outs
-are emitted by the ShaderBuilder header when this occupant is selected.
+are emitted by the ShaderBuilder header when the statistic is switched on.

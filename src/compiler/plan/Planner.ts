@@ -578,7 +578,12 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             },
             // 'exponential' is reserved-not-built: the Validator rejects it before
             // planning, so no dead construction branch survives here (C6).
-            accumulation: { type: strategy.estimator.accumulation.type },
+            // A statistic is recorded only when on (omitted otherwise, so programs without one
+            // describe exactly as before).
+            accumulation: {
+                type: strategy.estimator.accumulation.type,
+                ...(strategy.estimator.accumulation.variance === true ? { variance: true } : {}),
+            },
         },
         view: {
             tonemap: strategy.view.tonemap.type === 'none'
@@ -692,7 +697,7 @@ function planPipeline(program: ProgramDescription): PlannedPipeline {
     // (MRT): mean and moment then ping-pong in lockstep by construction — one swap flips
     // both attachments, so they can never desynchronize. The display pass still reads
     // attachment 0 (the mean); the moment is instrumentation, exported via readBuffer.
-    const variance = program.estimator.accumulation.type === 'variance';
+    const variance = program.estimator.accumulation.variance === true;
 
     return {
         framebuffers: [

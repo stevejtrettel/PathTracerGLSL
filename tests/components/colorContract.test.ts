@@ -39,10 +39,14 @@ void main() {
 }`, 'frag', 'RGB film boundary');
     });
 
-    it.each(['average', 'variance', 'oneshot'] as const)('%s uses the film boundary', (type) => {
+    it.each([
+        ['average', { type: 'average' }],
+        ['average + variance', { type: 'average', variance: true }],
+        ['oneshot', { type: 'oneshot' }],
+    ] as const)('%s uses the film boundary', (type, accumulation) => {
         const renderer = new Compiler().compile(minimalScene, {
             ...minimalStrategy,
-            estimator: { ...minimalStrategy.estimator, accumulation: { type } },
+            estimator: { ...minimalStrategy.estimator, accumulation },
         });
         const shader = renderer.shaders.get(`${renderer.id}-main`)!.fragment;
         const main = shader.slice(shader.lastIndexOf('void main()'));
