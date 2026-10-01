@@ -4,7 +4,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [claude-outputs-accumulation.md](claude-outputs-accumulation.md) | THE plan for outputs and accumulation: one ordered list of per-pixel pictures (radiance, variance option, first-hit AOVs) generating layout, accumulation, exports, display and saving; display state outside the parameter store; one save operation with declared lists; AOVs and their medium gate; parameter-system revamp deferred; build steps 0–7 with verification |
+| [claude-outputs-accumulation.md](claude-outputs-accumulation.md) | THE plan for outputs and accumulation, with the build record (steps 0–5 built; what differs from the plan, loose ends, next steps, a reviewer guide): one ordered list of per-pixel pictures (radiance, variance option, first-hit AOVs) generating layout, accumulation, exports, display and saving; display state outside the parameter store; one save operation with declared lists; AOVs and their medium gate; parameter-system revamp deferred; build steps 0–7 with verification |
 | [claude-outputs-step0-plan.md](claude-outputs-step0-plan.md) | Step 0 of that plan: exact before/after comparison tools (a frames record/compare mode in the witness runner; an inspectable `digest --keep`), with their own self-checks |
 | [claude-outputs-step1-plan.md](claude-outputs-step1-plan.md) | Step 1 of the outputs plan: rename the `hdr` export to `radiance` (export identity only), with the full rename/keep list and a prediction checked by digest and frames |
 | [claude-outputs-step2-plan.md](claude-outputs-step2-plan.md) | Step 2 of the outputs plan: variance becomes an option of `average` (`{ type: 'average', variance: true }`); declaration only, machinery unchanged; predicted digest 268/268 identical |

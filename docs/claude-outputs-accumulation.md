@@ -1,9 +1,13 @@
 # Outputs and accumulation: the plan
 
-**Date:** 2026-09-29
-**Status:** Merged plan: the owner's decisions, plus three independent reviews and a
-further review draft. Each build step still gets its own written plan and approval before
-code. Nothing is implemented yet.
+**Date:** 2026-09-29; build record updated 2026-10-01.
+**Status:** Steps 0–5 are built and committed (`d6fc27b` … `40e764a`). Steps 6 (AOVs) and 7
+(OIDN) are not started; each still needs its own written plan and the owner's approval.
+Steps 1–5 have had **no independent code review yet** (see "The build so far").
+
+The plan sections (§1–§10) are kept as approved. What was built, where the code differs from
+their text, the loose ends and what comes next are in **"The build so far"** at the end.
+A reviewer should start there.
 
 This file is the one plan. The discussion that led to it (the facts about today's system,
 the design pieces and the reviews) is kept as a record in
@@ -132,12 +136,11 @@ re-pointed; external inputs such as blue noise stay as they are.
 
 - The unused `m` shortcut (`app/extensions/AppShortcutsExtension.ts:24`) cycles the
   displayed picture.
-- **For the step-5 plan to settle:** the display state's lifecycle.
-  - Is the selected name saved in sessions, and where? The proposal is not at all, since it
-    isn't a render setting, and a fresh page shows the main picture.
-  - How do older sessions default?
-  - How is the selection resolved after a renderer change?
-  - Saving a different picture must leave the displayed one unchanged.
+- **The display state's lifecycle** (settled in the step-5 plan, and built):
+  - the selected name is not saved in sessions, since it isn't a render setting; a fresh
+    page, and any older session, shows the main picture;
+  - after a renderer change the App re-resolves the name, falling back to the main picture;
+  - saving a different picture leaves the displayed one unchanged (measured in step 5b).
 
 ## 5. Saving
 
@@ -304,3 +307,124 @@ reverted in reverse order.
   Steps 4 and 6 add a *numerics* reviewer.
 - **CHANGELOG:** literal command results, each reviewer finding and what was done about it,
   and anything expected but not measured.
+
+## The build so far (record for reviewers, 2026-10-01)
+
+### Steps and evidence
+
+Every step had its own plan (`claude-outputs-step<N>-plan.md`), a written prediction, one
+commit and a CHANGELOG entry with the literal results. Every prediction held.
+
+| Step | Commit | What | Measured | Witnesses run | Independent review |
+|---|---|---|---|---|---|
+| 0 | `d6fc27b` | comparison tools: `frames record/compare`, `digest --keep` | two fresh records 18/18 identical; the negative checks refuse broken records | — | one external reviewer: 4 findings, all fixed and re-measured |
+| 1 | `d77a28a` | export `hdr` → `radiance` | digest: every differing part equal after the key rename; frames 18/18 (`--rename hdr=radiance`) | `furnace` 3/3 | none reported |
+| 2 | `40b74d1` | variance is an option of `average` | digest 268/268 identical; frames 18/18 | `furnace`, `two-light` 5/5 | none |
+| 3 | `d6e4b0e` | the planned picture list generates layout, outputs, inputs, exports, display, recipe | shaders identical; exactly the 2 predicted structure diffs; frames 18/18 | `furnace` 3/3 | none |
+| 4 | `24dced1` | one generated accumulation `main()` | frames 18/18 bit-identical (the gate); shaders differ only from the accumulation blocks on | `furnace`, `two-light` 5/5 | none (§10 asked for a numerics reviewer) |
+| 5a | `fb38963` | viewing: picture facts on exports, display selector, `Engine.renderView`, `showPicture`, `m` key | structures differ only by picture facts; only the variance display shader changed; frames 18/18; browser check | — | none |
+| 5b | `40e764a` | saving: `save`/`saveAll`/`capture`, declared lists, stamp `picture` | digest 268/268 identical; frames 18/18; browser check | `cornell-area` 3/3 (tiled ≡ one piece through `save`) | none |
+
+Baselines for comparison live in `.digest/` (git-ignored, so only in the owner's checkout):
+`step5-commit-frames` and `step5c.json` with `step5c-keep` are at `40e764a`; each earlier
+step has its own (`step<N>-commit-frames`, `step<N>c.json`).
+
+### What exists now
+
+- **The picture list** (`compiler/plan/pictures.ts`): `planPictures` builds the ordered
+  list (the main picture from `measurement.response`, then the statistic the accumulator
+  descriptor declares); `pictureBuffer` is the one answer to where a picture's newest value
+  is. Accumulator descriptors (`components/accumulator/index.ts`) name their update rule and
+  their `statistics`; `requestedStatistic` says which one a strategy switches on.
+- **Accumulation:** one generated `main()` (`compiler/generate/features/accumulation.ts`)
+  calls the static rules `average_update`, `variance_update` and `oneshot_update`. Every mode
+  keeps the ping-pong pair.
+- **Contract:** `ExportTarget.picture = { view, formats }` marks the picture exports, in
+  planned order, main picture first (`docs/compiler-engine-contract.md`).
+  `Engine.renderView(target, parameters?)` re-runs the view recipe (contract field
+  `ldrRecipe`) onto `'screen'` or into `'ldr'`, with one-draw parameter overrides.
+- **Display:** with more than one picture the display shader binds them all and picks one by
+  `u_picture`, bound to the reserved no-reset path `renderer.picture`; with one picture it is
+  unchanged. The App holds the displayed picture by name (`getPictures`,
+  `getDisplayedPicture`, `showPicture`).
+- **Saving** (`app/capture.ts`, `App.capture/save/saveAll`): one operation, a picture in a
+  format it declares; `'png'` goes through the view mapping. Production
+  (`renderProduction(N, { save })`) and tiled (`renderTiled({ …, save })`) renders take
+  declared lists, validated before rendering. Every file's stamp names its picture.
+- **Checks:** `validateCompiledRenderer` checks every buffer reference (attachments,
+  `_current`/`_previous` only on double buffers, the recipe's pass and buffers). Tests:
+  `tests/compiler/pictures.test.ts` (a table test over average, average + variance and
+  oneshot), `validateCompiledRenderer.test.ts`, `tests/app/capture.test.ts`,
+  `productionOrchestrator.test.ts`, `fileExport.test.ts`.
+
+### Where the built code differs from the plan text above
+
+1. **§3, picture entries** state `view` and `formats`, not "whether it is signed". §5's own
+   reasoning (spectral radiance is signed yet keeps `.hdr`) made `formats` declared data, so
+   no `signed` field exists.
+2. **§3, the 4-picture cap** is a Generator error (`compiler/generate/Generator.ts`), not a
+   `validateCompiledRenderer` check.
+3. **§5, the Save button:** the panel keeps two buttons. Export PNG (and `x`) saves the
+   displayed picture as shown; Export HDR (and `X`) saves the raw radiance, the owner's "raw
+   radiance download". The `a` key ("export all AOVs") is gone. The production dialog
+   declares the radiance PNG (the files it saved before); the tiled job declares the radiance
+   HDR and PNG.
+4. **§10, reviews:** the owner chose one external reviewer instead of two fresh reviewers per
+   diff. Only step 0 has recorded review findings; steps 2–5 have had no independent review,
+   and step 4 no numerics review. Witness runs were the targeted ones in the table, by the
+   owner's instruction to keep them minimal.
+5. **§10, the table test** covers the three accumulation configurations; the AOV rows wait
+   for step 6.
+
+### Known loose ends (small; not fixed)
+
+- A save list may name the same picture and format twice; nothing rejects it, and a tiled
+  job would then download two files with the same name.
+- `saveAll(list, filename)` uses `filename` only for a one-entry list.
+- The frames tool (`tools/witness.mjs`, `recordCase`) picks the float pictures as "every
+  export except `'ldr'`", a name rule; `app.getPictures()` is the list's answer. The names
+  are equal today, so records would not change.
+- `ExportError` (`errors/RenderErrors.ts`) has no remaining thrower; kept under the
+  unused-code policy.
+- The contract field `ldrRecipe` keeps its name although it now also serves screen redraws
+  (a deliberate choice in the step-5 plan, to leave the locked field alone).
+- Timing only, unexplained: one step-0 frames record took 338 s against 37 s; one step-4
+  vitest run stalled and an immediate rerun passed.
+
+### What comes next, in order
+
+1. **Independent review of steps 1–5** (the guide below).
+2. **Step 6, AOVs (albedo, normal).** Its plan must first pass the §6 gate: tell arrival
+   from medium/GRIN termination, define the guides' meaning in scattering media under every
+   estimator, and keep programs without AOVs byte-identical. It also adds
+   `measurement.aovs`, the `components/aov/` family, the `transport_trace` out-parameters, the
+   albedo facts, the `'unit'` and `'signed'` view mappings (§4), an AOV witness and a
+   numerics reviewer. Normal saves as PNG only until a signed float format exists.
+3. **Step 7, OIDN** (§7), reusing the verified oidn-web facts in `claude-oidn-test-plan.md`.
+   Later, with larger changes allowed, OIDN becomes part of the production pipeline.
+4. **The parameter-system revamp** (§8), the next design topic.
+
+Recorded follow-ups with no plan yet: spectral AOVs; better guides for perfectly specular
+surfaces (OIDN's first-non-delta-hit and Fresnel-blend advice); a classification of
+everything the renderer could measure (§1); a signed float file format; a live exposure;
+`oneshot` single buffers (dropped from this plan by review).
+
+### Guide for a reviewer
+
+- **Read, in order:** §1–§5 above; `claude-outputs-step3-plan.md`, `-step4-plan.md`,
+  `-step5-plan.md`; their CHANGELOG entries; then the diffs `git show d6e4b0e`, `24dced1`,
+  `fb38963`, `40e764a` (steps 1 and 2 are mostly renames).
+- **Rules that apply** (CLAUDE.md): one answer per fact; exact linkage; the engine stays
+  blind; estimator choices never change the converged image; comments explain the present.
+- **Reproduce:** `npx tsc --noEmit`; `npx vitest run`; `npm run digest -- <out.json>` then
+  `--compare` against a baseline; `npm run frames -- record <dir>` then `compare`. Witnesses
+  only as targeted runs (`npm run witness -- furnace two-light cornell-area`).
+- **Questions worth checking:**
+  - *contract:* attachment indices, swap timing, after-frame reads (`pictureBuffer`), the
+    recipe re-aiming every picture input, `renderView` touching no accumulation state;
+  - *one answer:* `git grep` for the literals `'variance'`, `'hdr'`, `fragMoment`,
+    `u_previousMoment` and `_previous` outside their one home;
+  - *numerics (step 4):* that the generated `main()` is the old arithmetic, operation for
+    operation, including the `n == 0` branch and the unconditional previous-value fetch;
+  - *saving:* that every picture and stamp is read before any encode is awaited, and that a
+    PNG save changes neither the screen nor the accumulation.

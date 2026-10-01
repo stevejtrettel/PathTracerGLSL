@@ -4,6 +4,14 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-10-01 — Outputs plan: build record for review
+
+[The outputs plan](docs/claude-outputs-accumulation.md) now ends with "The build so far": each
+step's commit, measurements, witness runs and review status; what exists now; five places the
+built code differs from the plan text; small loose ends; the order of what comes next (review
+of steps 1–5, step 6 AOVs behind its gate, step 7 OIDN, the parameter revamp); and a guide for
+a reviewer. It records that steps 1–5 have had no independent code review. Docs only.
+
 ## 2026-09-30 — Step 5b of the outputs plan: one save operation, declared lists
 
 [Step 5 plan](docs/claude-outputs-step5-plan.md), second commit (saving).
