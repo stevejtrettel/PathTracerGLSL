@@ -1082,7 +1082,7 @@ void main() {
 **Export**:
 ```typescript
 exportTargets: {
-  'hdr': { bufferId: 'aovs', format: 'float', attachment: 0 },
+  'radiance': { bufferId: 'aovs', format: 'float', attachment: 0 },
   'albedo': { bufferId: 'aovs', format: 'float', attachment: 1 },
   'normal': { bufferId: 'aovs', format: 'float', attachment: 2 }
 }
@@ -1105,7 +1105,7 @@ for (let ty = 0; ty < numTilesY; ty++) {
     await app.renderProduction(samples);
 
     // Read tile data
-    const pixels = app.readExport('hdr');
+    const pixels = app.readExport('radiance');
 
     // Stitch into final image...
   }

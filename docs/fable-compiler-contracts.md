@@ -735,7 +735,7 @@ Paper stress tests (§9) validate contract *shape*; nothing above validates cont
 
 ### 11.1 Furnace tests (energy conservation)
 
-A closed scene with uniform albedo ρ under uniform illumination L converges to the analytic value `L / (1 − ρ)` at every pixel. Run per material model as it lands: any BSDF whose `sample.weight` / `eval` / `pdf` disagree, or that loses/gains energy, fails visibly. Automatable: render N samples headless, `readExport('hdr')`, assert mean/variance against the closed form. The homogeneous-slab single-scatter case has a closed form too — the same harness covers V1 media.
+A closed scene with uniform albedo ρ under uniform illumination L converges to the analytic value `L / (1 − ρ)` at every pixel. Run per material model as it lands: any BSDF whose `sample.weight` / `eval` / `pdf` disagree, or that loses/gains energy, fails visibly. Automatable: render N samples headless, `readExport('radiance')`, assert mean/variance against the closed form. The homogeneous-slab single-scatter case has a closed form too — the same harness covers V1 media.
 
 ### 11.2 Cross-strategy convergence (the MIS bug detector)
 

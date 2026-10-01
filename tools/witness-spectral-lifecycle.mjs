@@ -19,7 +19,7 @@ try {
         app.pinResetSalt(73);
         app.resize(12, 10);
         await app.renderProduction(16);
-        return Array.from(app.readExport('hdr'));
+        return Array.from(app.readExport('radiance'));
     });
     assert.equal(requests.length, 2, 'both versioned assets fetched once');
     await page.evaluate(() => {
@@ -37,7 +37,7 @@ try {
         app.stop();
         app.pinResetSalt(73);
         await app.renderProduction(16);
-        return Array.from(app.readExport('hdr'));
+        return Array.from(app.readExport('radiance'));
     });
     assert.deepEqual(after, before, 'restored image');
     assert.equal(requests.length, 2, 'context restore uses retained immutable bytes');

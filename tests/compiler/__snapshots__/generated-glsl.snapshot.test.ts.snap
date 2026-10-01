@@ -3,13 +3,13 @@
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > analytic-glass 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-analytic-glass",
@@ -1781,13 +1781,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > analytic-minimal 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-analytic-minimal",
@@ -3317,13 +3317,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell + pathtracer 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-cornell",
@@ -5036,13 +5036,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-cornell-area",
@@ -6670,13 +6670,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + pt-mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-cornell-area",
@@ -8552,13 +8552,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-cornell-area",
@@ -10391,13 +10391,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-glass + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-cornell-area-glass",
@@ -12086,13 +12086,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-glass + pt-mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-cornell-area-glass",
@@ -14032,13 +14032,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-area-glass + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-cornell-area-glass",
@@ -15934,13 +15934,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cornell-glass 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-cornell-glass",
@@ -17712,13 +17712,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > cylinders + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-cylinders",
@@ -19417,13 +19417,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > eta witness 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-eta",
@@ -20741,13 +20741,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-fog-area",
@@ -22734,13 +22734,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt-mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-fog-area",
@@ -25051,13 +25051,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-area + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-fog-area",
@@ -27319,13 +27319,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-panel + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-fog-panel",
@@ -29331,13 +29331,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fog-panel + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-fog-panel",
@@ -31618,13 +31618,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > fogcube witness 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-fogcube",
@@ -33068,13 +33068,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace + no-direct 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "furnace-furnace",
@@ -34373,13 +34373,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace + variance 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
     "variance": {
       "attachment": 1,
@@ -35707,13 +35707,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-scatter witness 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "furnace-scatter-furnace-scatter",
@@ -37301,13 +37301,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-sky + pt-mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-furnace-sky",
@@ -38759,13 +38759,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > furnace-sky + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-furnace-sky",
@@ -40176,13 +40176,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > haze + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-haze",
@@ -41965,13 +41965,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > haze + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-haze",
@@ -43990,13 +43990,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > instance-glass 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-instance-glass",
@@ -46127,13 +46127,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > marble demo (no scatter) 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-noscatter-marble",
@@ -47855,13 +47855,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > marble demo 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-marble",
@@ -49823,13 +49823,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + direct 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "direct-minimal",
@@ -51463,13 +51463,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > minimal + pathtracer 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-minimal",
@@ -53119,13 +53119,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > mist demo 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-mist",
@@ -55310,13 +55310,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > mixed backends 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-mixed",
@@ -56866,13 +56866,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > orb + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-orb",
@@ -58433,13 +58433,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > orb + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-orb",
@@ -60229,13 +60229,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > proc-sky + pt-mis-comp 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-comp-proc-sky",
@@ -62080,13 +62080,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > proc-sky + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-proc-sky",
@@ -63898,13 +63898,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sdf-table + table 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "table-sdf-table-twin",
@@ -66027,13 +66027,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-sky",
@@ -67556,13 +67556,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt-mis-oct 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-oct-sky",
@@ -69430,13 +69430,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky + pt-nee 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-nee-sky",
@@ -71233,13 +71233,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > sky-lamp + pt-mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-sky-lamp",
@@ -73275,13 +73275,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > slab witness 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-slab",
@@ -74725,13 +74725,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > submerged witness 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pathtracer-submerged",
@@ -76358,13 +76358,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + bvh 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "bvh-two-light",
@@ -78144,13 +78144,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + power 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "power-two-light",
@@ -79686,13 +79686,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > two-light + uniform 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "uniform-two-light",
@@ -81228,13 +81228,13 @@ void main() {
 exports[`generated GLSL snapshot (§2.10 refactor safety net) > veach + mis 1`] = `
 {
   "exportTargets": {
-    "hdr": {
-      "bufferId": "accumulation_previous",
-      "format": "float",
-    },
     "ldr": {
       "bufferId": "ldr",
       "format": "byte",
+    },
+    "radiance": {
+      "bufferId": "accumulation_previous",
+      "format": "float",
     },
   },
   "id": "pt-mis-veach-mis",

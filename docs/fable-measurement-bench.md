@@ -5,7 +5,7 @@ The owner cut this proposal down on review; the built subset is §2.1 + §2.4 + 
 
 - **BUILT — witness runner** (`npm run witness`, `tools/witness.mjs`): machine-readable
   `witness` specs beside the `expected` prose in the suite registry; headless SwiftShader
-  renders read LINEAR floats via `readExport('hdr')`; check kinds `mean` / `equality` /
+  renders read LINEAR floats via `readExport('radiance')`; check kinds `mean` / `equality` /
   `twin` / `noise`. All numeric witnesses reproduce (furnace 0.4000, F-ETA 0.5541, slab
   3-channel, F-BOX-M, furnace-sky ρ·L + L). Equality gates: Δ frame-mean in linear HDR
   (bias) + noise-normalized χ² (structure; requires the variance occupant) for arms with

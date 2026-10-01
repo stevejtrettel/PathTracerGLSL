@@ -19,7 +19,7 @@ async function render(page) {
         app.pinResetSalt(173);
         app.resize(32, 24);
         await app.renderProduction(32, { width: 32, height: 24 });
-        return Array.from(app.readExport('hdr'));
+        return Array.from(app.readExport('radiance'));
     });
 }
 function compare(actual, expected, name) {

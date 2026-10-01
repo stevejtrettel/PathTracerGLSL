@@ -22,7 +22,7 @@ function validRenderer(): CompiledRenderer {
             ],
             postFrame: { swaps: [{ type: 'swap', buffers: ['accumulation'] }] },
         },
-        exportTargets: { hdr: { bufferId: 'accumulation_previous', format: 'float' } },
+        exportTargets: { radiance: { bufferId: 'accumulation_previous', format: 'float' } },
     };
 }
 
@@ -120,7 +120,7 @@ describe('validateCompiledRenderer — swaps / exports / uniforms', () => {
         expect(errorCodes(r2)).toContain('invalid-pipeline');
     });
     it('flags an export from an unknown buffer', () => {
-        const r = validRenderer(); r.exportTargets = { hdr: { bufferId: 'ghost', format: 'float' } };
+        const r = validRenderer(); r.exportTargets = { radiance: { bufferId: 'ghost', format: 'float' } };
         expect(errorCodes(r)).toContain('export-invalid-buffer');
     });
     it('warns when a uniform is bound more than once', () => {

@@ -83,7 +83,7 @@ export class TiledRenderer {
         const wantHdr = format !== 'png';
         const wantPng = format !== 'hdr';
         const exports = this.app.getAvailableExports();
-        for (const [wanted, name] of [[wantHdr, 'hdr'], [wantPng, 'ldr']] as const) {
+        for (const [wanted, name] of [[wantHdr, 'radiance'], [wantPng, 'ldr']] as const) {
             if (wanted && !exports.includes(name)) {
                 throw new Error(`Tiled render: the active renderer has no '${name}' export (has: ${exports.join(', ') || 'none'})`);
             }
@@ -111,7 +111,7 @@ export class TiledRenderer {
             this.emitProgress();
             await this.production.renderTiles([width, height], plan.tiles, spp, (tile, index) => {
                 if (hdr) {
-                    const radiance = this.app.readExport('hdr') as Float32Array;
+                    const radiance = this.app.readExport('radiance') as Float32Array;
                     placeTile(hdr, width, height, tile, floatToRGBE(radiance, tile.width, tile.height));
                 }
                 if (ldr) {

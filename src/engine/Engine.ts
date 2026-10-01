@@ -350,7 +350,7 @@ export class Engine {
 
     // -- Export / Read Operations --
 
-    // Read a named export (e.g. 'hdr', 'ldr', 'albedo', 'normal')
+    // Read a named export (e.g. 'radiance', 'ldr', 'albedo', 'normal')
     readExport(name: string, rect?: Rectangle): Float32Array | Uint8Array {
         if (!this.activeRendererId) throw new Error('No active renderer');
 

@@ -76,7 +76,7 @@ export function buildExportTargets(variance = false): CompiledRenderer['exportTa
         // 'previous', not 'current': exports run after renderFrame(), and the postFrame
         // swap has already flipped the ping-pong index — post-swap, the freshly written
         // frame lives in 'accumulation_previous'. Reading 'current' exports frame N-1.
-        'hdr': { bufferId: 'accumulation_previous', format: 'float' },
+        'radiance': { bufferId: 'accumulation_previous', format: 'float' },
         // LDR = the tonemapped + dithered display, rendered on demand into the 'ldr' buffer
         // (Engine.renderLdr) just before readExport('ldr'). See impl-plan-display Stage 4.
         'ldr': { bufferId: 'ldr', format: 'byte' },

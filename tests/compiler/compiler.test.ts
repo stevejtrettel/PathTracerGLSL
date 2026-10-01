@@ -71,7 +71,7 @@ describe('Compiler', () => {
 
         it('has export targets', () => {
             expect(result.exportTargets).toBeDefined();
-            expect(result.exportTargets!['hdr']).toBeDefined();
+            expect(result.exportTargets!['radiance']).toBeDefined();
         });
     });
 

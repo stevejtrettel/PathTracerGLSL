@@ -1065,7 +1065,7 @@ export interface CompiledRenderer {
      * Optional: export targets for reading rendered outputs
      *
      * Standard exports:
-     * - 'hdr': HDR radiance (float, RGBA)
+     * - 'radiance': HDR radiance (float, RGBA)
      * - 'ldr': LDR display (byte, RGBA)
      *
      * Custom exports (AOVs):

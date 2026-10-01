@@ -186,7 +186,7 @@ come from the earlier step-1 plan and its review.
 - `App.renderProduction(N)` resolves once N samples are done, and rejects if the render
   is stopped (`app/ProductionOrchestrator.ts:60-92`). It runs one sample per animation
   frame (`app/RenderCoordinator.ts:214-236`).
-- `readExport('hdr')` reads RGBA floats synchronously, bottom row first
+- `readExport('radiance')` reads RGBA floats synchronously, bottom row first
   (`engine/Engine.ts:354-401`), from the newest finished frame
   (`compiler/generate/PipelineBuilder.ts:74-79`).
 - `app.selectRendererByStrategy(id)` switches renderer, re-sends the parameters and clears
@@ -288,7 +288,7 @@ the still-running extension onto a guide renderer.
    - check `app.getActiveStrategy()?.id` against the expected id, and abort the run on a
      mismatch (renderer selection has been seen to get lost intermittently,
      `tools/witness.mjs:300-306`);
-   - read `readExport('hdr')` synchronously;
+   - read `readExport('radiance')` synchronously;
    - build its stamp.
 
    Reading each image before the next selection is load-bearing: selecting clears every
@@ -330,7 +330,7 @@ asks for a new Run.
 
    The added samples continue the same seed stream with new sample indices, so they are
    independent of the first N (read: `average.glsl:10`, `Engine.ts:324-327`).
-2. Read `readExport('hdr')`, clean it, denoise it with the **stored** albedo and normal
+2. Read `readExport('radiance')`, clean it, denoise it with the **stored** albedo and normal
    bytes, and show it. The guides are not re-rendered.
 
    They were averaged over the first N camera rays only. Near edges they are therefore a

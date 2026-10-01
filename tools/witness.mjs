@@ -379,7 +379,7 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
         await waitForRender(page);
 
         const [mean, variance] = await page.evaluate(() => [
-            Array.from(window.app.readExport('hdr')),
+            Array.from(window.app.readExport('radiance')),
             Array.from(window.app.readExport('variance')),
         ]);
         if (mean.length !== W * H * 4 || variance.length !== W * H * 4) throw new Error(`readback is not ${W}×${H} — the page's app is not the one this render configured`);
@@ -461,7 +461,7 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
         }, spp);
         await waitForRender(page);
 
-        const px = new Float32Array(await page.evaluate(() => Array.from(window.app.readExport('hdr'))));
+        const px = new Float32Array(await page.evaluate(() => Array.from(window.app.readExport('radiance'))));
         if (px.length !== W * H * 4) throw new Error(`readback is ${px.length / 4} pixels, expected ${W}×${H} — the page's app is not the one this render configured`);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         process.stdout.write(`  rendered ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
@@ -601,12 +601,12 @@ async function runCheck(browser, registry, sceneId, spec, check) {
                 // timed batches ride extendProduction — continues the SAME accumulation
                 // with no reset, which is exactly the steady-state frame we want timed.
                 await app.renderProduction(wu);
-                app.readExport('hdr');   // sync barrier — warmup stays outside the clock
+                app.readExport('radiance');   // sync barrier — warmup stays outside the clock
                 const out = [];
                 for (let b = 0; b < 3; b++) {
                     const t0 = performance.now();
                     await app.extendProduction(fr);
-                    app.readExport('hdr');   // barrier inside the clock, ÷frames amortized
+                    app.readExport('radiance');   // barrier inside the clock, ÷frames amortized
                     out.push((performance.now() - t0) / fr);
                 }
                 return out;
@@ -732,15 +732,15 @@ function differingBytes(a, b) {
 // `pictures` is the exact set of float exports each case must record (an update to a renderer's
 // exports updates this list); the tiled case records encoded files instead.
 const FRAME_CASES = [
-    { id: 'average', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    { id: 'average', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     // Every furnace sample is the same number, so its variance is zero by design…
-    { id: 'variance-zero', scene: 'furnace', strategy: 1, size: [64, 64], spp: 8, pictures: ['hdr', 'variance'] },
+    { id: 'variance-zero', scene: 'furnace', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance', 'variance'] },
     // …so a noisy scene with variance forced on covers the variance update; record checks it is nonzero.
-    { id: 'variance-noisy', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr', 'variance'], forceVariance: true },
-    { id: 'oneshot', scene: 'cornell-oneshot', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
-    { id: 'spectral', scene: 'spectral-materials', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
-    { id: 'medium', scene: 'fog-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
-    { id: 'grin', scene: 'grin-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['hdr'] },
+    { id: 'variance-noisy', scene: 'cornell-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance', 'variance'], forceVariance: true },
+    { id: 'oneshot', scene: 'cornell-oneshot', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'spectral', scene: 'spectral-materials', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'medium', scene: 'fog-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'grin', scene: 'grin-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     // 150×100 in 64px tiles = 3×2 tiles with partial edges (tile sizes round up to 64, app/tiling.ts).
     { id: 'tiled', scene: 'cornell-area', strategy: 0, size: [150, 100], spp: 8, tileSize: 64 },
 ];

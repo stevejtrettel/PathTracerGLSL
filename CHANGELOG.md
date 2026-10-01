@@ -4,6 +4,39 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-30 — Step 1 of the outputs plan: the `hdr` export is now `radiance`
+
+[Step 1 plan](docs/claude-outputs-step1-plan.md). The color picture's export is named for
+its content, not a file format. The rename covers export identity only:
+- the definition in `PipelineBuilder.ts`;
+- `App.exportHDR` and `exportAllAOVs`;
+- `TiledRenderer`;
+- two comments;
+- three tests and the GLSL snapshot;
+- the witness tools and the frame tool's case list;
+- five docs describing the current API.
+
+Kept as `'hdr'`, because they mean something else:
+- the `.hdr` file extension;
+- the tiled renderer's `format` option (replaced in step 5);
+- `ParameterMetadata.hdr`;
+- the frame tool's encoded-file kinds;
+- an environment witness case.
+
+**Measured:**
+- **Typecheck and tests:** `tsc` clean; vitest 109 files and 4095 tests.
+- **Snapshot:** the GLSL snapshot diff is only the 47 export-key blocks (moved by key
+  order, contents unchanged).
+- **Digest** against step 0's baseline: 1794 parts identical (shaders, closures, scene data,
+  data reads, warnings). All 495 differing `rest` parts are structurally equal once the
+  export key is renamed.
+- **Frames:** 18 of 18 pictures bit-identical (`--rename hdr=radiance`). Without the rename,
+  the old record is refused.
+- **Witness:** `furnace` passes 3 of 3 (9 s).
+- **Leftovers:** a repo-wide `git grep` finds only the kept uses.
+
+**Review:** no reviewer findings were reported before this commit.
+
 ## 2026-09-30 — Step 0 of the outputs plan: exact comparison tools
 
 [Step 0 plan](docs/claude-outputs-step0-plan.md) of

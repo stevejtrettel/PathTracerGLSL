@@ -2,8 +2,8 @@
 
 **Status:** Executable companion to [fable-compiler-contracts.md](fable-compiler-contracts.md) §11. Each test is a concrete scene + strategy + an **expected number or invariant** with its derivation, so implementing a harness is transcription, not design. Scene literals use the *contract-target* format (post-migration `SceneDescription`), not the current vertical-slice types.
 **Date:** July 2026
-**Prerequisite:** the HDR-export off-by-one ([fable-review.md](fable-review.md) C2) — **fixed** (PipelineBuilder now exports `accumulation_previous`, the post-swap freshly-written buffer). Numeric assertions below are safe to trust against `readExport('hdr')`.
-**Protocol note:** all expected values are **linear HDR** (`readExport('hdr')`), pre-tonemap. Strategies for tests: Russian roulette **off** (unbiased but adds variance and complicates tolerances), pixel jitter on, `display` irrelevant.
+**Prerequisite:** the HDR-export off-by-one ([fable-review.md](fable-review.md) C2) — **fixed** (PipelineBuilder now exports `accumulation_previous`, the post-swap freshly-written buffer). Numeric assertions below are safe to trust against `readExport('radiance')`.
+**Protocol note:** all expected values are **linear HDR** (`readExport('radiance')`), pre-tonemap. Strategies for tests: Russian roulette **off** (unbiased but adds variance and complicates tolerances), pixel jitter on, `display` irrelevant.
 
 **Scoreboard (July 2026, owner-GPU-verified; suite scene ids in parens):**
 - §1 F-BOX (`furnace`) ✓ 0.4 exactly. §1b F-BOX-M (`furnace-scatter`) ✓ 0.39954–0.39989, channels together.
@@ -116,4 +116,4 @@ Generated debug strategy per model: fix `wo` at three inclinations (cosθ ∈ {0
 
 ## 7. Running these
 
-All tests reduce to: `compile(scene, strategy)` → load → render N spp → `readExport('hdr')` → assert. The infrastructure exists (multi-strategy loading, production render to target samples, HDR export); what's missing is only headless orchestration — either a vitest+playwright page that loads a test harness bundle and posts results, or, pragmatically at first, a manual `examples/validation.ts` page that runs the suite and prints a pass/fail table. Start manual (it exercises the same code), automate when the suite stabilizes. Suggested implementation order mirrors dependency order: F-BOX (needs only migrated Lambert + loop) → F-SLAB, R-FOGCUBE (null interfaces + absorbing media) → F-ETA, R-SUBMERGED (dielectric) → X-CORNELL (quad lights + NEE) → X-FOG, F-BOX-M (scattering) → X-GLASS, H (harness maturity).
+All tests reduce to: `compile(scene, strategy)` → load → render N spp → `readExport('radiance')` → assert. The infrastructure exists (multi-strategy loading, production render to target samples, HDR export); what's missing is only headless orchestration — either a vitest+playwright page that loads a test harness bundle and posts results, or, pragmatically at first, a manual `examples/validation.ts` page that runs the suite and prints a pass/fail table. Start manual (it exercises the same code), automate when the suite stabilizes. Suggested implementation order mirrors dependency order: F-BOX (needs only migrated Lambert + loop) → F-SLAB, R-FOGCUBE (null interfaces + absorbing media) → F-ETA, R-SUBMERGED (dielectric) → X-CORNELL (quad lights + NEE) → X-FOG, F-BOX-M (scattering) → X-GLASS, H (harness maturity).

@@ -758,7 +758,7 @@ export class App {
 
     exportHDR(filename?: string): void {
         const exports = this.getAvailableExports();
-        if (!exports.includes('hdr')) {
+        if (!exports.includes('radiance')) {
             throw new ExportError('HDR export not available for current renderer', {
                 availableExports: exports
             });
@@ -766,7 +766,7 @@ export class App {
 
         try {
             const [width, height] = this.getCanvasSize();
-            const pixels = this.readExport('hdr') as Float32Array;
+            const pixels = this.readExport('radiance') as Float32Array;
             const name = filename || this._generateExportFilename('radiance', 'hdr');
             saveHDRFile(pixels, width, height, name, this.buildRenderStamp());
             console.log(`Exported HDR: ${name}`);
@@ -819,7 +819,7 @@ export class App {
 
     async exportAllAOVs(): Promise<void> {
         const exports = this.getAvailableExports();
-        const aovs = exports.filter(e => e !== 'hdr' && e !== 'ldr');
+        const aovs = exports.filter(e => e !== 'radiance' && e !== 'ldr');
 
         // E1: an empty AOV set is the NORMAL case for standard renderers (only
         // hdr/ldr/±variance targets exist) — a no-op, never a throw: the old
