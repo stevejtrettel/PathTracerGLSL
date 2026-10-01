@@ -45,7 +45,8 @@ Strategy
  │                          measurement. directLighting, light selection, RR, env chart,
  │                          volume sampling method, accumulation.
  └─ view                    defines the presentation: tonemap, exposure, film passes.
-                            Touches only the converged linear HDR quantity.
+                            Touches only the converged pictures (the linear HDR radiance
+                            and any other per-pixel pictures the render keeps).
 ```
 
 **Scene + measurement = the integral. Estimator = the computation. View = the display.**
@@ -214,7 +215,10 @@ is unchanged.
 ## 10. The measurement/view boundary — PINNED (provisional wording)
 
 Anything that shapes **what accumulates** is measurement; anything applied to the
-**converged linear HDR quantity** is view. Exposure/tonemap: view. Pixel filtering and
+**converged pictures** (the linear HDR radiance and any other per-pixel pictures the
+render keeps, such as variance or first-hit albedo and normal) is view. Owner-approved
+wording change, 2026-09-29 (docs/claude-outputs-accumulation.md): the view can show any
+picture, and a denoiser reads several. Exposure/tonemap: view. Pixel filtering and
 (future) spectral→XYZ film integration: measurement. The existing "HDR export reads
 pre-tonemap accumulation" behavior is this line, already drawn.
 

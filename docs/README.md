@@ -4,6 +4,10 @@
 
 | Document | Description |
 |----------|-------------|
+| [claude-outputs-accumulation.md](claude-outputs-accumulation.md) | THE plan for outputs and accumulation: one ordered list of per-pixel pictures (radiance, variance option, first-hit AOVs) generating layout, accumulation, exports, display and saving; display state outside the parameter store; one save operation with declared lists; AOVs and their medium gate; parameter-system revamp deferred; build steps 0–7 with verification |
+| [claude-outputs-step0-plan.md](claude-outputs-step0-plan.md) | Step 0 of that plan: exact before/after comparison tools (a frames record/compare mode in the witness runner; an inspectable `digest --keep`), with their own self-checks |
+| [claude-outputs-accumulation-discussion.md](claude-outputs-accumulation-discussion.md) | RECORD: the design discussion and three reviews behind the plan (facts about today's output system, design pieces, findings); superseded by the plan |
+| [claude-oidn-test-plan.md](claude-oidn-test-plan.md) | OIDN denoising plan — ON HOLD pending the outputs/accumulation design; keeps the oidn-web facts, the guide research and the review record |
 | [architecture.md](architecture.md) | Full system reference — three-layer architecture, all components |
 | [claude-improvements-2026-09.md](claude-improvements-2026-09.md) | Suggested next work after the Sep 2026 review and audit: correctness items (1.1 mesh-light MIS normal and 1.2 estimator-dependent budgets since built; small GRIN items and thin surfaces open), rendering features with plans (thin dielectric questions, solid-angle quad/triangle sampling, energy compensation, conductors), speed (including local majorants for formula fogs), and structural fixes |
 | [claude-design-review-2026-09-28.md](claude-design-review-2026-09-28.md) | Design review of the whole renderer after the spectral build: what works, value forms with no home, rules written in several places, verification and documentation sprawl, transport notes, and an ordered list of small next steps; each finding marked by how it is known |

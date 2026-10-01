@@ -4,6 +4,76 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-09-29 — Outputs and accumulation: design and plan (documentation only)
+
+The OIDN work was paused for a redesign of the renderer's output side, because the
+current system hard-codes its one extra output (variance) in five places.
+
+The design went through a facts-only map of today's system, an owner discussion, three
+independent reviews (facts and feasibility, architecture and rules, adversarial) and a
+further review draft. It is merged into one plan,
+[claude-outputs-accumulation.md](docs/claude-outputs-accumulation.md).
+
+The plan:
+- **One ordered list of per-pixel pictures** (radiance; variance as an option of
+  `average`; first-hit AOVs albedo and normal), from which the layout, a generated
+  accumulation `main()`, the exports and the display are all generated.
+- **Display** of any picture, switched as display state outside the parameter store.
+- **One small engine call** to redraw the view, or write a PNG, without tracing.
+- **One save operation,** with saves declared as lists in code.
+- **The `hdr` export renamed to `radiance`.**
+- **A gate on AOV capture in media:** the walk falls through to surfaces after
+  termination.
+- **Build steps 0–7,** each with its own plan, prediction, checks and reviews.
+
+Recorded alongside it:
+- **The pinned taxonomy wording** changes, with the owner's approval: view acts on "the
+  converged pictures" (`fable-strategy-taxonomy.md` §2, §10).
+- **Deferred:** the parameter-system revamp (one "changes the render / display only" fact
+  per parameter, read by both the reset and the production lock).
+- **Proposed:** step 0 (comparison tools),
+  [claude-outputs-step0-plan.md](docs/claude-outputs-step0-plan.md).
+- **Kept as a record:** the discussion, in `claude-outputs-accumulation-discussion.md`.
+  The review draft `claude-outputs-accumulation-revised.md` is marked superseded.
+
+## 2026-09-29 — OIDN plan: guided denoising, guides as separate renderers
+
+Wrote [the OIDN plan](docs/claude-oidn-test-plan.md). Documentation only; nothing is
+implemented yet.
+
+**How the plan got here.**
+- **First draft** (one-sample MRT guides built into the compiler, WebGPU display). Two
+  reviews found:
+  - one-sample guides contradict the OIDN README (guides must be filtered like the color);
+  - input scale 1 is not OIDN's default;
+  - the switch was in `view`;
+  - the draft gave no way to get first-hit data out of the walk;
+  - the draft was too invasive.
+- **Color-only page.** It was reviewed and trimmed (the owner dropped the quality
+  experiment: OIDN's quality is established).
+- **Guides.** The owner then required them. Three research agents compared producing them
+  as separate renderers versus extra render targets, and per-material albedo facts versus
+  pbrt-v4's generic estimate. The owner chose separate renderers.
+
+**The plan now has two parts.**
+- **Part 1.** `measurement.response` gains `'albedo'` and `'normal'`, served by a new
+  `first_hit` integrator. This is the deferred "probe integrators" design of
+  `fable-measurement-bench.md` §2.3. It also adds per-model albedo facts as structured
+  descriptor data, and a `guides` witness with exact region values. The radiance programs
+  do not change.
+- **Part 2.** A dev page renders radiance, albedo and normal with one pinned salt (same
+  camera rays), and denoises them with oidn-web 0.4.0's guided model through its
+  float-array path.
+
+**Recorded in the plan:**
+- Facts read in oidn-web's source, several also measured by a reviewer:
+  - negative values and Inf poison its exposure;
+  - only square multiple-of-16 sizes work on the float-array path;
+  - it has no error callback;
+  - it passes normals through without encoding them.
+- The measured model checksum.
+- A known gap: guide programs carry 4–7 `seam-unused` warnings.
+
 ## 2026-09-29 — each value is checked once (spectra-in-every-slot, step 4)
 
 Step 4 of the [spectra-in-every-slot plan](docs/claude-spectrum-fields.md) ("Step 4 in full").
