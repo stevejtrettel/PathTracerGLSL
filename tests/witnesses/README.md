@@ -72,6 +72,22 @@ of undefined (reading 'readExport')` — the page's `app` was not ready when the
 back. It hit a different check on each of the two Sep 24 sweeps and never on a re-run of the
 same scene. Re-run that scene before treating the row as red.
 
+**`guides-grin-substep` and `guides-grin-substep-scatter` fail by design: a GRIN segment is
+attenuated over 0.001 less length than it travels (open defect, Oct 1 2026).** Behind a GRIN slab
+0.015 thick (thinner than one walker step, so flown straight), the albedo guide — which is the
+transport's own path weight — reads an effective thickness of 0.01400 in every channel and in
+both GRIN arms; the same slab as a plain absorbing medium reads 0.01498 (only the fp spawn
+margin). Exactly 0.001 is missing, so radiance through GRIN is attenuated less than it should
+be. Invisible on thick regions (about 0.1%); 6% on this thin, dense slab. Cause not yet found
+(not the spawn offset: box surfaces use `spawn_eps_fp`; not the box primitive). Whether full
+walker traversals lose it too is unmeasured. These two checks are the regression gate for the
+fix: their expected values are the exact geometric ones.
+
+**Several GRIN materials with NEE are extremely slow (open item, Oct 1 2026).** A scene with
+four GRIN materials rendered with NEE took over 9 minutes for ONE sample on SwiftShader (each
+GRIN material alone: 4–14 s per sample; no scene in the suite has more than one GRIN material).
+Cause unknown; the guides witnesses therefore use one GRIN material per scene.
+
 **Thin dielectrics are one-sided (open defect, no witness yet).** On a FRONT-face hit of a
 zero-thickness surface the dispatcher reports `region_to` = the surface's own region, which
 carries the material's index, so a thin glass sheet refracts as if entering glass and never
@@ -258,6 +274,21 @@ The runner pins `resetSalt` (`WITNESS_SALT` in tools/witness.mjs) for EVERY rend
   across salts), so their `meanTol` gates are calibrated AT the pinned salt and mean
   nothing at any other salt. Changing `WITNESS_SALT` re-rolls every pt tripwire —
   recalibrate them if you touch it.
+
+## Picture checks and `identical`
+
+A `mean` check reads `radiance` unless it names another `picture` the renderer keeps (an AOV
+listed in `measurement.aovs`, or `variance`). A render reads every picture its renderer keeps,
+and each is cached under its own key, so a check of one picture never replays another; the
+radiance keeps its old cache key.
+
+`kind: 'identical'` compares one picture of two strategies at the pinned salt BIT FOR BIT. It
+is for pairs that must draw the same random numbers and do the same arithmetic on that picture:
+the same strategy with and without extra pictures, or estimators that differ only after the
+picture is fixed. `guides` uses it for its AOVs under pt and pt-nee and under maxBounces 4 and
+0, and for radiance and variance with and without the AOVs. The χ² and rmse gates do not fit an
+AOV: it has no variance picture, and the rmse statistic's l/(1+l) tone map has a pole at −1,
+near a normal picture's mean.
 
 ## Tiled checks
 

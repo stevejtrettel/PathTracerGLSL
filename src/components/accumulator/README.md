@@ -48,6 +48,9 @@ and writes every picture to its output. The rules' signatures:
 - a mode that does not: `vec3 <mode>_update(vec3 x)`;
 - a statistic: `vec3 <stat>_update(vec3 previous, vec3 mainPrevious, vec3 mainNew, vec3 x, int n)`.
 
+An AOV picture (`components/aov/`, listed in `measurement.aovs`) is updated by the mode's own
+rule, with the AOV's sample in place of the traced color.
+
 `n` is the number of samples already folded in (`u_sampleCount`); every rule must handle
 `n = 0`, when the previous values are the just-cleared buffer. The type is validated in BOTH
 `Validator.ts` AND the feature's backstop — keep both registry-gated when adding an occupant.

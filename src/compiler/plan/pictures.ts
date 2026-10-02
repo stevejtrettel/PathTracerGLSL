@@ -1,11 +1,14 @@
 // compiler/plan/pictures.ts
 // The per-pixel pictures a program keeps (docs/claude-outputs-accumulation.md §1–§2): the main
-// picture its measurement reports, then the statistic its accumulation records. Every picture
+// picture its measurement reports, the statistic its accumulation records, then the first-hit
+// AOVs its measurement lists. Every picture
 // is one attachment of the `accumulation` double buffer, and every reference to a picture's
 // storage — pass outputs and inputs, exports, the display, the PNG recipe — is built from this
 // list and pictureBuffer().
 
-import { ACCUMULATORS, requestedStatistic, type PictureFacts } from '../../components/accumulator/index.js';
+import { ACCUMULATORS, requestedStatistic } from '../../components/accumulator/index.js';
+import { AOVS } from '../../components/aov/index.js';
+import type { PictureFacts } from '../types.js';
 import type { ProgramDescription, PlannedPicture } from './types.js';
 
 /** The accumulation double buffer every picture is an attachment of. */
@@ -24,6 +27,8 @@ export function planPictures(program: ProgramDescription): PlannedPicture[] {
     const entries: Array<{ facts: PictureFacts; role: PlannedPicture['role']; update: string }> = [
         { facts: RESPONSE_PICTURES[program.measurement.response], role: 'main', update: mode.update },
         ...(statistic === null ? [] : [{ facts: mode.statistics[statistic].picture, role: 'statistic' as const, update: mode.statistics[statistic].update }]),
+        // Each AOV is folded in by the mode's own rule, like the main picture.
+        ...(program.measurement.aovs ?? []).map((name) => ({ facts: AOVS[name].picture, role: 'aov' as const, update: mode.update })),
     ];
     return entries.map(({ facts, role, update }, attachment) => ({
         ...facts, previous: mode.readsPrevious ? facts.previous : null, attachment, role, update,

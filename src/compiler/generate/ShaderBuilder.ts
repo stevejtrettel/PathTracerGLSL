@@ -14,6 +14,7 @@ import type { MergedContributions } from './features/merge.js';
 import fullscreenVertGLSL from '../../glsl/shared/fullscreen.vert.glsl?raw';
 import displayMathGLSL from '../../glsl/shared/display.glsl?raw';
 import blueNoiseGLSL from '../../glsl/shared/noise.glsl?raw';
+import viewsGLSL from '../../glsl/shared/views.glsl?raw';
 import { tonemapModel, type TonemapDescriptor } from '../../components/tonemap/index.js';
 
 export interface ShaderBuildResult {
@@ -96,6 +97,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
     return [
         { origin: 'generated:display-header', source: header },
         { origin: 'glsl/shared/display.glsl', source: displayMathGLSL },
+        // The data views, only when some picture is not shown through the tonemap.
+        ...(pictures.some((p) => p.view !== 'tonemap') ? [{ origin: 'glsl/shared/views.glsl', source: viewsGLSL }] : []),
         ...(dither ? [{ origin: 'glsl/shared/noise.glsl', source: blueNoiseGLSL }] : []),
         // Origin DERIVED from the registry key (D2 — the path convention is the one truth).
         { origin: `components/tonemap/${model.type}/${model.type}.glsl`, source: model.glsl },
@@ -105,10 +108,12 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
 
 /** The composed display main() — policy/plumbing (generated), calling the occupant's
  *  static curve: the displayed picture → exposure → curve → (sRGB encode + clamp + blue-noise
- *  dither, iff the occupant encodes to display bytes). Every picture is viewed through the
- *  'tonemap' mapping (the only PictureView); with more than one picture, u_picture (its
- *  index in the planned list) chooses which — GLSL ES 3.00 cannot index samplers dynamically. */
+ *  dither, iff the occupant encodes to display bytes). With more than one picture, u_picture
+ *  (its index in the planned list) chooses which — GLSL ES 3.00 cannot index samplers
+ *  dynamically. When some picture uses a data view ('unit', 'signed'), each branch computes
+ *  its own final color instead (buildDataViewMain). */
 function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]): string {
+    if (pictures.some((p) => p.view !== 'tonemap')) return buildDataViewMain(model, pictures);
     // Dither in display-code space, right before the implicit 8-bit write: ±½ LSB of
     // blue noise, INDEPENDENT per channel (blue_noise returns a decorrelated RGB triple),
     // turns quantization banding into imperceptible high-frequency grain.
@@ -132,6 +137,37 @@ function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]):
         ...pick,
         `    color = ${model.curveFn}(color);`,
         `${encode}    fragColor = vec4(color, 1.0);`,
+        '}',
+    ].join('\n');
+}
+
+/** The display main() for a list that mixes views. Each picture's branch computes its final
+ *  color: a 'tonemap' picture through view_tonemap (the same steps as above — safe_color,
+ *  exposure, the curve, the sRGB encode), a data picture through its fixed view (views.glsl),
+ *  which applies neither exposure nor the curve and keeps negative values until it maps them.
+ *  The dither, when the occupant encodes to display bytes, is applied once after the choice. */
+function buildDataViewMain(model: TonemapDescriptor, pictures: PlannedPicture[]): string {
+    const viewFn: Record<PlannedPicture['view'], string> = { tonemap: 'view_tonemap', unit: 'view_unit', signed: 'view_signed' };
+    const shown = (p: PlannedPicture) => `${viewFn[p.view]}(texture(${p.display}, uv).rgb)`;
+    const [main, ...rest] = pictures;
+    const tonemapped = pictures.some((p) => p.view === 'tonemap');
+    return [
+        ...(tonemapped ? [
+            'vec3 view_tonemap(vec3 picture) {',
+            '    vec3 color = safe_color(picture) * DISPLAY_EXPOSURE;',
+            `    color = ${model.curveFn}(color);`,
+            ...(model.encodesToDisplay ? ['    color = clamp(linear_to_srgb(color), 0.0, 1.0);'] : []),
+            '    return color;',
+            '}',
+            '',
+        ] : []),
+        'void main() {',
+        '    vec2 uv = gl_FragCoord.xy / u_resolution;',
+        '    vec3 color;',
+        ...rest.map((p, i) => `    ${i === 0 ? 'if' : 'else if'} (u_picture == ${p.attachment}) color = ${shown(p)};`),
+        `    ${rest.length > 0 ? 'else ' : ''}color = ${shown(main)};`,
+        ...(model.encodesToDisplay ? ['    color += (blue_noise(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);'] : []),
+        '    fragColor = vec4(color, 1.0);',
         '}',
     ].join('\n');
 }

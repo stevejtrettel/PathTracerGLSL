@@ -13,6 +13,7 @@ import { contributeLighting } from './lighting.js';
 import { contributePixel } from './pixel.js';
 import { contributeCamera } from './camera.js';
 import { contributeEnvironment } from './environment.js';
+import { contributeAov } from './aov.js';
 import { contributeTransport } from '../../../components/transport/integrators/pt/pt.js';
 import { contributeAccumulation } from './accumulation.js';
 
@@ -23,7 +24,7 @@ export type { MergedContributions } from './merge.js';
  * Collect every feature's contribution to the main (pathtracer) shader, IN ORDER.
  *
  * The array order is the fragment-shader section order (core → intersection →
- * materials → lighting → camera → environment → transport → accumulation). Since T4,
+ * materials → lighting → camera → environment → aov → transport → accumulation). Since T4,
  * cross-feature declaration order is NOT load-bearing: the generated interface header
  * (spliced after core, whose structs the prototypes need) forward-declares every
  * provided seam, and merge validates every `requires` against the provides. Definition
@@ -40,6 +41,7 @@ export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedCon
         contributePixel(plan),
         contributeCamera(plan, bag),
         contributeEnvironment(plan, bag),
+        contributeAov(plan),
         contributeTransport(plan.program),
         contributeAccumulation(plan, bag),
     ];

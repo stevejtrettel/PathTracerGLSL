@@ -49,6 +49,9 @@ export type WitnessCheck =
     | {
           /** Mean over `region` (default: whole frame) equals `value` per channel. */
           kind: 'mean';
+          /** The picture to read (default 'radiance'): any name the renderer keeps, e.g. an
+           *  AOV listed in measurement.aovs. */
+          picture?: string;
           value: number | [number, number, number];
           /** Absolute tolerance, scalar or per-channel — the RENDER's noise budget. When
            *  `source.tier` is 'cross-check', the reference's own error rides `source.refTol`
@@ -84,6 +87,19 @@ export type WitnessCheck =
           meanTol: number;
           chi2?: number;
           rmse?: number;
+          label?: string;
+      }
+    | {
+          /**
+           * One picture (default 'radiance') of two strategies, rendered at the same pinned
+           * salt, must be equal BIT FOR BIT. For pairs that must draw the same random numbers
+           * and do the same arithmetic on the picture: the same strategy with and without
+           * extra pictures, or estimators that only differ after the picture is fixed (the
+           * first-hit AOVs under pt and pt-nee).
+           */
+          kind: 'identical';
+          strategies: [number, number];
+          picture?: string;
           label?: string;
       }
     | {

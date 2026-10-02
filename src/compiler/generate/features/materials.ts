@@ -80,6 +80,10 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // pdf's the surface MIS weight — a dispatch nothing links is not emitted.
     const { surfaceEval, surfacePdf } = plan.program.materials;
     blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? []) });
+    // The albedo guide's per-model fact (components/aov/albedo), only where an AOV calls it.
+    if (plan.program.materials.albedo) {
+        blocks.push({ origin: 'generated:albedo-dispatch', source: generateAlbedoDispatch(plan.materials) });
+    }
 
     // NEE guard (§6.2 / reference loop): at a pure-delta hit the eval is zero — transport skips
     // the shadow march. Constant-folds when the scene's materials are uniform in delta-ness.
@@ -262,6 +266,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     }
     if (plan.program.materials.twoSidedShading) {
         provides.push({ name: 'material_two_sided', signature: 'bool material_two_sided(int mat)' });
+    }
+    if (plan.program.materials.albedo) {
+        provides.push({ name: 'material_albedo', signature: 'Spectrum material_albedo(int mat, Hit hit, MaterialProperties mp)' });
     }
     // Self-requires: the generated medium_sample/medium_transmittance bodies call the
     // properties lookup themselves — honest linkage for the seam-unused check.
@@ -847,6 +854,40 @@ function generateMediumTransmittance(materials: PlannedMaterial[], scatteringMed
         lines.push('    }');
     }
     lines.push('    return SPECTRUM_ONE;');
+    lines.push('}');
+    return lines.join('\n');
+}
+
+// ============================================================================
+// Generated albedo dispatch (the albedo guide, components/aov/albedo)
+// ============================================================================
+// Each model's declared albedo fact — one of its own Spectrum rows, or a function its own
+// .glsl defines — clamped to [0, 1], switching on material id over ONLY the models present,
+// like the interaction dispatch below.
+
+function generateAlbedoDispatch(materials: PlannedMaterial[]): string {
+    const surface = surfaceMaterials(materials);
+    const order: MaterialModel[] = [];
+    const idsByModel = new Map<MaterialModel, number[]>();
+    for (const m of surface) {
+        if (!idsByModel.has(m.model)) { idsByModel.set(m.model, []); order.push(m.model); }
+        idsByModel.get(m.model)!.push(m.id);
+    }
+    const albedoOf = (model: MaterialModel): string => {
+        const fact = materialModel(model).albedo;
+        return `clamp(${'row' in fact ? `mp.${fact.row}` : `${fact.fn}(hit, mp)`}, 0.0, 1.0)`;
+    };
+    const lines = ['Spectrum material_albedo(int mat, Hit hit, MaterialProperties mp) {'];
+    if (order.length === 0) {
+        lines.push('    return SPECTRUM_ZERO;   // no surface materials: nothing for a path to reach');
+    } else {
+        const fallback = order[order.length - 1];
+        for (const model of order) {
+            if (model === fallback) continue;
+            lines.push(`    if (${idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ')}) return ${albedoOf(model)};`);
+        }
+        lines.push(`    return ${albedoOf(fallback)};`);
+    }
     lines.push('}');
     return lines.join('\n');
 }

@@ -9,8 +9,9 @@ import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { ACCUMULATORS, requestedStatistic } from '../../../components/accumulator/index.js';
 
-/** One camera sample, traced and converted to film RGB (`color`). */
-const CAMERA_SAMPLE = `    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
+/** One camera sample, traced and converted to film RGB (`color`); each AOV's sample for the
+ *  same ray lands in `<name>_sample` through transport_trace's out parameters. */
+const cameraSample = (aovs: PlannedPicture[]): string => `    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
     // Seed with the GLOBAL pixel (tile offset included) — seeding with the local
     // gl_FragCoord replays the identical RNG stream in every tile of a tiled render.
     // sampleCount decorrelates samples within a render; resetSalt (bumped per
@@ -21,24 +22,27 @@ const CAMERA_SAMPLE = `    vec2 pixel = gl_FragCoord.xy + u_pixelOffset;
     vec2 xiLens = random2();                       // lens-disk sample — cameras without aperture ignore it
     WavelengthSample camera_sample = wavelengths_sample();
     Ray ray = camera_generateRay(film, xiLens, camera_sample.wl);
-    Radiance L = transport_trace(ray);
+${aovs.map((p) => `    vec3 ${p.name}_sample;\n`).join('')}    Radiance L = transport_trace(${['ray', ...aovs.map((p) => `${p.name}_sample`)].join(', ')});
     vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);`;
 
 /** The main(): fetch each picture's previous value (when the mode reads history), compute
  *  each new value by its update rule in list order — the main picture first, so a statistic
- *  can read its new value — then write every picture to its output. */
+ *  can read its new value — then write every picture to its output. An AOV is folded in by
+ *  the mode's rule like the main picture, with its own sample in place of `color` (AOV values
+ *  are not radiance, so they skip color_to_pixel). */
 function generateMain(pictures: PlannedPicture[]): string {
     const main = pictures[0];
-    const lines = ['void main() {', CAMERA_SAMPLE, ''];
+    const lines = ['void main() {', cameraSample(pictures.filter((p) => p.role === 'aov')), ''];
     const history = pictures.filter((p) => p.previous !== null);
     if (history.length > 0) {
         lines.push('    ivec2 coord = ivec2(gl_FragCoord.xy);');
         for (const p of history) lines.push(`    vec3 ${p.name}_previous = texelFetch(${p.previous}, coord, 0).rgb;`);
     }
     for (const p of pictures) {
-        const args = p.role === 'main'
-            ? (p.previous !== null ? `${p.name}_previous, color, u_sampleCount` : 'color')
-            : `${p.name}_previous, ${main.name}_previous, ${main.name}_new, color, u_sampleCount`;
+        const sample = p.role === 'aov' ? `${p.name}_sample` : 'color';
+        const args = p.role === 'statistic'
+            ? `${p.name}_previous, ${main.name}_previous, ${main.name}_new, color, u_sampleCount`
+            : (p.previous !== null ? `${p.name}_previous, ${sample}, u_sampleCount` : sample);
         lines.push(`    vec3 ${p.name}_new = ${p.update}(${args});`);
     }
     for (const p of pictures) lines.push(`    ${p.output} = vec4(${p.name}_new, 1.0);`);

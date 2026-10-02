@@ -1,8 +1,8 @@
 # Outputs and accumulation: the plan
 
 **Date:** 2026-09-29; build record updated 2026-10-01.
-**Status:** Steps 0–5 are built and committed (`d6fc27b` … `40e764a`). Steps 6 (AOVs) and 7
-(OIDN) are not started; each still needs its own written plan and the owner's approval.
+**Status:** Steps 0–6 are built and committed (`d6fc27b` … step 6, 2026-10-01). Step 7 (OIDN)
+is not started; it needs its own written plan and the owner's approval.
 Steps 1–5 received an independent code review on 2026-10-01; its small cleanup is
 described in `claude-outputs-review-cleanup-plan.md` and the CHANGELOG.
 
@@ -406,12 +406,11 @@ The table above records the evidence and review status at each original commit.
 ### What comes next, in order
 
 1. **Independent review of steps 1–5:** done; the small cleanup is recorded above.
-2. **Step 6, AOVs (albedo, normal).** Its plan must first pass the §6 gate: tell arrival
-   from medium/GRIN termination, define the guides' meaning in scattering media under every
-   estimator, and keep programs without AOVs byte-identical. It also adds
-   `measurement.aovs`, the `components/aov/` family, the `transport_trace` out-parameters, the
-   albedo facts, the `'unit'` and `'signed'` view mappings (§4), an AOV witness and a
-   numerics reviewer. Normal saves as PNG only until a signed float format exists.
+2. **Step 6, AOVs (albedo, normal): built** (`claude-outputs-step6-plan.md`; its §1 settles
+   the §6 gate with definition C, the guide weighted by the path, so it converges to value ×
+   camera-ray transmittance). It found two pre-existing GRIN items, recorded in
+   tests/witnesses/README.md: a GRIN segment attenuated over 0.001 less length than it
+   travels, and several GRIN materials under NEE being extremely slow on SwiftShader.
 3. **Step 7, OIDN** (§7), reusing the verified oidn-web facts in `claude-oidn-test-plan.md`.
    Later, with larger changes allowed, OIDN becomes part of the production pipeline.
 4. **The parameter-system revamp** (§8), the next design topic.

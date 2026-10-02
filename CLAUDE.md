@@ -218,6 +218,10 @@ How a program is assembled:
   functions, null interfaces, variable-index (GRIN) media.
 - Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
   filter; accumulators average (with an optional variance statistic) / oneshot; seven tonemaps.
+- Pictures: radiance plus an optional variance statistic and first-hit albedo/normal guides
+  (`measurement.aovs`, RGB only; a guide is its surface value × the path weight on arrival,
+  so it converges to value × camera-ray transmittance), switched on screen live (`m`) and
+  saved by name (`app.save(picture, format)`, declared `save:` lists).
 - Output: exports carry reproducibility stamps; `app.renderTiled` renders any size in tiles
   and saves one stitched HDR/PNG (pixel-identical to a one-piece render at the same salt;
   the `cornell-area` witness checks this with a pinhole camera; other cameras were checked
@@ -249,6 +253,9 @@ reduced-precision failures). cube-cloud-ref does not finish under SwiftShader (t
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
 found (correctness items, duplicated decisions, tests that cannot fail, wrong documents), with
 proposed fixes; docs/claude-improvements-2026-09.md has the other suggested improvements.
+A GRIN segment is attenuated over 0.001 less length than it travels (measured on a thin slab;
+cause not found; `guides-grin-substep*` fail by design until fixed), and a scene with several
+GRIN materials under NEE takes minutes per sample on SwiftShader (tests/witnesses/README.md).
 The last full sweep (180 of 181 exact checks; only cube-cloud) ran at commit c5f3543. The
 transport changes after it — `Hit.ng`, the mesh margin, `maxNullCrossings`, the GRIN
 roulette, the derived tracking bound — had targeted witness runs only, and the witnesses

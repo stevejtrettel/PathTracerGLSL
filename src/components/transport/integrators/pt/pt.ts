@@ -80,17 +80,24 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
         parameters: {},
         textures: [],
         provides: [
-            { name: 'transport_trace', signature: 'Radiance transport_trace(Ray ray)' },
+            { name: 'transport_trace', signature: `Radiance transport_trace(${traceParams(program)})` },
             { name: 'light_query_surface', signature: 'LightQuery light_query_surface(int mat, Hit hit)' },
             { name: 'light_query_medium', signature: 'LightQuery light_query_medium(Point p)' },
         ],
-        requires: [...walkRequires(f), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
+        requires: [...walkRequires(f, program), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
     };
 }
 
+/** transport_trace's parameters: the camera ray, then one `out vec3 aov_<name>` per listed AOV
+ *  (measurement.aovs), so programs without AOVs keep the one-argument form. */
+function traceParams(p: ProgramDescription): string {
+    return ['Ray ray', ...(p.measurement.aovs ?? []).map((name) => `out vec3 aov_${name}`)].join(', ');
+}
+
 /** The seams the walk itself calls (techniques declare theirs separately). */
-function walkRequires(f: Flags): string[] {
+function walkRequires(f: Flags, p: ProgramDescription): string[] {
     const req = ['scene_intersect', 'material_of', 'scene_material_properties'];
+    for (const name of p.measurement.aovs ?? []) req.push(`${name}_aov`);
     if (f.media) req.push('material_has_medium', 'medium_sample', 'scene_region_at');
     if (f.scattering) req.push('scene_medium_properties');
     // The interior rule's survival source (docs/fable-subsurface.md §6) — required exactly
@@ -291,11 +298,13 @@ function rouletteInterior(f: Flags): ShaderBlock {
 // estimator, which the taxonomy forbids.
 function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     const N = p.measurement.maxBounces;
+    const aovs = p.measurement.aovs ?? [];
     const lines = [
         `// ── The walk (generated): pt${f.media ? ' over media' : ''} — the estimator's table of contents ──`,
         `// Budget: paths with at most ${N} scattering events. The final iteration (bounce == ${N})`,
         '// only scores emission; NEE and the continuation would add an event beyond the budget.',
-        'Radiance transport_trace(Ray ray) {',
+        `Radiance transport_trace(${traceParams(p)}) {`,
+        ...aovs.map((name) => `    aov_${name} = vec3(0.0);   // stays 0 unless the path reaches a surface before any event`),
         '    PathState s = path_state_init(ray);',
         `    for (int bounce = 0; bounce <= ${N}; bounce++) {`,
         '        Hit hit;',
@@ -409,6 +418,21 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
         '        Direction wo = -s.ray.direction;',
+    );
+    if (aovs.length > 0) {
+        // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null
+        // surface, reached with no scattering event or GRIN traversal before it (nulls keep
+        // bounce at 0; events `continue` with bounce ≥ 1). s.throughput is then exactly the
+        // product of the medium arms' weights, each an unbiased transmittance estimate, so the
+        // averaged AOV is its surface value times the camera-ray transmittance; a path a medium
+        // ended arrives with throughput 0. Before the budget break, so maxBounces 0 has AOVs too.
+        lines.push(
+            '        if (bounce == 0) {',
+            ...aovs.map((name) => `            aov_${name} = ${name}_aov(mat, hit, wo, props, s.throughput);`),
+            '        }',
+        );
+    }
+    lines.push(
         '',
         '        kernel_score_emitter_hit(s, hit, mat, wo, props);   // settle last bounce\'s deferred estimate',
         `        if (bounce == ${N}) break;   // budget reached: emission is the last term counted`,

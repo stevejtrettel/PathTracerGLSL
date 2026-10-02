@@ -114,6 +114,13 @@ export interface MaterialModelDescriptor {
      *  the frame maps). The INCLUDE GATE for that fixed-core library — declared, never
      *  a model-name list in the generator (fable-rough-dielectric §4). Default false. */
     usesMicrofacet?: boolean;
+    /** The model's albedo for the albedo guide (components/aov): the surface's color
+     *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
+     *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`
+     *  defines, `Spectrum fn(Hit hit, MaterialProperties mp)`. For a diffuse model the diffuse
+     *  color; for a metal the reflectance at normal incidence; for a dielectric its
+     *  transmittance (1 for clear glass), as OIDN's documentation recommends. */
+    albedo: { row: string } | { fn: string };
     capabilities: {
         /** Has lobes NEE can sample (false = pure delta: eval ≡ 0, shadow rays wasted).
          *  Feeds material_has_nondelta_lobes directly. (Polarity flipped vs

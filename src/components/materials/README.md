@@ -34,7 +34,12 @@ Conventions (pinned; see contracts §2/§3 and trace-loop-contract):
 
 **Descriptor** (`<id>.ts`): `id`, `glsl` (?raw), `properties` (the §3.4 schema — the
 fields this model READS; a field exists in `MaterialProperties` only because some
-present model declares it), `capabilities { nonDeltaLobes, transmission, emissive }`.
+present model declares it), `capabilities { nonDeltaLobes, transmission, emissive }`, and
+`albedo` — the model's color for the albedo guide (components/aov): `{ row }`, one of its own
+Spectrum properties, or `{ fn }`, a function its own `.glsl` defines with the signature
+`Spectrum fn(Hit hit, MaterialProperties mp)`. Diffuse color for a diffuse model, reflectance
+at normal incidence for a metal, transmittance for a dielectric (OIDN's recommendations);
+the compiler clamps it to [0, 1]. Required: a new model cannot forget it.
 
 **Registry line** in `index.ts`. Registry insertion order = generated dispatch order.
 
@@ -42,7 +47,8 @@ present model declares it), `capabilities { nonDeltaLobes, transmission, emissiv
 
 Planner: authored models filtered through this registry → `program.materials.models`.
 Generator: per-model GLSL included for models PRESENT; `generateInteractionDispatch`
-emits `interaction_surface_{sample,eval,pdf,emission}`; the schema union builds
+emits `interaction_surface_{sample,eval,pdf,emission}` (and `material_albedo` from the
+albedo facts, only in programs whose AOVs call it); the schema union builds
 `MaterialProperties` + the resolver arms; capabilities feed `material_has_nondelta_lobes`,
 the ior table (transmission), and the emission gate (emissive ∧ authored value).
 

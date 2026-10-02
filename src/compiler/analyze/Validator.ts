@@ -16,6 +16,7 @@ import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDe
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
+import { AOVS } from '../../components/aov/index.js';
 import { ENV_CHARTS } from '../../components/env/index.js';
 import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
@@ -880,6 +881,27 @@ export function validate(
     for (const [field, value, legal] of measurementEnums) {
         if (value !== undefined && !legal.includes(value as string)) {
             bag.error('invalid-setting', `measurement.${field} must be one of ${legal.map((v) => `'${v}'`).join(' | ')} (got ${JSON.stringify(value)})`).add();
+        }
+    }
+
+    // First-hit pictures (components/aov): registry names, each at most once. RGB only: a
+    // spectral program has no RGB albedo to report yet (spectral AOVs are a recorded follow-up).
+    const aovs: unknown = strategy.measurement.aovs;
+    if (aovs !== undefined) {
+        const legal = Object.keys(AOVS);
+        if (!Array.isArray(aovs)) {
+            bag.error('invalid-setting', `measurement.aovs must be a list of AOV names (${legal.map((v) => `'${v}'`).join(', ')}) (got ${JSON.stringify(aovs)})`).add();
+        } else {
+            aovs.forEach((name: unknown, i) => {
+                if (typeof name !== 'string' || !Object.hasOwn(AOVS, name)) {
+                    bag.error('invalid-setting', `measurement.aovs: unknown AOV ${JSON.stringify(name)} — known: ${legal.map((v) => `'${v}'`).join(', ')}`).add();
+                } else if (aovs.indexOf(name) !== i) {
+                    bag.error('invalid-setting', `measurement.aovs lists '${name}' twice`).add();
+                }
+            });
+            if (aovs.length > 0 && (strategy.measurement.color ?? 'rgb') !== 'rgb') {
+                bag.error('invalid-setting', `measurement.aovs needs color 'rgb': spectral AOVs are not built yet`).add();
+            }
         }
     }
 

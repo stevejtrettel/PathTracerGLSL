@@ -37,6 +37,7 @@ import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
+import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
@@ -637,6 +638,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // fact — registry-driven, baked literals (light geometry rows are constant).
             // OMITTED when empty so programs without softbeams are byte-identical.
             ...(emissionCones.length > 0 ? { emissionCones } : {}),
+            // The albedo dispatch, iff a listed AOV calls it (its descriptor says so).
+            ...((measurement.aovs ?? []).some((name) => AOVS[name].requires.includes('material_albedo')) ? { albedo: true as const } : {}),
             // Gates the REAL uv charts (fable-imagery P1/P2): a scene with no uv-reading
             // material keeps the cheap planar placeholder everywhere (no wasted chart trig).
             // ONE "reads uv" notion, shared with keepsLocalFrame (materialReadsUv): a PROCEDURAL

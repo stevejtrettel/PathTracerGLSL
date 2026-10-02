@@ -13,6 +13,7 @@ export const dielectricDescriptor: MaterialModelDescriptor = {
         { name: 'transmittance', glslType: 'Spectrum', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
         { name: 'ior', glslType: 'float', role: 'index', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
+    albedo: { row: 'transmittance' },   // 1 for clear glass, the tint for tinted glass
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)
         transmission: true,

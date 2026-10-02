@@ -21,6 +21,7 @@ export const ggxDescriptor: MaterialModelDescriptor = {
         fn: (v) => Math.max(1e-3, (v.roughness as number) * (v.roughness as number)),
     }],
     usesMicrofacet: true,   // D / G1 / VNDF / frame maps come from glsl/core/microfacet.glsl
+    albedo: { row: 'f0' },   // reflectance at normal incidence
     capabilities: {
         nonDeltaLobes: true,    // glossy: NEE samples it, MIS weights against ggx_pdf
         transmission: false,    // conductor — no ior table entry, no etaScale

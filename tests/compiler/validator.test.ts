@@ -870,6 +870,15 @@ describe('Validator — Sep 25 audit gaps', () => {
         expect(run((_s, st) => { st.measurement.scattering = 'ignored'; }).hasErrors()).toBe(false);
     });
 
+    it('measurement.aovs: registry names, each once, RGB only', () => {
+        expect(run((_s, st) => { st.measurement.aovs = ['albedo', 'normal']; }).hasErrors()).toBe(false);
+        expect(run((_s, st) => { st.measurement.aovs = []; }).hasErrors()).toBe(false);
+        expect(errs(run((_s, st) => { st.measurement.aovs = ['depth']; }))).toMatch(/unknown AOV "depth"/);
+        expect(errs(run((_s, st) => { st.measurement.aovs = ['albedo', 'albedo']; }))).toMatch(/lists 'albedo' twice/);
+        expect(errs(run((_s, st) => { (st.measurement as any).aovs = 'albedo'; }))).toMatch(/must be a list of AOV names/);
+        expect(errs(run((_s, st) => { st.measurement.aovs = ['albedo']; st.measurement.color = 'spectral'; }))).toMatch(/aovs needs color 'rgb'/);
+    });
+
     it('maxBounces and maxNullCrossings stay within what the generated loops can count to', () => {
         // The walk loops `bounce <= N` and the shadow walker `crossed <= left`: N must leave room
         // for one more increment inside a 32-bit int, so the largest value is 2^31 - 2.

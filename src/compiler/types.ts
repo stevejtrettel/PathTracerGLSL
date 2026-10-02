@@ -602,6 +602,12 @@ export interface MeasurementDescription {
     color?: 'rgb' | 'spectral';
     /** Measurement response; defaults to the colour model's compatible sensor. */
     sensor?: string;
+    /** First-hit pictures kept beside the main picture (components/aov registry keys, at most
+     *  one each), RGB only. Each is a guide for a denoiser: a sample is the AOV's value at the
+     *  first non-null surface the path reaches before any scattering event, times the path's
+     *  weight on arrival, so its expected value is that value times the transmittance along
+     *  the camera ray; a sample is 0 when no such surface is reached. */
+    aovs?: string[];
 }
 
 /**
@@ -1017,12 +1023,27 @@ export interface SourceBlockMapping {
  * from a rendered frame.
  */
 /** How a picture is shown: 'tonemap' = the strategy's exposure, tone curve and display
- *  encoding (radiometric pictures). Data mappings arrive with the pictures that need them. */
-export type PictureView = 'tonemap';
+ *  encoding (radiometric pictures); 'unit' = a value in [0, 1] (clamped), sRGB-encoded;
+ *  'signed' = a value in [−1, 1] shown as 0.5·x + 0.5 (clamped), not sRGB-encoded. */
+export type PictureView = 'tonemap' | 'unit' | 'signed';
 
 /** The file formats a picture can be saved in: 'hdr' = its raw floats as Radiance RGBE (which
  *  cannot store negative values), 'png' = 8-bit through its view mapping. */
 export type PictureFormat = 'hdr' | 'png';
+
+/** One per-pixel picture: its export name, the fragment output that writes it, the sampler
+ *  that reads its previous-frame value (bound only when the mode reads history), the display
+ *  program's sampler for it, how it is shown, and how it can be saved. Declared by the
+ *  component that adds the picture; the compiler builds the picture list, layout, exports
+ *  and display from these facts. */
+export interface PictureFacts {
+    name: string;
+    output: string;
+    previous: string;
+    display: string;
+    view: PictureView;
+    formats: PictureFormat[];
+}
 
 export interface ExportTarget {
     /** Which framebuffer to read from */

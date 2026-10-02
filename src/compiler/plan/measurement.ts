@@ -29,5 +29,7 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         color: m.color ?? 'rgb',
         sensor: m.sensor ?? COLOR_MODELS[m.color ?? 'rgb'].defaultSensor,
         ...(COLOR_MODELS[m.color ?? 'rgb'].version ? { colorModelVersion: COLOR_MODELS[m.color ?? 'rgb'].version } : {}),
+        // Omitted when there are none, so stamps and programs without AOVs are unchanged.
+        ...(m.aovs !== undefined && m.aovs.length > 0 ? { aovs: [...m.aovs] } : {}),
     };
 }

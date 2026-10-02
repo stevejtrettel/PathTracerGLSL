@@ -58,6 +58,9 @@ export interface ProgramDescription {
         color: 'rgb' | 'spectral';
         sensor: string;
         colorModelVersion?: string;
+        /** The first-hit pictures kept beside the main picture (components/aov keys, authored
+         *  order). PRESENT only when non-empty, so programs without AOVs are unchanged. */
+        aovs?: string[];
     };
     /** Defines the computation (taxonomy §3): no field here may change the converged
      *  image — §11.2 cross-strategy convergence is the enforcement. */
@@ -240,6 +243,9 @@ export interface MaterialsDesc {
      *  driven, the v1 pin). PRESENT only when non-empty — programs without cone-gated
      *  emitters carry no field and no dispatch arms (exact linkage, zero churn). */
     emissionCones?: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>;
+    /** The `material_albedo` dispatch exists: some listed AOV requires it (its descriptor's
+     *  `requires`). PRESENT only when true, so programs without it are unchanged. */
+    albedo?: true;
 }
 
 export type LightingDesc =
@@ -276,14 +282,16 @@ export interface PlannedPicture {
     formats: PictureFormat[];
     attachment: number;
     /** 'main' is the measured picture; a 'statistic' is computed from it (its update reads the
-     *  main picture's previous and new values). */
-    role: 'main' | 'statistic';
+     *  main picture's previous and new values); an 'aov' is a first-hit picture, updated by the
+     *  mode's rule with its own sample (components/aov). */
+    role: 'main' | 'statistic' | 'aov';
     /** The GLSL update rule (components/accumulator descriptors state its signature). */
     update: string;
 }
 
 export interface PlannedPipeline {
-    /** The pictures, in order: the main picture (attachment 0), then the requested statistic.
+    /** The pictures, in order: the main picture (attachment 0), the requested statistic, then
+     *  the AOVs in authored order.
      *  The layout, outputs, inputs and exports below are built from this list. */
     pictures: PlannedPicture[];
     // format array = MRT (one attachment per entry); output array = the MRT pass's

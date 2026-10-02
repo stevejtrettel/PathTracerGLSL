@@ -239,6 +239,16 @@ exports[`scene-data textures (byte fingerprints) > grin-vacuum-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > groundfog 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > guides 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > guides-grin-capture 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > guides-grin-substep 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > guides-grin-substep-scatter 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > guides-grin-traversal 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > gyroid-field 1`] = `
 {
   "nodes": "4096x1 9cbb174d926447a3",

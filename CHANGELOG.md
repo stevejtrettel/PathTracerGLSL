@@ -4,6 +4,76 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-10-01 — Step 6 of the outputs plan: albedo and normal pictures
+
+[Step 6 plan](docs/claude-outputs-step6-plan.md), reviewed twice before code (a fresh agent and
+the owner's external reviewer).
+
+**What changed:**
+- **`measurement.aovs: ['albedo', 'normal']`** (RGB only; the Validator rejects unknown names,
+  duplicates and spectral). The resolved measurement and stamps omit it when there are none.
+- **The `aov` component family** (`components/aov/`): one folder per AOV, one shared signature
+  `vec3 <name>_aov(int mat, Hit hit, Direction wo, MaterialProperties props, Spectrum weight)`,
+  a README contract, and picture facts (albedo: view `'unit'`, formats hdr and png; normal:
+  view `'signed'`, png only). The compiler feature `features/aov.ts` links them.
+- **The guide definition (C, the owner's choice):** at the first non-null surface reached at
+  `bounce == 0`, the sample is the surface value × the path throughput, so the averaged
+  guide is value × camera-ray transmittance in every medium arm; a path a medium ended
+  arrives with weight 0. One capture in the walk, before the budget break; no random numbers.
+  `transport_trace` gains `out` parameters only in AOV programs.
+- **Albedo facts** on every material descriptor (`{ row }` or `{ fn }`, required), and a
+  generated `material_albedo` dispatch, only where an AOV calls it. The normal is faced
+  toward the arriving ray with `ambient_dot`.
+- **Pictures:** each AOV is a picture after the statistic, updated by the mode's own rule.
+  The display gains `'unit'` (clamp, sRGB) and `'signed'` (0.5n + 0.5) views in
+  `glsl/shared/views.glsl`. A mixed list's display computes each picture's color in its own
+  branch; tonemap-only displays are unchanged.
+- **Witness runner:** `mean` checks take a `picture`; every picture of a render is read and
+  cached under its own key; new `kind: 'identical'` (one picture, two strategies, bit for bit).
+- **Docs:** the aov and accumulator READMEs, the materials README (the albedo fact), the
+  contract's view values, the witness README.
+
+**Measured:**
+- `tsc` clean. vitest: 4221 passed and 5 failed, the 5 being the program-description
+  snapshots of the new `guides` scene written from an earlier version of its fixture.
+  Regenerated: additions only (0 deleted lines, entries for exactly the 5 new scenes); that
+  file then passed (778 of 778).
+- New tests:
+  - the table test over {average, oneshot, average + variance} × AOVs, including all four
+    attachments;
+  - the walk capture's placement;
+  - every material's albedo fact names a real row or function;
+  - the dispatch only where needed;
+  - the Validator rules;
+  - a glslang compile of an AOV program per material model, which caught one bug before any
+    GPU run (`ambient_dot` takes the point).
+- **Digest** against the before-baseline: the 268 existing scenes identical; the only
+  differences are the 5 new scenes.
+- **Frames:** 18 of 18 identical.
+- **Witnesses** (`guides` and the four `guides-grin-*`): 28 of 32 exact checks pass.
+  - Every medium arm reads albedo × transmittance: constant absorbing, analytic, ratio and
+    delta tracking. So do the two null slabs; the glass reads its own transmittance, and the
+    sky and the null-crossing budget read 0. GRIN traversal and capture read 0.
+  - Bit for bit: the guides under pt ≡ pt-nee and maxBounces 1 ≡ 0, and radiance and
+    variance with AOVs ≡ without (76800 components each).
+  - The 4 failures are the two thin-GRIN scenes, a pre-existing defect (below), recorded as
+    standing failures.
+- **Browser check** (`guides`):
+  - `m` cycles radiance → variance → albedo → normal;
+  - `save('normal','png')` saves;
+  - `save('normal','hdr')` and a production list naming it are refused before rendering
+    (samples stay 4);
+  - salt and screen are unchanged; no page errors.
+
+**Found, not fixed (open items, tests/witnesses/README.md):**
+- A GRIN segment is attenuated over 0.001 less length than it travels: a 0.015 slab reads
+  an effective 0.01400 in every channel and both GRIN arms, while the same slab as a plain
+  medium reads 0.01498. Radiance is affected the same way. Cause not found.
+- A scene with four GRIN materials under NEE took over 9 minutes for one sample on
+  SwiftShader (each alone: 4–14 s); no suite scene had more than one.
+- NEE in `guides` costs about 3 s per sample with or without the guides, which is far above
+  a Cornell box. Unexplained.
+
 ## 2026-10-01 — Outputs review: small cleanup before AOVs
 
 [Cleanup plan](docs/claude-outputs-review-cleanup-plan.md), approved by the owner after

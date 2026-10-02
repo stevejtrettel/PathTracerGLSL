@@ -1,9 +1,9 @@
 # Step 6: albedo and normal pictures (outputs and accumulation plan)
 
 **Date:** 2026-10-01
-**Status:** The owner chose definition C and the normal display (2026-10-01). Both independent
-reviews (a fresh agent and the owner's external reviewer) are done and folded in (§6,
-"Review record"). Awaiting the owner's approval to code. No code yet.
+**Status:** Built 2026-10-01 (the owner chose definition C; two independent reviews folded in,
+§6). Every prediction held; where the build differs from this text is in §7, "As built", and
+the results are in the CHANGELOG.
 Part of `claude-outputs-accumulation.md` §1, §2, §4, §6 and §9. Baselines at commit `43d5b2e`
 (record fresh ones before coding: `npm run digest -- .digest/step6-before.json --keep …` and
 `npm run frames -- record .digest/step6-before-frames`).
@@ -383,3 +383,22 @@ Its four revisions, each checked in the source and folded in:
    exhaustion.
 4. The albedo dispatch would not be compiled for every model: one glslang case per material
    model.
+
+## 7. As built (2026-10-01)
+
+- **The witness is five scenes, not one.** A first `guides` scene held all eleven columns,
+  four of them GRIN materials. With NEE it took over 9 minutes for one sample on SwiftShader
+  (each GRIN material alone: 4–14 s per sample; no suite scene has more than one GRIN
+  material). So `guides` keeps the media, null slabs, glass and sky, and each GRIN case is its
+  own scene with one GRIN material (`guides-grin-traversal`, `-substep`, `-substep-scatter`,
+  `-capture`). Every check of §4 is kept. `guides` uses `maxBounces: 1` and 32 spp: the guides
+  are captured at bounce 0, and the radiance checks hold at any budget.
+- **A defect found by the witness, outside this step:** a GRIN segment is attenuated over
+  0.001 less length than it travels (a 0.015 slab reads 0.01400, the same slab as a plain
+  medium 0.01498). `guides-grin-substep` and `-substep-scatter` keep their exact geometric
+  expected values and fail by design until it is fixed (tests/witnesses/README.md).
+- **`normal` requires no seam:** `ambient_dot(a, b, p)` is core GLSL, not a provided seam.
+- **The canary:** AOV programs are skipped under the two-channel canary of the glslang suite
+  (they are RGB only by declaration) and compile under RGB in their own cases.
+- **The runner** reads every picture of a render at once and caches each under its own key;
+  radiance keeps its old disk key.

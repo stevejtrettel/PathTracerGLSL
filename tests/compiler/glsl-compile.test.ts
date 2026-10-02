@@ -67,6 +67,10 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
     describe('generated GLSL compiles (glslang static check)', () => {
         for (const [key, entry] of Object.entries(sceneSuite)) {
             for (const strategy of entry.strategies) {
+                // AOV programs are RGB only by declaration (the Validator; components/aov): their
+                // pictures are the film's vec3, so the canary representation is not theirs to
+                // carry. They compile under RGB here and in the AOV cases below.
+                if (model !== rgb && (strategy.measurement.aovs?.length ?? 0) > 0) continue;
                 it(`${key} + ${strategy.id}`, () => {
                     const renderer = compiler.compile(entry.scene, strategy);
                     for (const [shaderId, prog] of renderer.shaders) {
@@ -333,4 +337,33 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
         });
     });
 
+});
+
+// The first-hit pictures (components/aov) are RGB only (Validator), so they compile outside the
+// two-channel canary above. No suite scene lists AOVs and the table test uses the minimal scene,
+// so without these cases the generated material_albedo dispatch would never be compiled for
+// most models: one case per registered model, beside a lambert ground (an `if` arm and the
+// fallback), and one case keeping all four pictures.
+describe('AOV programs compile (glslang static check, RGB)', () => {
+    const compiler = new Compiler();
+    const compileAll = (scene: SceneDescription, strategy: RenderStrategy) => {
+        const renderer = compiler.compile(scene, strategy);
+        for (const [shaderId, prog] of renderer.shaders) {
+            check(prog.vertex, 'vert', `${shaderId} [vertex]`);
+            check(prog.fragment, 'frag', `${shaderId} [fragment]`);
+        }
+    };
+    const withAovs = (accumulation: RenderStrategy['estimator']['accumulation']): RenderStrategy => ({
+        ...minimalStrategy,
+        measurement: { ...minimalStrategy.measurement, aovs: ['albedo', 'normal'] },
+        estimator: { ...minimalStrategy.estimator, accumulation },
+    });
+    for (const id of Object.keys(MATERIAL_MODELS) as MaterialModel[]) {
+        it(`albedo + normal over ${id}`, () => {
+            compileAll({ ...minimalScene, materials: { ...minimalScene.materials, sphere: { model: id } } }, withAovs({ type: 'average' }));
+        });
+    }
+    it('all four pictures: radiance, variance, albedo, normal', () => {
+        compileAll(minimalScene, withAovs({ type: 'average', variance: true }));
+    });
 });

@@ -25,6 +25,7 @@ export const roughDielectricDescriptor: MaterialModelDescriptor = {
         fn: (v) => Math.max(1e-3, (v.roughness as number) * (v.roughness as number)),
     }],
     usesMicrofacet: true,
+    albedo: { row: 'transmittance' },   // 1 for clear glass, the tint for tinted glass
     capabilities: {
         nonDeltaLobes: true,    // glossy on BOTH lobes: NEE samples it, MIS weights against the pdf
         transmission: true,     // crosses the interface: ior row, eta_scale, current_medium

@@ -15,6 +15,7 @@ export const checkerDescriptor: MaterialModelDescriptor = {
         { name: 'albedo_b', glslType: 'Spectrum', role: 'reflectance', source: 'albedo_b', default: 0.1, storage: 'field' },
         { name: 'uv_scale', glslType: 'float', source: 'uv_scale', default: 8, storage: 'field', constraint: { kind: 'positive' } },
     ],
+    albedo: { fn: 'checker_albedo' },   // the color of the square the hit lies in
     capabilities: {
         nonDeltaLobes: true,
         transmission: false,

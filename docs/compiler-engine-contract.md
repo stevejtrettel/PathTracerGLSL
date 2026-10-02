@@ -116,14 +116,16 @@ override that one draw.
 
 ```typescript
 picture?: {
-  view: PictureView;          // how it is shown ('tonemap')
+  view: PictureView;          // how it is shown ('tonemap' | 'unit' | 'signed')
   formats: PictureFormat[];   // the file formats it can be saved in ('hdr' | 'png')
 }
 ```
 
 The export targets that carry it are the pictures, in planned order; the first is the main
 picture. Names are not repeated anywhere else. Optional — the environment bake's `table`
-export has none. Additive only.
+export has none. Additive only. The view values are compiler data the App never branches
+on; `'unit'` and `'signed'` (the first-hit AOVs, step 6 of the outputs plan) added no engine
+code.
 
 ---
 

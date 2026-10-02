@@ -405,21 +405,25 @@ async function waitForRender(page) {
     if (done !== true) throw new Error('the page reloaded during the render (a source file changed?) — rerun this scene');
 }
 
-async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp) {
-    const key = `${sceneId}#${strategyIdx}#${W}x${H}#${spp}`;
-    if (frameCache.has(key)) return frameCache.get(key);
+/** One picture of a rendered frame (default the main picture, `radiance`). A render reads
+ *  EVERY picture the renderer keeps, and each is cached under its own key — in memory and on
+ *  disk — so a check of the albedo never replays the radiance. The radiance keeps the disk key
+ *  it always had ('frame'), so existing caches stay valid. */
+async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp, picture = 'radiance') {
+    const memKey = (name) => `${sceneId}#${strategyIdx}#${W}x${H}#${spp}#${name}`;
+    const diskKeyOf = (name) => (cacheCtx ? cacheKey(sceneId, strategyIdx, [W, H], spp, name === 'radiance' ? 'frame' : `frame:${name}`) : null);
+    if (frameCache.has(memKey(picture))) return frameCache.get(memKey(picture));
 
     const entry = registry[sceneId];
     if (!entry) throw new Error(`unknown scene '${sceneId}'`);
     const strategyId = entry.strategyIds[strategyIdx];
     if (!strategyId) throw new Error(`${sceneId}: no strategy at index ${strategyIdx}`);
 
-    const diskKey = cacheCtx ? cacheKey(sceneId, strategyIdx, [W, H], spp, 'frame') : null;
-    const hit = cacheRead(diskKey);
+    const hit = cacheRead(diskKeyOf(picture));
     if (hit) {
-        process.stdout.write(`  cached  ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp\n`);
+        process.stdout.write(`  cached  ${sceneId} / ${strategyId}${picture === 'radiance' ? '' : ` [${picture}]`} @ ${W}×${H} ×${spp}spp\n`);
         const frame = { px: fromB64(hit.px), W: hit.W, H: hit.H };
-        frameCache.set(key, frame);
+        frameCache.set(memKey(picture), frame);
         return frame;
     }
 
@@ -461,16 +465,19 @@ async function renderFrame(browser, registry, sceneId, strategyIdx, [W, H], spp)
         }, spp);
         await waitForRender(page);
 
-        const px = new Float32Array(await page.evaluate(() => Array.from(window.app.readExport('radiance'))));
-        if (px.length !== W * H * 4) throw new Error(`readback is ${px.length / 4} pixels, expected ${W}×${H} — the page's app is not the one this render configured`);
+        const read = await page.evaluate(() => Object.fromEntries(window.app.getPictures().map((name) => [name, Array.from(window.app.readExport(name))])));
+        if (!(picture in read)) throw new Error(`${sceneId} / ${strategyId} keeps no picture '${picture}' (it keeps ${Object.keys(read).join(', ')})`);
         const secs = ((Date.now() - t0) / 1000).toFixed(1);
         process.stdout.write(`  rendered ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp (${secs}s)\n`);
         if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);
 
-        const frame = { px, W, H };
-        frameCache.set(key, frame);
-        if (finiteFrame(`${sceneId}/${strategyId}`, px)) cacheWrite(diskKey, { px: b64(px), W, H });
-        return frame;
+        for (const [name, values] of Object.entries(read)) {
+            const px = new Float32Array(values);
+            if (px.length !== W * H * 4) throw new Error(`readback of '${name}' is ${px.length / 4} pixels, expected ${W}×${H} — the page's app is not the one this render configured`);
+            frameCache.set(memKey(name), { px, W, H });
+            if (finiteFrame(`${sceneId}/${strategyId}/${name}`, px)) cacheWrite(diskKeyOf(name), { px: b64(px), W, H });
+        }
+        return frameCache.get(memKey(picture));
     } finally {
         await page.close();
     }
@@ -489,7 +496,7 @@ async function runCheck(browser, registry, sceneId, spec, check) {
     const label = check.label ?? check.kind;
 
     if (check.kind === 'mean') {
-        const { px, W, H } = await renderFrame(browser, registry, sceneId, check.strategy ?? 0, size, spp);
+        const { px, W, H } = await renderFrame(browser, registry, sceneId, check.strategy ?? 0, size, spp, check.picture ?? 'radiance');
         const bad = nanCount(px);
         if (bad) return { sceneId, label, pass: false, detail: `${bad} NaN components` };
         const measured = regionMean(px, W, H, check.region);
@@ -619,6 +626,24 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         } finally {
             await page.close();
         }
+    }
+
+    if (check.kind === 'identical') {
+        // One picture, two strategies, the same pinned salt: equal bit for bit.
+        const picture = check.picture ?? 'radiance';
+        const [a, b] = await Promise.all(check.strategies.map((st) => renderFrame(browser, registry, sceneId, st, size, spp, picture)));
+        const bitsA = new Uint32Array(a.px.buffer, a.px.byteOffset, a.px.length);
+        const bitsB = new Uint32Array(b.px.buffer, b.px.byteOffset, b.px.length);
+        let differ = 0, maxAbs = 0;
+        for (let i = 0; i < bitsA.length; i++) {
+            if (bitsA[i] !== bitsB[i]) { differ++; maxAbs = Math.max(maxAbs, Math.abs(a.px[i] - b.px[i])); }
+        }
+        return {
+            sceneId, label, pass: differ === 0,
+            detail: differ === 0
+                ? `${picture}: ${bitsA.length} components bit-identical`
+                : `${picture}: ${differ} of ${bitsA.length} components differ (largest |Δ| ${maxAbs.toExponential(3)})`,
+        };
     }
 
     if (check.kind === 'tiled') {

@@ -38,6 +38,10 @@ import {
     glowShell, glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy,
 } from './scenes/instanceLightsWitness.js';
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
+import {
+    guidesScene, guidesStrategies, GUIDES_WITNESS, WALL_G,
+    guidesGrinTraversal, guidesGrinSubstep, guidesGrinSubstepScatter, guidesGrinCapture, guidesGrinStrategies, GUIDES_GRIN_WITNESS,
+} from './scenes/guidesWitness.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
 import { bazaarScene, bazaarTableStrategy, bazaarUnrolledStrategy } from './scenes/tableWitness.js';
@@ -2128,6 +2132,41 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             // cornell-area 40% / fog-area 65%) — NOT a tight equality (pt fireflies per pixel).
             checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.02, rmse: 0.65, label: 'shadow-through-medium nee ≡ pt' }],
         },
+    },
+    'guides': {
+        scene: guidesScene,
+        strategies: guidesStrategies,
+        exercises: 'the first-hit AOVs (measurement.aovs: albedo, normal) through every medium arm: an orthographic view of a lambert wall behind seven columns — nothing, constant absorbing, analytic scattering, ratio tracking, delta tracking, two null slabs, glass — keys 1–5 = pt / pt-nee / pt-nee without AOVs / maxNullCrossings 3 / maxBounces 0; m cycles radiance, variance, albedo, normal',
+        expected: `albedo = wall albedo ${JSON.stringify(WALL_G)} × the column's transmittance (the glass's own transmittance at the glass; 0 in the sky); normal = +z × the mean transmittance; pt ≡ pt-nee and maxBounces 1 ≡ 0 for the guides, and radiance/variance unchanged by adding them, all bit for bit`,
+        witness: GUIDES_WITNESS,
+    },
+    'guides-grin-traversal': {
+        scene: guidesGrinTraversal,
+        strategies: guidesGrinStrategies,
+        exercises: 'the first-hit AOVs behind a GRIN region (n = 1): a traversal is an event, so the guides are 0',
+        expected: 'albedo and normal 0 inside the region',
+        witness: GUIDES_GRIN_WITNESS.traversal,
+    },
+    'guides-grin-substep': {
+        scene: guidesGrinSubstep,
+        strategies: guidesGrinStrategies,
+        exercises: 'the first-hit AOVs behind an absorbing GRIN slab thinner than one walker step: flown straight, not deflected',
+        expected: 'albedo = wall albedo × e^(−σ_a d), deterministic',
+        witness: GUIDES_GRIN_WITNESS.substep,
+    },
+    'guides-grin-substep-scatter': {
+        scene: guidesGrinSubstepScatter,
+        strategies: guidesGrinStrategies,
+        exercises: 'the first-hit AOVs behind a scattering GRIN slab thinner than one walker step: the collision lottery on the straight segment',
+        expected: 'albedo = wall albedo × e^(−σ_t d), within noise',
+        witness: GUIDES_GRIN_WITNESS.substepScatter,
+    },
+    'guides-grin-capture': {
+        scene: guidesGrinCapture,
+        strategies: guidesGrinStrategies,
+        exercises: 'the first-hit AOVs behind a GRIN field strong enough to capture rays (no-return: zero weight falling through to the wall)',
+        expected: 'albedo and normal 0 inside the region',
+        witness: GUIDES_GRIN_WITNESS.capture,
     },
     'null-budget-view': {
         scene: nullBudgetViewScene,

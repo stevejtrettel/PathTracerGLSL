@@ -12,6 +12,7 @@ export const mirrorDescriptor: MaterialModelDescriptor = {
     properties: [
         { name: 'f0', glslType: 'Spectrum', role: 'reflectance', source: 'f0', default: 0.9, storage: 'field' },
     ],
+    albedo: { row: 'f0' },   // reflectance at normal incidence
     capabilities: {
         nonDeltaLobes: false,   // pure delta: eval ≡ 0, NEE skips (the generated guard)
         transmission: false,    // conductor — no ior table entry, no etaScale

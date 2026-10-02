@@ -12,6 +12,7 @@ export const lambertDescriptor: MaterialModelDescriptor = {
         { name: 'albedo', glslType: 'Spectrum', role: 'reflectance', source: 'albedo', default: 0.8, storage: 'field' },
         { name: 'emission', glslType: 'Spectrum', role: 'emission', source: 'emission', default: 0, storage: 'field' },
     ],
+    albedo: { row: 'albedo' },   // the diffuse color
     capabilities: {
         nonDeltaLobes: true,
         transmission: false,
