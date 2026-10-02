@@ -409,8 +409,9 @@ The table above records the evidence and review status at each original commit.
 2. **Step 6, AOVs (albedo, normal): built** (`claude-outputs-step6-plan.md`; its §1 settles
    the §6 gate with definition C, the guide weighted by the path, so it converges to value ×
    camera-ray transmittance). It found two pre-existing GRIN items, recorded in
-   tests/witnesses/README.md: a GRIN segment attenuated over 0.001 less length than it
-   travels, and several GRIN materials under NEE being extremely slow on SwiftShader.
+   tests/witnesses/README.md: every medium segment in a GRIN program attenuated over 0.001
+   less length than it travels (fixed the same day, `claude-grin-spawn-floor-plan.md`), and
+   several GRIN materials under NEE being extremely slow on SwiftShader (open).
 3. **Step 7, OIDN** (§7), reusing the verified oidn-web facts in `claude-oidn-test-plan.md`.
    Later, with larger changes allowed, OIDN becomes part of the production pipeline.
 4. **The parameter-system revamp** (§8), the next design topic.

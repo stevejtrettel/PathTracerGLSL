@@ -40,7 +40,7 @@ import {
 import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
 import {
     guidesScene, guidesStrategies, GUIDES_WITNESS, WALL_G,
-    guidesGrinTraversal, guidesGrinSubstep, guidesGrinSubstepScatter, guidesGrinCapture, guidesGrinStrategies, GUIDES_GRIN_WITNESS,
+    guidesGrinTraversal, guidesGrinSubstep, guidesGrinSubstepScatter, guidesGrinCapture, guidesGrinElsewhere, guidesGrinStrategies, GUIDES_GRIN_WITNESS,
 } from './scenes/guidesWitness.js';
 import { minimalScene, minimalStrategy, directOnlyStrategy } from './scenes/minimalScene.js';
 import { analyticMinimal, analyticStrategy } from './scenes/analyticMinimal.js';
@@ -2167,6 +2167,13 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
         exercises: 'the first-hit AOVs behind a GRIN field strong enough to capture rays (no-return: zero weight falling through to the wall)',
         expected: 'albedo and normal 0 inside the region',
         witness: GUIDES_GRIN_WITNESS.capture,
+    },
+    'guides-grin-elsewhere': {
+        scene: guidesGrinElsewhere,
+        strategies: guidesGrinStrategies,
+        exercises: 'a plain absorbing slab 0.015 thick in a program that also carries a GRIN medium (a small box off to the side): the GRIN medium must not change how other media are crossed',
+        expected: 'albedo = wall albedo × e^(−σ_a d) at the slab\'s geometric thickness, deterministic',
+        witness: GUIDES_GRIN_WITNESS.elsewhere,
     },
     'null-budget-view': {
         scene: nullBudgetViewScene,

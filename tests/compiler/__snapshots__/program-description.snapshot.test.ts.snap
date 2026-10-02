@@ -15582,6 +15582,115 @@ exports[`ProgramDescription structural snapshot (the link map) > guides-grin-cap
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > guides-grin-elsewhere + pt 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": false,
+  },
+  "environment": {
+    "color": [
+      0.3,
+      0.3,
+      0.3,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "albedo": true,
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "aovs": [
+      "albedo",
+      "normal",
+    ],
+    "camera": {
+      "position": [
+        0,
+        0,
+        4,
+      ],
+      "scale": 1.4,
+      "target": [
+        0,
+        0,
+        0,
+      ],
+      "type": "orthographic",
+    },
+    "color": "rgb",
+    "maxBounces": 1,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": true,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": true,
+    "present": true,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > guides-grin-substep + pt 1`] = `
 {
   "dispersion": null,

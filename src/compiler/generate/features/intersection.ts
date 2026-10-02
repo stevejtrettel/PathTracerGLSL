@@ -50,14 +50,6 @@ import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 
-/** The ∇n central-difference radius of the GRIN walker, and therefore the floor on
- *  analytic spawn offsets in deflecting programs (the entry-step stencil must stay
- *  inside the region). THE ONE OWNER of the number: it is emitted as the program-header
- *  `#define GRIN_GRAD_EPS`, which grin.glsl's #ifndef default yields to (the numeric-knob
- *  override seam). grin.glsl's standalone fallback must match — pinned by
- *  tests/components/epsilonCoupling.test.ts. */
-export const GRIN_GRAD_EPS = 0.001;
-
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
     // no scene with geometry is empty, but a fully-empty scene contributes nothing.
@@ -199,31 +191,19 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
     }
 
-    // Hit.eps for floating-point-accurate hits (analytic roots and triangle tests): fp-scale,
-    // unless the program carries a DEFLECTING medium — the GRIN walker's ∇n stencil reaches
-    // GRIN_GRAD_EPS (1e-3) from a spawned entry point and authored ior formulas need not be
-    // total outside their region, so GRIN programs floor every such spawn at the stencil
-    // radius (the coupling to grin.glsl's GRIN_GRAD_EPS is pinned by
-    // tests/components/epsilonCoupling.test.ts). Emitted only when some arm produces such a
-    // hit (exact linkage).
+    // Hit.eps for floating-point-accurate hits (analytic roots and triangle tests): fp-scale, in
+    // every program. Emitted only when some arm produces such a hit (exact linkage).
     const hasFpFill = plan.objects.some((o) => o.intersect === 'closed-form')
         || plan.instanceBatches.some((b) => (b.prototype.backend === 'primitive' && b.prototype.intersect !== 'march') || b.prototype.backend === 'mesh')
         || plan.meshes.length > 0
         || (table !== undefined && table.kinds.length > 0);
-    // Deflecting programs get the compiler-owned stencil radius in the header (grin.glsl's
-    // #ifndef default yields to it), so the floor below and the walker read ONE number.
-    if (plan.program.media.deflecting) {
-        defines['GRIN_GRAD_EPS'] = formatFloat(GRIN_GRAD_EPS);
-    }
     if (hasFpFill) {
         blocks.push({
             origin: 'generated:spawn-eps',
             source: [
                 '// Spawn margin of a floating-point-accurate hit — an analytic root or a triangle test:',
                 '// its position error is a few ulps of its coordinates, so the margin is fp-relative.',
-                plan.program.media.deflecting
-                    ? 'float spawn_eps_fp(Point p) { return max(fp_uncertainty(p), GRIN_GRAD_EPS); }   // floored at the ∇n stencil radius: the walker\'s entry-step stencil must stay inside the region'
-                    : 'float spawn_eps_fp(Point p) { return fp_uncertainty(p); }',
+                'float spawn_eps_fp(Point p) { return fp_uncertainty(p); }',
             ].join('\n'),
         });
     }

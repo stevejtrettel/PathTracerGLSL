@@ -35,6 +35,9 @@
 //     substep-scatter the same, scattering             → g·e^{−σ_t d}              (the collision lottery)
 //     capture         GRIN region with n > GRIN_CAPTURE→ 0                         (no-return: zero weight
 //                                                        falling through to the wall; deflected rays: an event)
+//     elsewhere       a PLAIN absorbing slab 0.015 thick, with a small GRIN box elsewhere in the scene
+//                                                      → g·e^{−σ_a d}              (a GRIN medium anywhere in the
+//                                                        program must not change how other media are crossed)
 //
 // Tolerances: a few 1e-5 where the value is a constant (average_update is a mix(), which need not
 // return a constant exactly); 2e-3 more where a ray crosses medium boundaries (the spawn margins
@@ -259,6 +262,27 @@ export const guidesGrinSubstepScatter = grinScene('guides-grin-substep-scatter',
 export const guidesGrinCapture = grinScene('guides-grin-capture', 'Guides: GRIN capture (no-return, guide 0)',
     { model: 'none', medium: { ior: glsl('1.0 + 200.0 * exp(-dot(p - vec3(0.0, 0.0, 0.5), p - vec3(0.0, 0.0, 0.5)) / 0.02)') } }, 0, 1);
 
+/** A plain medium slab in a program that also carries a GRIN medium (off to the side, outside the
+ *  measured region): its crossing must be exactly the one a GRIN-free program makes. */
+export const guidesGrinElsewhere: SceneDescription = {
+    id: 'guides-grin-elsewhere',
+    name: 'Guides: a plain thin slab, with a GRIN box elsewhere in the scene',
+    ambientSpace: { type: 'euclidean' },
+    objects: [
+        WALL,
+        columnBox(0, 0.5, 'slab', 0.5 - THIN_D / 2, 0.5 + THIN_D / 2, 'slab'),
+        // Above the wall's top (y ≤ 1), so it covers only sky pixels; n = 1 at its 'none' wall.
+        { type: 'box', name: 'lens', parameters: { center: [1.6, 1.25, 0.5], halfSize: [0.1, 0.1, 0.1] }, material: 'lens' },
+    ],
+    materials: {
+        wall: { model: 'lambert', albedo: WALL_G },
+        slab: { model: 'none', medium: { sigma_a: THIN_SIGMA_T } },
+        lens: { model: 'none', medium: { ior: 1.0 } },
+    },
+    lights: [],
+    environment: ENVIRONMENT,
+};
+
 const substepScatter = lotteryTol(GUIDE_T.substep, GRIN_REGION, SPP);
 const grinWitness = (checks: WitnessCheck[]): WitnessSpec => ({ size: SIZE, spp: SPP, checks });
 
@@ -267,4 +291,5 @@ export const GUIDES_GRIN_WITNESS = {
     substep: grinWitness(pair(GRIN_REGION, 'GRIN sub-step, absorbing', mul3(WALL_G, GUIDE_T.substep), CONST + MARGIN, zT(GUIDE_T.substep), normalTol(CONST + MARGIN))),
     substepScatter: grinWitness(pair(GRIN_REGION, 'GRIN sub-step, scattering', mul3(WALL_G, GUIDE_T.substep), substepScatter.albedo, zT(GUIDE_T.substep), normalTol(substepScatter.normalZ))),
     capture: grinWitness(pair(GRIN_REGION, 'GRIN capture', ZERO, 1e-7, ZERO, normalTol(1e-7))),
+    elsewhere: grinWitness(pair(GRIN_REGION, 'plain slab, GRIN elsewhere', mul3(WALL_G, GUIDE_T.substep), CONST + MARGIN, zT(GUIDE_T.substep), normalTol(CONST + MARGIN))),
 };

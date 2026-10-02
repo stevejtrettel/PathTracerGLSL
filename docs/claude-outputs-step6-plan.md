@@ -396,7 +396,9 @@ Its four revisions, each checked in the source and folded in:
 - **A defect found by the witness, outside this step:** a GRIN segment is attenuated over
   0.001 less length than it travels (a 0.015 slab reads 0.01400, the same slab as a plain
   medium 0.01498). `guides-grin-substep` and `-substep-scatter` keep their exact geometric
-  expected values and fail by design until it is fixed (tests/witnesses/README.md).
+  expected values and fail by design until it is fixed (tests/witnesses/README.md). *Fixed the
+  same day* (docs/claude-grin-spawn-floor-plan.md): the cause was the 0.001 spawn floor in GRIN
+  programs, which affected every medium segment in such a program, not only GRIN ones.
 - **`normal` requires no seam:** `ambient_dot(a, b, p)` is core GLSL, not a provided seam.
 - **The canary:** AOV programs are skipped under the two-channel canary of the glslang suite
   (they are RGB only by declaration) and compile under RGB in their own cases.

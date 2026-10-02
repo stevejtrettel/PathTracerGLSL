@@ -67,7 +67,11 @@ two generated projections, consumed differently:
 - **Inside** — `ior_at(med, p, wl)` (this occupant's accessor), read by GRADIENT (the ray bends by
   `∇n`, sampled at many nearby points per step). It is NOT a `MediumProperties` field (that
   struct bundles the value-consumed σ_a/σ_s/ε) — a gradient-consumed field earns its own cheap
-  accessor.
+  accessor. **The formula contract:** n must be finite and smooth within about `GRIN_GRAD_EPS`
+  (0.001) outside the region, because the central-difference stencil reaches there whenever the
+  force is evaluated near a wall — every traversal's entry point and steps that land near the
+  exit. A kink or clamp at the wall itself would bias every first half-kick. Every suite
+  formula meets it (square roots are guarded with `max(…, 0)`, whose kink lies far outside).
 
 ## Scope and knobs
 

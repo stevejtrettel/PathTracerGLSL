@@ -10,7 +10,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { GRIN_GRAD_EPS } from '../../src/compiler/generate/features/intersection.js';
 import { glslDefine } from '../helpers/glslDefine.js';
 
 const SRC = join(__dirname, '../../src');
@@ -58,13 +57,6 @@ describe('provenance-tier clearances', () => {
     it('fp_uncertainty carries the transcribed Wächter–Binder constants', () => {
         expect(glslDefine(math, 'FP_UNCERTAINTY_REL')).toBeCloseTo(256 * 2 ** -23, 18);
         expect(glslDefine(math, 'FP_UNCERTAINTY_ABS')).toBeCloseTo(2 ** -16, 18);
-    });
-
-    it("grin.glsl's standalone GRIN_GRAD_EPS fallback matches the compiler-owned value", () => {
-        // The compiler owns the number (emitted as a header define that the #ifndef
-        // default yields to); the .glsl fallback exists only for standalone reading and
-        // must not drift from it.
-        expect(GRIN_GRAD_EPS).toBeCloseTo(glslDefine(grin, 'GRIN_GRAD_EPS'), 12);
     });
 
     it('the GRIN exit pull-back clears the walker residual and a marched wall, below the guard', () => {

@@ -452,9 +452,12 @@ export interface MediumDescription {
     /** Refractive index n(x) — a scalar FORMULA over `p` (or a constant) making the region a
      *  gradient-index (GRIN) DEFLECTING medium: rays bend along the ODE geodesic of the optical
      *  metric n²·δ instead of scattering (fable-variable-ior.md). Presence marks the medium
-     *  deflecting; v1 requires n → 1 at the region boundary (continuous, no Fresnel) and rejects
-     *  σ_s (no scattering-in-GRIN yet). Spectral-ready: the accessor gains `λ` under a future
-     *  spectral axis. Absent = a normal (straight-ray) scattering/absorbing medium. */
+     *  deflecting. The region's wall material decides its boundary: `model: 'none'` is a
+     *  continuous pass-through (the author asserts n → 1 at the wall), `model: 'dielectric'` a
+     *  hard interface with the local n (grin.md, "Scope and knobs"). The formula must be finite
+     *  and smooth within about GRIN_GRAD_EPS (grin.glsl) OUTSIDE the region too: the walker's
+     *  ∇n stencil reaches there at the walls (grin.glsl, grin_grad_n). Absent = a normal (straight-ray)
+     *  scattering/absorbing medium. */
     ior?: ScalarProperty;
     /** Henyey–Greenstein anisotropy g ∈ (−1, 1). Default 0 (isotropic). Read only by 'hg'. */
     phase_g?: ScalarProperty;

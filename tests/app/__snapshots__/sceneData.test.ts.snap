@@ -243,6 +243,8 @@ exports[`scene-data textures (byte fingerprints) > guides 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > guides-grin-capture 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > guides-grin-elsewhere 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > guides-grin-substep 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > guides-grin-substep-scatter 1`] = `null`;

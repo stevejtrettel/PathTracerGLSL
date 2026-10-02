@@ -329,6 +329,8 @@ own comment (mesh.glsl:29–32) says a fixed world-space floor "skips a sliver o
 … a measurable loss in dense media" and breaks scale invariance, which is why meshes removed
 theirs. So a scene with a GRIN lens and a dense medium probably carries a small bias the other
 scenes don't. Not measured. *Direction:* floor only at the GRIN region's own boundaries.
+*Resolved Oct 1 2026:* measured (a 0.015 slab read 0.01400 thick with any GRIN object in the
+scene) and fixed by removing the floor entirely (docs/claude-grin-spawn-floor-plan.md).
 
 **4.4 The hero collapse: correct, but its proof is somewhere else.** *Checked (code),
 Reviewer (symmetry audit).* The collapse runs once (a guarded flag, pt.ts:445–449), after the
@@ -594,8 +596,8 @@ that shapes the most code first, and cheap safety fixes early.
    READMEs). Git at HEAD is consistent; the risk is that one mixed commit, or a lost working
    tree, makes the history unreadable. Two separate commits, or an explicit hold.
 4. **Settle the spectral decision ledger** (7.1): confirm or reject D2, D4, D8 as built. In
-   the same pass, put the two undeclared estimator differences on the bias ledger (4.2, 4.3)
-   and decide whether to fix them.
+   the same pass, put the undeclared estimator difference on the bias ledger (4.2) and decide
+   whether to fix it (4.3 was fixed Oct 1 2026).
 5. **Verification entry point** (6.1, 6.2): one GPU command, a "changed X, run Y" table,
    `scripts/` typechecked, the vacuous assertions fixed. Then one full sweep, since none has
    run since the spectral work began.

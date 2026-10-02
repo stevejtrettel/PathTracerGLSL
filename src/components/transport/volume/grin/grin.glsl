@@ -59,12 +59,7 @@
 #ifndef GRIN_STEP
 #define GRIN_STEP 0.02          // Verlet parameter step ceiling (coordinate length ≈ n·h)
 #endif
-#ifndef GRIN_GRAD_EPS
-#define GRIN_GRAD_EPS 0.001     // central-difference epsilon for ∇n — STANDALONE FALLBACK ONLY:
-                                // compiled programs receive the compiler-owned header define
-                                // (intersection.ts GRIN_GRAD_EPS — it also floors analytic spawn
-                                // offsets there); this default must match it (epsilonCoupling.test)
-#endif
+#define GRIN_GRAD_EPS 0.001     // central-difference radius for ∇n (grin_grad_n: the formula contract)
 #ifndef GRIN_BISECT_ITERS
 #define GRIN_BISECT_ITERS 8     // exit refinement: crossing bracketed to n·h/2^8 before the pull-back
 #endif
@@ -103,6 +98,13 @@ float grin_n(int med, vec3 p, Wavelengths wl) {
     return max(ior_at(med, p, wl), 1e-3);   // fp-safety floor (physical n ≥ 1)
 }
 
+// ∇n by central differences of radius GRIN_GRAD_EPS. THE FORMULA CONTRACT: a deflecting
+// medium's ior formula must be finite and smooth within about GRIN_GRAD_EPS outside its region.
+// The stencil reaches there whenever the walker evaluates the force near a wall — at every
+// traversal's entry point (a spawn margin inside: fp-scale on analytic and mesh walls), and at
+// interior steps that land near the exit — and ior_at evaluates the formula there, not the
+// neighboring region's index.
+// A kink or clamp at the wall itself would bias the first half-kick of every traversal.
 vec3 grin_grad_n(int med, vec3 p, Wavelengths wl) {
     vec2 e = vec2(GRIN_GRAD_EPS, 0.0);
     return vec3(
@@ -241,7 +243,8 @@ MediumSample medium_sample_grin(int med, Ray ray, float t_max, vec2 xi) {
         // grazing (the pull-back is along the RAY, so the wall-hit distance is
         // angle-independent to first order). The exit direction is the drift
         // tangent T_half — deliberately NOT the second half-kick, which would evaluate ∇n
-        // outside the region where authored formulas need not be total. Absorption/emission
+        // beyond the GRIN_GRAD_EPS band outside the region, where authored formulas need not
+        // be finite (the contract at grin_grad_n). Absorption/emission
         // charge only the traveled fraction of the step.
         if (!grin_inside(med, r_next)) {
             float lo = 0.0, hi = 1.0;

@@ -4,6 +4,49 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
+
+[Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.
+
+**The defect** (found by the step-6 guides witness):
+- **What happened:** in any program containing a GRIN medium, every ray leaving a
+  floating-point-accurate surface started 0.001 off it (`spawn_eps_fp` floored at
+  `GRIN_GRAD_EPS`).
+- **The effect:** every medium segment after a crossing skipped its first 0.001/|cos θ|, and
+  every bounce started 0.001 off its surface. A 0.015 slab read 0.01400 thick whenever any GRIN
+  object was in the scene, GRIN or not.
+- **Why the floor existed:** it was a guard keeping the walker's entry-point ∇n stencil inside
+  the region. It protected only that point: interior steps near the exit already sample
+  outside, segments up to one step never sample ∇n, and no entry inside-test exists.
+
+**What changed:**
+- the floor is removed; GRIN programs use the fp-scale spawn margin like every other program;
+- `GRIN_GRAD_EPS` is grin.glsl's own `#define`; the TS constant, its header define and the
+  coupling-test case are deleted;
+- the real requirement is now written where authors read it (grin.glsl `grin_grad_n`, grin.md,
+  the `ior` doc, whose stale v1 text was corrected): an index formula must be finite and smooth
+  within about 0.001 outside its region;
+- the epsilon plan and the witness README record the removal;
+- new witness `guides-grin-elsewhere`: a plain thin slab with a GRIN box elsewhere in the
+  scene.
+
+**Measured:**
+- `tsc` clean; vitest 114 files, 4229 tests, all pass.
+- **Digest:** exactly the 26 GRIN scenes differ, by only the predicted lines (a script over
+  every changed line in all 28 GRIN programs); the other 247 scenes are identical.
+- **Frames:** 16 of 18 pictures identical; the `grin-furnace` case differs, as predicted.
+- **Bent paths:** the sky seen through the lossless Luneburg lens in `grin` must equal the sky
+  exactly. Over 1704 deterministic pixel-channels the error went from +0.293% to −0.096%.
+  - Frame means of `glassball` and `grin` moved by less than 2 standard errors.
+  - A per-pixel χ² predicted at about 1 came out 190 and 252,167. That statistic was the wrong
+    test: it is dominated by noiseless pixels that moved by a fixed fraction.
+- **GRIN witnesses** (21 scenes plus the new one): 28 of 28 exact checks pass, including the
+  two thin-GRIN checks that failed before the fix and `guides-grin-elsewhere`.
+
+**Still open:** the remaining −0.1% through the Luneburg lens. The expected but unmeasured
+cause is the exit-side index in the interior (n_in/n_out)² factor, read from |T| inside the
+wall. Also still open: several GRIN materials under NEE being extremely slow on SwiftShader.
+
 ## 2026-10-01 — Step 6 of the outputs plan: albedo and normal pictures
 
 [Step 6 plan](docs/claude-outputs-step6-plan.md), reviewed twice before code (a fresh agent and

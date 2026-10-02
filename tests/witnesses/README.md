@@ -72,21 +72,25 @@ of undefined (reading 'readExport')` — the page's `app` was not ready when the
 back. It hit a different check on each of the two Sep 24 sweeps and never on a re-run of the
 same scene. Re-run that scene before treating the row as red.
 
-**`guides-grin-substep` and `guides-grin-substep-scatter` fail by design: a GRIN segment is
-attenuated over 0.001 less length than it travels (open defect, Oct 1 2026).** Behind a GRIN slab
-0.015 thick (thinner than one walker step, so flown straight), the albedo guide — which is the
-transport's own path weight — reads an effective thickness of 0.01400 in every channel and in
-both GRIN arms; the same slab as a plain absorbing medium reads 0.01498 (only the fp spawn
-margin). Exactly 0.001 is missing, so radiance through GRIN is attenuated less than it should
-be. Invisible on thick regions (about 0.1%); 6% on this thin, dense slab. Cause not yet found
-(not the spawn offset: box surfaces use `spawn_eps_fp`; not the box primitive). Whether full
-walker traversals lose it too is unmeasured. These two checks are the regression gate for the
-fix: their expected values are the exact geometric ones.
+**GRIN spawn floor — RESOLVED (Oct 1 2026, docs/claude-grin-spawn-floor-plan.md).** In any
+program with a GRIN medium, every fp-accurate spawn was floored at 0.001, so every medium segment
+after a crossing skipped its first 0.001 (a 0.015 slab read 0.01400 thick, GRIN or not, whenever a
+GRIN object was in the scene). The floor is removed. `guides-grin-substep`, `-substep-scatter`
+and `guides-grin-elsewhere` gate it at the exact geometric transmittance.
 
 **Several GRIN materials with NEE are extremely slow (open item, Oct 1 2026).** A scene with
 four GRIN materials rendered with NEE took over 9 minutes for ONE sample on SwiftShader (each
 GRIN material alone: 4–14 s per sample; no scene in the suite has more than one GRIN material).
 Cause unknown; the guides witnesses therefore use one GRIN material per scene.
+
+**The sky through the Luneburg lens reads 0.1% dark (open item, Oct 1 2026; no witness yet).**
+In `grin` (a lossless Luneburg lens, n = 1 at its 'none' wall, under a constant sky), a pixel
+that sees the sky through the lens must read exactly the sky: radiance is invariant through a
+lossless region whose index is 1 at both ends. Measured over 1704 deterministic pixel-channels
+(256 spp, salt 1234): −0.096% mean (largest 0.133%). Before the spawn floor was removed it read
++0.293%. Expected cause, not yet measured: the interior (n_in/n_out)² factor takes n_out from |T| at
+the last drift, inside the wall rather than at it (grin.glsl, grin_finish); the floor's deeper
+entry point had partly cancelled that.
 
 **Thin dielectrics are one-sided (open defect, no witness yet).** On a FRONT-face hit of a
 zero-thickness surface the dispatcher reports `region_to` = the surface's own region, which

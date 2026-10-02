@@ -253,9 +253,9 @@ reduced-precision failures). cube-cloud-ref does not finish under SwiftShader (t
 README.md). docs/claude-review-2026-09-25.md lists what the review of the Sep 24–25 work
 found (correctness items, duplicated decisions, tests that cannot fail, wrong documents), with
 proposed fixes; docs/claude-improvements-2026-09.md has the other suggested improvements.
-A GRIN segment is attenuated over 0.001 less length than it travels (measured on a thin slab;
-cause not found; `guides-grin-substep*` fail by design until fixed), and a scene with several
-GRIN materials under NEE takes minutes per sample on SwiftShader (tests/witnesses/README.md).
+A scene with several GRIN materials under NEE takes minutes per sample on SwiftShader (cause
+unknown), and the sky seen through the lossless Luneburg lens (`grin`) reads 0.1% dark
+(the exact value is the sky; tests/witnesses/README.md).
 The last full sweep (180 of 181 exact checks; only cube-cloud) ran at commit c5f3543. The
 transport changes after it — `Hit.ng`, the mesh margin, `maxNullCrossings`, the GRIN
 roulette, the derived tracking bound — had targeted witness runs only, and the witnesses

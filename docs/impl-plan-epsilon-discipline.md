@@ -3,7 +3,8 @@
 **STATUS: BUILT (Aug 12 2026, owner-approved same day; the plan was REWRITTEN after a six-agent
 adversarial audit of the full blast radius before the owner's go). vitest 2355 + glslang all 329
 pairs green; snapshots re-goldened, churn audited to the named classes; the GRIN-floored
-`spawn_eps_analytic` variant verified in the grin-furnace dumps; the neg-seg-len rider (decision
+`spawn_eps_analytic` variant verified in the grin-furnace dumps (that floor was removed Oct 1 2026 —
+see "GRIN floor policy" below); the neg-seg-len rider (decision
 4) SHIPPED. GPU witness sweep OWNER-GATED — slab-albedo ×4 must go green at the exact values;
 the shadow sentinels (cornell-area, cornell-disk, shadow-medium, emit-scatter, mesh-light-twin,
 orb, instance-lights, driven-emission-equals-baked, haze) re-gate; pt tripwires recalibrate.**
@@ -59,10 +60,14 @@ larger offsets — correctly, fp error there genuinely exceeds 1e-3.
 - Per-arm eps expression at the fill sites per the tier table. `scene_intersect` takes an
   **uninitialized `out Hit`** — a structure test must assert every emitted arm writes `eps`
   (garbage otherwise reaches `ray_spawn` silently).
-- **GRIN floor policy**: in programs with deflecting media, the generated fills floor eps at
-  `GRIN_GRAD_EPS` (1e-3) — the walker's ∇n stencil reaches 1e-3 from the entry point and only
-  stays inside the region because today's offset matches it; authored ior formulas need not be
-  total outside. Policy lives in the generated fill (core `ray.glsl` stays fixed).
+- **GRIN floor policy — REMOVED (Oct 1 2026, docs/claude-grin-spawn-floor-plan.md).** It floored
+  every fp-accurate spawn in a deflecting program at `GRIN_GRAD_EPS` (1e-3) to keep the walker's
+  entry-point ∇n stencil inside the region. It protected only that one point (interior steps near
+  the exit already reach outside), and it skipped the first 1e-3 of every medium segment in the
+  whole scene (measured: a 0.015 slab read 0.01400 thick whenever any GRIN object existed). GRIN
+  programs now use the fp-scale margin like every other program; the real requirement is a
+  formula contract (n finite and smooth within about 1e-3 outside its region, grin.glsl
+  `grin_grad_n`).
 - Byte gate: nothing reads the field yet — churn = struct line + fill lines exactly.
 
 ## T2 — the paired flip (analytic tier only; never ship half)
@@ -144,10 +149,9 @@ Three compromises the build carried were cleaned up hours later:
    asserts, for every registry pair + the sinks, `hit.eps` fills = `hit.p` fills + the seed —
    a missing fill fails CI instead of silently degrading to legacy behavior (the
    roulette-clamp lesson applied preemptively). The seed stays as out-param hygiene only.
-2. **`GRIN_GRAD_EPS` has ONE owner**: the TS const in intersection.ts, emitted as a program-header
-   define that grin.glsl's `#ifndef` default yields to (the numeric-knob override seam);
-   `spawn_eps_analytic`'s floor references the macro, not a baked literal. The `.glsl` value is a
-   standalone-reading fallback, drift-pinned by the coupling test.
+2. **`GRIN_GRAD_EPS` had ONE owner** (the TS const in intersection.ts, emitted as a header define)
+   while the spawn floor shared it. With the floor removed (Oct 1 2026) grin.glsl is its only
+   reader and owns it as a plain `#define`; the TS const and the coupling-test case are gone.
 3. **The `*_interval` sliver clips reverted to the pure geometric statement** (`tf ≤ 0`, "behind
    the ray") and the emitted march loop gained the missing FIRST-acceptance `t_stop` guard —
    the bound now lives where the math says it should, and the hairline class where a shape whose
