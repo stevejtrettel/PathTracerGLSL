@@ -5,7 +5,7 @@
 // generated `lighting_sample` that CDF-selects a light and calls its kind sampler (§6.1/§3.3).
 
 import { emitSpectrum, glslValue } from '../color.js';
-import type { RenderPlan, PlannedLight, AttributeValue } from '../../plan/types.js';
+import type { RenderPlan, PlannedLight, AttributeValue, ProgramDescription } from '../../plan/types.js';
 import { isAttributeValue } from '../../plan/types.js';
 import type { Vec3, BlackbodyValue } from '../../types.js';
 import type { RadiometricRole } from '../../../components/descriptors.js';
@@ -726,10 +726,10 @@ function fieldExpr(f: number, vec3: boolean): string {
 /** One loader per present kind: `<Kind>Light <kind>_light_row(int li, Wavelengths wl)` — positional
  *  float reads in ctor order (rows then derived), mirroring packLightTable exactly
  *  (the ONE layout truth on both sides). */
-function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: string[], color: 'rgb' | 'spectral'): string {
+function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: ProgramDescription['spectrumKinds'], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
     // Spectrum kinds this program evaluates that pack their own numbers into the row header.
-    const packedKinds = spectrumKinds.map(kindById).filter((k) => k.packed !== undefined);
+    const packedKinds = spectrumKinds.map(({ id }) => kindById(id)).filter((k) => k.packed !== undefined);
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
         const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.role })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];

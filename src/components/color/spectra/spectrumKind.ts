@@ -64,8 +64,8 @@ export interface SpectrumKind<V = unknown> {
     /** Rules that relate several of its numbers, or that `fields` cannot state, reported as
      *  messages. Called only when the slot takes the kind and its fields are valid. */
     validate?(value: V, label: string, report: (message: string) => void): void;
-    /** The RGB stand-in at the given slider values: a triple for a radiometric role, the
-     *  index at indexReferenceNM for the index role. */
+    /** The RGB stand-in at the given slider values: a triple for a radiometric or optical
+     *  role, the index at indexReferenceNM for the index role. */
     toRGB(value: V, role: SpectrumRole, params: Record<string, unknown>): Vec3 | number;
     /** A constant, positive value: the light census's question. Implies mayBeNonzero. */
     constantNonzero(value: V): boolean;
@@ -74,13 +74,14 @@ export interface SpectrumKind<V = unknown> {
     mayBeNonzero(value: V): boolean;
     /** Whether, as an index, it varies with wavelength (and so forces the hero collapse). */
     dispersive(value: V): boolean;
-    /** GLSL for the value at ctx.wl: a Spectrum for radiometric roles, a float for index, as a
-     *  single operand (a call or a parenthesized expression). An RGB program never calls it for
-     *  a named kind: it shows the kind's stand-in (toRGB). */
+    /** GLSL for the value at ctx.wl: a Spectrum for radiometric and optical roles, a float for
+     *  index, as a single operand (a call or a parenthesized expression). An RGB program never
+     *  calls it for a named kind: it shows the kind's stand-in (toRGB). */
     emit(value: V, ctx: EmitContext): string;
-    /** GLSL helpers the kind's `emit` calls when a program evaluates it spectrally or
-     *  dispersively (ProgramDescription.spectrumKinds); linked once. */
-    glsl?: { origin: string; source: string };
+    /** GLSL helpers the kind's `emit` calls for `values`, every distinct value of this kind a
+     *  program evaluates spectrally or dispersively (ProgramDescription.spectrumKinds); linked
+     *  once. A helper exists only if one of those values calls it. */
+    glsl?(values: readonly V[]): { origin: string; source: string };
     /** The sliders of its live numbers, and the uniforms its `emit` reads. An RGB program keeps
      *  the sliders and reads the kind only through its stand-in's uniform. */
     mint?(value: V, ctx: MintContext): void;

@@ -1693,7 +1693,17 @@ exports[`ProgramDescription structural snapshot (the link map) > blackbody-equia
     "weightedAbsorptionArms": true,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 3000,
+            "scale": 2,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -1914,7 +1924,17 @@ exports[`ProgramDescription structural snapshot (the link map) > blackbody-lamp-
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 3000,
+            "scale": 2,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -39704,7 +39724,39 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": {
+              "default": 2900,
+              "max": 40000,
+              "min": 1000,
+              "param": "lamp.kelvin",
+            },
+            "scale": {
+              "default": 7.687615923237919,
+              "max": 22,
+              "min": 0,
+              "param": "lamp.power",
+            },
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -39816,7 +39868,39 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": {
+              "default": 2900,
+              "max": 40000,
+              "min": 1000,
+              "param": "lamp.kelvin",
+            },
+            "scale": {
+              "default": 7.687615923237919,
+              "max": 22,
+              "min": 0,
+              "param": "lamp.power",
+            },
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -39928,7 +40012,39 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": {
+              "default": 2900,
+              "max": 40000,
+              "min": 1000,
+              "param": "lamp.kelvin",
+            },
+            "scale": {
+              "default": 7.687615923237919,
+              "max": 22,
+              "min": 0,
+              "param": "lamp.power",
+            },
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40040,7 +40156,39 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": {
+              "default": 2900,
+              "max": 40000,
+              "min": 1000,
+              "param": "lamp.kelvin",
+            },
+            "scale": {
+              "default": 7.687615923237919,
+              "max": 22,
+              "min": 0,
+              "param": "lamp.power",
+            },
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40152,7 +40300,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 1000,
+            "scale": 1.739980689684732,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40264,7 +40434,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 1000,
+            "scale": 1.739980689684732,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40464,7 +40656,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 1000,
+            "scale": 0.2174975862105915,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40575,7 +40777,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.9586431216686195,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40686,7 +40898,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.9586431216686195,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40794,7 +41016,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.9586431216686195,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -40905,7 +41137,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41017,7 +41271,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41133,7 +41409,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 5800,
+            "scale": 20,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41248,7 +41534,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 5800,
+            "scale": 20,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41359,7 +41655,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41471,7 +41789,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41583,7 +41923,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -41695,7 +42057,29 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-blackb
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "blackbody",
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 2900,
+            "scale": 7.687615923237919,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 12000,
+            "scale": 1.914207773915614,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 6500,
+            "scale": 0.03834572486674478,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -42559,7 +42943,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-disper
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "cauchy",
+    {
+      "id": "cauchy",
+      "values": [
+        {
+          "cauchy": [
+            1.4,
+            0.04,
+          ],
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -42781,7 +43175,25 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-disper
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "sellmeier",
+    {
+      "id": "sellmeier",
+      "values": [
+        {
+          "sellmeier": {
+            "B": [
+              1.03961212,
+              0.231792344,
+              1.01046945,
+            ],
+            "C": [
+              0.006000699,
+              0.0200179144,
+              103.560653,
+            ],
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -43003,7 +43415,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-disper
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "cauchy",
+    {
+      "id": "cauchy",
+      "values": [
+        {
+          "cauchy": [
+            1.45,
+            0.02,
+          ],
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -43113,7 +43535,17 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-disper
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "cauchy",
+    {
+      "id": "cauchy",
+      "values": [
+        {
+          "cauchy": [
+            1.5,
+            0.01,
+          ],
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -46365,7 +46797,19 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-gaussi
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "gaussian",
+    {
+      "id": "gaussian",
+      "values": [
+        {
+          "gaussian": {
+            "center": 610,
+            "floor": 0.04,
+            "peak": 0.85,
+            "width": 25,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -46472,7 +46916,19 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-gaussi
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "gaussian",
+    {
+      "id": "gaussian",
+      "values": [
+        {
+          "gaussian": {
+            "center": 610,
+            "floor": 0.04,
+            "peak": 0.85,
+            "width": 25,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {
@@ -52027,9 +52483,91 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-showca
     "weightedAbsorptionArms": false,
   },
   "spectrumKinds": [
-    "sellmeier",
-    "blackbody",
-    "gaussian",
+    {
+      "id": "sellmeier",
+      "values": [
+        {
+          "sellmeier": {
+            "B": [
+              1.73759695,
+              0.313747346,
+              1.89878101,
+            ],
+            "C": [
+              0.013188707,
+              0.0623068142,
+              155.23629,
+            ],
+          },
+        },
+      ],
+    },
+    {
+      "id": "blackbody",
+      "values": [
+        {
+          "blackbody": {
+            "kelvin": 1800,
+            "scale": 4,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 5800,
+            "scale": 1000,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 2700,
+            "scale": 10,
+          },
+        },
+        {
+          "blackbody": {
+            "kelvin": 3500,
+            "scale": 0.04,
+          },
+        },
+      ],
+    },
+    {
+      "id": "gaussian",
+      "values": [
+        {
+          "gaussian": {
+            "center": 610,
+            "floor": 0.04,
+            "peak": 0.85,
+            "width": 25,
+          },
+        },
+        {
+          "gaussian": {
+            "center": 645,
+            "floor": 0.03,
+            "peak": 0.9,
+            "width": 18,
+          },
+        },
+        {
+          "gaussian": {
+            "center": 490,
+            "floor": 0.05,
+            "peak": 0.85,
+            "width": 30,
+          },
+        },
+        {
+          "gaussian": {
+            "center": 540,
+            "floor": 0.88,
+            "peak": 0.04,
+            "width": 28,
+          },
+        },
+      ],
+    },
   ],
   "view": {
     "tonemap": {

@@ -5,7 +5,7 @@
 // handful of models), never with library size; a single-model scene's struct IS that
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
-import { isRadiometric, type PropertySchema, type ParamKind, type RadiometricRole } from '../../components/descriptors.js';
+import { isLaneSpectrum, isRadiometric, type PropertySchema, type ParamKind, type RadiometricRole } from '../../components/descriptors.js';
 import { emitSpectrum, type SpectrumSite } from './color.js';
 import { formatFloat } from '../../components/glsl-format.js';
 
@@ -41,10 +41,10 @@ export function structFromRows(structName: string, rows: StructRow[]): string {
     ].join('\n');
 }
 
-/** The row's default at the site's wavelengths: a gray spectrum for a radiometric row, the
- *  number itself otherwise. */
+/** The row's default at the site's wavelengths: a gray spectrum for a per-lane Spectrum row
+ *  (radiometric or optical), the number itself otherwise. */
 export function defaultExpr(f: PropertySchema<string>, site: SpectrumSite): string {
-    return isRadiometric(f.role) ? emitSpectrum(f.default, f.role, site) : formatFloat(f.default);
+    return isLaneSpectrum(f.role) ? emitSpectrum(f.default, f.role, site) : formatFloat(f.default);
 }
 
 /**

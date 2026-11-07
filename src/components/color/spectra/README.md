@@ -5,17 +5,21 @@ A spectrum is a function of wavelength. Its **kind** is the way it was produced
 
 | Kind | Authored as | Roles |
 |---|---|---|
-| `rgb` | a number (gray, or one index at every wavelength), an RGB triple, a `{param}`, a GLSL expression or a per-instance attribute | reflectance, coefficient, emission, index |
+| `rgb` | a number (gray, or one index at every wavelength), an RGB triple, a `{param}`, a GLSL expression or a per-instance attribute | reflectance, coefficient, emission, index, optical |
 | [`blackbody`](blackbody/README.md) | `{ blackbody: { kelvin, scale } }` | emission |
 | [`cauchy`](cauchy/README.md) | `{ cauchy: [A, B, C?] }` | index |
 | [`sellmeier`](sellmeier/README.md) | `{ sellmeier: { B, C } }` | index |
 | [`gaussian`](gaussian/README.md) | `{ gaussian: { center, width, peak, floor? } }` (nm) | reflectance |
+| [`measured`](measured/README.md) | `{ measured: 'metal-Au-eta' }` (a pbrt-v4 table) | optical |
 
 The **role** belongs to the slot a value sits in, never to the value: reflectance, coefficient
-and emission for radiometric rows, index for refractive-index rows. The role decides how a
-spectrum is read: the direction of the RGB conversion (the color model lifts an RGB triple by
-role), the domain every value must lie in (reflectance, coefficient and emission nonnegative,
-index positive; the spectral model also limits reflectance to 1), and the units.
+and emission for radiometric rows, index for refractive-index rows, optical for a metal's
+optical constants η and κ (a dimensionless number per wavelength lane, never collapsed to the
+hero). The role decides how a spectrum is read: the direction of the RGB conversion (the color
+model lifts an RGB triple by role; an optical value lifts like a coefficient), the domain every
+value must lie in (reflectance, coefficient, emission and optical nonnegative, index positive;
+the spectral model also limits reflectance to 1, and takes no RGB triple in an optical slot),
+and the units.
 
 ## The contract
 
@@ -31,12 +35,14 @@ about its values:
   rules that relate several numbers (Sellmeier's positive n²) or that `fields` cannot state
   (Sellmeier's poles outside the visible range, Cauchy's array), and runs only when the fields
   are valid;
-- `toRGB` gives its RGB stand-in: the RGB value for a radiometric role, the index at the helium
-  d line (587.5618 nm) for the index role;
+- `toRGB` gives its RGB stand-in: the RGB value for a radiometric or optical role, the index at
+  the helium d line (587.5618 nm) for the index role;
 - `constantNonzero` and `mayBeNonzero` answer the light census and the emitter checks;
 - `dispersive` says whether, as an index, it varies with wavelength (which forces the one-time
   hero collapse);
-- `emit` writes its GLSL at the ray's wavelengths, `glsl` holds the helpers it calls, and
+- `emit` writes its GLSL at the ray's wavelengths, `glsl` gives the helpers it calls for the
+  values a program uses (so a program links only the helpers its values call: a gold scene
+  carries no silver table), and
   `mint` adds its sliders and the uniforms its `emit` reads (blackbody's temperature). A kind
   never asks whether the program is RGB or spectral. An RGB program never calls its `emit`: it
   shows the kind's stand-in (`toRGB`, a reflectance clipped to [0, 1]) through the `rgb` kind,
@@ -48,15 +54,18 @@ a literal, uniform or expression; the color model's lift; minting a slider) reac
 `EmitContext` and `MintContext`.
 
 `index.ts` is the registry: `SPECTRUM_KINDS` in lookup order (the index formulas, then
-blackbody and gaussian, then `rgb`, which claims everything else), `kindOf`, `namedKindOf`,
-`kindById` and `rgbKind`.
-A program lists the kinds it evaluates at wavelengths in `ProgramDescription.spectrumKinds`
-(registry order); their `glsl` helpers are linked in that order.
+blackbody, gaussian and measured, then `rgb`, which claims everything else), `kindOf`,
+`namedKindOf`, `kindById` and `rgbKind`.
+A program lists the kinds it evaluates at wavelengths, each with its distinct values, in
+`ProgramDescription.spectrumKinds` (registry order); their `glsl` helpers are linked in that
+order.
+`standIn.ts` holds `d65StandIn`, the daylight projection of a function of wavelength that the
+Gaussian and measured kinds use as their RGB stand-in.
 
 Outside this folder, code does not test for a particular kind at run time (no kind predicate,
 kind object, id comparison or authored-key check); tests/components/spectrumKinds.test.ts scans
 for these. The authored value types (`BlackbodyValue`, `GaussianValue`, `CauchyIndex`,
-`SellmeierIndex` in compiler/types.ts) still name each kind's spelling, so a new kind also adds its type to the
+`SellmeierIndex`, `MeasuredValue` in compiler/types.ts) still name each kind's spelling, so a new kind also adds its type to the
 `NamedSpectrumValue` union (or `SpectralIndex` for an index formula).
 
 ## Adding a kind

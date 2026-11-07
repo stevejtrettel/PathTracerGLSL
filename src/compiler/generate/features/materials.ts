@@ -16,7 +16,7 @@ import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, hasPerHitForm, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
-import { isRadiometric } from '../../../components/descriptors.js';
+import { isLaneSpectrum, isRadiometric } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
@@ -410,7 +410,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             if (f.name === 'emission' && !emissionMayBeNonzero(raw)) continue;
             const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
             // `element` is Hit.element, the instance index a per-instance value is read at.
-            const resolved = isRadiometric(f.role)
+            const resolved = isLaneSpectrum(f.role)
                 ? emitSpectrum(raw as ParamValue, f.role, { ...site, instance: 'element' })
                 : emitValue(raw as ParamValue, fmt, { instance: 'element' });
             body.push(`${target} = ${resolved};`);

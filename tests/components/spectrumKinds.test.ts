@@ -21,7 +21,7 @@ function tsFiles(dir: string): string[] {
 
 // Run-time tests for a particular kind: its predicates, its kind object, a comparison of a
 // kind's id to a name, or a check for its authored key.
-const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody|isGaussian|rgbKind|blackbodyKind|cauchyKind|sellmeierKind|gaussianKind)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier|gaussian)'|'(blackbody|cauchy|sellmeier|gaussian)'\s+in\b/g;
+const KIND_TEST = /\b(isBlackbody|isCauchyIndex|isSellmeierIndex|isSpectralIndex|indexIsDispersive|evaluateIndex|indexForm|emitBlackbody|isGaussian|isMeasured|rgbKind|blackbodyKind|cauchyKind|sellmeierKind|gaussianKind|measuredKind)\b|\.id\s*[!=]==?\s*'(rgb|blackbody|cauchy|sellmeier|gaussian|measured)'|'(blackbody|cauchy|sellmeier|gaussian|measured)'\s+in\b/g;
 
 const ALLOWED: Record<string, number> = {};
 
@@ -94,6 +94,7 @@ describe('spectrum kinds', () => {
         cauchy: { cauchy: [1.5, 0.004] },
         sellmeier: { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } },
         gaussian: { gaussian: { center: 610, width: 25, peak: 0.85, floor: 0.04 } },
+        measured: { measured: 'metal-Au-eta' },
     };
 
     it('every named kind has an example; its value is { <id>: … }, and its declared fields name every key', () => {

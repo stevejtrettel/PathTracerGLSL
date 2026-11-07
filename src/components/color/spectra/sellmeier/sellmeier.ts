@@ -45,7 +45,7 @@ export const sellmeierKind: SpectrumKind<SellmeierIndex> = {
     // An index is never emission.
     constantNonzero: () => false,
     mayBeNonzero: () => false,
-    glsl: { origin: 'components/color/spectra/sellmeier/sellmeier.glsl', source: sellmeierGLSL },
+    glsl: () => ({ origin: 'components/color/spectra/sellmeier/sellmeier.glsl', source: sellmeierGLSL }),
     dispersive: v => v.sellmeier.B.some((b, i) => b !== 0 && v.sellmeier.C[i] !== 0),
     emit(v, ctx) {
         // Every term with B = 0 or C = 0 is constant in wavelength; then so is the index.

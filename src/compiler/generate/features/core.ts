@@ -117,8 +117,8 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).
-    for (const id of plan.program.spectrumKinds) {
-        const helpers = kindById(id).glsl;
+    for (const { id, values } of plan.program.spectrumKinds) {
+        const helpers = kindById(id).glsl?.(values);
         if (helpers !== undefined) blocks.push(helpers);
     }
     // Microfacet stdlib (fable-rough-dielectric §4): D / Smith G₁ / VNDF / the frame maps,

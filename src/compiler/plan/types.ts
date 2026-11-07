@@ -37,10 +37,11 @@ import type { AABB } from '../../components/accel/bvh/bvh.js';
  * structural snapshot test).
  */
 export interface ProgramDescription {
-    /** Ids of the named spectrum kinds this program evaluates at wavelengths, in registry
-     *  order: a radiometric kind (blackbody) in a spectral program, a dispersive index formula.
-     *  Their GLSL helpers are linked, and packed light rows may carry them in their headers. */
-    spectrumKinds: string[];
+    /** The named spectrum kinds this program evaluates at wavelengths, in registry order, each
+     *  with the distinct values it evaluates: a kind in a radiometric or optical setting of a
+     *  spectral program, a dispersive index formula. Each kind's GLSL helpers for those values
+     *  are linked, and packed light rows may carry the kind in their headers. */
+    spectrumKinds: { id: string; values: unknown[] }[];
     /** Index consumers and real interior regions requiring the one-time hero collapse. */
     dispersion: { indexMaterials: number[]; regions: number[] } | null;
     /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations

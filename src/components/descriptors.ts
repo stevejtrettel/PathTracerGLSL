@@ -42,13 +42,25 @@ export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<
  *  (reflectance, a fraction in [0,1]; coefficient, a rate per unit length). */
 export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
 
-/** A spectrum setting's role: a radiometric role, or a refractive index. The role belongs to the
- *  setting, never to the value in it; it decides how RGB converts, and the allowed domain. */
-export type SpectrumRole = RadiometricRole | 'index';
+/** A spectrum setting's role: a radiometric role, a refractive index, or an optical constant.
+ *  The role belongs to the setting, never to the value in it; it decides how RGB converts, and
+ *  the allowed domain.
+ *    index   — a real refractive index, one number per path (a dispersive index forces the
+ *              one-time hero collapse);
+ *    optical — a dimensionless optical constant (a metal's η or κ), one number per wavelength
+ *              lane, never collapsed. */
+export type SpectrumRole = RadiometricRole | 'index' | 'optical';
 
-/** Whether a role reads light or a multiplier of light, as opposed to an index. */
+/** Whether a role reads light or a multiplier of light, as opposed to an index or an optical
+ *  constant. */
 export function isRadiometric(role: SpectrumRole | undefined): role is RadiometricRole {
-    return role !== undefined && role !== 'index';
+    return role !== undefined && role !== 'index' && role !== 'optical';
+}
+
+/** Whether a setting of this role is a Spectrum evaluated per wavelength lane: the radiometric
+ *  roles and the optical constants. */
+export function isLaneSpectrum(role: SpectrumRole | undefined): role is RadiometricRole | 'optical' {
+    return isRadiometric(role) || role === 'optical';
 }
 
 /**

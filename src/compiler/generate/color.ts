@@ -26,12 +26,14 @@ export interface SpectrumSite {
     instance?: string;
 }
 
-/** What a spectrum kind needs from the compiler to emit a value in this role. */
+/** What a spectrum kind needs from the compiler to emit a value in this role. An optical
+ *  constant lifts like a coefficient: unbounded and nonnegative, and exact for the gray values
+ *  a spectral program lets an optical setting hold as plain numbers. */
 function spectrumContext(role: SpectrumRole, site: SpectrumSite): EmitContext {
     return {
         role, wl: site.wl,
         bind: (value, format) => emitValue(value as ParamValue, format, { instance: site.instance }),
-        lift: (rgb) => emitColor(rgb, role as RadiometricRole, site.wl),
+        lift: (rgb) => emitColor(rgb, role === 'optical' ? 'coefficient' : role as RadiometricRole, site.wl),
     };
 }
 
@@ -45,7 +47,7 @@ function shown(value: ParamValue, role: SpectrumRole, site: SpectrumSite): Param
 
 /** A spectrum setting's GLSL at the site's wavelengths: its value's kind writes it, with the
  *  numbers bound by emitValue. */
-export function emitSpectrum(value: ParamValue, role: RadiometricRole, site: SpectrumSite): string {
+export function emitSpectrum(value: ParamValue, role: RadiometricRole | 'optical', site: SpectrumSite): string {
     const v = shown(value, role, site);
     return kindOf(v).emit(v, spectrumContext(role, site));
 }

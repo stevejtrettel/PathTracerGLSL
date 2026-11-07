@@ -102,7 +102,7 @@ export const blackbodyKind: SpectrumKind<BlackbodyValue> = {
         const { scale } = dials(v) ?? {};
         return scale === undefined || isValueParam(scale) || (typeof scale === 'number' && scale > 0);
     },
-    glsl: { origin: 'components/color/spectra/blackbody/blackbody.glsl', source: blackbodyGLSL },
+    glsl: () => ({ origin: 'components/color/spectra/blackbody/blackbody.glsl', source: blackbodyGLSL }),
     dispersive: () => false,
     emit: emitPlanck,
     mint(v, ctx) {

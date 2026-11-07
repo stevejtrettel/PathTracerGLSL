@@ -309,7 +309,7 @@ export type IndexProperty = ScalarProperty | SpectralIndex;
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
 
 /** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
-export type NamedSpectrumValue = BlackbodyValue | GaussianValue;
+export type NamedSpectrumValue = BlackbodyValue | GaussianValue | MeasuredValue;
 
 /** Authored temperature and reference brightness, preserved through scene planning.
  * RGB evaluates the signed projection of the same normalized Planck spectrum. */
@@ -326,6 +326,12 @@ export interface BlackbodyValue {
  *  Reflectance only; constants. */
 export interface GaussianValue {
     gaussian: { center: number; width: number; peak: number; floor?: number };
+}
+
+/** A measured optical constant of a metal, by table name (color/spectra/measured/data.ts:
+ *  `metal-<Ag|Al|Au|Cu|CuZn>-<eta|k>`, from pbrt-v4). Optical settings only. */
+export interface MeasuredValue {
+    measured: string;
 }
 
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
