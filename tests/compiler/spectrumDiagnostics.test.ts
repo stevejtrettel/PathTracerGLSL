@@ -59,6 +59,10 @@ const cases: Record<string, Mutation> = {
     'cauchy as medium ior': set((s) => { s.materials.fog.medium.ior = { cauchy: [1.5, 0.004] }; }),
     'sellmeier as albedo': set((s) => { s.materials.m.albedo = { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } }; }),
     'sellmeier as medium ior': set((s) => { s.materials.fog.medium.ior = { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } }; }),
+    // A row that feeds a derived field computed on the host takes a constant or a {param}.
+    'cauchy as ggx roughness': set((s) => { s.materials.m = { model: 'ggx', f0: 0.9, roughness: { cauchy: [1.5, 0.004] } }; }),
+    'blackbody as rough_dielectric roughness': set((s) => { s.materials.glass = { model: 'rough_dielectric', ior: 1.5, roughness: blackbody(3000) }; }),
+    'expression as ggx roughness': set((s) => { s.materials.m = { model: 'ggx', f0: 0.9, roughness: { kind: 'glsl', source: '0.1 + 0.2 * uv.x' } }; }),
     // Bad numbers inside a kind.
     'blackbody kelvin below range': set((s) => { s.lights[0].emission = blackbody(500); }),
     'blackbody kelvin slider default above range': set((s) => { s.lights[0].emission = blackbody({ param: 'lamp.k', default: 50000 }); }),

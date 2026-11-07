@@ -11,7 +11,7 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, derivedFieldFedBy } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
@@ -1220,10 +1220,10 @@ export function validate(
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
-                // Rows feeding a DERIVED field (ggx roughness → alpha) are CPU-derived once
-                // per material — a per-instance input would need per-instance derived slots
-                // (precompute-and-ship an extra table column). Deferred; reject-not-degrade.
-                const derived = MATERIAL_MODELS[model]?.derived?.find((d) => d.inputs.includes(key));
+                // A row feeding a derived field (ggx roughness → alpha) is read once per
+                // material on the host; a per-instance value would need a per-instance
+                // derived column, which the table does not have.
+                const derived = derivedFieldFedBy(model, key);
                 if (derived !== undefined) {
                     bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}' — per-instance derived rows are deferred (the derived value is computed once per material)`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();

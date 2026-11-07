@@ -20,7 +20,7 @@ import { namedKindOf } from '../../components/color/spectra/index.js';
 import type { SpectrumKind } from '../../components/color/spectra/spectrumKind.js';
 import { SLIDER_KEYS, unknownKeysProblem, valueParamProblems } from '../../components/param.js';
 import type { SpectrumRole, RowConstraint, PropertySchema } from '../../components/descriptors.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, derivedFieldFedBy } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 
 /** The one interpreter of RowConstraint, with one message voice for every family's rows.
@@ -55,11 +55,10 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
     const report = (problems: string[]) => { for (const message of problems) bag.error('invalid-setting', message).add(); };
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.model !== 'none') {
-            const model = MATERIAL_MODELS[mat.model];
-            for (const field of model?.properties ?? []) {
+            for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
                 const value = (mat as unknown as Record<string, unknown>)[field.source];
                 const label = `Material '${name}': ${field.source}`;
-                const derived = model?.derived?.find((d) => d.inputs.includes(field.source));
+                const derived = derivedFieldFedBy(mat.model, field.source);
                 const kind = namedKindOf(value);
                 if (derived !== undefined && (kind !== undefined || isGlslExpression(value))) {
                     report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);

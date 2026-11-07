@@ -5,7 +5,7 @@
 // this registry + the Validator's unknown-model rejection gatekeep).
 
 import type { MaterialModel } from '../../compiler/types.js';
-import type { MaterialModelDescriptor, PropertySchema } from '../descriptors.js';
+import type { MaterialDerivedSpec, MaterialModelDescriptor, PropertySchema } from '../descriptors.js';
 import { lambertDescriptor } from './lambert/lambert.js';
 import { dielectricDescriptor } from './dielectric/dielectric.js';
 import { ggxDescriptor } from './ggx/ggx.js';
@@ -37,6 +37,13 @@ export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] 
             source: s.name, default: 0, storage: 'field',
         })),
     ];
+}
+
+/** The derived field (computed on the host by `fn`) that the model's row `source` feeds, if any.
+ *  A derived value is computed once per material from the row's numbers, so its inputs
+ *  take only a constant or a {param}, and cannot vary per instance. */
+export function derivedFieldFedBy(id: MaterialModel, source: string): MaterialDerivedSpec | undefined {
+    return MATERIAL_MODELS[id]?.derived?.find((d) => d.inputs.includes(source));
 }
 
 /** Lookup that throws on unregistered models — the Validator rejects them upstream
