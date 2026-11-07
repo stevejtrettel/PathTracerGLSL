@@ -20,6 +20,7 @@ import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
 import { spectralGrinSuite } from './scenes/spectralGrin.js';
 import { h3Suite } from './scenes/h3Witness.js';
 import { s3Suite } from './scenes/s3Witness.js';
+import { curvedSdfSuite } from './scenes/curvedSdfWitness.js';
 import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
@@ -166,6 +167,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralTrackingSuite,
     ...h3Suite,
     ...s3Suite,
+    ...curvedSdfSuite,
     'thinlens-zero': {
         scene: camCornell,
         strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),

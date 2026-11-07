@@ -353,9 +353,18 @@ export function apply(m: number[], v: V4): V4 {
 // ---------------------------------------------------------------------------
 
 /** The sculpture: two balls on the x axis smooth-unioned, and a tube along the y axis capped by two
- *  planes, smooth-unioned onto them. Its solid lies inside {min(pieces) ≤ k₁/4 + k₂/4}, within
- *  distance 0.7 of o in either space, so a ball of radius `bound` contains it. */
-export const SCULPTURE = { offset: 0.3, radius: 0.3, k1: 0.2, tube: 0.12, half: 0.45, k2: 0.1, bound: 0.8 };
+ *  planes, smooth-unioned onto them. */
+export const SCULPTURE = { offset: 0.3, radius: 0.3, k1: 0.2, tube: 0.12, halfLength: 0.45, k2: 0.1, bound: 0 };
+
+/** The sculpture's march bound: a ball about o containing {min(pieces) ≤ K}, K = (k₁ + k₂)/4. A ball
+ *  piece reaches offset + radius + K; a point of the capped tube's piece lies within tube + K of the
+ *  axis and within halfLength + K of o along it, so within halfLength + tube + 2K of o (the triangle inequality
+ *  through the foot of its perpendicular). */
+export function sculptureBound(v: { offset: number; radius: number; k1: number; tube: number; halfLength: number; k2: number }): number {
+    const K = (v.k1 + v.k2) / 4;
+    return Math.max(v.offset + v.radius + K, v.halfLength + v.tube + 2 * K);
+}
+SCULPTURE.bound = sculptureBound(SCULPTURE);
 
 export function sculptureField(S: Space): Field {
     const c1 = sdfPoint(S, [SCULPTURE.offset, 0, 0]), c2 = sdfPoint(S, [-SCULPTURE.offset, 0, 0]);
@@ -363,7 +372,7 @@ export function sculptureField(S: Space): Field {
     return (p) => {
         const balls = smoothUnion(sdfBall(S, p, c1, SCULPTURE.radius), sdfBall(S, p, c2, SCULPTURE.radius), SCULPTURE.k1);
         const tube = Math.max(sdfTube(S, p, O, Y, SCULPTURE.tube),
-            sdfPlane(S, p, [0, 1, 0], -SCULPTURE.half), sdfPlane(S, p, [0, -1, 0], -SCULPTURE.half));
+            sdfPlane(S, p, [0, 1, 0], -SCULPTURE.halfLength), sdfPlane(S, p, [0, -1, 0], -SCULPTURE.halfLength));
         return smoothUnion(balls, tube, SCULPTURE.k2);
     };
 }
