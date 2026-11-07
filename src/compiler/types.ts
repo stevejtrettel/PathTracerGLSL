@@ -328,16 +328,19 @@ export interface GaussianValue {
     gaussian: { center: number; width: number; peak: number; floor?: number };
 }
 
-/** A measured optical constant of a metal, by table name (color/spectra/measured/data.ts:
- *  `metal-<Ag|Al|Au|Cu|CuZn>-<eta|k>`, from pbrt-v4). Optical settings only. */
+/** A measured spectrum, by table name (color/spectra/measured/README.md): a metal's optical
+ *  constant (`metal-<Ag|Al|Au|Cu|CuZn>-<eta|k>`), a ColorChecker reflectance
+ *  (`colorchecker-<patch>`) or a CIE illuminant (`illuminant-<A|D65|FL2|FL11|LED-B3>`). Each table
+ *  goes in settings of its own role. `scale`, on illuminants only, is the reference CIE Y of the
+ *  emission (default 1), in renderer-relative units. */
 export interface MeasuredValue {
-    measured: string;
+    measured: { table: string; scale?: Value<number> };
 }
 
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
  * minus GlslExpression). The Model B split surface for radiometric values that are read at a
  * point but never vary spatially: light emission and the constant-env color. */
-export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
+export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
 export type MaterialProperty = ScalarProperty | SpectrumProperty | SpectralIndex;

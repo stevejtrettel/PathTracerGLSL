@@ -94,7 +94,7 @@ describe('spectrum kinds', () => {
         cauchy: { cauchy: [1.5, 0.004] },
         sellmeier: { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } },
         gaussian: { gaussian: { center: 610, width: 25, peak: 0.85, floor: 0.04 } },
-        measured: { measured: 'metal-Au-eta' },
+        measured: { measured: { table: 'illuminant-A', scale: 2 } },
     };
 
     it('every named kind has an example; its value is { <id>: … }, and its declared fields name every key', () => {

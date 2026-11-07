@@ -30,7 +30,7 @@ import { measuredKind, measuredValue } from '../../../src/components/color/spect
 import { conductorFresnel } from '../../../src/components/materials/conductor/fresnel.js';
 import { veachMis, veachMisStrategy, veachNeeStrategy, veachPtStrategy } from './ggxScenes.js';
 
-const metal = (m: string) => ({ eta: { measured: `metal-${m}-eta` }, k: { measured: `metal-${m}-k` } });
+const metal = (m: string) => ({ eta: { measured: { table: `metal-${m}-eta` } }, k: { measured: { table: `metal-${m}-k` } } });
 
 // ── conductor-gold ─────────────────────────────────────────────────────────────
 
@@ -42,8 +42,8 @@ function goldSpectral(c: number): Vec3 {
     return d65StandIn((l) => conductorFresnel(c, measuredValue('metal-Au-eta', l), measuredValue('metal-Au-k', l)));
 }
 function goldRGB(c: number): Vec3 {
-    const eta = measuredKind.toRGB({ measured: 'metal-Au-eta' }, 'optical', {}) as Vec3;
-    const k = measuredKind.toRGB({ measured: 'metal-Au-k' }, 'optical', {}) as Vec3;
+    const eta = measuredKind.toRGB({ measured: { table: 'metal-Au-eta' } }, 'optical', {}) as Vec3;
+    const k = measuredKind.toRGB({ measured: { table: 'metal-Au-k' } }, 'optical', {}) as Vec3;
     return [0, 1, 2].map((ch) => conductorFresnel(c, eta[ch], k[ch])) as Vec3;
 }
 export const GOLD_EXPECTED = {

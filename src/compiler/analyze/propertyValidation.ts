@@ -121,9 +121,10 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
     const beside = unknownKeysProblem(value, [kind.id]);
     if (beside !== null) return [`${label}: the ${kind.label} value has ${beside}`];
     if (setting.role === undefined || !kind.roles.includes(setting.role)) {
-        const role = kind.roles[0];
-        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role} form`];
+        const roles = kind.roles.length === 1 ? kind.roles[0] : `${kind.roles.slice(0, -1).join(', ')} or ${kind.roles[kind.roles.length - 1]}`;
+        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(roles) ? 'an' : 'a'} ${roles} form`];
     }
+    const role = setting.role;
     const problems: string[] = [];
     const fields = kind.fields;
     if (fields !== undefined) {
@@ -138,10 +139,14 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
         for (const [name, field] of Object.entries(fields)) {
             const number = (numbers as Record<string, unknown>)[name];
             if (number === undefined && field.optional) continue;
+            if (field.name) {
+                if (typeof number !== 'string') problems.push(`${label}: ${kind.label} ${name} must be a name`);
+                continue;
+            }
             problems.push(...numberProblems(number, field.triple ? 'vec3' : 'scalar', field.domain, `${label}: ${kind.label} ${name}`, field.slider ?? false));
         }
     }
-    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message));
+    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message), role);
     return problems;
 }
 

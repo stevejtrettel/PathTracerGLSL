@@ -90,14 +90,16 @@ How a program is assembled:
   `tests/compiler/compileOrder.test.ts` checks that strategy order changes nothing.
 - **Spectrum values have kinds** (components/color/spectra/, whose README is the contract):
   plain RGB (numbers, triples, `{param}`, expressions, per-instance attributes), blackbody,
-  Cauchy and Sellmeier. A kind answers every question the compiler asks about its values
+  Cauchy, Sellmeier, Gaussian and measured tables (metal η and κ, ColorChecker reflectances, CIE
+  illuminants). A kind answers every question the compiler asks about its values
   (allowed roles, live sliders, its own checks, RGB stand-in, GLSL). Outside that folder nothing
   tests for a particular kind (tests/components/spectrumKinds.test.ts). The slot's role
   (reflectance, coefficient, emission, index, optical) sets the domain, checked the same way in
   RGB and spectral programs; the spectral model adds only reflectance ≤ 1, the media ceilings
   and no RGB triple in an optical slot (a metal's η, κ).
   Temperature and brightness are decoupled: `kelvin` sets a blackbody's color, `scale` its
-  brightness.
+  brightness. An emission table, like a blackbody, is normalized to unit reference CIE Y, so
+  `scale` is its luminance.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.
@@ -235,7 +237,9 @@ How a program is assembled:
   (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
   use the same reflectance/emission domains. GRIN supports wavelength-independent index
   fields, absorbing/emitting fields and constant-coefficient scattering. Planck blackbody emission supports
-  constants/live controls and packed emitters in both modes. Surface dispersion uses
+  constants/live controls and packed emitters in both modes, as do the measured CIE illuminants
+  (A, D65, FL2, FL11, LED-B3); the 24 measured ColorChecker reflectances go in reflectance
+  slots. Surface dispersion uses
   one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
 - Tooling: the witness runner, shader dumps, CI.

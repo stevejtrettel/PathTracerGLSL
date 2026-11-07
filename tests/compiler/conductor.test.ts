@@ -12,7 +12,7 @@ import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.
 import { glslangCheck } from '../helpers/glslangCheck.js';
 
 const compiler = new Compiler();
-const GOLD = { eta: { measured: 'metal-Au-eta' }, k: { measured: 'metal-Au-k' } };
+const GOLD = { eta: { measured: { table: 'metal-Au-eta' } }, k: { measured: { table: 'metal-Au-k' } } };
 
 function scene(materials: Record<string, unknown>): SceneDescription {
     return { ...minimalScene, materials: { ...minimalScene.materials, ...materials } as SceneDescription['materials'] };

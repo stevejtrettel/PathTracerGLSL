@@ -728,8 +728,13 @@ function fieldExpr(f: number, vec3: boolean): string {
  *  (the ONE layout truth on both sides). */
 function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBaked, spectrumKinds: ProgramDescription['spectrumKinds'], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated light-table row loaders (fable-light-bvh §4) — mirror packLightTable'];
-    // Spectrum kinds this program evaluates that pack their own numbers into the row header.
-    const packedKinds = spectrumKinds.map(({ id }) => kindById(id)).filter((k) => k.packed !== undefined);
+    // Spectrum kinds this program evaluates that pack their own numbers into the row header, each
+    // with its reader for the values the program holds (none when no value can sit in a row).
+    const packedReads = spectrumKinds.flatMap(({ id, values }) => {
+        const packed = kindById(id).packed;
+        const read = packed?.read('emissionHeader', 'wl', values) ?? null;
+        return read === null ? [] : [{ code: packed!.code, read }];
+    });
     for (const kind of layout.kinds) {
         const d = LIGHT_KINDS[kind];
         const rows = [...d.params.map((r) => ({ vec3: r.shape === 'vec3', role: r.role })), ...(d.derivedFields ?? []).map((r) => ({ vec3: r.shape === 'vec3', role: undefined }))];
@@ -740,7 +745,7 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
         for (let t = 0; t < texels; t++) {
             lines.push(`    vec4 t${t} = texelFetch(u_data_records, data_texel1d(uint(rb + ${t})), 0);`);
         }
-        if (packedKinds.length > 0) lines.push('    vec4 emissionHeader = texelFetch(u_data_records, data_texel1d(uint(rb - 1)), 0);');
+        if (packedReads.length > 0) lines.push('    vec4 emissionHeader = texelFetch(u_data_records, data_texel1d(uint(rb - 1)), 0);');
         let f = 0;
         const args = rows.map(r => {
             const e = fieldExpr(f, r.vec3);
@@ -749,8 +754,8 @@ function generateLightRowLoaders(layout: LightTableLayout, slot: LightTreeSlotBa
             const rgb = emitSpectrum(glslValue(e), r.role, { wl: 'wl', color });
             if (r.role !== 'emission') return rgb;
             // A kind kept whole in the row header is read from it; otherwise the RGB payload.
-            return packedKinds.reduceRight((inner, k) =>
-                `(int(emissionHeader.y) == ${k.packed!.code} ? ${k.packed!.read('emissionHeader', 'wl')} : ${inner})`, rgb);
+            return packedReads.reduceRight((inner, k) =>
+                `(int(emissionHeader.y) == ${k.code} ? ${k.read} : ${inner})`, rgb);
         });
         lines.push(`    return ${lightStructName(kind)}(${args.join(', ')});`);
         lines.push('}');

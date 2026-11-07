@@ -783,6 +783,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-blackbody-tree 1`] =
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > spectral-colorchecker-d65 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-colored-furnace 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-comp-empty 1`] = `null`;
@@ -892,6 +894,13 @@ exports[`scene-data textures (byte fingerprints) > spectral-materials 1`] = `
 {
   "nodes": "4096x1 5fe3415bc91cdd80",
   "records": "4096x1 fb8c08c3814c9d0f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-measured-lamps 1`] = `
+{
+  "nodes": "4096x1 7bb8a806d83cff31",
+  "records": "4096x1 8ece9f215a148954",
 }
 `;
 

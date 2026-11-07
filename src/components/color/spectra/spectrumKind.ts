@@ -35,8 +35,12 @@ export interface MintContext {
 }
 
 /** One of a named kind's numbers, where they sit in an object. The compiler checks it like any
- *  other authored number: a constant (or, if allowed, a slider) whose values lie in `domain`. */
+ *  other authored number: a constant (or, if allowed, a slider) whose values lie in `domain`. A
+ *  field marked `name` is a string instead, and the kind's `validate` says which names it
+ *  knows. */
 export interface KindField {
+    /** It is a name (a string), not a number. */
+    name?: boolean;
     /** The values it may take, per component; absent means any finite number. */
     domain?: RowConstraint;
     /** It may be a slider `{ param, default, min?, max? }`. */
@@ -61,9 +65,10 @@ export interface SpectrumKind<V = unknown> {
     /** Its numbers, where they sit in an object (`{ <id>: { <field>: … } }`). The compiler
      *  checks their keys, their sliders and their domains. */
     fields?: Readonly<Record<string, KindField>>;
-    /** Rules that relate several of its numbers, or that `fields` cannot state, reported as
-     *  messages. Called only when the slot takes the kind and its fields are valid. */
-    validate?(value: V, label: string, report: (message: string) => void): void;
+    /** Rules that relate several of its numbers, or that `fields` cannot state (a value that
+     *  suits only some of the kind's roles), reported as messages. Called only when the slot,
+     *  of the given role, takes the kind and its fields are valid. */
+    validate?(value: V, label: string, report: (message: string) => void, role: SpectrumRole): void;
     /** The RGB stand-in at the given slider values: a triple for a radiometric or optical
      *  role, the index at indexReferenceNM for the index role. */
     toRGB(value: V, role: SpectrumRole, params: Record<string, unknown>): Vec3 | number;
@@ -86,10 +91,12 @@ export interface SpectrumKind<V = unknown> {
      *  the sliders and reads the kind only through its stand-in's uniform. */
     mint?(value: V, ctx: MintContext): void;
     /** Light-table rows keep the kind whole in the row header: `code` tags the header's
-     *  second float, `header` supplies its last two, and `read` evaluates them in GLSL. */
+     *  second float, `header` supplies its last two, and `read` evaluates them in GLSL for a row
+     *  holding one of `values` (the kind's values in the program, as for `glsl`), or is null when
+     *  none of `values` can sit in a light row. */
     packed?: {
         code: number;
         header(value: V): [number, number];
-        read(header: string, wl: string): string;
+        read(header: string, wl: string, values: readonly V[]): string | null;
     };
 }

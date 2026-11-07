@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { conductorFresnel } from '../conductor/fresnel.js';
 import { dielectricFresnel } from '../microfacet_energy/build.js';
-import { measuredNames, measuredValue } from '../../color/spectra/measured/measured.js';
+import { measuredNames, measuredRole, measuredValue } from '../../color/spectra/measured/measured.js';
 import {
     type V3, type TwinSample, alphaOf, dirOf, lcg, reflectEval, reflectPdf, reflectSample, samplerConsistency,
 } from '../microfacetTwin.js';
@@ -158,8 +158,8 @@ describe('rough_conductor §11.3 (twin of rough_conductor.glsl through the share
         expect(code).not.toContain('schlick_fresnel');
     });
 
-    it('every measured table is an optical constant the formula accepts (eta ≥ 0, kappa > 0)', () => {
-        for (const name of measuredNames) for (let lambda = 360; lambda <= 830; lambda += 1) {
+    it('every measured optical table is an optical constant the formula accepts (eta ≥ 0, kappa > 0)', () => {
+        for (const name of measuredNames.filter(n => measuredRole(n) === 'optical')) for (let lambda = 360; lambda <= 830; lambda += 1) {
             expect(measuredValue(name, lambda)).toBeGreaterThan(0);
         }
     });

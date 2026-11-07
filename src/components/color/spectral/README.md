@@ -5,7 +5,7 @@ with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
 instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
-Wavelength-independent GRIN and [Planck blackbody emission](../spectra/blackbody/README.md) are supported; Cauchy and Sellmeier indices are also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar, Cauchy and Sellmeier wavelength-dependent IOR; see the
+Wavelength-independent GRIN, [Planck blackbody emission](../spectra/blackbody/README.md) and [measured tables](../spectra/measured/README.md) (metal η and κ, ColorChecker reflectances, CIE illuminants) are supported; Cauchy and Sellmeier indices are also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar, Cauchy and Sellmeier wavelength-dependent IOR; see the
 [index/collapse contract](../spectra/cauchy/README.md).
 
 ## Measurement and sampling

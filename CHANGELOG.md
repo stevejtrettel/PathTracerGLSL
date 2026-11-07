@@ -4,6 +4,42 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Measured colors: ColorChecker reflectances and CIE illuminants
+
+The photorealism step "measured-colors": the `measured` kind now also covers the reflectance and
+emission roles, so scenes can use real measured surface colors and real light spectra.
+
+**What:**
+- `unitLuminanceStandIn(g)` (color/spectra/standIn.ts): blackbody's projection of an emission
+  spectrum at unit reference Y, now shared (separate refactor commit; digest identical).
+- 24 ColorChecker Classic reflectances (BabelColor average, 380–730 nm at 10 nm) and five CIE
+  illuminants (A and D65 every 5 nm over 360–830 nm, FL2, FL11 and LED-B3 at 5 nm over 380–780 nm)
+  in color/spectra/measured/colors.ts, written by tools/spectral/measured-colors.mjs from the
+  downloaded source files (source URLs in the file; each illuminant checked against
+  colour-science's copy).
+- The measured value is spelled `{ measured: { table, scale? } }` (was `{ measured: 'name' }`),
+  like every other named kind. Each table has its own role (metal → optical, patch → reflectance,
+  illuminant → emission); another role, an unknown table or a `scale` on a non-emission table is
+  an error. An illuminant is normalized to unit reference CIE Y and multiplied by `scale` (a
+  constant or a slider), the blackbody convention; D65 at scale 1 is RGB white.
+- A table not reaching 360 or 830 nm holds its end values (pbrt-v4's FromInterleaved).
+- RGB stand-ins: a patch's D65 projection (within 0.0020 of colour-science for all 24); an
+  illuminant's unit-luminance RGB times scale (D65 (1, 1, 1); A matches Planck at 2856 K).
+- Light tree: a measured illuminant on a light-table row keeps its table index and
+  scale × normalization in the row header (packed code 2); the reader chooses among the
+  program's illuminants.
+- Kind contract: a `fields` entry may be a name (a string); `validate` is given the slot's role;
+  `packed.read` is given the kind's values in the program and is null when none can sit in a
+  light row. `SpectrumValue` (light emission, sky color) takes any named kind.
+
+**Verified:** tests/components/measured.test.ts (patches against colour-science 0.4.4 within
+0.0025, measured worst 0.0020; normalizations against an independent quadrature, 1e-6; D65 white
+to 1e-5; A against Planck, 1e-4; search twin; linkage; light-table rows; validation),
+tests/compiler/measuredColors.test.ts, new spectrumDiagnostics cases. Digest: the 288 existing
+synchronous scenes identical; two witness scenes added. Witnesses `spectral-colorchecker-d65`
+(orange patch under a measured D65 sky, exact) and `spectral-measured-lamps` (A and FL11 quad
+lamps, power vs tree, NEE vs MIS).
+
 ## 2026-11-07 — Measured metals: `conductor`, `rough_conductor`, the `optical` role, the `measured` kind
 
 Integration step 12 of the photorealism batch (conductor plan and review; owner decision P1/Q3,
