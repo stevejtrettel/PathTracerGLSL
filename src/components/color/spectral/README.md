@@ -201,6 +201,11 @@ no runtime clamp. Parameter bounds describe the controls, not the resulting colo
 a negative phase parameter is valid when its formula still returns valid RGB.
 Expressions return RGB, not explicit wavelength-dependent spectra.
 
+A material expression may call the solid-noise functions `perlin_noise(vec3)`,
+`perlin_fbm(vec3, omega, octaves)` and `perlin_turbulence(vec3, omega, octaves)`
+(src/glsl/core/perlin.glsl, pbrt-v4's noise). The program includes them when some material
+row is an expression. Their header states the bounds that keep a formula inside its domain.
+
 Expression emission remains path-found under the existing light eligibility rules;
 it is not inserted into the finite-light sampling roster or light tree. PT, NEE and
 MIS all retain that hit-side contribution. Constant reference emitters must also set

@@ -650,6 +650,8 @@ exports[`scene-data textures (byte fingerprints) > proc-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > proc-sky-rotated 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > procedural-textures 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > rayleigh 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > region-overlap 1`] = `

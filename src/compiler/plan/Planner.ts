@@ -34,7 +34,7 @@ import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMes
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, materialHasExpression, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
@@ -647,6 +647,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // reading only `p` still turns charts on — correctness-safe (a uv-formula is NEVER
             // missed), slightly wasteful. Precise per-formula uv-detection is the noted follow-up.
             materialsReadUv: Object.keys(scene.materials).some((name) => materialReadsUv(name, scene)),
+            // The noise library, for the material formulas to call.
+            ...(Object.keys(scene.materials).some((name) => materialHasExpression(name, scene)) ? { noise: true as const } : {}),
         },
         media: {
             present: features.media.hasMedia,

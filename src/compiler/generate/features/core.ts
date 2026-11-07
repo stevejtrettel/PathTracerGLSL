@@ -18,6 +18,7 @@ import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../../../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
+import perlinGLSL from '../../../glsl/core/perlin.glsl?raw';
 import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
 
 /** The ambient occupant's block, from the registry (D3) — throws on an unregistered
@@ -110,6 +111,11 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
     if (plan.program.materials.models.some((m) => MATERIAL_MODELS[m]?.usesMicrofacet === true)) {
         blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
+    }
+    // Perlin noise for GLSL-expression material rows, ahead of the generated resolver
+    // that evaluates them.
+    if (plan.program.materials.noise === true) {
+        blocks.push({ origin: 'glsl/core/perlin.glsl', source: perlinGLSL });
     }
 
     return {

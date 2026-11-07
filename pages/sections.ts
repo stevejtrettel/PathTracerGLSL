@@ -136,7 +136,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Materials & texturing',
         blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos',
         entries: [
-            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'),
+            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
             e('expr-const', 'expr-const-ref'),
         ],
     },

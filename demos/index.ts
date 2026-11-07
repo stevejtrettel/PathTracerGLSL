@@ -26,6 +26,7 @@ import { sdfFieldScene, sdfFieldTableStrategy } from './sdfFieldScene.js';
 import { sdfKnotScene, sdfKnotStrategy } from './sdfKnotScene.js';
 import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfShapesScene.js';
 import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
+import { proceduralTexturesScene, proceduralTexturesStrategy } from './proceduralTexturesScene.js';
 import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
 import { glassLabScene, glassLabStrategies } from './glassLabScene.js';
 import { sssLabScene, sssStrategy, sssShortStrategy, sssNoScatterStrategy, sssPtStrategy } from './sssLabScene.js';
@@ -200,6 +201,19 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'DEMO — expression-driven materials (fable-imagery P2): albedo as a FORMULA over the surface chart `uv` (P1) and the shading point `p`, live sliders, zero recompiles. Left sphere = a cosine palette over uv (rainbow bands following the (θ,φ) chart); right sphere = a 3D sinusoid over the world point p (works chart-or-not). Same GlslExpression idiom the fog uses, pointed at material rows. Drag paint.freq. Keys 1 (pt-nee) / 2 (pt).',
         expected:
             'two spheres painted by math over a gray floor — the left one banded in rainbow stripes that wrap its surface, the right one a soft multicolor blob field; drag paint.freq to add bands/detail LIVE with no recompile; keys 1 and 2 converge',
+    },
+    'procedural-textures': {
+        scene: proceduralTexturesScene,
+        strategies: posed([0.35, 1.75, 4.2], [0, 0.75, 0], proceduralTexturesStrategy),
+        exercises:
+            'DEMO — the Perlin library (glsl/core/perlin.glsl, pbrt-v4 noise) called from albedo formulas at the '
+            + 'world point p: marble on a Menger sponge (sin bands shifted by fBm), wood rings on a torus, stone '
+            + 'speckle (turbulence) on a sphere. Solid noise needs no surface chart, so the fractal is textured '
+            + 'like any other surface.',
+        expected:
+            'a pale marble sponge with thin dark blue-gray veins that run continuously across its holes and faces, '
+            + 'a brown torus with concentric darker growth rings that wobble, and a gray speckled pebble, on a gray floor '
+            + 'under an overhead panel',
     },
     laser: {
         scene: laserScene,

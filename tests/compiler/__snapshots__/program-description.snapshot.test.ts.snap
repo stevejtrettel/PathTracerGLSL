@@ -8542,6 +8542,7 @@ exports[`ProgramDescription structural snapshot (the link map) > expr-const + pt
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
@@ -10477,6 +10478,7 @@ exports[`ProgramDescription structural snapshot (the link map) > fogcube + patht
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
@@ -26697,6 +26699,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt 1`] 
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
@@ -26805,6 +26808,7 @@ exports[`ProgramDescription structural snapshot (the link map) > paint + pt-nee 
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
@@ -30711,6 +30715,116 @@ exports[`ProgramDescription structural snapshot (the link map) > proc-sky-rotate
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > procedural-textures + pathtracer 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "color": [
+      0.1,
+      0.12,
+      0.16,
+    ],
+    "intensity": 1,
+    "type": "constant",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 4,
+    },
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": true,
+    "models": [
+      "lambert",
+    ],
+    "noise": true,
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "euclidean",
+    "camera": {
+      "fov": 0.8,
+      "position": [
+        0.35,
+        1.75,
+        4.2,
+      ],
+      "target": [
+        0,
+        0.75,
+        0,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "maxBounces": 6,
+    "maxNullCrossings": 32,
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > rayleigh + pathtracer 1`] = `
 {
   "dispersion": null,
@@ -30758,6 +30872,7 @@ exports[`ProgramDescription structural snapshot (the link map) > rayleigh + path
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
@@ -41837,6 +41952,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
@@ -41944,6 +42060,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
@@ -42048,6 +42165,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
@@ -42155,6 +42273,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": true,
@@ -42262,6 +42381,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": true,
     "surfacePdf": false,
@@ -42366,6 +42486,7 @@ exports[`ProgramDescription structural snapshot (the link map) > spectral-expres
     "models": [
       "lambert",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,
@@ -51719,6 +51840,7 @@ exports[`ProgramDescription structural snapshot (the link map) > submerged + pat
       "lambert",
       "dielectric",
     ],
+    "noise": true,
     "regionLookup": "baked",
     "surfaceEval": false,
     "surfacePdf": false,

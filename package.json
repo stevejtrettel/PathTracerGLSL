@@ -24,7 +24,8 @@
     "witness:spectral-bindings": "vite-node scripts/witness-spectral-bindings.ts",
     "witness:spectral-live": "node tools/witness-spectral-live.mjs",
     "witness:spectral-majorant": "vite-node scripts/witness-spectral-majorant.ts",
-    "witness:environment": "vite-node scripts/witness-environment.ts"
+    "witness:environment": "vite-node scripts/witness-environment.ts",
+    "witness:textures": "vite-node scripts/witness-textures.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

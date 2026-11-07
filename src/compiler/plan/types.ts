@@ -246,6 +246,10 @@ export interface MaterialsDesc {
     /** The `material_albedo` dispatch exists: some listed AOV requires it (its descriptor's
      *  `requires`). PRESENT only when true, so programs without it are unchanged. */
     albedo?: true;
+    /** The Perlin noise library (glsl/core/perlin.glsl) is included: some material row is a
+     *  GLSL expression, and expressions may call it. PRESENT only when true, so programs
+     *  without material expressions are unchanged. */
+    noise?: true;
 }
 
 export type LightingDesc =

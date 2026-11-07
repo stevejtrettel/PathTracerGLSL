@@ -4,6 +4,31 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Perlin noise for material expressions
+
+Photorealism integration step 4 (docs/claude-2026-11-review/photoreal/integration.md): Part A
+of the procedural-textures plan, with its review's must-fix items. Part B (the object-space
+point `q`) is deferred to its own plan.
+
+- **`src/glsl/core/perlin.glsl`**: `perlin_noise`, `perlin_fbm`, `perlin_turbulence`, a
+  transcription of pbrt-v4 `noise.cpp` at zero ray-differential footprint. That includes
+  Turbulence's `+0.2·ωⁿ` residual for the octaves pbrt leaves out (review F3). No octave
+  clamp: the octave count is part of the authored scene.
+- **Linkage**: included when some material row is a GLSL expression
+  (`materials.noise`, from `materialHasExpression`, which `materialReadsUv` now calls).
+  Medium expressions do not include it.
+- **Tests**: `tests/glsl/perlinTwin.ts` (fp32 twin, table parsed from the GLSL) matches pbrt's
+  compiled `noise.cpp` **bit for bit** on 300 points × 5 functions
+  (`tools/perlin-golden` → `tests/fixtures/perlin-pbrt-golden.json`); the table equals pbrt's
+  `NoisePerm`; the stated bounds hold on 10⁵ samples. `perlinLinkage.test.ts` checks
+  inclusion, absence and a glslang compile.
+- **GPU probe** `npm run witness:textures`: SwiftShader matches the twin exactly (max error 0)
+  at 4096 points, and an expression row read back through the generated resolver matches to
+  3.6e-8. A cubic fade (error 0.18) and a residual-free turbulence (error 0.16) are rejected.
+- **Demo** `procedural-textures`: marble on a Menger sponge, wood on a torus, stone on a sphere.
+- **Digest**: 267 of 275 scenes identical. The 7 scenes with material expressions differ by
+  exactly the perlin block and its source-map lines. `procedural-textures` is new.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.
