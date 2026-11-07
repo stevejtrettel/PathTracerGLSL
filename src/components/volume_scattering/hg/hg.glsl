@@ -5,17 +5,19 @@
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -30,13 +32,13 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }

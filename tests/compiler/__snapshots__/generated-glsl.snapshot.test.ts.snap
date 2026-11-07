@@ -22175,7 +22175,7 @@ bool material_has_medium(int mat);
 MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -22789,17 +22789,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -22814,20 +22816,20 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -23028,7 +23030,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -23338,99 +23340,99 @@ void main() {
         "startLine": 1062,
       },
       {
-        "endLine": 1157,
+        "endLine": 1159,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1115,
       },
       {
-        "endLine": 1161,
+        "endLine": 1163,
         "origin": "generated:medium-dispatch",
-        "startLine": 1158,
+        "startLine": 1160,
       },
       {
-        "endLine": 1175,
+        "endLine": 1177,
         "origin": "generated:medium-sample",
-        "startLine": 1162,
+        "startLine": 1164,
       },
       {
-        "endLine": 1186,
+        "endLine": 1188,
         "origin": "generated:medium-survival",
-        "startLine": 1176,
+        "startLine": 1178,
       },
       {
-        "endLine": 1194,
+        "endLine": 1196,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1187,
+        "startLine": 1189,
       },
       {
-        "endLine": 1214,
+        "endLine": 1216,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1195,
+        "startLine": 1197,
       },
       {
-        "endLine": 1218,
+        "endLine": 1220,
         "origin": "generated:environment",
-        "startLine": 1215,
+        "startLine": 1217,
       },
       {
-        "endLine": 1225,
+        "endLine": 1227,
         "origin": "generated:transport/light-query",
-        "startLine": 1219,
+        "startLine": 1221,
       },
       {
-        "endLine": 1245,
+        "endLine": 1247,
         "origin": "generated:transport/state",
-        "startLine": 1226,
+        "startLine": 1228,
       },
       {
-        "endLine": 1252,
+        "endLine": 1254,
         "origin": "generated:transport/combiner",
-        "startLine": 1246,
+        "startLine": 1248,
       },
       {
-        "endLine": 1258,
+        "endLine": 1260,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1253,
+        "startLine": 1255,
       },
       {
-        "endLine": 1267,
+        "endLine": 1269,
         "origin": "generated:transport/roulette",
-        "startLine": 1259,
+        "startLine": 1261,
       },
       {
-        "endLine": 1314,
+        "endLine": 1316,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1268,
+        "startLine": 1270,
       },
       {
-        "endLine": 1350,
+        "endLine": 1352,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1315,
+        "startLine": 1317,
       },
       {
-        "endLine": 1366,
+        "endLine": 1368,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1351,
+        "startLine": 1353,
       },
       {
-        "endLine": 1421,
+        "endLine": 1423,
         "origin": "generated:transport/walk",
-        "startLine": 1367,
+        "startLine": 1369,
       },
       {
-        "endLine": 1422,
+        "endLine": 1424,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1422,
+        "startLine": 1424,
       },
       {
-        "endLine": 1433,
+        "endLine": 1435,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1423,
+        "startLine": 1425,
       },
       {
-        "endLine": 1453,
+        "endLine": 1455,
         "origin": "generated:accumulation-main",
-        "startLine": 1434,
+        "startLine": 1436,
       },
     ],
   },
@@ -24232,9 +24234,9 @@ MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
-float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp);
+float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // lighting:
 LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);
@@ -24864,17 +24866,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -24889,26 +24893,26 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_eval(wi, wo, mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_eval(wi, wo, p, mp);
 }
-float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_pdf(wi, wo, mp);
+float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_pdf(wi, wo, p, mp);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -25174,10 +25178,10 @@ float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialP
     if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;
     return power_heuristic(ls.pdf, interaction_surface_pdf(mat, ls.wi, wo, hit, props));
 }
-float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {
+float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {
     // Balances against the phase density — no cosine anywhere (§2.2).
     if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;
-    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, m_evt));
+    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, p_evt, m_evt));
 }
 // ── Kernel record (generated): the ONE writer of T1's carried state ──
 // The query arrives from the SAME generated constructor the NEE call used at
@@ -25293,7 +25297,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -25345,7 +25349,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -25659,159 +25663,159 @@ void main() {
         "startLine": 1084,
       },
       {
-        "endLine": 1179,
+        "endLine": 1181,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1137,
       },
       {
-        "endLine": 1189,
+        "endLine": 1191,
         "origin": "generated:medium-dispatch",
-        "startLine": 1180,
+        "startLine": 1182,
       },
       {
-        "endLine": 1203,
+        "endLine": 1205,
         "origin": "generated:medium-sample",
-        "startLine": 1190,
+        "startLine": 1192,
       },
       {
-        "endLine": 1214,
+        "endLine": 1216,
         "origin": "generated:medium-survival",
-        "startLine": 1204,
+        "startLine": 1206,
       },
       {
-        "endLine": 1221,
+        "endLine": 1223,
         "origin": "generated:medium-transmittance",
-        "startLine": 1215,
+        "startLine": 1217,
       },
       {
-        "endLine": 1287,
+        "endLine": 1289,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1222,
+        "startLine": 1224,
       },
       {
-        "endLine": 1296,
+        "endLine": 1298,
         "origin": "generated:light-structs",
-        "startLine": 1288,
-      },
-      {
-        "endLine": 1338,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1297,
+        "startLine": 1290,
       },
       {
         "endLine": 1340,
-        "origin": "generated:light-accessors",
-        "startLine": 1339,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1299,
       },
       {
-        "endLine": 1347,
-        "origin": "generated:light-sampling",
+        "endLine": 1342,
+        "origin": "generated:light-accessors",
         "startLine": 1341,
       },
       {
-        "endLine": 1353,
+        "endLine": 1349,
+        "origin": "generated:light-sampling",
+        "startLine": 1343,
+      },
+      {
+        "endLine": 1355,
         "origin": "generated:light-of",
-        "startLine": 1348,
+        "startLine": 1350,
       },
       {
-        "endLine": 1358,
+        "endLine": 1360,
         "origin": "generated:lighting-pdf",
-        "startLine": 1354,
+        "startLine": 1356,
       },
       {
-        "endLine": 1366,
+        "endLine": 1368,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1359,
+        "startLine": 1361,
       },
       {
-        "endLine": 1386,
+        "endLine": 1388,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1367,
+        "startLine": 1369,
       },
       {
-        "endLine": 1390,
+        "endLine": 1392,
         "origin": "generated:environment",
-        "startLine": 1387,
+        "startLine": 1389,
       },
       {
-        "endLine": 1397,
+        "endLine": 1399,
         "origin": "generated:transport/light-query",
-        "startLine": 1391,
+        "startLine": 1393,
       },
       {
-        "endLine": 1422,
+        "endLine": 1424,
         "origin": "generated:transport/state",
-        "startLine": 1398,
+        "startLine": 1400,
       },
       {
-        "endLine": 1436,
+        "endLine": 1438,
         "origin": "components/transport/math_mis.glsl",
-        "startLine": 1423,
+        "startLine": 1425,
       },
       {
-        "endLine": 1458,
+        "endLine": 1460,
         "origin": "generated:transport/combiner",
-        "startLine": 1437,
+        "startLine": 1439,
       },
       {
-        "endLine": 1466,
+        "endLine": 1468,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1459,
+        "startLine": 1461,
       },
       {
-        "endLine": 1475,
+        "endLine": 1477,
         "origin": "generated:transport/roulette",
-        "startLine": 1467,
+        "startLine": 1469,
       },
       {
-        "endLine": 1522,
+        "endLine": 1524,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1476,
+        "startLine": 1478,
       },
       {
-        "endLine": 1526,
+        "endLine": 1528,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1523,
+        "startLine": 1525,
       },
       {
-        "endLine": 1562,
+        "endLine": 1564,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1527,
+        "startLine": 1529,
       },
       {
-        "endLine": 1578,
+        "endLine": 1580,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1563,
+        "startLine": 1565,
       },
       {
-        "endLine": 1608,
+        "endLine": 1610,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1579,
+        "startLine": 1581,
       },
       {
-        "endLine": 1627,
+        "endLine": 1629,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1609,
+        "startLine": 1611,
       },
       {
-        "endLine": 1684,
+        "endLine": 1686,
         "origin": "generated:transport/walk",
-        "startLine": 1628,
+        "startLine": 1630,
       },
       {
-        "endLine": 1685,
+        "endLine": 1687,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1685,
+        "startLine": 1687,
       },
       {
-        "endLine": 1696,
+        "endLine": 1698,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1686,
+        "startLine": 1688,
       },
       {
-        "endLine": 1716,
+        "endLine": 1718,
         "origin": "generated:accumulation-main",
-        "startLine": 1697,
+        "startLine": 1699,
       },
     ],
   },
@@ -26612,8 +26616,8 @@ MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // lighting:
 LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);
@@ -27239,17 +27243,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -27264,23 +27270,23 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_eval(wi, wo, mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_eval(wi, wo, p, mp);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -27520,7 +27526,7 @@ float combiner_w_env(PathState s) {
 float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {
     return 1.0;   // plain NEE: the light sample carries full weight
 }
-float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {
+float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {
     return 1.0;   // plain NEE at the medium site
 }
 // ── Kernel record (generated): the ONE writer of T1's carried state ──
@@ -27635,7 +27641,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -27687,7 +27693,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -28001,149 +28007,149 @@ void main() {
         "startLine": 1078,
       },
       {
-        "endLine": 1173,
+        "endLine": 1175,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1131,
       },
       {
-        "endLine": 1180,
+        "endLine": 1182,
         "origin": "generated:medium-dispatch",
-        "startLine": 1174,
+        "startLine": 1176,
       },
       {
-        "endLine": 1194,
+        "endLine": 1196,
         "origin": "generated:medium-sample",
-        "startLine": 1181,
+        "startLine": 1183,
       },
       {
-        "endLine": 1205,
+        "endLine": 1207,
         "origin": "generated:medium-survival",
-        "startLine": 1195,
+        "startLine": 1197,
       },
       {
-        "endLine": 1212,
+        "endLine": 1214,
         "origin": "generated:medium-transmittance",
-        "startLine": 1206,
+        "startLine": 1208,
       },
       {
-        "endLine": 1278,
+        "endLine": 1280,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1213,
+        "startLine": 1215,
       },
       {
-        "endLine": 1287,
+        "endLine": 1289,
         "origin": "generated:light-structs",
-        "startLine": 1279,
-      },
-      {
-        "endLine": 1329,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1288,
+        "startLine": 1281,
       },
       {
         "endLine": 1331,
-        "origin": "generated:light-accessors",
-        "startLine": 1330,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1290,
       },
       {
-        "endLine": 1338,
-        "origin": "generated:light-sampling",
+        "endLine": 1333,
+        "origin": "generated:light-accessors",
         "startLine": 1332,
       },
       {
-        "endLine": 1344,
+        "endLine": 1340,
+        "origin": "generated:light-sampling",
+        "startLine": 1334,
+      },
+      {
+        "endLine": 1346,
         "origin": "generated:light-of",
-        "startLine": 1339,
+        "startLine": 1341,
       },
       {
-        "endLine": 1352,
+        "endLine": 1354,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1345,
+        "startLine": 1347,
       },
       {
-        "endLine": 1372,
+        "endLine": 1374,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1353,
+        "startLine": 1355,
       },
       {
-        "endLine": 1376,
+        "endLine": 1378,
         "origin": "generated:environment",
-        "startLine": 1373,
+        "startLine": 1375,
       },
       {
-        "endLine": 1383,
+        "endLine": 1385,
         "origin": "generated:transport/light-query",
-        "startLine": 1377,
+        "startLine": 1379,
       },
       {
-        "endLine": 1403,
+        "endLine": 1405,
         "origin": "generated:transport/state",
-        "startLine": 1384,
+        "startLine": 1386,
       },
       {
-        "endLine": 1421,
+        "endLine": 1423,
         "origin": "generated:transport/combiner",
-        "startLine": 1404,
+        "startLine": 1406,
       },
       {
-        "endLine": 1427,
+        "endLine": 1429,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1422,
+        "startLine": 1424,
       },
       {
-        "endLine": 1436,
+        "endLine": 1438,
         "origin": "generated:transport/roulette",
-        "startLine": 1428,
+        "startLine": 1430,
       },
       {
-        "endLine": 1483,
+        "endLine": 1485,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1437,
+        "startLine": 1439,
       },
       {
-        "endLine": 1487,
+        "endLine": 1489,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1484,
+        "startLine": 1486,
       },
       {
-        "endLine": 1523,
+        "endLine": 1525,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1488,
+        "startLine": 1490,
       },
       {
-        "endLine": 1539,
+        "endLine": 1541,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1524,
+        "startLine": 1526,
       },
       {
-        "endLine": 1569,
+        "endLine": 1571,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1540,
+        "startLine": 1542,
       },
       {
-        "endLine": 1588,
+        "endLine": 1590,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1570,
+        "startLine": 1572,
       },
       {
-        "endLine": 1645,
+        "endLine": 1647,
         "origin": "generated:transport/walk",
-        "startLine": 1589,
+        "startLine": 1591,
       },
       {
-        "endLine": 1646,
+        "endLine": 1648,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1646,
+        "startLine": 1648,
       },
       {
-        "endLine": 1657,
+        "endLine": 1659,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1647,
+        "startLine": 1649,
       },
       {
-        "endLine": 1677,
+        "endLine": 1679,
         "origin": "generated:accumulation-main",
-        "startLine": 1658,
+        "startLine": 1660,
       },
     ],
   },
@@ -28941,7 +28947,7 @@ bool material_has_medium(int mat);
 MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -29574,17 +29580,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -29599,20 +29607,20 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -29813,7 +29821,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -30123,99 +30131,99 @@ void main() {
         "startLine": 1081,
       },
       {
-        "endLine": 1176,
+        "endLine": 1178,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1134,
       },
       {
-        "endLine": 1180,
+        "endLine": 1182,
         "origin": "generated:medium-dispatch",
-        "startLine": 1177,
+        "startLine": 1179,
       },
       {
-        "endLine": 1194,
+        "endLine": 1196,
         "origin": "generated:medium-sample",
-        "startLine": 1181,
+        "startLine": 1183,
       },
       {
-        "endLine": 1205,
+        "endLine": 1207,
         "origin": "generated:medium-survival",
-        "startLine": 1195,
+        "startLine": 1197,
       },
       {
-        "endLine": 1213,
+        "endLine": 1215,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1206,
+        "startLine": 1208,
       },
       {
-        "endLine": 1233,
+        "endLine": 1235,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1214,
+        "startLine": 1216,
       },
       {
-        "endLine": 1237,
+        "endLine": 1239,
         "origin": "generated:environment",
-        "startLine": 1234,
+        "startLine": 1236,
       },
       {
-        "endLine": 1244,
+        "endLine": 1246,
         "origin": "generated:transport/light-query",
-        "startLine": 1238,
+        "startLine": 1240,
       },
       {
-        "endLine": 1264,
+        "endLine": 1266,
         "origin": "generated:transport/state",
-        "startLine": 1245,
+        "startLine": 1247,
       },
       {
-        "endLine": 1271,
+        "endLine": 1273,
         "origin": "generated:transport/combiner",
-        "startLine": 1265,
+        "startLine": 1267,
       },
       {
-        "endLine": 1277,
+        "endLine": 1279,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1272,
+        "startLine": 1274,
       },
       {
-        "endLine": 1286,
+        "endLine": 1288,
         "origin": "generated:transport/roulette",
-        "startLine": 1278,
+        "startLine": 1280,
       },
       {
-        "endLine": 1333,
+        "endLine": 1335,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1287,
+        "startLine": 1289,
       },
       {
-        "endLine": 1369,
+        "endLine": 1371,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1334,
+        "startLine": 1336,
       },
       {
-        "endLine": 1385,
+        "endLine": 1387,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1370,
+        "startLine": 1372,
       },
       {
-        "endLine": 1440,
+        "endLine": 1442,
         "origin": "generated:transport/walk",
-        "startLine": 1386,
+        "startLine": 1388,
       },
       {
-        "endLine": 1441,
+        "endLine": 1443,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1441,
+        "startLine": 1443,
       },
       {
-        "endLine": 1452,
+        "endLine": 1454,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1442,
+        "startLine": 1444,
       },
       {
-        "endLine": 1472,
+        "endLine": 1474,
         "origin": "generated:accumulation-main",
-        "startLine": 1453,
+        "startLine": 1455,
       },
     ],
   },
@@ -31016,8 +31024,8 @@ MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // lighting:
 LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);
@@ -31662,17 +31670,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -31687,23 +31697,23 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_eval(wi, wo, mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_eval(wi, wo, p, mp);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -31943,7 +31953,7 @@ float combiner_w_env(PathState s) {
 float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {
     return 1.0;   // plain NEE: the light sample carries full weight
 }
-float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {
+float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {
     return 1.0;   // plain NEE at the medium site
 }
 // ── Kernel record (generated): the ONE writer of T1's carried state ──
@@ -32058,7 +32068,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -32110,7 +32120,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -32424,149 +32434,149 @@ void main() {
         "startLine": 1097,
       },
       {
-        "endLine": 1192,
+        "endLine": 1194,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1150,
       },
       {
-        "endLine": 1199,
+        "endLine": 1201,
         "origin": "generated:medium-dispatch",
-        "startLine": 1193,
+        "startLine": 1195,
       },
       {
-        "endLine": 1213,
+        "endLine": 1215,
         "origin": "generated:medium-sample",
-        "startLine": 1200,
+        "startLine": 1202,
       },
       {
-        "endLine": 1224,
+        "endLine": 1226,
         "origin": "generated:medium-survival",
-        "startLine": 1214,
+        "startLine": 1216,
       },
       {
-        "endLine": 1231,
+        "endLine": 1233,
         "origin": "generated:medium-transmittance",
-        "startLine": 1225,
+        "startLine": 1227,
       },
       {
-        "endLine": 1297,
+        "endLine": 1299,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1232,
+        "startLine": 1234,
       },
       {
-        "endLine": 1306,
+        "endLine": 1308,
         "origin": "generated:light-structs",
-        "startLine": 1298,
-      },
-      {
-        "endLine": 1348,
-        "origin": "components/lights/quad/quad.glsl",
-        "startLine": 1307,
+        "startLine": 1300,
       },
       {
         "endLine": 1350,
-        "origin": "generated:light-accessors",
-        "startLine": 1349,
+        "origin": "components/lights/quad/quad.glsl",
+        "startLine": 1309,
       },
       {
-        "endLine": 1357,
-        "origin": "generated:light-sampling",
+        "endLine": 1352,
+        "origin": "generated:light-accessors",
         "startLine": 1351,
       },
       {
-        "endLine": 1363,
+        "endLine": 1359,
+        "origin": "generated:light-sampling",
+        "startLine": 1353,
+      },
+      {
+        "endLine": 1365,
         "origin": "generated:light-of",
-        "startLine": 1358,
+        "startLine": 1360,
       },
       {
-        "endLine": 1371,
+        "endLine": 1373,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1364,
+        "startLine": 1366,
       },
       {
-        "endLine": 1391,
+        "endLine": 1393,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1372,
+        "startLine": 1374,
       },
       {
-        "endLine": 1395,
+        "endLine": 1397,
         "origin": "generated:environment",
-        "startLine": 1392,
+        "startLine": 1394,
       },
       {
-        "endLine": 1402,
+        "endLine": 1404,
         "origin": "generated:transport/light-query",
-        "startLine": 1396,
+        "startLine": 1398,
       },
       {
-        "endLine": 1422,
+        "endLine": 1424,
         "origin": "generated:transport/state",
-        "startLine": 1403,
+        "startLine": 1405,
       },
       {
-        "endLine": 1440,
+        "endLine": 1442,
         "origin": "generated:transport/combiner",
-        "startLine": 1423,
+        "startLine": 1425,
       },
       {
-        "endLine": 1446,
+        "endLine": 1448,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1441,
+        "startLine": 1443,
       },
       {
-        "endLine": 1455,
+        "endLine": 1457,
         "origin": "generated:transport/roulette",
-        "startLine": 1447,
+        "startLine": 1449,
       },
       {
-        "endLine": 1502,
+        "endLine": 1504,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1456,
+        "startLine": 1458,
       },
       {
-        "endLine": 1506,
+        "endLine": 1508,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1503,
+        "startLine": 1505,
       },
       {
-        "endLine": 1542,
+        "endLine": 1544,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1507,
+        "startLine": 1509,
       },
       {
-        "endLine": 1558,
+        "endLine": 1560,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1543,
+        "startLine": 1545,
       },
       {
-        "endLine": 1588,
+        "endLine": 1590,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1559,
+        "startLine": 1561,
       },
       {
-        "endLine": 1607,
+        "endLine": 1609,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1589,
+        "startLine": 1591,
       },
       {
-        "endLine": 1664,
+        "endLine": 1666,
         "origin": "generated:transport/walk",
-        "startLine": 1608,
+        "startLine": 1610,
       },
       {
-        "endLine": 1665,
+        "endLine": 1667,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1665,
+        "startLine": 1667,
       },
       {
-        "endLine": 1676,
+        "endLine": 1678,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1666,
+        "startLine": 1668,
       },
       {
-        "endLine": 1696,
+        "endLine": 1698,
         "origin": "generated:accumulation-main",
-        "startLine": 1677,
+        "startLine": 1679,
       },
     ],
   },
@@ -37643,7 +37653,7 @@ bool material_has_medium(int mat);
 MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
 // camera:
@@ -37981,17 +37991,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -38006,20 +38018,20 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -38153,7 +38165,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -38446,84 +38458,84 @@ void main() {
         "startLine": 784,
       },
       {
-        "endLine": 879,
+        "endLine": 881,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 837,
       },
       {
-        "endLine": 883,
+        "endLine": 885,
         "origin": "generated:medium-dispatch",
-        "startLine": 880,
+        "startLine": 882,
       },
       {
-        "endLine": 897,
+        "endLine": 899,
         "origin": "generated:medium-sample",
-        "startLine": 884,
+        "startLine": 886,
       },
       {
-        "endLine": 905,
+        "endLine": 907,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 898,
+        "startLine": 900,
       },
       {
-        "endLine": 925,
+        "endLine": 927,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 906,
+        "startLine": 908,
       },
       {
-        "endLine": 929,
+        "endLine": 931,
         "origin": "generated:environment",
-        "startLine": 926,
+        "startLine": 928,
       },
       {
-        "endLine": 936,
+        "endLine": 938,
         "origin": "generated:transport/light-query",
-        "startLine": 930,
+        "startLine": 932,
       },
       {
-        "endLine": 956,
+        "endLine": 958,
         "origin": "generated:transport/state",
-        "startLine": 937,
+        "startLine": 939,
       },
       {
-        "endLine": 963,
+        "endLine": 965,
         "origin": "generated:transport/combiner",
-        "startLine": 957,
+        "startLine": 959,
       },
       {
-        "endLine": 969,
+        "endLine": 971,
         "origin": "generated:transport/kernel-record",
-        "startLine": 964,
+        "startLine": 966,
       },
       {
-        "endLine": 1005,
+        "endLine": 1007,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 970,
+        "startLine": 972,
       },
       {
-        "endLine": 1021,
+        "endLine": 1023,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1006,
+        "startLine": 1008,
       },
       {
-        "endLine": 1074,
+        "endLine": 1076,
         "origin": "generated:transport/walk",
-        "startLine": 1022,
+        "startLine": 1024,
       },
       {
-        "endLine": 1075,
+        "endLine": 1077,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1075,
+        "startLine": 1077,
       },
       {
-        "endLine": 1086,
+        "endLine": 1088,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1076,
+        "startLine": 1078,
       },
       {
-        "endLine": 1106,
+        "endLine": 1108,
         "origin": "generated:accumulation-main",
-        "startLine": 1087,
+        "startLine": 1089,
       },
     ],
   },
@@ -42309,7 +42321,7 @@ bool material_has_medium(int mat);
 MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -42733,17 +42745,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -42758,20 +42772,20 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -42972,7 +42986,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -43272,99 +43286,99 @@ void main() {
         "startLine": 872,
       },
       {
-        "endLine": 967,
+        "endLine": 969,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 925,
       },
       {
-        "endLine": 971,
+        "endLine": 973,
         "origin": "generated:medium-dispatch",
-        "startLine": 968,
+        "startLine": 970,
       },
       {
-        "endLine": 985,
+        "endLine": 987,
         "origin": "generated:medium-sample",
-        "startLine": 972,
+        "startLine": 974,
       },
       {
-        "endLine": 996,
+        "endLine": 998,
         "origin": "generated:medium-survival",
-        "startLine": 986,
+        "startLine": 988,
       },
       {
-        "endLine": 1004,
+        "endLine": 1006,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 997,
+        "startLine": 999,
       },
       {
-        "endLine": 1024,
+        "endLine": 1026,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1005,
+        "startLine": 1007,
       },
       {
-        "endLine": 1028,
+        "endLine": 1030,
         "origin": "generated:environment",
-        "startLine": 1025,
+        "startLine": 1027,
       },
       {
-        "endLine": 1035,
+        "endLine": 1037,
         "origin": "generated:transport/light-query",
-        "startLine": 1029,
+        "startLine": 1031,
       },
       {
-        "endLine": 1055,
+        "endLine": 1057,
         "origin": "generated:transport/state",
-        "startLine": 1036,
+        "startLine": 1038,
       },
       {
-        "endLine": 1062,
+        "endLine": 1064,
         "origin": "generated:transport/combiner",
-        "startLine": 1056,
+        "startLine": 1058,
       },
       {
-        "endLine": 1068,
+        "endLine": 1070,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1063,
+        "startLine": 1065,
       },
       {
-        "endLine": 1077,
+        "endLine": 1079,
         "origin": "generated:transport/roulette",
-        "startLine": 1069,
+        "startLine": 1071,
       },
       {
-        "endLine": 1124,
+        "endLine": 1126,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1078,
+        "startLine": 1080,
       },
       {
-        "endLine": 1160,
+        "endLine": 1162,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1125,
+        "startLine": 1127,
       },
       {
-        "endLine": 1176,
+        "endLine": 1178,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1161,
+        "startLine": 1163,
       },
       {
-        "endLine": 1231,
+        "endLine": 1233,
         "origin": "generated:transport/walk",
-        "startLine": 1177,
+        "startLine": 1179,
       },
       {
-        "endLine": 1232,
+        "endLine": 1234,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1232,
+        "startLine": 1234,
       },
       {
-        "endLine": 1243,
+        "endLine": 1245,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1233,
+        "startLine": 1235,
       },
       {
-        "endLine": 1263,
+        "endLine": 1265,
         "origin": "generated:accumulation-main",
-        "startLine": 1244,
+        "startLine": 1246,
       },
     ],
   },
@@ -44161,8 +44175,8 @@ MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // lighting:
 LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);
@@ -44597,17 +44611,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -44622,23 +44638,23 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_eval(wi, wo, mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_eval(wi, wo, p, mp);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -44845,7 +44861,7 @@ float combiner_w_env(PathState s) {
 float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {
     return 1.0;   // plain NEE: the light sample carries full weight
 }
-float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {
+float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {
     return 1.0;   // plain NEE at the medium site
 }
 // ── Kernel record (generated): the ONE writer of T1's carried state ──
@@ -44960,7 +44976,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -45012,7 +45028,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -45316,144 +45332,144 @@ void main() {
         "startLine": 887,
       },
       {
-        "endLine": 982,
+        "endLine": 984,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 940,
       },
       {
-        "endLine": 989,
+        "endLine": 991,
         "origin": "generated:medium-dispatch",
-        "startLine": 983,
+        "startLine": 985,
       },
       {
-        "endLine": 1003,
+        "endLine": 1005,
         "origin": "generated:medium-sample",
-        "startLine": 990,
+        "startLine": 992,
       },
       {
-        "endLine": 1014,
+        "endLine": 1016,
         "origin": "generated:medium-survival",
-        "startLine": 1004,
+        "startLine": 1006,
       },
       {
-        "endLine": 1021,
+        "endLine": 1023,
         "origin": "generated:medium-transmittance",
-        "startLine": 1015,
+        "startLine": 1017,
       },
       {
-        "endLine": 1087,
+        "endLine": 1089,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1022,
+        "startLine": 1024,
       },
       {
-        "endLine": 1092,
+        "endLine": 1094,
         "origin": "generated:light-structs",
-        "startLine": 1088,
-      },
-      {
-        "endLine": 1116,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 1093,
+        "startLine": 1090,
       },
       {
         "endLine": 1118,
-        "origin": "generated:light-accessors",
-        "startLine": 1117,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 1095,
       },
       {
-        "endLine": 1125,
-        "origin": "generated:light-sampling",
+        "endLine": 1120,
+        "origin": "generated:light-accessors",
         "startLine": 1119,
       },
       {
-        "endLine": 1133,
+        "endLine": 1127,
+        "origin": "generated:light-sampling",
+        "startLine": 1121,
+      },
+      {
+        "endLine": 1135,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1126,
+        "startLine": 1128,
       },
       {
-        "endLine": 1153,
+        "endLine": 1155,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1134,
+        "startLine": 1136,
       },
       {
-        "endLine": 1157,
+        "endLine": 1159,
         "origin": "generated:environment",
-        "startLine": 1154,
+        "startLine": 1156,
       },
       {
-        "endLine": 1164,
+        "endLine": 1166,
         "origin": "generated:transport/light-query",
-        "startLine": 1158,
+        "startLine": 1160,
       },
       {
-        "endLine": 1184,
+        "endLine": 1186,
         "origin": "generated:transport/state",
-        "startLine": 1165,
+        "startLine": 1167,
       },
       {
-        "endLine": 1197,
+        "endLine": 1199,
         "origin": "generated:transport/combiner",
-        "startLine": 1185,
+        "startLine": 1187,
       },
       {
-        "endLine": 1203,
+        "endLine": 1205,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1198,
+        "startLine": 1200,
       },
       {
-        "endLine": 1212,
+        "endLine": 1214,
         "origin": "generated:transport/roulette",
-        "startLine": 1204,
+        "startLine": 1206,
       },
       {
-        "endLine": 1259,
+        "endLine": 1261,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1213,
+        "startLine": 1215,
       },
       {
-        "endLine": 1263,
+        "endLine": 1265,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1260,
+        "startLine": 1262,
       },
       {
-        "endLine": 1299,
+        "endLine": 1301,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1264,
+        "startLine": 1266,
       },
       {
-        "endLine": 1315,
+        "endLine": 1317,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1300,
+        "startLine": 1302,
       },
       {
-        "endLine": 1345,
+        "endLine": 1347,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1316,
+        "startLine": 1318,
       },
       {
-        "endLine": 1364,
+        "endLine": 1366,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1346,
+        "startLine": 1348,
       },
       {
-        "endLine": 1421,
+        "endLine": 1423,
         "origin": "generated:transport/walk",
-        "startLine": 1365,
+        "startLine": 1367,
       },
       {
-        "endLine": 1422,
+        "endLine": 1424,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1422,
+        "startLine": 1424,
       },
       {
-        "endLine": 1433,
+        "endLine": 1435,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1423,
+        "startLine": 1425,
       },
       {
-        "endLine": 1453,
+        "endLine": 1455,
         "origin": "generated:accumulation-main",
-        "startLine": 1434,
+        "startLine": 1436,
       },
     ],
   },
@@ -50260,7 +50276,7 @@ bool material_is_emissive(int mat);
 bool material_has_medium(int mat);
 MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // pixel:
 vec2 pixel_sample(vec2 coord, vec2 xi);
@@ -50814,17 +50830,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -50839,20 +50857,20 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -51053,7 +51071,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -51363,99 +51381,99 @@ void main() {
         "startLine": 1004,
       },
       {
-        "endLine": 1099,
+        "endLine": 1101,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1057,
       },
       {
-        "endLine": 1103,
+        "endLine": 1105,
         "origin": "generated:medium-dispatch",
-        "startLine": 1100,
+        "startLine": 1102,
       },
       {
-        "endLine": 1117,
+        "endLine": 1119,
         "origin": "generated:medium-sample",
-        "startLine": 1104,
+        "startLine": 1106,
       },
       {
-        "endLine": 1128,
+        "endLine": 1130,
         "origin": "generated:medium-survival",
-        "startLine": 1118,
+        "startLine": 1120,
       },
       {
-        "endLine": 1136,
+        "endLine": 1138,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1129,
+        "startLine": 1131,
       },
       {
-        "endLine": 1156,
+        "endLine": 1158,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1137,
+        "startLine": 1139,
       },
       {
-        "endLine": 1160,
+        "endLine": 1162,
         "origin": "generated:environment",
-        "startLine": 1157,
+        "startLine": 1159,
       },
       {
-        "endLine": 1167,
+        "endLine": 1169,
         "origin": "generated:transport/light-query",
-        "startLine": 1161,
+        "startLine": 1163,
       },
       {
-        "endLine": 1187,
+        "endLine": 1189,
         "origin": "generated:transport/state",
-        "startLine": 1168,
+        "startLine": 1170,
       },
       {
-        "endLine": 1194,
+        "endLine": 1196,
         "origin": "generated:transport/combiner",
-        "startLine": 1188,
+        "startLine": 1190,
       },
       {
-        "endLine": 1200,
+        "endLine": 1202,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1195,
+        "startLine": 1197,
       },
       {
-        "endLine": 1209,
+        "endLine": 1211,
         "origin": "generated:transport/roulette",
-        "startLine": 1201,
+        "startLine": 1203,
       },
       {
-        "endLine": 1256,
+        "endLine": 1258,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1210,
+        "startLine": 1212,
       },
       {
-        "endLine": 1292,
+        "endLine": 1294,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1257,
+        "startLine": 1259,
       },
       {
-        "endLine": 1308,
+        "endLine": 1310,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1293,
+        "startLine": 1295,
       },
       {
-        "endLine": 1358,
+        "endLine": 1360,
         "origin": "generated:transport/walk",
-        "startLine": 1309,
+        "startLine": 1311,
       },
       {
-        "endLine": 1359,
+        "endLine": 1361,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1359,
+        "startLine": 1361,
       },
       {
-        "endLine": 1370,
+        "endLine": 1372,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1360,
+        "startLine": 1362,
       },
       {
-        "endLine": 1390,
+        "endLine": 1392,
         "origin": "generated:accumulation-main",
-        "startLine": 1371,
+        "startLine": 1373,
       },
     ],
   },
@@ -55699,8 +55717,8 @@ MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl);
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi);
 bool is_null_interface(int mat);
 Spectrum medium_transmittance(int med, Ray ray, float len);
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi);
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp);
 Spectrum medium_survival(int med, Point p, Wavelengths wl);
 // lighting:
 LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl);
@@ -56276,17 +56294,19 @@ Spectrum medium_transmittance_analytic(MediumProperties m, float len) {
 // its own book footnotes the divergence from the scattering literature — do NOT "fix" this
 // file against PBRT: mixing the conventions swaps forward/backward scattering AND desyncs
 // eval from sample (the second-pass audit caught exactly this).
-// Raw dot() is forced here: the pinned §3.5 signature carries no Point, so the metric seam
-// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize). The sampling basis is core math's
+// build_basis, a Euclidean construction (vec3 cross); a curved space needs the tangent frame at
+// p instead (ambient_frame).
 
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
     float g = mp.phase_g;
-    float c = dot(wi, -wo);                           // cos from the FORWARD (propagation) direction
+    float c = ambient_dot(wi, -wo, p);                // cos from the FORWARD (propagation) direction
     float d = 1.0 + g * g - 2.0 * g * c;
     return Spectrum((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta;
     if (abs(g) < 1e-3) {
@@ -56301,23 +56321,23 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     build_basis(-wo, t, b);                           // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1 exactly: HG sampling is exact (§2.1)
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
 
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) {
-    return spectrum_average(hg_eval(wi, wo, mp));
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return spectrum_average(hg_eval(wi, wo, p, mp));
 }
 
 // Generated volume-scattering dispatch (interaction_medium_* over mp.model)
-InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {
-    return hg_sample(wo, mp, xi);
+InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
+    return hg_sample(wo, p, mp, xi);
 }
-Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {
-    return hg_eval(wi, wo, mp);
+Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    return hg_eval(wi, wo, p, mp);
 }
 // Generated volumetric-component dispatch (seam 1, fable-volumetric-component §2)
 MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi) {
@@ -56524,7 +56544,7 @@ float combiner_w_env(PathState s) {
 float combiner_w_light(int mat, LightSample ls, Direction wo, Hit hit, MaterialProperties props) {
     return 1.0;   // plain NEE: the light sample carries full weight
 }
-float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {
+float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {
     return 1.0;   // plain NEE at the medium site
 }
 // ── Kernel record (generated): the ONE writer of T1's carried state ──
@@ -56639,7 +56659,7 @@ void kernel_sample_phase(inout PathState s, int med_mat, Point p_evt, Direction 
     // Phase sample (§3.5): both current occupants (hg, rayleigh) sample their density
     // exactly, so weight is SPECTRUM_ONE; an inexact phase sampler would carry its
     // ratio in ps.weight and this line already honors it.
-    InteractionSample ps = interaction_medium_sample(wo_med, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
+    InteractionSample ps = interaction_medium_sample(wo_med, p_evt, scene_medium_properties(med_mat, p_evt, s.ray.wl), random2());
     s.throughput *= ps.weight;
     kernel_record(s, ps.pdf, light_query_medium(p_evt), false);
     s.ray = make_ray(p_evt, ps.wi, s.ray.wl);   // continue from the event — no surface offset
@@ -56691,7 +56711,7 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }
 
 // ── The walk (generated): pt over media — the estimator's table of contents ──
@@ -57000,144 +57020,144 @@ void main() {
         "startLine": 1029,
       },
       {
-        "endLine": 1124,
+        "endLine": 1126,
         "origin": "components/volume_scattering/hg/hg.glsl",
         "startLine": 1082,
       },
       {
-        "endLine": 1131,
+        "endLine": 1133,
         "origin": "generated:medium-dispatch",
-        "startLine": 1125,
+        "startLine": 1127,
       },
       {
-        "endLine": 1145,
+        "endLine": 1147,
         "origin": "generated:medium-sample",
-        "startLine": 1132,
+        "startLine": 1134,
       },
       {
-        "endLine": 1156,
+        "endLine": 1158,
         "origin": "generated:medium-survival",
-        "startLine": 1146,
+        "startLine": 1148,
       },
       {
-        "endLine": 1163,
+        "endLine": 1165,
         "origin": "generated:medium-transmittance",
-        "startLine": 1157,
+        "startLine": 1159,
       },
       {
-        "endLine": 1229,
+        "endLine": 1231,
         "origin": "components/transport/shadow/media/media.glsl",
-        "startLine": 1164,
+        "startLine": 1166,
       },
       {
-        "endLine": 1234,
+        "endLine": 1236,
         "origin": "generated:light-structs",
-        "startLine": 1230,
-      },
-      {
-        "endLine": 1258,
-        "origin": "components/lights/point/point.glsl",
-        "startLine": 1235,
+        "startLine": 1232,
       },
       {
         "endLine": 1260,
-        "origin": "generated:light-accessors",
-        "startLine": 1259,
+        "origin": "components/lights/point/point.glsl",
+        "startLine": 1237,
       },
       {
-        "endLine": 1267,
-        "origin": "generated:light-sampling",
+        "endLine": 1262,
+        "origin": "generated:light-accessors",
         "startLine": 1261,
       },
       {
-        "endLine": 1275,
+        "endLine": 1269,
+        "origin": "generated:light-sampling",
+        "startLine": 1263,
+      },
+      {
+        "endLine": 1277,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1268,
+        "startLine": 1270,
       },
       {
-        "endLine": 1295,
+        "endLine": 1297,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1276,
+        "startLine": 1278,
       },
       {
-        "endLine": 1299,
+        "endLine": 1301,
         "origin": "generated:environment",
-        "startLine": 1296,
+        "startLine": 1298,
       },
       {
-        "endLine": 1306,
+        "endLine": 1308,
         "origin": "generated:transport/light-query",
-        "startLine": 1300,
+        "startLine": 1302,
       },
       {
-        "endLine": 1326,
+        "endLine": 1328,
         "origin": "generated:transport/state",
-        "startLine": 1307,
+        "startLine": 1309,
       },
       {
-        "endLine": 1339,
+        "endLine": 1341,
         "origin": "generated:transport/combiner",
-        "startLine": 1327,
+        "startLine": 1329,
       },
       {
-        "endLine": 1345,
+        "endLine": 1347,
         "origin": "generated:transport/kernel-record",
-        "startLine": 1340,
+        "startLine": 1342,
       },
       {
-        "endLine": 1354,
+        "endLine": 1356,
         "origin": "generated:transport/roulette",
-        "startLine": 1346,
+        "startLine": 1348,
       },
       {
-        "endLine": 1401,
+        "endLine": 1403,
         "origin": "generated:transport/roulette-interior",
-        "startLine": 1355,
+        "startLine": 1357,
       },
       {
-        "endLine": 1405,
+        "endLine": 1407,
         "origin": "generated:transport/shadow-crossings",
-        "startLine": 1402,
+        "startLine": 1404,
       },
       {
-        "endLine": 1441,
+        "endLine": 1443,
         "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1406,
+        "startLine": 1408,
       },
       {
-        "endLine": 1457,
+        "endLine": 1459,
         "origin": "components/transport/techniques/kernel/kernel_phase.glsl",
-        "startLine": 1442,
+        "startLine": 1444,
       },
       {
-        "endLine": 1487,
+        "endLine": 1489,
         "origin": "components/transport/techniques/light/light.glsl",
-        "startLine": 1458,
+        "startLine": 1460,
       },
       {
-        "endLine": 1506,
+        "endLine": 1508,
         "origin": "components/transport/techniques/light/light_medium.glsl",
-        "startLine": 1488,
+        "startLine": 1490,
       },
       {
-        "endLine": 1563,
+        "endLine": 1565,
         "origin": "generated:transport/walk",
-        "startLine": 1507,
+        "startLine": 1509,
       },
       {
-        "endLine": 1564,
+        "endLine": 1566,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1564,
+        "startLine": 1566,
       },
       {
-        "endLine": 1575,
+        "endLine": 1577,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1565,
+        "startLine": 1567,
       },
       {
-        "endLine": 1595,
+        "endLine": 1597,
         "origin": "generated:accumulation-main",
-        "startLine": 1576,
+        "startLine": 1578,
       },
     ],
   },

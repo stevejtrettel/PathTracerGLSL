@@ -82,14 +82,14 @@ export function combinerFns(f: Flags): ShaderBlock {
         lines.push('}');
 
         if (f.scattering && !f.equiangular) {
-            lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {');
+            lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {');
             if (f.mis) {
                 lines.push(
                     '    // Balances against the phase density — no cosine anywhere (§2.2).',
                     '    if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;',
                     // The DISPATCH is the seam (matches light.ts's requires) — calling a
                     // per-model pdf here broke any non-hg medium under mis (unlinkable).
-                    '    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, m_evt));',
+                    '    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, p_evt, m_evt));',
                 );
             } else {
                 lines.push('    return 1.0;   // plain NEE at the medium site');

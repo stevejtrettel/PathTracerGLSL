@@ -296,13 +296,13 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // The dispatch is the public seam (transport calls it); the per-model funcs
             // (hg_*/rayleigh_*) are internal, called only by the dispatch in this feature.
             provides.push(
-                { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi)' },
+                { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi)' },
             );
             if (media.mediumEval) {
-                provides.push({ name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp)' });
+                provides.push({ name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp)' });
             }
             if (media.mediumPdf) {
-                provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' });
+                provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp)' });
             }
             if (media.weightedAbsorptionArms) {
                 // Exists ONLY where a weighted arm leaves a survival owed — an all-tracked
@@ -628,17 +628,17 @@ function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: 
         return out;
     };
     const lines: string[] = ['// Generated volume-scattering dispatch (interaction_medium_* over mp.model)'];
-    lines.push('InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {');
-    lines.push(...arms((m) => `${m}_sample(wo, mp, xi)`));
+    lines.push('InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {');
+    lines.push(...arms((m) => `${m}_sample(wo, p, mp, xi)`));
     lines.push('}');
     if (wantsEval) {
-        lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {');
-        lines.push(...arms((m) => `${m}_eval(wi, wo, mp)`));
+        lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_eval(wi, wo, p, mp)`));
         lines.push('}');
     }
     if (wantsPdf) {
-        lines.push('float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {');
-        lines.push(...arms((m) => `${m}_pdf(wi, wo, mp)`));
+        lines.push('float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_pdf(wi, wo, p, mp)`));
         lines.push('}');
     }
     return lines.join('\n');

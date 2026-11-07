@@ -114,6 +114,13 @@ direction with `ambient_dot`, dots between the resulting local vectors are raw `
 `microfacet_from_local` normalizes the recombined world vector with `ambient_normalize` at the
 frame's point.
 
+Phase functions work in world space at the scattering event, so they take its point:
+`<id>_eval(wi, wo, p, mp)`, `<id>_sample(wo, p, mp, xi)`, `<id>_pdf(wi, wo, p, mp)` and the
+generated `interaction_medium_*` dispatch over them. The phase-angle cosine is
+`ambient_dot(wi, -wo, p)`, and a sampled direction is normalized with `ambient_normalize` at `p`.
+Their sampling basis is core math's `build_basis`, a Euclidean construction
+(components/volume_scattering/README.md).
+
 ## Updated signatures (vs the current slice)
 
 ```glsl

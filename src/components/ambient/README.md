@@ -51,8 +51,8 @@ locals inside component bodies (the cameras' look-at frames, for one) still say 
 
 Sole occupant: `euclidean/`. Several places are Euclidean beyond the seam and need new
 bodies in a curved space, not just a new occupant: the light samplers (Euclidean solid-angle
-constructions; their files carry a METRIC EXEMPTION note), the phase functions (no point
-argument; `build_basis`), the SDF march and the similarity-placement arms, the camera frame
+constructions; their files carry a METRIC EXEMPTION note), the phase functions' sampling
+basis (`build_basis`), the SDF march and the similarity-placement arms, the camera frame
 uniforms, the environment samplers, and equiangular placement (extrinsic closest-approach
 geometry).
 
