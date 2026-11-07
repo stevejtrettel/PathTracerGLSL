@@ -4,6 +4,66 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Seifert–Weber GPU witnesses, a walk counter and a demo (quotients plan Q2.6)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Q2.6 witnesses 1–3. The first renders of a
+Seifert–Weber program.
+
+**What was built:**
+- `seifert-weber-windows` (tests/witnesses/scenes/seifertWeberWitness.ts): three emissive spheres
+  of different colors at generic positions in D, pt, maxBounces 0, farClip 6, fov 0.5. Eleven pixel
+  windows are certified by a float64 twin (tests/helpers/seifertWeberTwin.ts) with a one-pixel
+  margin as seeing one sphere through 0, 1, 2 or 3 face crossings, or nothing within the far clip.
+  The twin builds Γ from the closed forms itself, lists the cells that can meet each window's view
+  cone by a breadth-first search over face-adjacent cells, and intersects every pixel ray with every
+  sphere image in them (brute force over the cover, not the walk); it also walks each certified ray
+  in float64 and requires the walk's cell to be the image's. tests/witnesses/seifertWeberWindows.test.ts
+  re-derives every window from the scene as authored.
+- `seifert-weber-lights`: a disk light 0.62 along face 0's direction facing the face (so D is lit
+  mostly by its copies across the faces; the copy across face 1 shines in through face 1) and three
+  lambert balls; pt = pt-nee = pt-mis, maxBounces 3, farClip 8, 256 spp.
+- The runner's `walk-counter` check (tools/witness.mjs `renderWalkCounter`, report only): the
+  strategy's own program with counters added at fixed anchors of the generated Seifert–Weber walk
+  (the render fails if an anchor is missing): capped segments, the most faces one segment crossed,
+  the largest constraint drift after a crossing.
+- Demo `seifert-weber-room` in the gallery's "Curved spaces" section: beads in D's 20 corners and at
+  its 30 edge midpoints, set as close to the faces as the Validator allows, so around every vertex of
+  the tiling 20 corner beads meet in a node and around every edge 5 beads close into a ring; a
+  two-sided lamp at the center (two disk lights back to back) and two small balls; pt-mis and pt,
+  farClip 6.
+- `pixelWindowRegion` (tests/witnesses/types.ts): the runner region of a pixel window, now shared by
+  the torus fog windows and these.
+
+**Measured (SwiftShader, WITNESS_PORT 3208):**
+- `seifert-weber-windows`: 11 of 11 windows exact (each reads its sphere's emission to 4 digits, or
+  0). With TWIST = π/5 in place of 3π/5, 6 of 11 fail: the five crossing windows the twin predicts
+  and one miss window. The two crossing windows that still pass both cross faces 1, 8, 10: the two
+  twists differ by a 1/5 turn, a symmetry of D, and along that face path the inserted symmetries
+  compose to the identity (the wrong walk meets the same sphere at the same arc length to 1e-14 in
+  the twin). The plan's sentence "moves every image beyond 2r_in" was corrected accordingly.
+- `seifert-weber-lights`: pt-nee ≡ pt-mis Δmean 0.00%, χ²ᵣ 0.01; pt tripwire Δmean 0.00%, rmse
+  20.6% (gate 25%); σ/µ pt-mis 18.1%, pt 19.7%. With the image index off by one (`first_face` for
+  `1 + first_face` in quotient_image_index) the frame means differ by 2.58% and both
+  equality checks fail. Under the pinned salt pt-nee and pt-mis draw the same numbers, so their χ²
+  stays near 0 (0.03) even under that bug: the 1% mean gate is what catches it. An earlier light
+  (radius 0.22, normal mostly along the face) let the same bug through (Δmean 0.08%) and failed the
+  pt tripwire on noise (rmse 33%); that is why the light faces the face.
+- Walk counter: windows (160×120×16 camera rays, cap 56): 0 capped segments, at most 11 faces in a
+  segment, drift ≤ 9.5e-6; lights (160×120×256 pt-mis paths with bounce and shadow segments, cap 64):
+  0 capped, at most 17 faces, drift ≤ 1.14e-5. With the cap set to 6 it counted 24,880 capped camera
+  segments (at most 7 faces), so it counts.
+- Non-quotient output: no program source changed (the only file under src/ touched is the
+  seifert-weber.md note). `npm run digest` on HEAD (exported tree) against this tree: 295 of 295
+  existing scenes identical in every part; the three new scenes are the only additions. Frames were
+  not recorded: no code a frame case compiles changed.
+- Vitest (full suite, load average 22–30): 4,714 passed, 5 timed out (5 s limit; no assertion
+  failed) in 4 files, which pass with --testTimeout=300000 (1,188 of 1,188); 9 snapshots written,
+  all additions for the three new scenes. tsc clean. The new seifertWeberWindows.test.ts: 19 of 19.
+
+**Open:** neither scene has been in a full sweep. The M2 GPU's builtins and FMA contraction are
+still not measured (the counter runs only on SwiftShader here). The demo was composed on
+SwiftShader renders at 320×240 and up to 96 spp only.
+
 ## 2026-11-07 — The Seifert–Weber space: group data, walk, image-aware NEE (quotients plan Q2 core)
 
 [Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q2: Q2.1–Q2.3, Q2.5 and vitest

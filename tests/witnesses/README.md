@@ -72,6 +72,28 @@ are computed by the fp64 twin `scenes/s3Twins.ts` (space-free parts in `scenes/c
 independent Monte Carlo estimate, the blocker's position on every long arc and the lights' absence
 from every camera ray's geodesic. Not yet in a full sweep.
 
+## Closed-manifold witnesses (Seifert–Weber)
+
+`scenes/seifertWeberWitness.ts`: `seifert-weber-windows` (three emissive spheres of different
+colors in the dodecahedral domain, pt, maxBounces 0, farClip 6; eleven pixel windows that the
+float64 twin `tests/helpers/seifertWeberTwin.ts` certifies, by brute force over the sphere images in
+the cover with a one-pixel margin, as seeing one sphere through 0, 1, 2 or 3 face crossings, or
+nothing within the far clip, so each reads that sphere's emission exactly, or 0) and
+`seifert-weber-lights` (a disk light near face 0 facing the face, so D is lit mostly by its copies
+across the faces, and three lambert balls; pt = pt-nee = pt-mis, maxBounces 3, farClip 8).
+`seifertWeberWindows.test.ts` re-derives every window from the scene as authored. Each can fail:
+with a twist of 1/10 turn in place of 3/10, 6 of the 11 windows read wrong (the twin predicts the
+five crossing windows; the other two crossing windows lie on a face path along which the two twists
+agree, since they differ by a symmetry of D); with the image index off by one (`first_face` for
+`1 + first_face`) the frame means differ by 2.6%. Under the pinned salt pt-nee and pt-mis
+draw the same numbers, so their χ² stays near 0 even then; the mean gate is what catches it.
+
+Both scenes carry a `walk-counter` row (report only): the runner adds counters to the program's
+own Seifert–Weber walk (`renderWalkCounter` in tools/witness.mjs, at fixed anchors in the generated
+text, failing if one is missing) and reports the segments that reached the crossing cap, the most
+faces one segment crossed, and the largest constraint drift after a crossing. With the cap set to
+6 it counts 24,880 capped camera segments, so it can count.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

@@ -40,12 +40,14 @@ export const gallerySections: GallerySection[] = [
         title: 'Curved spaces',
         blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, curved light falloff, the sky at infinity) and spherical space S³ (two arcs between any two points, the antipodal lens, no sky)',
         entries: [e('hyperbolic'), e('h3-furnace'), e('h3-disk-light'), e('h3-point-light'), e('h3-medium'), e('h3-sky'), e('h3-sky-ball'),
-            e('spherical'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium')],
+            e('spherical'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium'),
+            e('seifert-weber-room')],
     },
     {
         title: 'Closed manifolds',
-        blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face; in vacuum and in a homogeneous fog',
-        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights'), e('torus-fog'), e('torus-crystal-fog', 'torus-crystal-fog-ref'), e('torus-lights-fog')],
+        blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face, in vacuum and in a homogeneous fog; and the Seifert–Weber dodecahedral space, a closed hyperbolic manifold',
+        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights'), e('torus-fog'), e('torus-crystal-fog', 'torus-crystal-fog-ref'), e('torus-lights-fog'),
+            e('seifert-weber-windows'), e('seifert-weber-lights')],
     },
     {
         title: 'Instance clouds',

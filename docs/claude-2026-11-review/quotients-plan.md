@@ -4,7 +4,8 @@
 **Status:** Milestone Q1 (the cube 3-torus: Q1a in vacuum, Q1b with a homogeneous fog) is built
 on branch `quotient` (CHANGELOG 2026-11-07). Milestone Q2's core (Q2.1–Q2.3, Q2.5 and vitest 1–3
 of Q2.6) is built on branch `sw`, with decision 1 taken at this plan's recommendation (both `Hit`
-fields in Q2), provisionally; Q2.6's GPU witnesses are not built yet. Model-written for the owner. This is the draft
+fields in Q2), provisionally; Q2.6's GPU witnesses 1–3 and a demo are built there too (CHANGELOG
+2026-11-07). Model-written for the owner. This is the draft
 (`quotients/plan.md`) revised after two independent reviews: `quotients/review-0.md`
 (correctness: estimator, group theory, truncations) and `quotients/review-1.md` (simplicity and
 fit to the code). Every must-fix item of both reviews is applied; the table at the end says
@@ -760,7 +761,9 @@ All of these are float32 simulated with `Math.fround`
    - **Windows:** windows certified, with a one-pixel margin, as fully covered by one sphere image
      seen through 0, 1, 2 and 3 or more crossings, plus windows of misses.
    - **Check:** `mean` equals that sphere's Le (or 0). A twist of 1/10 turn in place of 3/10
-     moves every image beyond 2r_in.
+     changes most windows seen across a face, not every one: the two twists differ by a 1/5 turn,
+     a symmetry of D, so along some face paths the wrong walk meets the same image (measured on
+     the built witness: 6 of 11 windows fail).
 2. **Estimator equality:** pt = pt-nee = pt-mis with a disk light near a face (membership
    changes across the frame), lambert balls, maxBounces 3, farClip 8. Gates as Q1 witness 2.
 3. **Cap counter, report only** (review-0 S3): a debug count of capped segments on the GPU, since

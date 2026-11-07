@@ -35,6 +35,7 @@ import { originalPresetsScene, originalPresetsStrategy, originalPresetsDeepStrat
 import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { torusRoomScene, torusRoomStrategy, torusRoomPtStrategy } from './torusScene.js';
+import { seifertWeberRoomScene, seifertWeberRoomStrategy, seifertWeberRoomPtStrategy } from './seifertWeberScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
 import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
 import { spectralShowcaseScene, spectralShowcaseStrategies } from './spectralShowcaseScene.js';
@@ -79,6 +80,18 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             + 'the floor and the backdrop are ultraparallel, so the sky shows between them. Keys 1/2/3 = pt-mis / pt-nee / pt '
             + '(same image). The orbit and fly controls move the pose in exp coordinates (not isometric motion yet).',
         expected: 'warm light pooling on the floor under the lamp, soft contact shadows, balls shrinking quickly with distance, a strip of blue sky between the floor and the backdrop',
+    },
+    'seifert-weber-room': {
+        scene: seifertWeberRoomScene,
+        strategies: posed([0.45, 0.4, 0.6], [-0.4, -0.1, -0.6], seifertWeberRoomStrategy, seifertWeberRoomPtStrategy),
+        exercises:
+            'DEMO — the Seifert–Weber space H³/Γ (components/quotient/seifert-weber): a closed hyperbolic manifold whose '
+            + 'cell is a regular dodecahedron with 72° dihedral angles, opposite faces glued with a 3/10 twist. Beads in the '
+            + 'cell\'s corners and at its edge midpoints trace the tiling of H³ by copies of the cell (pale nodes of twenty '
+            + 'around every vertex, teal rings of five around every edge); a two-sided lamp hangs at the center beside two '
+            + 'small balls. NEE samples one of 13 images of each lamp face (partition MIS); farClip 6. Keys 1/2 = pt-mis / pt '
+            + '(same image).',
+        expected: 'the lamp at the center of a cage of pale nodes joined by teal rings, the cage repeating outward and shrinking quickly into a fine lattice',
     },
     spherical: {
         scene: sphericalScene,

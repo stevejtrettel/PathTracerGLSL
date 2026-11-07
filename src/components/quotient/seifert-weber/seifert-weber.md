@@ -84,6 +84,13 @@ every point x of D, so the far clip must be at least that (the Validator's floor
   `atanh` on [0, tanh 2R_c] within 2.4e-7 absolute (an arc-length error only; the geometry uses τ
   directly), `inversesqrt` within 9e-8 relative. Unlike S³'s sin and cos, they need no
   replacement here.
+- **In the rendered programs** (SwiftShader, the witness runner's `walk-counter`, which adds
+  counters to the program's own walk): over the 160×120×16 camera rays of
+  `seifert-weber-windows` (farClip 6, cap 56) no segment reached the cap, at most 11 faces were
+  crossed in one segment, and the constraint drift after a crossing stayed at most 9.5e-6; over the
+  160×120×256 pt-mis paths of `seifert-weber-lights` (camera, bounce and shadow segments, farClip
+  8, cap 64) no segment reached the cap, at most 17 faces were crossed, and the drift stayed at
+  most 1.1e-5.
 - **Not measured:** the M2 GPU, and FMA contraction there.
 
 ## The camera
