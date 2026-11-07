@@ -69,3 +69,18 @@ by more than the spawn offset; S³ uses its own `spherical_cos_sin` (error ≤ 7
 Open for the owner: `spherical_light_arc` (a light-sampling choice) lives in the S³ ambient
 occupant; a reviewer suggests a lights-family helper. Transformed groups are an error in curved
 spaces (flattenGroups does not compose isometries yet). App orbit/fly controls are not isometric.
+
+## 2026-11-07 — photorealism (branches `photo-materials`, `photo-camera`, `photo-textures`)
+
+Plans: photoreal/ (eight plans, their reviews, integration.md). Each step reviewed; fixes applied.
+
+| branch | steps (commits) | notes |
+|---|---|---|
+| photo-materials | guards (fe1d428, 552d7f8); plastic (3581715); derived fields (e311c71); frames GGX/rough-glass cases (ada5a8f); energy compensation `measurement.microfacet` (5026bc1, ae1eed0); thin_dielectric (55deaf9, e83eb54); sheen (a2121a3 bug fix, 73ab929); GGX lobe extracted (0a5d531, 3b20506); conductor + rough_conductor with pbrt-v4 metal tables, 'optical' role, 'measured' kind (dafb913, e03b5be, 08ff27b); measured colors: ColorChecker, CIE A/D65/FL2/FL11/LED-B3 (268e241, 8a52887) | rough_conductor is single-scattering only (rejected under energy compensation until its F_avg gain is built); `{ measured: { table, scale? } }` spelling is provisional |
+| photo-camera | Gaussian filter + thinLensFromPhoto (633cd0d, e1eac80); bladed aperture + white balance (094def8, 3a0aa84) | white balance source is Planck at every temperature (not pbrt's daylight locus above 4000 K) |
+| photo-textures | Perlin (6dade9a); procedural bump (69ced33, 2552c8a); image textures, RGBA8 array (c82e49e); Poly Haven trial assets, offline glTF→OBJ (1f396e1, dc80497) | roughness/normal maps are fetched but unread (need per-hit derived rows and a tangent on Hit) |
+
+Integration branch `integrate` (../PTG-integrate): quotient, photo-camera, photo-textures, and
+photo-materials at e83eb54 merged; `npm run shoot` (real-GPU renders, b9a9a6a); six photographic
+scenes (f6782f8), renders in renders/photo/ (gitignored). Materials after e83eb54 (sheen, metals,
+measured colors) and branch `curved` are not merged there yet.
