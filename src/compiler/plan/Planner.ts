@@ -40,7 +40,7 @@ import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authore
 import { planDataLayout } from '../../components/data/ledger.js';
 import { curvedGeometryOf } from '../../components/ambient/index.js';
 import { placementIsometry, type CurvedGeometry } from '../../components/ambient/isometry.js';
-import { curvedShape, curvedLightValues } from './curved.js';
+import { curvedShape, curvedLightValues, curvedConstantPlacement } from './curved.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
@@ -918,10 +918,12 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
  *  g = T(position)·R(rotation)·T(point row), baked when the transform is constant, a mat4 uniform
  *  when it is {param}-driven. */
 function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; isometry: IsometryPlacement } {
-    const { parameters, pre } = curvedShape(type, rawParameters);
-    if (isDrivenTransform(transform)) return { parameters, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
-    const g = placementOf(transform);
-    return { parameters, isometry: { kind: 'constant', inverse: geom.inverse(placementIsometry(geom, g.translation, g.rotation, pre)) } };
+    if (isDrivenTransform(transform)) {
+        const { parameters, pre } = curvedShape(type, rawParameters);
+        return { parameters, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
+    }
+    const { parameters, g } = curvedConstantPlacement(geom, type, rawParameters, transform);
+    return { parameters, isometry: { kind: 'constant', inverse: geom.inverse(g) } };
 }
 
 /** The curved-space lowering of a driven transform: one mat4 uniform `u_object<i>Isometry`, the

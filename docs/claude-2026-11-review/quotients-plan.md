@@ -2,7 +2,9 @@
 
 **Date:** 2026-11-07
 **Status:** Milestone Q1 (the cube 3-torus: Q1a in vacuum, Q1b with a homogeneous fog) is built
-on branch `quotient` (CHANGELOG 2026-11-07); Q2 is not. Model-written for the owner. This is the draft
+on branch `quotient` (CHANGELOG 2026-11-07). Milestone Q2's core (Q2.1–Q2.3, Q2.5 and vitest 1–3
+of Q2.6) is built on branch `sw`, with decision 1 taken at this plan's recommendation (both `Hit`
+fields in Q2), provisionally; Q2.6's GPU witnesses are not built yet. Model-written for the owner. This is the draft
 (`quotients/plan.md`) revised after two independent reviews: `quotients/review-0.md`
 (correctness: estimator, group theory, truncations) and `quotients/review-1.md` (simplicity and
 fit to the code). Every must-fix item of both reviews is applied; the table at the end says

@@ -7,8 +7,9 @@ pick-at-most-one — `scene.ambientSpace.quotient`, absent for the space X itsel
 ## What an occupant supplies
 
 A descriptor (`<kind>.ts`, registered by one line in `index.ts`: the space it acts on, |S|, the
-domain's diameter, its defines) and one static GLSL file, included whole after the ambient
-occupant. The file is pure group math with no calls into the program:
+far clip's floor, its defines and const tables, whether it supports an ambient fog, and for a
+curved space its placement test and camera reduction) and one static GLSL file, included whole
+after the ambient occupant. The file is pure group math with no calls into the program:
 
 ```glsl
 int        quotient_image_index(...);                     // the NEE-table index of the image a
@@ -41,6 +42,9 @@ image j through the maps, and the walk names the image a BSDF ray hit through th
   outside S, so that BSDF hit keeps weight 1, and otherwise runs the existing pdf at the moved
   stored query. pt-nee's emitter weight is 1 for a hit outside S too (combiner.ts).
 - `MAX_DIST` is the measurement's `farClip`, required in quotients.
+- **The camera pose** of a quotient whose walk needs every ray to start in D (Seifert–Weber) is
+  moved into D on the CPU by the group (the descriptor's `reduceCamera`), its frame carried
+  along. The torus walk starts anywhere.
 - **Reduced medium vertices** (pt.ts, programs with media): a medium arm reports its event point
   in the chart of the ray's origin, possibly many cells away, and the walk moves it to the
   equivalent point of D (`quotient_reduce`) before NEE, the phase sample and the next segment;
@@ -85,8 +89,8 @@ carries 0.
 
 ## Validator rules
 
-No delta lights (BSDF rays cannot find their images outside S), no environment, `farClip ≥
-2·diam(D)` (every image in S is reachable by a BSDF ray), no unbounded primitives, no driven
+In the torus: no delta lights (BSDF rays cannot find their images outside S), no environment,
+`farClip ≥ 2·diam(D)` (every image in S is reachable by a BSDF ray), no unbounded primitives, no driven
 placements, and every object inside D by `EPS_INTERFACE`, except an unrotated box that spans
 whole periods on some axes (a wall or a beam; it is lattice-invariant along them). Emitters must
 lie inside D.
@@ -103,11 +107,26 @@ vertex by the light's position in D (`lighting_query_delta`) and samples none of
 also needs delta lights, which a quotient rejects; the quotient rule stands on its own, so
 relaxing either rule cannot make it a silent bias.
 
+In the Seifert–Weber space: no delta lights, no environment, `farClip ≥ 2R_c + 2r_in = 5.80`
+(every image in S13 lies within it of every point of D), no unbounded primitives, no driven
+placements, every object's and light's bounding ball (center g·o, radius the shape's
+`ballBound`) inside D by `EPS_INTERFACE` (⟨N_i, c⟩ ≤ −sinh(r + m) for every face; no exception
+for objects spanning faces, which would need copies on both sides), and no media at all (fog in
+this quotient needs medium state carried across faces). An emissive object is reached by BSDF
+rays only (`sampleAsLight: false`; H³ does not sample emissive objects as lights), with weight 1,
+which is unbiased.
+
+The bias ledger adds one item here: the walk's crossing cap `QUOTIENT_MAX_CROSSINGS` =
+⌈4·farClip⌉ + 32 ends a segment that would cross more faces (a miss, or occluded for a shadow
+ray), so it only ever removes light. It has no proof in H³ (the torus bound is a theorem); it is
+set far above the measured maximum (seifert-weber/seifert-weber.md).
+
 ## Occupants
 
 - `torus/` — the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), |S| = 27.
+- `seifert-weber/` — the Seifert–Weber dodecahedral space H³/Γ, |S| = 13.
 
 The design and its evidence (the derivations, the float64 Monte Carlo twins and the float32 walk
-twin) are in docs/claude-2026-11-review/quotients-plan.md (Milestone Q1) and the folder
+twin) are in docs/claude-2026-11-review/quotients-plan.md (Milestones Q1 and Q2) and the folder
 docs/claude-2026-11-review/quotients/; the twins the vitest suite keeps are in
 tests/components/quotient/.

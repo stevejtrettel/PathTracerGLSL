@@ -50,4 +50,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
         const r = v.radius as number;
         return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
     },
+    // Every point of the disk is within its radius of its center (a geodesic disk in a curved
+    // space: the points of its plane within geodesic distance radius of the center).
+    ballBound: (v) => v.radius as number,
 };

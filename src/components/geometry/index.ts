@@ -109,6 +109,14 @@ export function primitiveBounds(type: string, values: PrimitiveValues): AABB | n
     return null;
 }
 
+/** The radius of a ball about the primitive's point row that contains it (`ballBound`), or null
+ *  when the primitive declares none (or is unregistered). */
+export function primitiveBallBound(type: string, values: PrimitiveValues): number | null {
+    const d = PRIMITIVES[type];
+    if (d?.ballBound === undefined) return null;
+    return d.ballBound(resolvePrimitiveValues(d, values));
+}
+
 /** The primitives whose `<type>_interval` a marched `type` calls, in chain order: its march
  *  bound (an analytic object of a possibly different primitive), that bound's own bound, and
  *  so on, until a bound is 'self' or 'unbounded'. Empty when the march needs no other

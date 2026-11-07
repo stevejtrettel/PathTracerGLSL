@@ -11,8 +11,9 @@
 import type { PrimitiveValues } from '../../components/descriptors.js';
 import type { LightKindDescriptor, LightRowValue } from '../../components/descriptors.js';
 import { canonicalizePrimitiveParameters, primitive } from '../../components/geometry/index.js';
-import { IDENTITY_QUAT, type Vec3Tuple } from '../../components/geometry/similarity.js';
-import { ORIGIN, mat4Apply, placementIsometry, tangentAtOrigin, type CurvedGeometry } from '../../components/ambient/isometry.js';
+import { IDENTITY_QUAT, similarityFromTransform, type Vec3Tuple } from '../../components/geometry/similarity.js';
+import { ORIGIN, mat4Apply, placementIsometry, tangentAtOrigin, type CurvedGeometry, type Mat4 } from '../../components/ambient/isometry.js';
+import type { Transform } from '../types.js';
 
 /** The one point row of a set of rows, or undefined when there is none. The shapes and lights
  *  with curved bodies have at most one point row; more would need a design for which one the
@@ -31,6 +32,14 @@ export function curvedShape(type: string, rawParameters: PrimitiveValues): { par
     if (point === undefined) return { parameters: canonical, pre: [0, 0, 0] };
     const { [point]: pre, ...parameters } = canonical;
     return { parameters, pre: pre as Vec3Tuple };
+}
+
+/** A curved object's canonical parameters and its placement isometry
+ *  g = T(position)·R(rotation)·T(point row) under a constant transform. */
+export function curvedConstantPlacement(geom: CurvedGeometry, type: string, rawParameters: PrimitiveValues, transform: Transform | undefined): { parameters: PrimitiveValues; g: Mat4 } {
+    const { parameters, pre } = curvedShape(type, rawParameters);
+    const s = similarityFromTransform(transform);
+    return { parameters, g: placementIsometry(geom, s.translation, s.rotation, pre) };
 }
 
 /** A light's rows in a curved space: its point row (the anchor, at most one) mapped to g·o and its
