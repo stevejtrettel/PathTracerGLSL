@@ -25,6 +25,9 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
   and the renormalized crossing (static GLSL); the 13-image table (0: the light in D, 1 + f: its
   copy across face f, seen from `PAIRING[f]·x`, directions carried back by `PAIRING[f xor 1]`)
   and the crossing-count image index; the camera pose reduced into D on the CPU (`swReduce`).
+  Image-aware MIS moves only the query, not the departure direction the plan's Q2.3 first
+  listed (`PAIRING[f]·wi`): the cover's pdf reads the light point and `wo` at the emitter (the
+  reversed `hit.arrival`), both already in D's chart. The plan line now says so.
 - **The generated walk** (intersection.ts): the cell query clipped at the exit face, then the
   crossing; `hit.t` summed, `hit.image` from the crossings (0, 1 + first face, or −1);
   `QUOTIENT_MAX_CROSSINGS = ⌈4·farClip⌉ + 32`, a miss for `scene_intersect` and occluded for

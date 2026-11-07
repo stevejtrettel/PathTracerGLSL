@@ -667,7 +667,11 @@ checked-num review-0/rerun.out: shadowMaxCross 1].
 The image maps for NEE and MIS have the same shape as Q1, with matrices in place of shifts:
 - For j = 1 + f, the query becomes (`PAIRING[f]·q.p`, `PAIRING[f]·q.n`).
 - NEE maps the sampled direction back with `PAIRING[f ^ 1]`.
-- MIS moves the departure direction the same way: `PAIRING[f]·wi`.
+- MIS moves only the query. It reads no departure direction at q.p: the cover's pdf takes the
+  light point and `wo` at the emitter (the reversed `hit.arrival`), both already in D's chart, so
+  the moved query and the emitter hit give NEE's density for image j. (An earlier draft of this
+  line moved the departure direction by `PAIRING[f]·wi`; the build found it unnecessary, since
+  the H³ pdfs read `wo` at the emitter.)
 
 Moved query points lie within about 4.1 of o, where coordinates are at most about 31 [math].
 

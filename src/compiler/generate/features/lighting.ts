@@ -963,17 +963,21 @@ function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBak
 // ============================================================================
 // Image-aware NEE and MIS in a quotient (components/quotient/README.md, partition MIS)
 // ============================================================================
-// A lamp in D is seen from x along one geodesic per image. NEE picks image j of the occupant's
-// table S uniformly and runs the cover's sampler for the lights in D at the query moved by image
-// j's map: the lamp's image j seen from x is the lamp seen from x − shift(j), and directions and
-// distances are invariant under the translation. The image is drawn with a fresh random() (the
+// A lamp in D is seen from x along one geodesic per image. Image j of the occupant's table S is
+// g_j⁻¹L, the lamp L in D carried by a deck isometry g_j, and d(x, g_j⁻¹y) = d(g_j x, y): the
+// image seen from x is the lamp in D seen from the moved query g_j x. NEE picks j uniformly, runs
+// the cover's sampler for the lights in D at quotient_image_query(q, j), and carries the sampled
+// direction back to q.p with quotient_image_direction(j, ·) (the identity in the 3-torus, where
+// g_j is a translation). The distance needs no map. The image is drawn with a fresh random() (the
 // light tree's convention), so xi reaches the sampler untouched.
 //
-// MIS needs NEE's density for the image a BSDF ray hit: quotient_image names it (−1 outside S),
-// and an image outside S has density 0, so the power heuristic gives that BSDF hit weight 1.
-// This is unbiased because BSDF sampling covers every path. The MIS side replays the stored
-// query, and the recovered j is the j NEE drew for that image, so the moved query is the same
-// bits on both sides.
+// MIS needs NEE's density for the image a BSDF ray hit: the walk names it in hit.image (−1
+// outside S), and an image outside S has density 0, so the power heuristic gives that BSDF hit
+// weight 1. This is unbiased because BSDF sampling covers every path. The cover's pdf reads the
+// light point and wo at the emitter (the reversed hit.arrival), both already in D's chart, so it
+// needs only the moved query and no departure direction at q.p. The MIS side replays the stored
+// query, and hit.image is the j NEE draws for that image, so the moved query is the same bits on
+// both sides.
 
 function generateQuotientLightSampling(imageCount: number): string {
     const n = formatFloat(imageCount);

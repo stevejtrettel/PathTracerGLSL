@@ -171,6 +171,7 @@ leaving into its upper hemisphere, and anything else takes each arc with probabi
 query `lighting_pdf(q, wo, light_id, light_hit)` takes `wo` at the emitter hit — the arrival
 direction reversed — because only the emitter cosine depends on the arc a ray travelled
 (components/lights/README.md).
+
 **Quotient spaces** (components/quotient). In M = X/Γ the scene is one copy inside a fundamental
 domain D, and `scene_intersect` is a generated walk: it queries that copy with the ray clipped at
 the face where it leaves D (`scene_intersect_cell`, today's dispatcher), and if it finds nothing,
