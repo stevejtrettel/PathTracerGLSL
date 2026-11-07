@@ -26,10 +26,10 @@ float             <id>_pdf   (Direction wi, Direction wo, Point p, MediumPropert
 Conventions:
 - **Metric at p.** The phase-angle cosine is `ambient_dot(wi, -wo, p)` and a sampled
   direction is normalized with `ambient_normalize(…, p)` (docs/trace-loop-contract.md, the
-  metric rule). The sampling basis around `-wo` is core math's `build_basis`, a Euclidean
-  construction (vec3 `cross`): a curved space needs the tangent frame at `p`
-  (`ambient_frame`), so hg and rayleigh are Euclidean-only until they build their basis
-  that way.
+  metric rule). The sampling basis around `-wo` is the tangent frame at `p`,
+  `ambient_frame(p, -wo)`, so a file written this way serves every space: hg is listed under
+  euclidean and hyperbolic with one file. rayleigh still builds its basis with core math's
+  `build_basis` (a Euclidean construction, vec3 `cross`) and is Euclidean-only.
 - NO cosine anywhere — the cosine is a *surface* Jacobian (§2.2); phase functions are
   already densities over the sphere (eval integrates to 1).
 - Exact samplers return `weight = SPECTRUM_ONE` (HG does — the §2.1 cancellation is

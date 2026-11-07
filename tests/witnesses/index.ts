@@ -18,6 +18,7 @@ import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
 // See ./README.md for the gate policy (χ² vs rmse) and how to add a witness.
 
 import { spectralGrinSuite } from './scenes/spectralGrin.js';
+import { h3Suite } from './scenes/h3Witness.js';
 import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
@@ -162,6 +163,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
     ...spectralTrackingSuite,
+    ...h3Suite,
     'thinlens-zero': {
         scene: camCornell,
         strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),

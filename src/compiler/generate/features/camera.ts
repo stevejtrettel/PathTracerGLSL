@@ -22,7 +22,8 @@ import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { cameraModel, type CameraControl, type CameraDerived } from '../../../components/camera/index.js';
-import { cameraBasis } from '../../../components/camera/basis.js';
+import { cameraBasis, curvedCameraBasis } from '../../../components/camera/basis.js';
+import { curvedGeometryOf } from '../../../components/ambient/index.js';
 import { bodyFor } from '../../../components/descriptors.js';
 import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
 
@@ -84,16 +85,22 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // to feed these closures). u_cameraPosition survives as the perspective/ortho origin.
     // ONE basis computation shared by the three closures (they fire together each frame):
     // memoized on the pose values so a frame runs cameraBasis once, not once per vector.
+    // In a curved space the frame is curvedCameraBasis's (the target-centered up rule) and all
+    // four vectors are vec4: the camera point exp_o(position) and a tangent frame there.
+    const geom = curvedGeometryOf(plan.program.measurement.ambient);
+    const frameOf = (position: Vec3Tuple, target: Vec3Tuple): Record<'position' | 'forward' | 'right' | 'up', number[]> =>
+        geom !== undefined ? curvedCameraBasis(geom, position, target) : { position, ...cameraBasis(position, target) };
     let memoKey = '';
-    let memoBasis = cameraBasis(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
+    let memoBasis = frameOf(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
     const basisFor = (position: Vec3Tuple, target: Vec3Tuple) => {
         const key = `${position.join(',')}|${target.join(',')}`;
-        if (key !== memoKey) { memoKey = key; memoBasis = cameraBasis(position, target); }
+        if (key !== memoKey) { memoKey = key; memoBasis = frameOf(position, target); }
         return memoBasis;
     };
-    const basisUniform = (name: string, pick: (b: ReturnType<typeof cameraBasis>) => Vec3Tuple) => ({
+    const vecType = geom !== undefined ? 'vec4' as const : 'vec3' as const;
+    const basisUniform = (name: string, pick: (b: ReturnType<typeof frameOf>) => number[]) => ({
         name,
-        type: 'vec3' as const,
+        type: vecType,
         parameterPath: 'camera.position',
         parameterPaths: ['camera.position', 'camera.target'],
         default: pick(basisFor(pose.position as Vec3Tuple, pose.target as Vec3Tuple)),
@@ -109,7 +116,10 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
         // The model's body for the program's space (its origin travels with it).
         blocks: [bodyFor(model.glsl, plan.program.measurement.ambient, `camera '${model.type}'`)],
         uniforms: [
-            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
+            // The Euclidean camera point is camera.position itself; a curved one is exp_o of it.
+            geom !== undefined
+                ? basisUniform('u_cameraPosition', (b) => b.position)
+                : { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
             basisUniform('u_cameraForward', (b) => b.forward),
             basisUniform('u_cameraRight', (b) => b.right),
             basisUniform('u_cameraUp', (b) => b.up),

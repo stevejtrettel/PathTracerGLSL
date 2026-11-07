@@ -105,10 +105,10 @@ describe('Compiler', () => {
     });
 
     describe('validation rejects unsupported features', () => {
-        it('rejects non-euclidean ambient space', () => {
+        it('rejects an unregistered ambient space', () => {
             const badScene: SceneDescription = {
                 ...minimalScene,
-                ambientSpace: { type: 'hyperbolic' },
+                ambientSpace: { type: 'spherical' },
             };
             expect(() => compiler.compile(badScene, minimalStrategy)).toThrow('not yet supported');
         });

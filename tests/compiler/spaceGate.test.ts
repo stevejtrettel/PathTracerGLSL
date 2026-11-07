@@ -1,5 +1,5 @@
 // The space gate and the curved-space limitations, exercised with a test-only ambient space.
-// No curved space is registered yet, so this file registers 'testspace' in memory (the
+// This file registers a test-only space, 'testspace', in memory (the
 // Euclidean GLSL under a new key; nothing here renders), gives a few occupants a body for it,
 // and checks that every occupant without one, and every limitation row, is reported with its
 // message, while the same scenes in Euclidean space report nothing.
@@ -96,12 +96,13 @@ describe('the space gate (descriptor occupants)', () => {
         });
         const st = strategy({}, { camera: { type: 'thinlens', fov: 0.8, aperture: 0.1, focusDistance: 4 } as never, aovs: ['normal'] });
         expect(spaceErrors(s, st)).toEqual([
-            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean)",
-            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean)",
-            "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean)",
+            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic)",
+            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic)",
+            "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean, hyperbolic)",
             "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean)",
             "Object 1: primitive 'torus' has no testspace implementation (implemented in: euclidean)",
             "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean)",
+            'marched objects: not implemented in testspace space (implemented in: euclidean)',
             "measurement.aovs: AOV 'normal' has no testspace implementation (implemented in: euclidean)",
             "measurement.camera: camera 'thinlens' has no testspace implementation (implemented in: euclidean)",
         ].sort());
@@ -135,6 +136,7 @@ describe('a marched shape\'s bound chain', () => {
             });
             expect(spaceErrors(s, strategy())).toEqual([
                 "Object 0: the primitive bounding its march, 'box' has no testspace implementation (implemented in: euclidean)",
+                'marched objects: not implemented in testspace space (implemented in: euclidean)',
             ]);
         } finally {
             cylinder.marchBound = bound;
@@ -178,7 +180,7 @@ describe('the hittable light\'s desugared parts', () => {
             try {
                 for (const directLighting of ['none', 'nee'] as const) {
                     expect(spaceErrors(mirrorLit(), strategy({ directLighting }))).toEqual([
-                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean)",
+                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean, hyperbolic)",
                     ]);
                 }
             } finally { lambert[SPACE] = body; }
@@ -248,7 +250,7 @@ describe('curvedLimitations (features without a descriptor, resolved estimator o
         expect(reasons).toEqual([
             'an ambient medium: not implemented in testspace space (implemented in: euclidean)',
             'an environment sampled as a light: not implemented in testspace space (implemented in: euclidean)',
-            'an environment: not implemented in testspace space (implemented in: euclidean)',
+            'an environment: not implemented in testspace space (implemented in: euclidean, hyperbolic)',
             'deflecting (GRIN) media: not implemented in testspace space (implemented in: euclidean)',
             'emissive objects sampled as lights: not implemented in testspace space (implemented in: euclidean)',
             'instanced objects: not implemented in testspace space (implemented in: euclidean)',
@@ -279,7 +281,7 @@ describe('curvedLimitations (features without a descriptor, resolved estimator o
 
     it('checks the resolved light selection only when the program selects lights', () => {
         const lit = scene(SPACE, (x) => { x.lights.push({ kind: 'point', position: [0, 3, 0], emission: 5 } as never); });
-        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean)";
+        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean, hyperbolic)";
         expect(spaceErrors(lit, strategy({ directLighting: 'nee' }))).toContain(power);
         expect(spaceErrors(lit, strategy())).not.toContain(power);
     });

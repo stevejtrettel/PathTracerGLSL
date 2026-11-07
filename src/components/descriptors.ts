@@ -405,6 +405,8 @@ export interface PrimitiveEmitCtx {
  *  `vec3 <type>_normal(vec3 p, <Type>)` iff `provides.analytic`. Call sites
  *  construct the struct from compile-time literals (constant placement) or
  *  s-scaled expressions (driven rigid frame); all emission is DERIVED from the row.
+ *  A curved-space body (components/ambient/README.md, "Curved spaces") is the shape at the
+ *  origin of its own frame: Point/Direction in place of vec3, the struct without its point row.
  *
  *  Descriptor functions receive RESOLVED values (row defaults already applied) and
  *  return NUMBERS — the framework does all GLSL formatting; descriptors never build
@@ -435,8 +437,9 @@ export interface PrimitiveDescriptor {
      *  (classifyPlacement) and the instance params-tier record. Independent of
      *  `provides` — closure is about parameter storage, never intersection method. */
     similarityClosed: boolean;
-    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant provides
-     *  `vec2 <type>_uv(vec3 p, <Type>)`, and hit-fill sites call it instead of the planar
+    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant's Euclidean body
+     *  provides `vec2 <type>_uv(vec3 p, <Type>)` (curved spaces have no charts yet — a uv-reading
+     *  material is a limitation row there), and hit-fill sites call it instead of the planar
      *  placeholder WHEN some scene material reads uv (the scene-level program.materials.
      *  materialsReadUv gate — no chart trig when nothing consumes it). Contract-test-checked
      *  (symbol exists iff declared). Absent/false = planar-placeholder uv only. */

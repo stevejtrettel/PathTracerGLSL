@@ -360,6 +360,9 @@ export interface PlannedPrimitiveObject {
      *  rotation residual a non-closed shape cannot absorb. Plain constant placements fold
      *  entirely into `parameters` and this stays undefined. */
     placement?: PlannedPlacement;
+    /** A curved space's placement (H³): every object has one, `placement` is then absent, and
+     *  `parameters` hold only the shape's intrinsic rows (its point row is folded in). */
+    isometry?: IsometryPlacement;
     /** This object has a scene-table record (fable-object-tables): under 'table' dispatch
      *  it leaves the unrolled arms (intersect via the TLAS leaf, containment via the
      *  record loop). Constant + bounded, per the adapter's ONE eligibility predicate. */
@@ -593,6 +596,24 @@ export interface DrivenPlacement {
     /** Slider metadata for the authored `{param}` fields, keyed by param path. */
     parameters: Record<string, ParameterMetadata>;
 }
+
+/**
+ * An object's placement in a curved space: the INVERSE of its isometry g (world → object frame)
+ * as a column-major mat4 — baked as a `const mat4` when constant, a mat4 uniform recomputed in
+ * fp64 from the parameter map when {param}-driven. The object's shape sits canonically at the
+ * origin of its own frame; the generated arm moves the ray into that frame (G⁻¹·x) and maps the
+ * normal back (isometry_direction).
+ */
+export type IsometryPlacement =
+    | { kind: 'constant'; inverse: number[] }
+    | {
+          kind: 'driven';
+          /** The mat4 uniform's name. */
+          uniform: string;
+          uniforms: [PlannedUniform];
+          /** Slider metadata for the authored `{param}` fields, keyed by param path. */
+          parameters: Record<string, ParameterMetadata>;
+      };
 
 /** A leaf's placement: a constant similarity (folds/wrapper tiers) or a live one. */
 export type PlannedPlacement = Similarity | DrivenPlacement;

@@ -4,6 +4,30 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Hyperbolic space H³ (curved-space step 2)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.3 and Part 1, after three reviews.
+
+- **The occupant** `components/ambient/hyperbolic/`: the hyperboloid model (Point and Direction
+  are vec4), MAX_DIST = 10 arc length, fp_uncertainty = REL·w, the chord-form distance, the
+  longest-axis tangent frame, the ideal-point sky key, and `isometry_direction` for normals; its
+  CPU geometry (exp_o, log_o, transvection, exact inverse) behind `CurvedGeometry`
+  (components/ambient/isometry.ts). `ambient_distance` joins the contract in every space.
+- **Bodies in H³:** sphere, plane and disk shapes; point and disk lights (sinh² r area density,
+  the uniform-area geodesic disk sampler); lambert, pinhole, fisheye and hg as the same files
+  listed under both spaces (hg now builds its basis with `ambient_frame`, which changes the
+  sampled directions of Euclidean HG media but not their distribution).
+- **Placement:** every curved object has one inverse isometry (a baked `const mat4`, or a mat4
+  uniform when {param}-driven); point rows fold in as a pre-translation; lights read the isometry
+  of their backing region (compiler/plan/curved.ts). The camera ships four vec4 uniforms from
+  the target-centered frame (`curvedCameraBasis`).
+- **Validator:** curvature parameter and a missing camera pose are errors in curved spaces; new
+  limitation rows for marched objects and uv-reading or GLSL-expression materials; skies are
+  supported in H³ as lookups by BSDF rays.
+- **Witnesses** `h3-furnace`, `h3-disk-light`, `h3-point-light`, `h3-medium`, with fp64 twins
+  (tests/witnesses/scenes/h3Twins.ts); demo `hyperbolic` in the gallery's new "Curved spaces"
+  section.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

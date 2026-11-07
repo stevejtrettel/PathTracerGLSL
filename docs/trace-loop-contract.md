@@ -118,8 +118,8 @@ Phase functions work in world space at the scattering event, so they take its po
 `<id>_eval(wi, wo, p, mp)`, `<id>_sample(wo, p, mp, xi)`, `<id>_pdf(wi, wo, p, mp)` and the
 generated `interaction_medium_*` dispatch over them. The phase-angle cosine is
 `ambient_dot(wi, -wo, p)`, and a sampled direction is normalized with `ambient_normalize` at `p`.
-Their sampling basis is core math's `build_basis`, a Euclidean construction
-(components/volume_scattering/README.md).
+The sampling basis is the tangent frame at `p`, `ambient_frame(p, -wo)` (hg; rayleigh still uses
+core math's Euclidean `build_basis` and is Euclidean-only — components/volume_scattering/README.md).
 
 ## Updated signatures (vs the current slice)
 
@@ -134,13 +134,24 @@ float    ambient_dot         (Direction a, Direction b, Point p);      // the me
 Direction ambient_normalize  (Direction v, Point p);                   // unit length in the metric at p
 Direction ambient_aim        (Point from, Direction along, Point to, out float remaining);
                                                                        // shadow-ray aim + arc length left (see below)
+float    ambient_distance    (Point a, Point b);                       // geodesic distance (light samplers, the aim's arc length)
 vec3     ambient_sky_key     (Point p, Direction v);                   // what the sky is looked up by, for the ray (p, v)
 ```
 The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`), `MAX_DIST` and
 `fp_uncertainty` (components/ambient/README.md). A space states its geodesic formula once:
 `ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
 `environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
-is the direction.
+is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t.
+`MAX_DIST` is an arc length: 1000 in Euclidean space, 10 in H³ (float32 cosh overflows near 89; a
+scene within the working radius, about 3 from the origin, loses only sub-pixel grazing bands of its
+planes there).
+
+In a curved space every object is intersected in its own frame: the generated arm moves the ray
+by the object's inverse isometry (`G⁻¹·origin`, `G⁻¹·direction`), the shape's closed form returns
+the arc length t (an isometry preserves it, so it is compared with `hit.t` unchanged), the hit
+point is taken along the WORLD ray (`ambient_geodesic(ray.origin, ray.direction, t)`), and the
+normal computed in the object's frame is mapped back by the occupant's `isometry_direction`
+(components/ambient/README.md, "Curved spaces").
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
 never mutated by intersection — it is a pure seed.
@@ -185,9 +196,10 @@ never mutated by intersection — it is a pure seed.
 
 ## Deferred (not this contract)
 
-Curved ambient occupants (H³/S³ first — docs/claude-2026-11-review/curved-spaces-design.md;
-`Point`→`vec4` there). Which components run in which space is decided outside the loop: each
-space-dependent occupant has a GLSL body per space it implements, and the Validator rejects a
-program that uses one without a body (components/ambient/README.md, "Who implements what").
+Further curved ambient occupants (S³ next, then H²×R — docs/claude-2026-11-review/curved-spaces-design.md).
+H³ is registered (`Point` = `vec4`, the hyperboloid model); which components run in it is decided
+outside the loop: each space-dependent occupant has a GLSL body per space it implements, and the
+Validator rejects a program that uses one without a body (components/ambient/README.md, "Who
+implements what"; the table is components/ambient/support.md).
 BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

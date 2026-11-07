@@ -10,6 +10,7 @@
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import diskGLSL from './disk.glsl?raw';
+import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 
 /** The shared unit-vector formula (invLen multiply, canonicalPlane's op pattern) —
  *  compile-time, one source: geometry canonicalize AND the disk light's desugar. */
@@ -27,7 +28,10 @@ export const diskDescriptor: PrimitiveDescriptor = {
         // (plane's normal stays required: it IS the plane's identity).
         { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
     ],
-    glsl: { euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL },
+        hyperbolic: { origin: 'components/geometry/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
+    },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry
     uvChart: true,            // polar (r/R, θ/2π) — disk_uv (fable-imagery P1)

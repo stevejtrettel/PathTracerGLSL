@@ -42,6 +42,14 @@ loss/substitution, discarded packed RGB and conversion errors must compile and f
 These probes use test-only observable evaluations, not a physical spectral colour model.
 They share the standalone float-framebuffer runner with `witness:color` and run in GPU CI.
 
+## Curved-space witnesses (H³)
+
+`scenes/h3Witness.ts`: `h3-furnace` (six emissive planes, every path Σ_{k≤6} 0.8^k), `h3-disk-light`
+and `h3-point-light` (a lambert disk receiver against closed forms integrated over the readout
+window), `h3-medium` (a scattering ball, pt = pt-nee = pt-mis). The window means are computed by
+the fp64 twin `scenes/h3Twins.ts`; `h3Twins.test.ts` recomputes them and checks the twin against
+the on-axis closed form and an independent Monte Carlo estimate. Not yet in a full sweep.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

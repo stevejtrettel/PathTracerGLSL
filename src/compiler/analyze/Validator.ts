@@ -17,7 +17,7 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, sampledEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights, marchedObjectCount, LIGHT_BACKING_MODEL } from '../plan/dataTenants.js';
-import { AMBIENT_SPACES } from '../../components/ambient/index.js';
+import { AMBIENT_SPACES, curvedGeometryOf } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { AOVS } from '../../components/aov/index.js';
 import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../../components/env/index.js';
@@ -70,6 +70,19 @@ export function validate(
     };
     if (spaceKnown) {
         for (const reason of curvedLimitations(scene, strategy, features)) bag.error('invalid-setting', reason).add();
+    }
+    if (curvedGeometryOf(space) !== undefined) {
+        // A curved space has curvature ±1: lengths are in units of the curvature radius, and the
+        // shapes' sizes carry the scale.
+        if (scene.ambientSpace.parameters?.curvature !== undefined) {
+            bag.error('invalid-setting', `ambientSpace.parameters.curvature: the ${space} space has curvature fixed at magnitude 1; give the shapes' sizes in units of the curvature radius instead`).add();
+        }
+        // No default pose: the Euclidean one (position [0, 0, 8]) lies far outside a curved
+        // scene's working radius.
+        const cam = strategy.measurement.camera;
+        if (cam.position === undefined || cam.target === undefined) {
+            bag.error('invalid-setting', `measurement.camera: a ${space} scene needs an authored camera position and target`).add();
+        }
     }
 
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):

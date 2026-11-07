@@ -197,7 +197,7 @@ export const MARCHED_TABLE_THRESHOLD = 9;
 
 export const OBJECT_DISPATCHES: Record<string, ObjectDispatchDescriptor> = {
     /** The research regime: params baked into GLSL, named symbols, linear arms. */
-    unrolled: { spaces: ['euclidean'] },
+    unrolled: { spaces: ['euclidean', 'hyperbolic'] },
     /** The scale regime: typed records + ONE scene TLAS; residual arm for driven/unbounded. */
     table: { spaces: ['euclidean'] },
 };

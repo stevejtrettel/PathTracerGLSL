@@ -4,6 +4,7 @@
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import sphereGLSL from './sphere.glsl?raw';
+import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
 
 export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
@@ -11,7 +12,10 @@ export const sphereDescriptor: PrimitiveDescriptor = {
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
         { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],
-    glsl: { euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL },
+        hyperbolic: { origin: 'components/geometry/sphere/sphere_hyperbolic.glsl', source: sphereHyperbolicGLSL },
+    },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
     // exactly, so a marched arm is confined to precisely this shape's interval.

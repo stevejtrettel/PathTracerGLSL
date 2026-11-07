@@ -27,6 +27,7 @@ float ambient_dot(Direction a, Direction b, Point p);      // the metric at p
 Direction ambient_normalize(Direction v, Point p);         // v at unit length in the metric at p
 Frame ambient_frame(Point p, Direction n);                 // orthonormal shading frame around n
 Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);
+float ambient_distance(Point a, Point b);                  // geodesic distance
 Direction ambient_direction_to(Point from, Point to);      // unit start direction of the geodesic from → to
 Direction ambient_aim(Point from, Direction along, Point to, out float remaining);
     // shadow-ray aim: the unit direction at `from` of the geodesic to `to` on the arc the ray
@@ -46,6 +47,42 @@ signatures and the generated signatures (`scene_region_at`, `scene_material_prop
 `scene_medium_properties`, `ior_of`, `sdf_<id>`, `environment_pdf`, the LightQuery
 constructors) write points and tangent vectors as `Point` and `Direction`; hand-written
 locals inside component bodies (the cameras' look-at frames, for one) still say `vec3`.
+
+## Curved spaces
+
+A curved occupant (`hyperbolic/`: H³, curvature −1, the hyperboloid model) stores points and
+tangent vectors as 4-vectors (`Point` and `Direction` are `vec4`) and supplies, besides the
+contract above:
+
+- **`Direction isometry_direction(mat4 inverse, Direction v)`** — the world image G·v of a tangent
+  vector given in an object's frame, from the object's INVERSE placement G⁻¹ (H³:
+  J·((J·v)·G⁻¹), J = diag(1,1,1,−1); the generated arms map normals with it).
+- **Its CPU geometry** (`<type>.ts`, the `CurvedGeometry` of `isometry.ts`): the form, exp_o and
+  log_o at the origin o = (0,0,0,1), the transvection by a tangent vector at o, and the exact
+  inverse of an isometry. Registered as the descriptor's `curved` field; its presence is the one
+  fact "this space is curved" (`curvedGeometryOf`).
+
+What the compiler does with it (all fp64 on the CPU, compiler/plan/curved.ts):
+
+- **Authored points.** A Vec3 naming a point (a camera position or target, a placement position,
+  a light position, a shape's center) means exp_o(v): the point at distance |v| from o in
+  direction v̂. In Euclidean space that is v itself.
+- **Placements.** Every object is placed by one isometry g = T(position)·R(rotation)·T(point row):
+  its shape sits canonically at o with only its intrinsic rows (lengths, and direction rows as
+  tangent vectors at o, `Direction(x, y, z, 0.0)`); the point row (a sphere's center) folds in as
+  a pre-translation. The program holds G⁻¹ as a column-major `mat4` — a named const when constant,
+  a mat4 uniform recomputed from the parameter map when {param}-driven. A scale other than 1 is a
+  limitation row.
+- **Lights.** A light's point row becomes g·o and its direction rows g applied to them at o, with
+  g the isometry its backing region is placed by (`placementIsometry` makes both), so the sampled
+  disk is the disk rays hit.
+- **The camera.** `curvedCameraBasis` (components/camera/basis.ts): the camera point exp_o(position)
+  and an orthonormal tangent frame there, by the target-centered up rule (the Euclidean look-at
+  taken with the target pulled back to o), shipped as four vec4 uniforms. The pose must be
+  authored (the Euclidean default lies outside the working radius).
+- **Curvature** is ±1; sizes carry the scale (`ambientSpace.parameters.curvature` is an error).
+- **The working radius.** float32 hyperboloid coordinates lose accuracy like e^{2D} at distance D
+  from o; keep the camera and the scene within about 3 of the origin. Documented, not checked.
 
 ## Who implements what
 
@@ -85,15 +122,23 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 
 ## Status & the honest caveat
 
-Sole occupant: `euclidean/`. Several places are Euclidean beyond the seam and need new
-bodies in a curved space, not just a new occupant: the light samplers (Euclidean solid-angle
-constructions; their files carry a METRIC EXEMPTION note), the phase functions' sampling
-basis (`build_basis`), the SDF march and the similarity-placement arms, the camera frame
-uniforms, the environment samplers, and equiangular placement (extrinsic closest-approach
-geometry).
+Occupants: `euclidean/` and `hyperbolic/` (H³). In H³: sphere, plane and disk shapes; point and
+disk lights; lambert; pinhole and fisheye; hg in homogeneous object media; sky lookup by BSDF
+rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
+bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
+their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
+similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
+`flattenGroups` (the authoring layer composes transformed groups as similarities, so a curved
+scene must not use transformed groups yet).
 
 ## Invariants & witnesses
 
-None space-specific yet (one occupant). A respelling of the seam must leave every Euclidean
-scene bit-identical (`npm run frames -- compare`). The gate and the limitation rows are
-exercised with a test-only space registered in memory (tests/compiler/spaceGate.test.ts).
+- H³ (tests/witnesses/scenes/h3Witness.ts): `h3-furnace` (six emissive planes, Σ_{k≤6} 0.8^k
+  exactly), `h3-disk-light` and `h3-point-light` (a lambert disk receiver against closed forms
+  integrated over the readout window by tests/witnesses/scenes/h3Twins.ts), `h3-medium` (pt =
+  pt-nee = pt-mis for a scattering ball). The CPU geometry, the column-major layout and
+  `isometry_direction`'s arithmetic are pinned by tests/components/hyperbolic.test.ts.
+- A change to the seam that is a respelling must leave every Euclidean scene bit-identical
+  (`npm run frames -- compare`).
+- The gate and the limitation rows are exercised with a test-only space registered in memory
+  (tests/compiler/spaceGate.test.ts).

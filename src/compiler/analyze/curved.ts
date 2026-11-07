@@ -15,7 +15,7 @@ import type { SceneFeatures } from './types.js';
 import type { SpaceList } from '../../components/descriptors.js';
 import { LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
-import { sampledEmitterObjects, objectDispatchOf } from '../plan/dataTenants.js';
+import { sampledEmitterObjects, objectDispatchOf, marchedObjectCount, materialReadsUv } from '../plan/dataTenants.js';
 
 /** The message for an occupant that has no implementation in the program's space, or null
  *  when it has one. `occupant` names it (`light kind 'disk'`); `implementedIn` is its
@@ -42,6 +42,16 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
     { feature: 'instanced objects', spaces: ['euclidean'], present: (scene) => scene.objects.some(isInstancedObject) },
     { feature: 'object scale other than 1', spaces: ['euclidean'], present: scaled },
     {
+        // The generated march steps along straight lines (resolved: a backend pin counts).
+        feature: 'marched objects', spaces: ['euclidean'],
+        present: (scene) => marchedObjectCount(scene) > 0,
+    },
+    {
+        // uv charts and GLSL expressions (which may read p or uv) are Euclidean constructions.
+        feature: 'materials that read uv or hold GLSL expressions', spaces: ['euclidean'],
+        present: (scene) => scene.objects.some((o) => (isPrimitiveObject(o) || isMeshObject(o)) && materialReadsUv(o.material, scene)),
+    },
+    {
         feature: 'media on the null-collision (tracking) arms', spaces: ['euclidean'],
         present: (scene, strategy) => sceneRoutesToTracking(scene, strategy.measurement.scattering ?? 'full'),
     },
@@ -56,7 +66,8 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
         present: (_scene, strategy) => strategy.estimator.mediumLightSampling === 'equiangular',
     },
     {
-        feature: 'an environment', spaces: ['euclidean'],
+        // Looked up by BSDF rays at the ray's sky key (H³: its ideal endpoint).
+        feature: 'an environment', spaces: ['euclidean', 'hyperbolic'],
         present: (scene) => scene.environment !== undefined && scene.environment.type !== 'none',
     },
     {

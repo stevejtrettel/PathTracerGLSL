@@ -11,7 +11,7 @@ import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBa
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
+import { formatFloat, formatMat3, formatMat4, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
 import { emitIndex } from '../color.js';
 import { modelTransmission, modelIndexRow } from '../../../components/materials/index.js';
 import {
@@ -19,6 +19,8 @@ import {
     primitive,
     structName,
     emitCtor,
+    emitCurvedCtor,
+    curvedRows,
     emitSdfCall,
     emitAnalyticTest,
     emitSignedDistance,
@@ -51,6 +53,7 @@ import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 import { bodyFor } from '../../../components/descriptors.js';
+import { curvedGeometryOf } from '../../../components/ambient/index.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
@@ -106,6 +109,12 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
             Object.assign(parameters, rec.parameters);
         }
     }
+    // A curved space's {param}-driven objects: one mat4 isometry uniform each.
+    for (const o of plan.objects) {
+        if (o.isometry?.kind !== 'driven') continue;
+        uniforms.push(...o.isometry.uniforms);
+        Object.assign(parameters, o.isometry.parameters);
+    }
 
     // Primitive math for exactly the primitives PRESENT (registry order): each is one
     // wholesale file carrying BOTH backends' functions for that primitive (§2.12 —
@@ -141,6 +150,8 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     ];
     for (const type of intervalSeeds) for (const bound of marchBoundTypes(type)) presentTypes.add(bound);
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
+    // A curved space places every object by an isometry; its structs keep the intrinsic rows.
+    const curved = curvedGeometryOf(plan.program.measurement.ambient) !== undefined;
     // Marching tolerances BEFORE the generated march block: march_epsilon()/
     // NORMAL_EPSILON are consumed ONLY by the generated intersects/normals now, so
     // the file rides exactly when something marches (exact linkage — an occupant
@@ -152,7 +163,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         blocks.push({
             origin: 'generated:primitive-structs',
             source: ['// Generated primitive structs (rows are the single source — A1)',
-                ...present.map((d) => structFromRows(structName(d), [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
+                ...present.map((d) => structFromRows(structName(d), curved
+                    ? curvedRows(d)
+                    : [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
         });
     }
     const space = plan.program.measurement.ambient;
@@ -183,6 +196,10 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const namedShapes = generateNamedShapes(plan.objects, ids);
     if (namedShapes !== null) {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
+    }
+    const isometries = generateIsometryConsts(plan.objects, ids);
+    if (isometries !== null) {
+        blocks.push({ origin: 'generated:isometries', source: isometries });
     }
 
     // Hit.eps for floating-point-accurate hits (analytic roots and triangle tests): fp-scale, in
@@ -475,10 +492,32 @@ function generateNamedShapes(objects: PlannedPrimitiveObject[], ids: Map<number,
         const constName = hoistedShapeName(obj, ids);
         if (constName === null) continue;
         const d = primitive(obj.type);
-        lines.push(`const ${structName(d)} ${constName} = ${emitCtor(d, obj.parameters)};`);
+        lines.push(`const ${structName(d)} ${constName} = ${objectCtor(obj)};`);
     }
     if (lines.length === 0) return null;
     return ['// Generated named shapes (authored names, constant placement — compile-time data)', ...lines].join('\n');
+}
+
+/** An object's struct constructor in its own frame: the folded parameters in Euclidean space,
+ *  the intrinsic rows under a curved isometry. */
+function objectCtor(obj: PlannedPrimitiveObject): string {
+    const d = primitive(obj.type);
+    return obj.isometry !== undefined ? emitCurvedCtor(d, obj.parameters) : emitCtor(d, obj.parameters);
+}
+
+/** A curved object's G⁻¹ (world → object frame): its baked const or its uniform. */
+function isometryRef(obj: PlannedPrimitiveObject, ids: Map<number, string>): string {
+    const iso = obj.isometry!;
+    return iso.kind === 'driven' ? iso.uniform : `isometry_${ids.get(obj.index)!}`;
+}
+
+/** Each constantly placed curved object's G⁻¹ as one named const. */
+function generateIsometryConsts(objects: PlannedPrimitiveObject[], ids: Map<number, string>): string | null {
+    const lines = objects.flatMap((o) => o.isometry?.kind === 'constant'
+        ? [`const mat4 ${isometryRef(o, ids)} = ${formatMat4(o.isometry.inverse)};`]
+        : []);
+    if (lines.length === 0) return null;
+    return ['// Generated object isometries: G⁻¹, world → object frame (column-major)', ...lines].join('\n');
 }
 
 // ============================================================================
@@ -734,6 +773,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
     const d = primitive(obj.type);
     const sn = structName(d);
     const lines: string[] = [];
+    if (obj.isometry !== undefined) return curvedObjectArm(obj, ids, chartUv, bound);
     if (obj.placement !== undefined) {
         // Placed arm — DRIVEN (§6.1) or a CONSTANT placement retained for a patterned
         // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
@@ -782,6 +822,34 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
     }));
     lines.push(`        }`);
     lines.push(`    }`);
+    return lines;
+}
+
+/** One closed-form object's arm in a curved space: the ray moved into the object's frame by its
+ *  G⁻¹ (arc length t is the same in both frames, so it is compared with world hits unchanged),
+ *  the hit point taken along the WORLD ray, the normal computed in the object's frame and mapped
+ *  back by isometry_direction. No material reads uv in a curved space (SPACE_LIMITATIONS), so the
+ *  uv is the unread placeholder. */
+function curvedObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+    if (chartUv) throw new Error('intersection: a curved program with a uv-reading material (the Validator should have rejected it)');
+    const d = primitive(obj.type);
+    const inv = isometryRef(obj, ids);
+    const constName = hoistedShapeName(obj, ids);
+    const lines = ['    {', `        Ray lray = make_ray(${inv} * ray.origin, ${inv} * ray.direction, ray.wl);`];
+    if (bound !== null) {
+        lines.push(`        if (${d.type}_intersect(lray, ${constName ?? objectCtor(obj)}, t) && t < ${bound}) return true;`, '    }');
+        return lines;
+    }
+    if (constName === null) lines.push(`        ${structName(d)} shape = ${objectCtor(obj)};`);
+    const ref = constName ?? 'shape';
+    lines.push(`        if (${d.type}_intersect(lray, ${ref}, t) && t < hit.t) {`);
+    lines.push(...primitiveHitFill('            ', {
+        nWorld: `isometry_direction(${inv}, ${d.type}_normal(ambient_geodesic(lray.origin, lray.direction, t), ${ref}))`,
+        region: obj.index,
+        uv: uvFill(d, 'hit.p', ref, false),
+        eps: 'spawn_eps_fp(hit.p)',
+    }));
+    lines.push('        }', '    }');
     return lines;
 }
 
@@ -1129,7 +1197,12 @@ function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: Planne
             lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
             continue;
         }
-        if (obj.placement !== undefined && !primitive(obj.type).thin) {
+        if (obj.isometry !== undefined) {
+            // Curved: the shape's own distance at the point moved into its frame — an isometry
+            // preserves distance, so d is the world signed distance. Thin shapes claim nothing.
+            const d = primitive(obj.type);
+            lines.push(`    d = ${d.thin ? '1.0e20' : `${obj.type}_sdf(${isometryRef(obj, ids)} * p, ${hoistedShapeName(obj, ids) ?? objectCtor(obj)})`};`);
+        } else if (obj.placement !== undefined && !primitive(obj.type).thin) {
             // Placed (§6.1) — driven OR a patterned-shape's retained constant placement (P1b):
             // classify in the rigid frame with s-scaled params — d stays an exact WORLD signed
             // distance, so innermost-wins compares correctly across constant and placed objects.

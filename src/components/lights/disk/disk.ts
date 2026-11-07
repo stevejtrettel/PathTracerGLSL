@@ -10,10 +10,14 @@ import type { LightKindDescriptor } from '../../descriptors.js';
 import { unitVec3 } from '../../geometry/index.js';
 import { radiantScalar } from '../power.js';
 import lightDiskGLSL from './disk.glsl?raw';
+import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 
 export const diskLightDescriptor: LightKindDescriptor = {
     kind: 'disk',
-    glsl: { euclidean: { origin: 'components/lights/disk/disk.glsl', source: lightDiskGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/lights/disk/disk.glsl', source: lightDiskGLSL },
+        hyperbolic: { origin: 'components/lights/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
+    },
     delta: false,
     // Authored input (besides kind/emission): position → row `center`; optional normal.
     // The normal's default lives ON THE ROW (D1) — applied once by the framework, so

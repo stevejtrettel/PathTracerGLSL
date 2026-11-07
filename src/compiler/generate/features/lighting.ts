@@ -13,7 +13,8 @@ import { namedKindOf, kindById } from '../../../components/color/spectra/index.j
 import { projectRGB, radiometricValueDeps } from '../../../components/color/values.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
+import { formatFloat, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
+import { curvedGeometryOf } from '../../../components/ambient/index.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
 import { EMISSION_KEY, MATERIAL_MODELS } from '../../../components/materials/index.js';
@@ -130,7 +131,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
     // driven rows reading their uniforms (Model B). Table-resident (bvh) programs read
     // records rows through the generated loaders instead — no accessors emitted.
     if (plan.lights.length > 0 && !bvh) {
-        blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights, plan.program.measurement.color) });
+        blocks.push({ origin: 'generated:light-accessors', source: generateLightAccessors(plan.lights, plan.program.measurement.color, curvedGeometryOf(plan.program.measurement.ambient) !== undefined) });
     }
     if (bvh && layout !== null && plan.lightTree !== undefined) {
         blocks.push({ origin: 'components/accel/light_tree/light_tree.glsl', source: lightTreeGLSL });
@@ -403,15 +404,17 @@ function lightRef(l: PlannedLight, wl: string): string {
     return `light_get_${l.id}(${wl})`;
 }
 
-function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral'): string {
+function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral', curved: boolean): string {
     const d = lightKind(l);
     const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
     const args = d.params.map((row) => {
         // The constant/driven split is emitValue's: a driven radiometric row reads its uniform
         // (for a HITTABLE light the SAME one the synthesized material's emission declares),
-        // a constant row bakes its literal via the row's formatter.
+        // a constant row bakes its literal via the row's formatter. In a curved space the point
+        // and direction rows hold 4-vectors (compiler/plan/curved.ts).
         const fmt = (row.shape === 'number' ? formatFloat
-            : formatVec3) as (x: never) => string;
+            : curved && (row.kind === 'point' || row.kind === 'direction') ? formatVec4
+                : formatVec3) as (x: never) => string;
         return row.role !== undefined
             ? emitSpectrum(l.values[row.name] as ParamValue, row.role, { wl: 'wl', color })
             : emitValue(l.values[row.name] as ParamValue, fmt);
@@ -427,12 +430,12 @@ function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral'): string {
 /** One wavelength-indexed accessor per light (§6.1), `light_get_<id>(wl)` — the uniform structural shape.
  *  A constant light bakes its literals inside; a driven light reads its uniforms. The GPU
  *  inlines a constant accessor to nothing, so this costs nothing and unifies the readers. */
-function generateLightAccessors(lights: PlannedLight[], color: 'rgb' | 'spectral'): string {
+function generateLightAccessors(lights: PlannedLight[], color: 'rgb' | 'spectral', curved: boolean): string {
     const lines = ['// Generated light accessors (§6.1) — constants baked inline, driven read u_'];
     for (const l of lights) {
         const d = lightKind(l);
         const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
-        lines.push(`${structName} light_get_${l.id}(Wavelengths wl) { return ${lightCtor(l, color)}; }`);
+        lines.push(`${structName} light_get_${l.id}(Wavelengths wl) { return ${lightCtor(l, color, curved)}; }`);
     }
     return lines.join('\n');
 }

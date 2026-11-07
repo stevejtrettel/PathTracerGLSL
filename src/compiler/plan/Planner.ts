@@ -32,12 +32,15 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMesh, SceneInstanceBatch, SceneLight, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMesh, SceneInstanceBatch, SceneLight, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, IsometryPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
 import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads, objectDispatchOf, LIGHT_BACKING_MODEL } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
+import { curvedGeometryOf } from '../../components/ambient/index.js';
+import { placementIsometry, type CurvedGeometry } from '../../components/ambient/isometry.js';
+import { curvedShape, curvedLightValues } from './curved.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
@@ -127,6 +130,9 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
     // ordinal on both sides; they just never plan).
     const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
+    // A curved space places every object by an isometry (compiler/plan/curved.ts); Euclidean
+    // space folds similarities into the parameters below.
+    const geom = curvedGeometryOf(scene.ambientSpace.type);
     let objectIndex = 0;
     for (const obj of scene.objects) {
         if (isMeshObject(obj)) {
@@ -218,6 +224,17 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
         }
         const matId = materialIdMap.get(obj.material)!;   // validated by Validator
 
+        if (geom !== undefined) {
+            // Curved: the closed form in the object's own frame (a marched object is rejected in
+            // curved spaces — SPACE_LIMITATIONS), placed by its isometry.
+            const index = objectIndex++;
+            objects.push({
+                index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name,
+                ...curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index),
+            });
+            continue;
+        }
+
         if (backend === 'sdf') {
             // Placement (fable-transforms §5.2/§6): constant → the point param folds into
             // the placement as a pre-translation and the wrapper owns all positioning;
@@ -293,7 +310,7 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             // Row defaults applied once by the framework (the record the Validator judged).
             const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
             const values = d.toValues(authored, authoredLightEmission(light.emission));
-            if (d.region === undefined) return { id, kind: entry.kind, values };
+            if (d.region === undefined) return { id, kind: entry.kind, values: geom === undefined ? values : curvedLightValues(geom, d, values) };
             const matId = materialIndex++;
             materials.push({
                 id: matId,
@@ -303,6 +320,16 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
                 medium: null,
             });
             const regionId = objectIndex++;
+            if (geom !== undefined) {
+                // Curved: the region is placed by the isometry its point row makes, and the light's
+                // rows are that isometry applied (curvedLightValues), so the sampled disk is the
+                // disk rays hit.
+                objects.push({
+                    index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form',
+                    ...curvedPlacement(geom, d.region.primitive, d.region.parameters(authored), undefined, regionId),
+                });
+                return { id, kind: entry.kind, regionId, values: curvedLightValues(geom, d, values) };
+            }
             // Canonicalization (the disk's unit normal) is the same formula the kind's toValues
             // applies, so hit side and sample side stay bit-identical.
             objects.push({
@@ -617,8 +644,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             anyQuery: lighting !== null && !features.media.hasMedia,
             // Any leaf with a {param} transform field (fable-transforms §6) — gates
             // glsl/core/placement.glsl + the rigid-frame query tiers. (Instanced batches
-            // also need placement.glsl — the feature includes it on `instanced` too.)
-            drivenPlacement: scene.objects.some((o) => !isInstancedObject(o) && isDrivenTransform(o.transform)),
+            // also need placement.glsl — the feature includes it on `instanced` too.) A curved
+            // space's driven objects carry mat4 isometry uniforms instead and need neither.
+            drivenPlacement: curvedGeometryOf(scene.ambientSpace.type) === undefined
+                && scene.objects.some((o) => !isInstancedObject(o) && isDrivenTransform(o.transform)),
         },
         materials: {
             models: brdfModels,
@@ -761,7 +790,18 @@ export const placementOf = similarityFromTransform;
 /** Reader of one TRS field from the live parameter map (constants baked in). */
 type FieldReader<T> = (params: Record<string, unknown>) => T;
 
-export function buildDrivenPlacement(transform: Transform, index: number): DrivenPlacement {
+/** The live readers of a transform's three fields, the parameter paths they read and their slider
+ *  metadata — shared by the Euclidean lowering (buildDrivenPlacement) and the curved one
+ *  (buildDrivenIsometry), which differ only in the uniform they compute. */
+interface TransformReaders {
+    paths: string[];
+    parameters: Record<string, ParameterMetadata>;
+    readPosition: FieldReader<Vec3Tuple>;
+    readRotation: FieldReader<Quat>;
+    readScale: FieldReader<number>;
+}
+
+function transformReaders(transform: Transform, index: number): TransformReaders {
     const paths: string[] = [];
     const parameters: Record<string, ParameterMetadata> = {};
     let warned = false;
@@ -849,6 +889,11 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
         const c = (scl ?? 1) as number;
         readScale = () => c;
     }
+    return { paths, parameters, readPosition, readRotation, readScale };
+}
+
+export function buildDrivenPlacement(transform: Transform, index: number): DrivenPlacement {
+    const { paths, parameters, readPosition, readRotation, readScale } = transformReaders(transform, index);
 
     // The §6.1 rigid-form inverse, computed fp64 host-side (rigidInverse = the ONE ABI truth,
     // shared with instancing's constant-placement lowering).
@@ -865,6 +910,33 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
             { name: uniformQ, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalQ({}), compute: evalQ },
             { name: uniformTS, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalTS({}), compute: evalTS },
         ],
+        parameters,
+    };
+}
+
+/** A curved object's intrinsic parameters and its placement: the inverse of
+ *  g = T(position)·R(rotation)·T(point row), baked when the transform is constant, a mat4 uniform
+ *  when it is {param}-driven. */
+function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; isometry: IsometryPlacement } {
+    const { parameters, pre } = curvedShape(type, rawParameters);
+    if (isDrivenTransform(transform)) return { parameters, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
+    const g = placementOf(transform);
+    return { parameters, isometry: { kind: 'constant', inverse: geom.inverse(placementIsometry(geom, g.translation, g.rotation, pre)) } };
+}
+
+/** The curved-space lowering of a driven transform: one mat4 uniform `u_object<i>Isometry`, the
+ *  inverse of g = T(position)·R(rotation)·T(pre) recomputed in fp64 from the parameter map
+ *  (`pre` is the shape's folded point row). The scale field is not read: a scale other than 1
+ *  is rejected in curved spaces (SPACE_LIMITATIONS). */
+export function buildDrivenIsometry(geom: CurvedGeometry, transform: Transform, pre: Vec3Tuple, index: number): IsometryPlacement {
+    const { paths, parameters, readPosition, readRotation } = transformReaders(transform, index);
+    const evalInverse = (p: Record<string, unknown>): number[] =>
+        geom.inverse(placementIsometry(geom, readPosition(p), readRotation(p), pre));
+    const uniform = `u_object${index}Isometry`;
+    return {
+        kind: 'driven',
+        uniform,
+        uniforms: [{ name: uniform, type: 'mat4', parameterPath: paths[0], parameterPaths: paths, default: evalInverse({}), compute: evalInverse }],
         parameters,
     };
 }

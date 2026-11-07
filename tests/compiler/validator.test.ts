@@ -41,8 +41,8 @@ describe('Validator', () => {
         expect(bag.isEmpty()).toBe(true);
     });
 
-    it('rejects non-euclidean ambient space', () => {
-        const bag = run(s => { s.ambientSpace = { type: 'hyperbolic' }; });
+    it('rejects an unregistered ambient space', () => {
+        const bag = run(s => { s.ambientSpace = { type: 'spherical' }; });
         expect(codes(bag)).toContain('invalid-setting');
         expect(bag.getErrors().some(e => /ambient space/i.test(e.message))).toBe(true);
     });

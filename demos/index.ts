@@ -49,6 +49,7 @@ import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresS
 import { cactiScene, cactiStrategy, cactiMisStrategy } from './cactiScene.js';
 import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from './grandBazaarScene.js';
 import { embersScene, embersStrategy, embersMisStrategy, embersPtStrategy } from './embersScene.js';
+import { hyperbolicScene, hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy } from './hyperbolicScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -67,6 +68,16 @@ const cornellOneshotStrategy: RenderStrategy = {
 // untracked .inst files; registry-iterating tests skip them via isAsyncSceneEntry).
 export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     ...dataScenes,
+    hyperbolic: {
+        scene: hyperbolicScene,
+        strategies: posed([0, 0.35, 0.95], [0, -0.55, -0.25], hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy),
+        exercises:
+            'DEMO — hyperbolic space H³ (the hyperboloid model): a floor, a backdrop plane and two rings of resting balls '
+            + 'under a disk light and a sky. Equal balls at equal spacing fill rings whose length grows like 2π·sinh ρ; '
+            + 'the floor and the backdrop are ultraparallel, so the sky shows between them. Keys 1/2/3 = pt-mis / pt-nee / pt '
+            + '(same image). The orbit and fly controls move the pose in exp coordinates (not isometric motion yet).',
+        expected: 'warm light pooling on the floor under the lamp, soft contact shadows, balls shrinking quickly with distance, a strip of blue sky between the floor and the backdrop',
+    },
     embers: {
         scene: embersScene,
         strategies: posed([9, 2.6, 9], [0, 0.8, 0], embersStrategy, embersMisStrategy, embersPtStrategy),
