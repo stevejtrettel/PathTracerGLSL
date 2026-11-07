@@ -145,7 +145,10 @@ homogeneous object media; in H³ also sky lookup by BSDF rays. In H²×R: the me
 root: convex Newton), horizontal and vertical planes (the only totally geodesic surfaces there),
 horizontal disks and the capped vertical cylinder; point lights and horizontal disk lights with the
 direction-dependent area density d²·sinh(D_H)/D_H; lambert; pinhole and fisheye; sky lookup by BSDF
-rays; rotations about the vertical only, and no media yet (support.md has the full table). Places that are Euclidean beyond the seam and need new
+rays; rotations about the vertical only, and no media (support.md has the full table). Accuracy:
+the float32 hyperboloid coordinates cost relative error ε·w² far from o, as in H³; a floor's horizon
+band is hit beyond 4 from o, where directions are finite (the metric is a sum of squares in the
+transported basis) but off by up to percents. Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
 similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and

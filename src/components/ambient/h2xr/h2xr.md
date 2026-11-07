@@ -35,7 +35,16 @@ tests/witnesses/scenes/h2xrTwins.ts, checked by tests/components/h2xr.test.ts.
   horizon (hit points beyond about 4 from o) SwiftShader's form of a unit vector came out negative:
   NaN directions under next-event estimation in 2–14% of the pixels after 20 s (pt hid them: a NaN
   ray misses everything and reads the constant sky). The sum of squares cannot be negative; with it
-  the same renders have no NaN.
+  the same renders have no NaN. It keeps those directions finite, not accurate: either form's
+  relative error grows like ε·w² (measured in emulated float32 by the review: 2e-6 at 2 from o,
+  2e-4 at 4, 1e-2 at 6, order 1 at 8). The working radius for accurate shading is about 3 from o,
+  as in H³; the witnesses stay within 1.5.
+- **Directions are made tangent at the ray's origin** (`h2xr_tangent_at`) in the flow, the
+  vertical-plane root and the cylinder. A spawned ray keeps the direction sampled at its hit
+  point, off the spawned origin's tangent space by about the spawn offset, and the closed forms
+  assume tangency: without the projection a cylinder root landed up to 4e-5 inside the surface,
+  the next ray met the cylinder from inside (a back face, no emission), and the furnace read
+  3.9398 against 3.9514; with it, 3.95142.
 - **`MAX_DIST = 10`**, as H³; **`fp_uncertainty(p) = max(ABS, REL·max(p.w, |p.y|))`**. A horizontal
   floor seen from height h is hit beyond the clip by rays within about h/10 of the horizon, so a
   thin band of sky shows there (the declared far-clip truncation); unlike H³'s grazing bands

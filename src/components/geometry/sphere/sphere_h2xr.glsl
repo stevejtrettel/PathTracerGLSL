@@ -31,9 +31,10 @@ vec2 sphere_f(Ray ray, Sphere sp, float t) {
 //     the exit root.
 // The iterates approach the root from the side where f > 0, so f ≤ 0 at an iterate means it has
 // reached the root within float32 rounding of f: a hit there. Otherwise a hit when the step is at
-// most 1e-5·(1 + t) — near the root Newton's error after a step δ is of order δ², far below δ, and
-// the rounding of f in float32 keeps the steps from falling much below 1e-5 (measured on SwiftShader:
-// h2xr.md). 24 iterations without either (a ray grazing the silhouette within rounding) is a miss.
+// most 1e-5·(1 + t) — near a transversal root Newton's error after a step δ is of order δ², far
+// below δ; near a tangent (double) root it converges linearly and the error is about δ, still on
+// the f > 0 side, just outside the ball. The rounding of f in float32 keeps the steps from falling
+// much below 1e-5 (measured on SwiftShader: h2xr.md). 24 iterations without either (a ray grazing the silhouette within rounding) is a miss.
 bool sphere_intersect(Ray ray, Sphere sp, out float t) {
     bool inside = sphere_f(ray, sp, 0.0).x < 0.0;
     t = inside ? 2.0 * sp.radius : 0.0;

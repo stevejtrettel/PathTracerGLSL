@@ -9,7 +9,7 @@
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
 //           isometry_point(), isometry_tangent(), isometry_direction(); for the H²×R bodies,
-//           h2xr_form(), h2xr_h2(), h2xr_speed(), h2xr_sinhc(), h2xr_asinhc(), h2xr_basis(),
+//           h2xr_form(), h2xr_h2(), h2xr_tangent_at(), h2xr_speed(), h2xr_sinhc(), h2xr_asinhc(), h2xr_basis(),
 //           h2xr_local(), h2xr_world(),
 //           h2xr_vertical_plane_root() and h2xr_area_density().
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
@@ -64,11 +64,21 @@ float h2xr_speed(Direction v) {
     return sqrt(max(h2xr_form(v, v), 0.0));
 }
 
+// dir made tangent at `origin`: its H² part projected onto T_{origin_H}H² (⟨origin_H, origin_H⟩_H = −1).
+// A spawned ray keeps the direction sampled at its hit point, tangent there and off the spawned
+// origin's tangent space by about the spawn offset; the flow and the closed-form roots below assume
+// tangency: without the projection a cylinder root lands up to 4e-5 inside the surface (more than
+// a spawn offset; measured on SwiftShader), and the next ray meets the cylinder from inside.
+Direction h2xr_tangent_at(Point origin, Direction dir) {
+    return dir + h2xr_form(dir, origin) * h2xr_h2(origin);
+}
+
 // The point at arc length t along the geodesic leaving `origin` with unit velocity `dir`: the H²
 // part runs along an H² geodesic at speed s, the height at speed dir.y:
 // cosh(st)·origin_H + t·sinhc(st)·dir_H + (origin.y + dir.y·t)·e_y. No division by s, so a vertical
 // geodesic (s = 0) is exact.
 Point ambient_geodesic(Point origin, Direction dir, float t) {
+    dir = h2xr_tangent_at(origin, dir);
     float st = h2xr_speed(dir) * t;
     vec4 h = cosh(st) * h2xr_h2(origin) + (t * h2xr_sinhc(st)) * h2xr_h2(dir);
     h.y = origin.y + dir.y * t;
@@ -78,10 +88,11 @@ Point ambient_geodesic(Point origin, Direction dir, float t) {
 // The geodesic flow: the point at arc length t and the velocity there,
 // s·sinh(st)·origin_H + cosh(st)·dir_H + dir.y·e_y (the ARRIVAL direction).
 Ray ambient_flow(Ray r, float t) {
-    float s = h2xr_speed(r.direction);
+    Direction dir = h2xr_tangent_at(r.origin, r.direction);
+    float s = h2xr_speed(dir);
     float st = s * t;
-    Direction v = (s * sinh(st)) * h2xr_h2(r.origin) + cosh(st) * h2xr_h2(r.direction);
-    v.y = r.direction.y;
+    Direction v = (s * sinh(st)) * h2xr_h2(r.origin) + cosh(st) * h2xr_h2(dir);
+    v.y = dir.y;
     return Ray(ambient_geodesic(r.origin, r.direction, t), v, r.wl);
 }
 
@@ -108,10 +119,11 @@ Direction h2xr_world(Point p, vec3 l) {
 }
 
 // The metric on tangent vectors at p — the Minkowski form of R^{3,1} — evaluated as the dot product
-// of the components in the orthonormal basis. Far from o the form itself cancels (a tangent vector's
-// coordinates grow like w while its length stays 1), and on SwiftShader it came out negative —
-// NaN directions — at hit points beyond about 4 from o, which a floor seen near its horizon
-// reaches; the sum of squares cannot be negative.
+// of the components in the orthonormal basis. Far from o the form cancels (a tangent vector's
+// coordinates grow like w while its length stays 1) and on SwiftShader can come out negative at
+// hit points beyond about 4 from o, which a floor seen near its horizon reaches; the sum of squares
+// cannot be negative. This keeps such directions finite, not accurate: either way their relative
+// error grows like ε·w² (about 1e-4 at 4 from o, 1e-2 at 6, order 1 at 8).
 float ambient_dot(Direction v1, Direction v2, Point p) {
     return dot(h2xr_local(p, v1), h2xr_local(p, v2));
 }
@@ -180,9 +192,10 @@ vec3 ambient_sky_key(Point p, Direction v) {
 // with P = ⟨p, N⟩, W = ⟨v, N⟩, zero where tanh(st) = −s·P/W: t = (−P/W)·atanhc(−s·P/W), a root at
 // t > 0 iff P·W < 0 and s·|P| < |W|. No 1/s: a near-vertical ray loses nothing.
 bool h2xr_vertical_plane_root(Ray ray, vec4 N, out float t) {
+    Direction dir = h2xr_tangent_at(ray.origin, ray.direction);
     float P = h2xr_form(ray.origin, N);
-    float W = h2xr_form(ray.direction, N);
-    float s = h2xr_speed(ray.direction);
+    float W = h2xr_form(dir, N);
+    float s = h2xr_speed(dir);
     if (P * W >= 0.0 || s * abs(P) >= abs(W)) return false;
     t = (-P / W) * h2xr_atanhc(-s * P / W);
     return true;
@@ -192,7 +205,7 @@ bool h2xr_vertical_plane_root(Ray ray, vec4 N, out float t) {
 // solid angle at the point b (the Jacobi fields along a geodesic at angle β from the vertical grow
 // as sinh(t·sin β)/sin β and as t, and t·sin β = D_H). It replaces E³'s d² in the area ↔ solid
 // angle conversion, dω = cos·dA/J, and is symmetric in a and b. It depends on the direction, not
-// only on d: a light straight above falls off as 1/d², one at the same height as d/sinh d.
+// only on d: a light straight above falls off as 1/d², one at the same height as 1/(d·sinh d).
 float h2xr_area_density(Point a, Point b) {
     float dh = h2xr_hdistance(a, b);
     float dy = b.y - a.y;

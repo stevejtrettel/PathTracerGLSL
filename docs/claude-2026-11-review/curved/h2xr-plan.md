@@ -379,6 +379,7 @@ dim constant sky; checked on a lab render.
 | 7 | sky: constant and procedural, BSDF rays only | the key is exact; sampling it needs its Jacobian | add the sky-as-light row with a witness |
 | 8 | MAX_DIST = 10 | as H³; a floor's horizon band (rays within about h/10 of it) is clipped to sky — visible, unlike H³'s grazing bands | one constant |
 | 9 | the metric and frame through the transported basis (E1, e_y, E2) | the form cancels far from o (measured NaN) | the form |
+| 10 | ray directions projected onto the origin's tangent space in the flow and the closed-form roots | a spawned ray's direction is tangent at the hit point, not at the offset origin; measured furnace deficit 0.3% without it | project in ray_spawn instead (shared, all spaces) |
 
 ## 10. Review
 

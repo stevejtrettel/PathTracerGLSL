@@ -4,7 +4,7 @@
 // distance. Derivations: components/ambient/h2xr/h2xr.md.
 // Provides (struct GENERATED from descriptor rows): cylinder_sdf(), cylinder_intersect(),
 //           cylinder_normal().
-// Depends on: h2xr_speed(), h2xr_h2() (the H²×R occupant).
+// Depends on: h2xr_speed(), h2xr_h2(), h2xr_tangent_at() (the H²×R occupant).
 
 // Exact signed distance: with a = dist_H²(p, o) − R = asinh(|p.xz|) − R and b = |y| − h,
 // length(max((a, b), 0)) + min(max(a, b), 0).
@@ -23,7 +23,7 @@ float cylinder_sdf(Point p, Cylinder c) {
 bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
     float lo = -1.0e30, hi = 1.0e30;
     Point p = ray.origin;
-    Direction v = ray.direction;
+    Direction v = h2xr_tangent_at(p, ray.direction);   // the flow's direction (the occupant)
     if (v.y == 0.0) {
         if (abs(p.y) > c.halfHeight) return false;
     } else {

@@ -111,19 +111,21 @@ describe('H²×R witness twins', () => {
     }, 60000);
 
     it('every point-light window is covered by its surface and unshadowed, and its mean is the stated constant', () => {
-        const results: Array<[WindowKey, ReturnType<typeof pointWindow>, number]> = [];
+        const results: Array<[WindowKey, ReturnType<typeof pointWindow>, number, number]> = [];
         for (const k of Object.keys(H2XR_POINT_WINDOWS) as WindowKey[]) {
             const m = pointWindow(k);
             const isoMean = pointWindow(k, iso).mean, sinhMean = pointWindow(k, isoSinh).mean;
             console.log(`point-light ${k}: ${m.mean.toFixed(7)} (missed ${m.missed}, shadowed ${m.shadowed}); d² ${isoMean.toFixed(4)}, d·sinh d ${sinhMean.toFixed(4)}`);
-            results.push([k, m, isoMean]);
+            results.push([k, m, isoMean, sinhMean]);
         }
-        for (const [k, m, isoMean] of results) {
+        for (const [k, m, isoMean, sinhMean] of results) {
             expect(m.missed, k).toBe(0);
             expect(m.shadowed, k).toBe(0);
             expect(Number.isFinite(m.mean), k).toBe(true);
             expect(Math.abs(m.mean - H2XR_POINT_WINDOW_MEANS[k]), k).toBeLessThan(2e-5);
             expect(Math.abs(isoMean - m.mean), k).toBeGreaterThan(0.006);
+            // the horizontal-only density d·sinh d is separated on every window but the wall (0.0015)
+            if (k !== 'wall') expect(Math.abs(sinhMean - m.mean), k).toBeGreaterThan(0.006);
         }
     }, 120000);
 
