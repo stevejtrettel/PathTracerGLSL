@@ -100,14 +100,16 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         source: color.wavelengthSamplers[plan.program.estimator.wavelengths!],
     });
     const sensor = SENSORS[plan.program.measurement.sensor];
+    // The far clip (an arc length): the authored measurement.farClip, else the ambient space's
+    // default. MAX_DIST is it, and a quotient's walk bound is sized for it.
+    const farClip = farClipOf(plan.program.measurement.ambient, plan.program.measurement.farClip);
     blocks.push(
         // The colour projection calls the sensor's measurement response.
         { origin: `components/sensor/${sensor.id}/${sensor.id}.glsl`, source: sensor.glsl },
         { origin: `components/color/${color.id}/${color.id}.glsl`, source: color.glsl },
         // The far clip, then the ambient functions (and fp_uncertainty): after core math, whose
         // FP_UNCERTAINTY_* constants fp_uncertainty reads; before ray.glsl, which calls them.
-        // MAX_DIST is the far clip (AmbientDescriptor.farClip, or the measurement's farClip).
-        { origin: 'generated:far-clip', source: `#define MAX_DIST ${formatFloat(farClipOf(plan.program.measurement.ambient, plan.program.measurement.farClip))}` },
+        { origin: 'generated:far-clip', source: `#define MAX_DIST ${formatFloat(farClip)}` },
         ambient.functions,
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
@@ -119,7 +121,7 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     if (quotient !== undefined) {
         const q = QUOTIENTS[quotient.kind];
         if (q === undefined) throw new Error(`quotient '${quotient.kind}' has no occupant (Validator should have rejected it)`);
-        Object.assign(defines, q.defines(quotient, farClipOf(plan.program.measurement.ambient, plan.program.measurement.farClip)));
+        Object.assign(defines, q.defines(quotient, farClip));
         blocks.push({ origin: `components/quotient/${q.kind}/${q.kind}.glsl`, source: q.glsl });
     }
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).

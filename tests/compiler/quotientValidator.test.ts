@@ -1,4 +1,5 @@
-// The Validator's quotient rules (compiler/analyze/quotient.ts; plan Q1.5): each rule produces its
+// The Validator's quotient rules (compiler/analyze/quotient.ts; their reasons are in
+// docs/claude-2026-11-review/quotients-plan.md, Q1.5): each rule produces its
 // error, and a jungle-gym scene and a wall scene pass. Meshes and instance batches that cross a
 // face exercise the world-box code (positions × placement; placements × the prototype's box).
 

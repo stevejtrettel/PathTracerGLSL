@@ -114,8 +114,10 @@ How a program is assembled:
   shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB color.
   `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
   each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
-  (1000, glsl/core/math.glsl) is an absolute far clip: the environment and the directional
-  light are found there, by both BSDF rays and NEE.
+  is an absolute far clip: `measurement.farClip` when authored (required in a quotient, where
+  it is a real truncation), else the ambient space's default (1000 in Euclidean space,
+  `farClipOf` in components/ambient). The environment and the directional light are found
+  there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
   seed; `scene_intersect` fills a `Hit`; dot products go through `ambient_dot` (the
   curved-space seam).
@@ -237,15 +239,22 @@ How a program is assembled:
   constants/live controls and packed emitters in both modes. Surface dispersion uses
   one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
+- Closed manifolds (components/quotient/): the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z) in vacuum
+  (`ambientSpace.quotient`, required `measurement.farClip`): a generated cell walk, and NEE over
+  a 27-image table with partition MIS. Validator rules: no sky, delta lights, media, unbounded
+  or driven geometry; objects inside the fundamental domain except period-spanning unrotated
+  boxes (docs/claude-2026-11-review/quotients-plan.md, Milestone Q1a).
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
+registered); media in a quotient (plan Q1b) and other quotients (Seifert–Weber, Q2); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: 221 of the 265 synchronous suite scenes warn that the transport
+**Known open defects**: in the 3-torus, with a GGX ball at roughness 0.15, pt-nee read 2.8% low
+against pt and pt-mis (cause untested; the `torus-lights` witness uses roughness 0.45, and
+CHANGELOG 2026-11-07 names the check that would decide it). 221 of the 265 synchronous suite scenes warn that the transport
 feature provides `light_query_medium` with nothing requiring it (dead generated code; an
 exact-linkage gap, not yet investigated). Float-sampler precision outside the two spectral tables still needs
 a portability audit (many declarations use GLSL's default lowp; SwiftShader does not expose

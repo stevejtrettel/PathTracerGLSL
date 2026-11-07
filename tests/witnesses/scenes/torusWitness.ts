@@ -15,7 +15,8 @@
 // faces of D (so whether a light image is in NEE's table changes across the picture) and a disk
 // light of about four times its power deeper in D. pt, pt-nee, pt-mis (power selection) and
 // pt-mis with the light tree must converge to the same image: partition MIS is unbiased only if
-// NEE's image table and MIS's identification of the hit image agree (plan Q1.1, Q1.4).
+// NEE's image table and MIS's identification of the hit image agree (the argument is in
+// docs/claude-2026-11-review/quotients-plan.md, Q1.1 and Q1.4).
 
 import type { SceneDescription, RenderStrategy, Transform, Vec3, ObjectDescription } from '../../../src/compiler/types.js';
 import { withPose } from '../../../src/authoring/strategy.js';
@@ -117,8 +118,11 @@ export const torusLights: SceneDescription = {
     ],
     materials: {
         beam: { model: 'lambert', albedo: [0.7, 0.68, 0.62] },
-        // Rough enough that pt-nee is not firefly-bound: with 27 images, NEE at a sharp lobe
-        // (roughness 0.15) is so heavy-tailed that 1,024 spp still read 4.7% low (Δ 7.6% at 128).
+        // Roughness 0.45. At roughness 0.15 pt-nee read 2.8% low against pt, pt-mis and pt-mis
+        // with the light tree (256 spp, χ²ᵣ 145; 7.6% low at 128 spp and 4.7% at 1,024 in a
+        // variant without beams). Heavy-tailed NEE samples (27 images × a sharp lobe) are a
+        // plausible cause, but no decisive check has been run, so an estimator bias at sharp
+        // lobes is not ruled out (CHANGELOG 2026-11-07 says which check would decide it).
         gloss: { model: 'ggx', roughness: 0.45, f0: [0.95, 0.8, 0.55] },
         matte: { model: 'lambert', albedo: [0.3, 0.45, 0.75] },
     },

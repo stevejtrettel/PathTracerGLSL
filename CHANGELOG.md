@@ -6,8 +6,9 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
 ## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
 
-[Plan](docs/claude-2026-11-review/quotients-plan.md) (review commit 253a9ba), Milestone Q1a
-(vacuum). Fog in the quotient (Q1b) is not built.
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1a (vacuum); its evidence and
+twins are in docs/claude-2026-11-review/quotients/ (both committed on this branch). Fog in the
+quotient (Q1b) is not built.
 
 **What was built:**
 - `measurement.farClip` (a truncation field) over the ambient descriptor's default `farClip`;
@@ -28,10 +29,24 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 - vitest twins: the float32 walk (tests/components/quotient/torusWalk.test.ts) and the float64
   partition-MIS twin with its W1/W2 controls (torusMis.test.ts).
 - Demo `torus-room`: a jungle-gym room repeating in every direction.
+- Review fixes: the plan and its evidence committed beside the code; the plan's float32-twin
+  sentence corrected (the cell sequence matched float64 on 3,993 of 4,000 rays; the 7 others
+  are edge or vertex passages); the far clip computed once in core.ts; the quotient family's
+  taxonomy is `scene` in both its README and registry; the demo text says farClip 16.
 
-**Measured along the way:** at GGX roughness 0.15, pt-nee in the torus is firefly-dominated
-(27 images × a sharp lobe): 2.8% low at 256 spp, still 4.7% low at 1,024 spp in a variant,
-with χ² invalid; the witness uses roughness 0.45.
+**Measured along the way, cause untested:** with the glossy ball at GGX roughness 0.15,
+`torus-lights` pt-nee read 2.8% low against pt ≡ pt-mis ≡ pt-mis with the light tree (256 spp,
+χ²ᵣ 145). A matte-ball variant and a roughness-0.45 variant agree (0.06%, 0.52%). In a variant
+without beams the deficit shrank with samples (7.6% at 128 spp, 4.7% at 1,024), and the
+per-block pt-nee/pt-mis map was mostly negative with rare +46% and +84% blocks. That fits
+heavy-tailed NEE samples (27 images × a sharp lobe), but it is not shown: pt-mis cannot confirm
+the NEE side, because MIS gives NEE samples little weight exactly where the BSDF pdf is high,
+and an estimator bias in pt-nee at sharp lobes is not ruled out. The witness was moved to
+roughness 0.45, so it does not test that regime. **Decisive check (not run):** the
+roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the samples
+(4,096 and 16,384 spp) under independent salts: heavy tails predict a deficit that keeps
+shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
+deficit that stays near 2.8%.
 
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 

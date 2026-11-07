@@ -2,7 +2,8 @@
 // torus_face_times (components/quotient/torus/torus.glsl): every arithmetic step rounds to float32
 // with Math.fround, in the order the GLSL writes it. Port of the review twin
 // docs/claude-2026-11-review/quotients/torus-code/dda_bound_twin.py, plus exact ±0.0 direction
-// components and the image identification of quotient_image (plan Q1.1).
+// components and the image identification of quotient_image (derived in
+// docs/claude-2026-11-review/quotients-plan.md, Q1.1).
 //
 // What it checks, for random rays (origins in D, far outside D, exactly on a face; directions
 // generic and near-axis), random periods 0.3–3 and far clips 1–200:

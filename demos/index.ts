@@ -532,7 +532,7 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         scene: torusRoomScene,
         strategies: posed([0.95, 0.9, 0.85], [-0.2, -1.3, -0.9], torusRoomStrategy, torusRoomPtStrategy),
         exercises:
-            'DEMO — the cube 3-torus E³/(2Z)³ (components/quotient/torus): one cell holds three beams through its center, three balls (terracotta, glass, gold) and two sphere lamps; every ray leaving the cell comes back through the opposite face, so the room repeats in every direction. NEE samples one of 27 images of each lamp (partition MIS); farClip 12',
+            'DEMO — the cube 3-torus E³/(2Z)³ (components/quotient/torus): one cell holds three beams through its center, three balls (terracotta, glass, gold) and two sphere lamps; every ray leaving the cell comes back through the opposite face, so the room repeats in every direction. NEE samples one of 27 images of each lamp (partition MIS); farClip 16',
         expected:
             'an endless jungle gym of beams receding in every direction, with the same three balls and the warm and cool lamps repeating in every room; key 1 (pt-mis) and key 2 (pt) converge to the same image',
     },

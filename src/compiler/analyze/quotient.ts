@@ -43,7 +43,7 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
     const m = QUOTIENT_MARGIN;
     const label = `quotient '${q.kind}'`;
 
-    // C3: one far clip for every segment, and every image in the NEE table within it of every
+    // One far clip for every segment, and every image in the NEE table within it of every
     // vertex. With emitters inside D by m and vertices within rounding of D, every image in the
     // table lies within 2·diam(D) of every vertex.
     const farClip = strategy.measurement.farClip;
@@ -54,7 +54,7 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
         bag.error('invalid-setting', `${label}: measurement.farClip ${farClip} is below 2·diam(D) = ${minClip.toPrecision(4)} — a BSDF ray must be able to reach every light image NEE samples`).add();
     }
 
-    // C4: BSDF rays never hit a delta light, so its images outside the NEE table would be lost.
+    // BSDF rays never hit a delta light, so its images outside the NEE table would be lost.
     scene.lights.forEach((light, i) => {
         const k = LIGHT_KINDS[light.kind];
         if (k === undefined) return;   // the light rules report it

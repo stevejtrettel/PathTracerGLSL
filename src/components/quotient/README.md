@@ -1,6 +1,7 @@
 # quotient/ — closed manifolds M = X/Γ
 
-**Taxonomy:** scene (part of the space the light lives in — WHAT integral). **Kind:**
+**Taxonomy:** scene (part of the space the light lives in — WHAT integral; like the ambient
+space, the Planner copies it into `ProgramDescription.measurement`). **Kind:**
 pick-at-most-one — `scene.ambientSpace.quotient`, absent for the space X itself.
 
 ## What an occupant supplies
@@ -51,6 +52,7 @@ along them). Emitters must lie inside D.
 
 - `torus/` — the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), |S| = 27.
 
-The design, its evidence and the float twins are in docs/claude-2026-11-review/quotients-plan.md
-(Milestone Q1) and its folder quotients/ (review commit 253a9ba); the twins the vitest suite
-keeps are tests/components/quotient/.
+The design and its evidence (the derivations, the float64 Monte Carlo twins and the float32 walk
+twin) are in docs/claude-2026-11-review/quotients-plan.md (Milestone Q1) and the folder
+docs/claude-2026-11-review/quotients/; the twins the vitest suite keeps are in
+tests/components/quotient/.

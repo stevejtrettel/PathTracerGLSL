@@ -1,4 +1,4 @@
-// Quotient registry (measurement pick-at-most-one family — the group Γ of a closed manifold
+// Quotient registry (scene pick-at-most-one family — the group Γ of a closed manifold
 // M = X/Γ, a property of the scene's ambient space). An occupant = one folder (<kind>.ts: the
 // descriptor; <kind>.glsl: the static lattice math, the contract in README.md) + one line below.
 // The walks across the fundamental domain's faces and the image-aware NEE/MIS wrappers are
