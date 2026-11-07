@@ -4,6 +4,35 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md) (review commit 253a9ba), Milestone Q1a
+(vacuum). Fog in the quotient (Q1b) is not built.
+
+**What was built:**
+- `measurement.farClip` (a truncation field) over the ambient descriptor's default `farClip`;
+  `MAX_DIST` is emitted from it. Non-quotient programs are unchanged (digest: only the define
+  moved; frames: 30 of 30 pictures identical).
+- `ambientSpace.quotient: { kind: 'torus', size }` and the new component family
+  `components/quotient/` (torus occupant: static lattice math; no locked-type change, no `Hit`
+  field — the MIS side recovers the hit image by rounding).
+- In quotient programs only: the generated cell walk (`scene_intersect` / `scene_intersect_any`
+  over `scene_intersect_cell`), image-aware NEE and MIS (27 images, partition MIS: an image
+  outside the table has NEE density 0, so its BSDF hit keeps weight 1), the pt-nee emitter rule.
+- Validator rules (compiler/analyze/quotient.ts): far clip ≥ 2·diam(D), no delta lights, no sky,
+  no media, no unbounded or driven geometry, everything inside D by EPS_INTERFACE except
+  unrotated boxes spanning whole periods; emitters strictly inside.
+- Witnesses `torus-crystal` (≡ the unrolled crystal `torus-crystal-ref`: Δmean 0.01%, rmse
+  1.8%) and `torus-lights` (pt ≡ pt-nee ≡ pt-mis ≡ pt-mis with the light tree: Δmean 0.38%,
+  χ²ᵣ 1.19); the latter fails as required with a W1-like (Δ 10.2%) and a W2-like (Δ 7.5%) error.
+- vitest twins: the float32 walk (tests/components/quotient/torusWalk.test.ts) and the float64
+  partition-MIS twin with its W1/W2 controls (torusMis.test.ts).
+- Demo `torus-room`: a jungle-gym room repeating in every direction.
+
+**Measured along the way:** at GGX roughness 0.15, pt-nee in the torus is firefly-dominated
+(27 images × a sharp lobe): 2.8% low at 256 spp, still 4.7% low at 1,024 spp in a variant,
+with χ² invalid; the witness uses roughness 0.45.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.
