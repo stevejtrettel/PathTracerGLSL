@@ -10,65 +10,66 @@ microfacet.glsl) are not listed: the witnesses of each space establish them. Fil
 families (pixel, sampler, sensor, color, accumulator, tonemap) never see a point and are
 not keyed by space.
 
-| family | occupant or feature | euclidean | hyperbolic | spherical |
-|---|---|---|---|---|
-| geometry | sphere | yes | yes | yes |
-| geometry | plane | yes | yes | yes |
-| geometry | box | yes | — | — |
-| geometry | quad | yes | — | — |
-| geometry | cylinder | yes | — | — |
-| geometry | disk | yes | yes | yes |
-| geometry | torus | yes | — | — |
-| geometry | bottle | yes | — | — |
-| geometry | knob | yes | — | — |
-| geometry | menger | yes | — | — |
-| geometry | apollonian | yes | — | — |
-| lights | point | yes | yes | yes |
-| lights | quad | yes | — | — |
-| lights | sphere | yes | — | — |
-| lights | disk | yes | yes | yes |
-| lights | spot | yes | — | — |
-| lights | mesh | yes | — | — |
-| lights | directional | yes | — | — |
-| lights | beam | yes | — | — |
-| lights | softbeam | yes | — | — |
-| materials | lambert | yes | yes | yes |
-| materials | dielectric | yes | — | — |
-| materials | rough_dielectric | yes | — | — |
-| materials | ggx | yes | — | — |
-| materials | mirror | yes | — | — |
-| materials | checker | yes | — | — |
-| volume_scattering | hg | yes | yes | yes |
-| volume_scattering | rayleigh | yes | — | — |
-| camera | pinhole | yes | yes | yes |
-| camera | thinlens | yes | — | — |
-| camera | equirect | yes | — | — |
-| camera | orthographic | yes | — | — |
-| camera | fisheye | yes | yes | yes |
-| camera | cylindrical | yes | — | — |
-| env chart | equirect | yes | — | — |
-| env chart | octahedral | yes | — | — |
-| aov | albedo | yes | — | — |
-| aov | normal | yes | — | — |
-| light selection | power | yes | yes | yes |
-| light selection | uniform | yes | yes | yes |
-| light selection | bvh | yes | — | — |
-| mesh traversal | brute | yes | — | — |
-| mesh traversal | bvh | yes | — | — |
-| instance traversal | linear | yes | — | — |
-| instance traversal | tlas | yes | — | — |
-| instance traversal | cwbvh | yes | — | — |
-| object dispatch | unrolled | yes | yes | yes |
-| object dispatch | table | yes | — | — |
-| limitation | mesh objects | yes | — | — |
-| limitation | instanced objects | yes | — | — |
-| limitation | object scale other than 1 | yes | — | — |
-| limitation | marched objects | yes | — | — |
-| limitation | materials that read uv or hold GLSL expressions | yes | — | — |
-| limitation | media on the null-collision (tracking) arms | yes | — | — |
-| limitation | deflecting (GRIN) media | yes | — | — |
-| limitation | an ambient medium | yes | — | — |
-| limitation | mediumLightSampling 'equiangular' | yes | — | — |
-| limitation | an environment | yes | yes | — |
-| limitation | an environment sampled as a light | yes | — | — |
-| limitation | emissive objects sampled as lights | yes | — | — |
+| family | occupant or feature | euclidean | hyperbolic | spherical | h2xr |
+|---|---|---|---|---|---|
+| geometry | sphere | yes | yes | yes | yes |
+| geometry | plane | yes | yes | yes | yes |
+| geometry | box | yes | — | — | — |
+| geometry | quad | yes | — | — | — |
+| geometry | cylinder | yes | — | — | yes |
+| geometry | disk | yes | yes | yes | yes |
+| geometry | torus | yes | — | — | — |
+| geometry | bottle | yes | — | — | — |
+| geometry | knob | yes | — | — | — |
+| geometry | menger | yes | — | — | — |
+| geometry | apollonian | yes | — | — | — |
+| lights | point | yes | yes | yes | yes |
+| lights | quad | yes | — | — | — |
+| lights | sphere | yes | — | — | — |
+| lights | disk | yes | yes | yes | yes |
+| lights | spot | yes | — | — | — |
+| lights | mesh | yes | — | — | — |
+| lights | directional | yes | — | — | — |
+| lights | beam | yes | — | — | — |
+| lights | softbeam | yes | — | — | — |
+| materials | lambert | yes | yes | yes | yes |
+| materials | dielectric | yes | — | — | — |
+| materials | rough_dielectric | yes | — | — | — |
+| materials | ggx | yes | — | — | — |
+| materials | mirror | yes | — | — | — |
+| materials | checker | yes | — | — | — |
+| volume_scattering | hg | yes | yes | yes | — |
+| volume_scattering | rayleigh | yes | — | — | — |
+| camera | pinhole | yes | yes | yes | yes |
+| camera | thinlens | yes | — | — | — |
+| camera | equirect | yes | — | — | — |
+| camera | orthographic | yes | — | — | — |
+| camera | fisheye | yes | yes | yes | yes |
+| camera | cylindrical | yes | — | — | — |
+| env chart | equirect | yes | — | — | — |
+| env chart | octahedral | yes | — | — | — |
+| aov | albedo | yes | — | — | — |
+| aov | normal | yes | — | — | — |
+| light selection | power | yes | yes | yes | yes |
+| light selection | uniform | yes | yes | yes | yes |
+| light selection | bvh | yes | — | — | — |
+| mesh traversal | brute | yes | — | — | — |
+| mesh traversal | bvh | yes | — | — | — |
+| instance traversal | linear | yes | — | — | — |
+| instance traversal | tlas | yes | — | — | — |
+| instance traversal | cwbvh | yes | — | — | — |
+| object dispatch | unrolled | yes | yes | yes | yes |
+| object dispatch | table | yes | — | — | — |
+| limitation | mesh objects | yes | — | — | — |
+| limitation | instanced objects | yes | — | — | — |
+| limitation | object scale other than 1 | yes | — | — | — |
+| limitation | object rotations about a non-vertical axis | yes | yes | yes | — |
+| limitation | marched objects | yes | — | — | — |
+| limitation | materials that read uv or hold GLSL expressions | yes | — | — | — |
+| limitation | media on the null-collision (tracking) arms | yes | — | — | — |
+| limitation | deflecting (GRIN) media | yes | — | — | — |
+| limitation | an ambient medium | yes | — | — | — |
+| limitation | mediumLightSampling 'equiangular' | yes | — | — | — |
+| limitation | an environment | yes | yes | — | yes |
+| limitation | an environment sampled as a light | yes | — | — | — |
+| limitation | emissive objects sampled as lights | yes | — | — | — |

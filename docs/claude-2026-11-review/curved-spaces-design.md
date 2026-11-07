@@ -206,8 +206,9 @@ Box, cylinder, torus (with the march through ambient_flow and curved normals), q
 centered (a, b) rectangle, the sphere light (cone sampler; S³ flip rule: sample the forward
 cone, flip ω below n or with probability ½, light distance 2π − far root), other materials with
 witnesses, Klein-chart Euclidean SDFs in H³, meshes through Klein/gnomonic charts, image-sky NEE
-in H³ (Jacobian 1/((x+v)₄)², evaluated at the scattering vertex), H²×R, isometric App controls,
-quotients ([quotients plan](quotients-plan.md) when written).
+in H³ (Jacobian 1/((x+v)₄)², evaluated at the scattering vertex), isometric App controls,
+quotients ([quotients plan](quotients-plan.md) when written). H²×R has its own plan and first
+subset: [curved/h2xr-plan.md](curved/h2xr-plan.md).
 
 ## 7. Provisional choices (model's, unconfirmed)
 

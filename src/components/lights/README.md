@@ -58,11 +58,12 @@ material model backing it, `LIGHT_BACKING_MODEL` in compiler/plan/dataTenants.ts
 space the point row is the backing region's isometry applied to o and the direction rows the
 same isometry applied to them at o, 4-vectors — compiler/plan/curved.ts; the H³ bodies,
 `<kind>_hyperbolic.glsl`, use the area density sinh² r in place of r², the S³ bodies,
-`<kind>_spherical.glsl`, sin² r and the arc rule above), `delta`, `authoredParams` (the kind's
+`<kind>_spherical.glsl`, sin² r and the arc rule above, the H²×R bodies, `<kind>_h2xr.glsl`, the
+direction-dependent d²·sinh(D_H)/D_H, `h2xr_area_density`, D_H the H² distance), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
 loop derives unknown-key/required/shape/constraint checks from it, including a row's
 `constraintIn` (the further domain a space's body requires: the S³ disk light's radius lies
-in (0, π), `SPHERICAL_RADIUS`), and runs `validateAuthored`
+in (0, π), `SPHERICAL_RADIUS`; the H²×R disk light's normal is vertical, `H2XR_VERTICAL`), and runs `validateAuthored`
 only on well-shaped input; the desugar-totality contract test keeps it honest
 against the desugar functions in both drift directions), `params` (rows = generated
 struct fields = ctor order; radiometric rows are `Spectrum`; geometric rows carry a

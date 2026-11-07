@@ -67,7 +67,8 @@ A primitive supplies:
    declares `kind` (point | vector | direction | length — how it transforms under a
    similarity), `shape`, `required`, `default`, `constraint`, and `constraintIn`: the further
    domain a space's body requires, keyed by space — an S³ sphere or disk radius lies in (0, π),
-   `SPHERICAL_RADIUS`), the declared surface
+   `SPHERICAL_RADIUS`; in H²×R a plane's normal is vertical or horizontal and a disk's vertical,
+   `H2XR_VERTICAL_OR_HORIZONTAL` and `H2XR_VERTICAL`), the declared surface
    (`provides.sdf` / `provides.analytic`), flat facts (`thin`),
    and — only when genuinely irregular — the `derivedFields`/`derivedCtorFields`
    pair (quad: the precompiled one-sided normal, a compile-time literal shared with
@@ -94,14 +95,16 @@ classification, region tables ("descriptors declare facts; generators decide").
 1. `geometry/<type>/<type>.glsl` — the math, per the symbol contract.
 2. `geometry/<type>/<type>.ts` — the descriptor; its `glsl` lists the file under each ambient
    space it is implemented in (`{ euclidean: { origin, source } }`; ambient/README.md).
-   A curved body (`<type>_hyperbolic.glsl`, `<type>_spherical.glsl`) is the shape canonically at the origin o of its own
+   A curved body (`<type>_hyperbolic.glsl`, `<type>_spherical.glsl`, `<type>_h2xr.glsl`) is the shape canonically at the origin o of its own
    frame: its struct is generated from the rows without the point row (folded into the object's
    isometry), a direction row arrives as a tangent vector at o (`Direction(x, y, z, 0.0)`), and it
    provides `<type>_intersect(Ray, <Type>, out float t)` (t = arc length), `Direction
    <type>_normal(Point, <Type>)` and, with `provides.sdf`, `float <type>_sdf(Point, <Type>)`, all
    in that frame. In S³ the returned t is the first hit in (0, 2π) (every geodesic closes after 2π;
    a great sphere is crossed twice per period, at antipodal points). Curved bodies have no uv chart (a uv-reading material is a limitation row) and
-   no march (sphere, plane and disk are closed forms; a marched object is a limitation row).
+   no march (sphere, plane, disk and the H²×R cylinder are closed forms; the H²×R ball, which has
+   none, is a convex Newton iteration on the squared distance, not the SDF march; a marched object
+   is a limitation row).
 3. One line in `index.ts` (`PRIMITIVES`).
 
 Placement (constant folds, wrapper tiers, driven uniforms), regions, and epsilons

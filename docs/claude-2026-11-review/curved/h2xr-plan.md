@@ -78,7 +78,13 @@ and 4e-6 for asinh at x = 0.05, falling as x grows. This matters most for the ar
   point straight above is exact.
 - **Aim**: one geodesic joins two points (H²×R is a Hadamard manifold), so `along` selects nothing;
   remaining = d.
-- **Frame**: H³'s longest-axis Gram–Schmidt with the H² projection above (e_y is always tangent).
+- **Frame**: ~~H³'s longest-axis Gram–Schmidt with the H² projection above~~. *Changed during the
+  build*: the metric and the frame go through the orthonormal basis (E1, e_y, E2) of T_p (the axes
+  at o carried along the H² geodesic; no cancellation): `ambient_dot` is the dot product of the
+  components, `ambient_frame` an orthonormal completion of n's components. The Minkowski form
+  cancels far from o, and on SwiftShader it came out negative (NaN directions under NEE, 2–14% of
+  the demo's pixels) at floor hits beyond about 4 from o, near the floor's horizon [checked-num:
+  lab captures counting NaN pixels, before and after]. Undo: the form, which is exact only near o.
 - **Parallel transport** [math]: the height component is parallel; the H² part uses H³'s formula
   v_H + ⟨b_H, v⟩_H/(1 − ⟨a_H, b_H⟩_H)·(a_H + b_H). No caller (in-progress seam, as in H³/S³).
 - **Sky key** [checked-num, curved/far-precision-media/h2xr_key.ts]: a geodesic's endpoint class is
@@ -213,8 +219,13 @@ the object's frame (the arm moves the ray in by G⁻¹; the center row is folded
     with f > 0: miss. Else t ← t − f/f′.
   - inside (f(0) < 0): start at t = 2R (d(γ(2R), c) ≥ 2R − d(p, c) > R, so f > 0 there and the exit
     root lies between), iterate down to the exit root.
-  - stop when |step| ≤ 1e-6·(1 + t) (hit) or after 24 iterations (miss: only rays grazing within
-    rounding of the silhouette); a hit requires t > 0 (floor 0, escape is ray_spawn's offset).
+  - stop at an iterate with f ≤ 0 (the root within float32 rounding of f: the iterates approach it
+    from f > 0) or when |step| ≤ 1e-5·(1 + t) (hit), or after 24 iterations (miss: only rays grazing
+    within rounding of the silhouette); a hit requires t > 0 (floor 0, escape is ray_spawn's
+    offset). *Changed during the build*: the first rule, |step| ≤ 1e-6·(1 + t) alone, left 8 holes in
+    4096 near-silhouette rays on SwiftShader (rounding of f keeps the steps near 1e-5); with this rule
+    0 hit/miss disagreements with fp64, hit points within 1.3 spawn offsets of the surface
+    [checked-num, scratchpad cv-h2r/newton-probe.mjs].
   - f′(t) = 2·asinhc(r(t))·γ′(t).w + 2·(p.y + v.y·t)·v.y, with r(t) = |γ(t).xz| = sinh D_H(t) (from
     d(D_H²)/dt = 2·D_H·γ′.w/sinh D_H) — stable through the axis D_H = 0.
   - normal: (asinhc(r)·p.w·p.x, p.y, asinhc(r)·p.w·p.z, asinhc(r)·r²)/d (the unit velocity at p of
@@ -366,7 +377,8 @@ dim constant sky; checked on a lab render.
 | 5 | ball by convex Newton (24 iterations max) | no closed form; monotone convergence is sound | a bracketed solver |
 | 6 | no media in H²×R | no witness of the medium walker there yet | list hg and add an h2xr-medium witness |
 | 7 | sky: constant and procedural, BSDF rays only | the key is exact; sampling it needs its Jacobian | add the sky-as-light row with a witness |
-| 8 | MAX_DIST = 10 | as H³ | one constant |
+| 8 | MAX_DIST = 10 | as H³; a floor's horizon band (rays within about h/10 of it) is clipped to sky — visible, unlike H³'s grazing bands | one constant |
+| 9 | the metric and frame through the transported basis (E1, e_y, E2) | the form cancels far from o (measured NaN) | the form |
 
 ## 10. Review
 

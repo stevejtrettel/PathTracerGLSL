@@ -51,15 +51,24 @@ locals inside component bodies (the cameras' look-at frames, for one) still say 
 ## Curved spaces
 
 A curved occupant (`hyperbolic/`: H³, curvature −1, the hyperboloid model; `spherical/`: S³,
-curvature +1, the unit sphere in R⁴) stores points and tangent vectors as 4-vectors (`Point` and
-`Direction` are `vec4`) and supplies, besides the contract above:
+curvature +1, the unit sphere in R⁴; `h2xr/`: H²×R, the height y and the hyperboloid of R^{2,1} on
+(x, z, w)) stores points and tangent vectors as 4-vectors (`Point` and `Direction` are `vec4`) and
+supplies, besides the contract above:
 
+- **`Point isometry_point(mat4 m, Point p)`, `Direction isometry_tangent(mat4 m, Direction v)`** —
+  an object's placement applied to a point and to a tangent vector (the generated arm moves the ray
+  into the object's frame with them, the region query its point). In H³ and S³ the isometry is a
+  linear map and both are `m * x`; in H²×R it is affine (a translation of R), and the mat4 is an
+  encoding: m[3][1] holds the height shift, the rest the H² isometry on (x, z, w) (h2xr/h2xr.md).
 - **`Direction isometry_direction(mat4 inverse, Direction v)`** — the world image G·v of a tangent
   vector given in an object's frame, from the object's INVERSE placement G⁻¹ (H³:
-  J·((J·v)·G⁻¹), J = diag(1,1,1,−1); S³: v·G⁻¹; the generated arms map normals with it).
+  J·((J·v)·G⁻¹), J = diag(1,1,1,−1); S³: v·G⁻¹; H²×R: H³'s with G⁻¹'s shift stripped; the
+  generated arms map normals with it).
 - **Its CPU geometry** (`<type>.ts`, the `CurvedGeometry` of `isometry.ts`): the form, exp_o and
-  log_o at the origin o = (0,0,0,1), the transvection by a tangent vector at o, and the exact
-  inverse of an isometry. Registered as the descriptor's `curved` field; its presence is the one
+  log_o at the origin o = (0,0,0,1), the transvection by a tangent vector at o, the exact inverse,
+  composition and application (to points and to tangent vectors) of an isometry, the rotation at o
+  of an authored quaternion, and the projection onto a tangent space (H³ and S³ take the linear
+  ones, `linearIsometries`). Registered as the descriptor's `curved` field; its presence is the one
   fact "this space is curved" (`curvedGeometryOf`).
 
 S³ adds two facts no other space has. Two geodesics join any two points, of lengths d and 2π − d,
@@ -130,9 +139,13 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 
 ## Status & the honest caveat
 
-Occupants: `euclidean/`, `hyperbolic/` (H³) and `spherical/` (S³). In both curved spaces: sphere,
-plane and disk shapes; point and disk lights; lambert; pinhole and fisheye; hg in homogeneous
-object media; in H³ also sky lookup by BSDF rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
+Occupants: `euclidean/`, `hyperbolic/` (H³), `spherical/` (S³) and `h2xr/` (H²×R). In H³ and S³:
+sphere, plane and disk shapes; point and disk lights; lambert; pinhole and fisheye; hg in
+homogeneous object media; in H³ also sky lookup by BSDF rays. In H²×R: the metric ball (an iterated
+root: convex Newton), horizontal and vertical planes (the only totally geodesic surfaces there),
+horizontal disks and the capped vertical cylinder; point lights and horizontal disk lights with the
+direction-dependent area density d²·sinh(D_H)/D_H; lambert; pinhole and fisheye; sky lookup by BSDF
+rays; rotations about the vertical only, and no media yet (support.md has the full table). Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
 similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
@@ -161,6 +174,16 @@ non-identity transform is an error there).
   uniform selection), `s3-medium` (pt = pt-nee = pt-mis for a scattering ball lit through both arcs,
   the ½ rule). The CPU geometry and the occupant's arc arithmetic are pinned by
   tests/components/spherical.test.ts.
+- H²×R (tests/witnesses/scenes/h2xrWitness.ts; every occupant and estimator key listed under h2xr
+  in support.md is rendered by one of them): `h2xr-furnace` (a box of vertical and horizontal
+  planes with an emissive ball and column, Σ_{k≤6} 0.8^k exactly, pinhole and fisheye),
+  `h2xr-disk-light` (pt = pt-nee = pt-mis on a disk receiver against the closed form,
+  tests/witnesses/scenes/h2xrTwins.ts), `h2xr-point-light` (windows on a disk, a vertical wall, a
+  placed ball and a column's wall and cap, power and uniform selection), `h2xr-sky` (black shapes,
+  one under a {param}-driven placement, under the sky 1 + key: every silhouette and the key, pinhole
+  and fisheye). The occupant's math, the CPU geometry and the GLSL decode of the placement are
+  pinned by tests/components/h2xr.test.ts against independent computations (an ODE integration,
+  finite differences of exp, Monte Carlo ray hits, sphere tracing).
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

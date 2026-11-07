@@ -13,6 +13,8 @@ import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import lightDiskGLSL from './disk.glsl?raw';
 import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 import diskSphericalGLSL from './disk_spherical.glsl?raw';
+import diskH2xrGLSL from './disk_h2xr.glsl?raw';
+import { H2XR_VERTICAL } from '../../ambient/h2xr/h2xr.js';
 
 export const diskLightDescriptor: LightKindDescriptor = {
     kind: 'disk',
@@ -20,6 +22,7 @@ export const diskLightDescriptor: LightKindDescriptor = {
         euclidean: { origin: 'components/lights/disk/disk.glsl', source: lightDiskGLSL },
         hyperbolic: { origin: 'components/lights/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
         spherical: { origin: 'components/lights/disk/disk_spherical.glsl', source: diskSphericalGLSL },
+        h2xr: { origin: 'components/lights/disk/disk_h2xr.glsl', source: diskH2xrGLSL },
     },
     delta: false,
     // Authored input (besides kind/emission): position → row `center`; optional normal.
@@ -28,7 +31,7 @@ export const diskLightDescriptor: LightKindDescriptor = {
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },
         { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },
-        { name: 'normal', shape: 'vec3', required: false, kind: 'direction', default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
+        { name: 'normal', shape: 'vec3', required: false, kind: 'direction', default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 }, constraintIn: { h2xr: H2XR_VERTICAL } },
     ],
     params: [
         { name: 'center', shape: 'vec3', kind: 'point' },

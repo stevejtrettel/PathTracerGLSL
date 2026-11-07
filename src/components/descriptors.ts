@@ -63,7 +63,11 @@ export type RowConstraint =
     | { kind: 'positive' }
     | { kind: 'min-length'; value: number }
     | { kind: 'interval'; min: number; max: number }
-    | { kind: 'closed-interval'; min: number; max: number };
+    | { kind: 'closed-interval'; min: number; max: number }
+    /** A direction along ±y (x = z = 0 exactly). */
+    | { kind: 'vertical' }
+    /** A direction along ±y or in the xz-plane (y = 0 exactly). */
+    | { kind: 'vertical-or-horizontal' };
 
 /** Further domains a row's value must lie in when the program runs in a particular space, keyed by
  *  AMBIENT_SPACES key: what the occupant's body for that space requires beyond the row's own

@@ -7,6 +7,7 @@ import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import sphereGLSL from './sphere.glsl?raw';
 import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
 import sphereSphericalGLSL from './sphere_spherical.glsl?raw';
+import sphereH2xrGLSL from './sphere_h2xr.glsl?raw';
 
 export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
@@ -18,6 +19,7 @@ export const sphereDescriptor: PrimitiveDescriptor = {
         euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL },
         hyperbolic: { origin: 'components/geometry/sphere/sphere_hyperbolic.glsl', source: sphereHyperbolicGLSL },
         spherical: { origin: 'components/geometry/sphere/sphere_spherical.glsl', source: sphereSphericalGLSL },
+        h2xr: { origin: 'components/geometry/sphere/sphere_h2xr.glsl', source: sphereH2xrGLSL },
     },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it

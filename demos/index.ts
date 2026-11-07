@@ -51,6 +51,7 @@ import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from '.
 import { embersScene, embersStrategy, embersMisStrategy, embersPtStrategy } from './embersScene.js';
 import { hyperbolicScene, hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy } from './hyperbolicScene.js';
 import { sphericalScene, sphericalMisStrategy, sphericalNeeStrategy, sphericalPtStrategy } from './sphericalScene.js';
+import { h2xrScene, h2xrMisStrategy, h2xrNeeStrategy, h2xrPtStrategy } from './h2xrScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -88,6 +89,16 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             + 'the ring holds few balls (a circle of radius ρ has length 2π·sin ρ); the far ball is magnified near the '
             + 'antipode. No sky: light reaches every point along both arcs. Keys 1/2/3 = pt-mis / pt-nee / pt (same image).',
         expected: 'the ring of balls with soft contact shadows on the floor, the floor rising behind them and closing overhead as a ceiling, a large dim teal shape above (the far ball, magnified near the antipode)',
+    },
+    h2xr: {
+        scene: h2xrScene,
+        strategies: posed([0.1, 0.35, 0.6], [-0.05, -0.55, -1.0], h2xrMisStrategy, h2xrNeeStrategy, h2xrPtStrategy),
+        exercises:
+            'DEMO — H²×R (the hyperbolic plane times the line): a floor, a backdrop wall and two rings of columns '
+            + 'with balls resting between the inner ones, under a disk light and a dim sky. The outer ring, at twice the '
+            + 'radius, needs nearly three times the columns (a circle of radius ρ has length 2π·sinh ρ); the columns stay '
+            + 'upright and parallel while the floor recedes hyperbolically. Keys 1/2/3 = pt-mis / pt-nee / pt (same image).',
+        expected: 'a pool of warm light under the lamp, upright columns receding in two rings, the outer ring dense, soft contact shadows of the balls, the backdrop wall in the distance',
     },
     embers: {
         scene: embersScene,

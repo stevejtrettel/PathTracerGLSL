@@ -41,7 +41,7 @@ export interface SceneDescription {
 }
 
 export interface AmbientSpaceDescription {
-    type: 'euclidean' | 'hyperbolic' | 'spherical';
+    type: 'euclidean' | 'hyperbolic' | 'spherical' | 'h2xr';
     parameters?: { curvature?: number };
 }
 

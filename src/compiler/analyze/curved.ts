@@ -33,6 +33,17 @@ export interface SpaceLimitation {
     present(scene: SceneDescription, strategy: RenderStrategy, features: SceneFeatures): boolean;
 }
 
+/** A rotation that may move the vertical axis: an axis-angle whose axis has an x or z component, or a
+ *  quaternion (constant with a nonzero x or z, or {param}-driven: any value may arrive). In H²×R
+ *  the isometries fixing a point preserve the vertical, so only rotations about y place an object. */
+const tilting = (scene: SceneDescription): boolean => scene.objects.some((o) => {
+    if (!(isPrimitiveObject(o) || isMeshObject(o))) return false;
+    const r = o.transform?.rotation;
+    if (r === undefined) return false;
+    if (!Array.isArray(r) && 'axis' in r) return r.axis[0] !== 0 || r.axis[2] !== 0;
+    return !Array.isArray(r) || r[0] !== 0 || r[2] !== 0;
+});
+
 /** A scale other than exactly 1 (a {param} scale counts: it may move away from 1). */
 const scaled = (scene: SceneDescription): boolean => scene.objects.some((o) =>
     (isPrimitiveObject(o) || isMeshObject(o)) && o.transform?.scale !== undefined && o.transform.scale !== 1);
@@ -41,6 +52,7 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
     { feature: 'mesh objects', spaces: ['euclidean'], present: (scene) => scene.objects.some(isMeshObject) },
     { feature: 'instanced objects', spaces: ['euclidean'], present: (scene) => scene.objects.some(isInstancedObject) },
     { feature: 'object scale other than 1', spaces: ['euclidean'], present: scaled },
+    { feature: 'object rotations about a non-vertical axis', spaces: ['euclidean', 'hyperbolic', 'spherical'], present: tilting },
     {
         // The generated march steps along straight lines (resolved: a backend pin counts).
         feature: 'marched objects', spaces: ['euclidean'],
@@ -66,8 +78,9 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
         present: (_scene, strategy) => strategy.estimator.mediumLightSampling === 'equiangular',
     },
     {
-        // Looked up by BSDF rays at the ray's sky key (H³: its ideal endpoint).
-        feature: 'an environment', spaces: ['euclidean', 'hyperbolic'],
+        // Looked up by BSDF rays at the ray's sky key (H³: its ideal endpoint; H²×R: the ideal point
+        // of its H² part and its angle from the vertical).
+        feature: 'an environment', spaces: ['euclidean', 'hyperbolic', 'h2xr'],
         present: (scene) => scene.environment !== undefined && scene.environment.type !== 'none',
     },
     {
