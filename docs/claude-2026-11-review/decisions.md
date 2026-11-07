@@ -49,3 +49,14 @@ copied here until the owner accepts them.
     nothing.
 11. **Quotients: think about them if time and reasoning permit**, after the curved-space plan.
     (H²×R stays a goal from decision 3; this decision names H³ and S³ as the first spaces.)
+
+## 2026-11-06 (evening: photorealism)
+
+12. **Photorealism is built tonight, in parallel with the curved-space design**, while the App
+    waits to be talked through with the owner. Goal: "total photorealism" — renders that look
+    identical to photographs, of many kinds, "including photographs of purely math scenes".
+13. **Assets.** Textures, HDRIs, models and the like may be downloaded "and saved for trial
+    periods".
+14. **Witnesses.** Targeted witness runs are allowed; never the full slow sweep.
+15. **Procedural textures.** Research shader-based procedural textures too, where they are
+    better (e.g. for math scenes without UVs).
