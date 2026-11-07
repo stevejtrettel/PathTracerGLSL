@@ -63,3 +63,22 @@ copied here until the owner accepts them.
 16. **No license work.** "what if we skip all the license stuff im just a hobbyist academic" —
     data and assets are used without license research. Each data file still records where it
     came from (a source URL), as an academic citation. Owner: "i dont need agents wasting their brains on that", "just grab the spectra and report the sources".
+
+## 2026-11-06 (before the overnight run)
+
+17. **New material models are added beside the old ones**; the old ones may be DEMOTED if the
+    new are better, and eventually (decided together) replaced, or several kept.
+18. **Locked contract changes are allowed** for tangents (normal maps, anisotropy) and texture
+    arrays — "make sure to not change them in a sloppy way; do what is clean and useful".
+19. **No mipmaps** for image textures.
+20. **3D models: offline conversion** (glTF → OBJ + textures) for now; a runtime loader may be
+    considered later.
+21. **The real GPU may be used** for renders ("you can definitely use the gpu").
+22. **Curved spaces tonight: design + step 1**, and the owner expects a lot more work done than
+    proposed ("i kind of think you can get a lot done here").
+23. Question 7 (the five small confirmed bugs) was not answered. Any bug fix made overnight is
+    a provisional choice, logged under "Provisional choices" below.
+
+## Provisional choices (model's choices, unconfirmed by the owner)
+
+(Each entry: what was chosen, why, and how to undo it.)
