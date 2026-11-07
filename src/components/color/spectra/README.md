@@ -59,8 +59,9 @@ blackbody, gaussian and measured, then `rgb`, which claims everything else), `ki
 A program lists the kinds it evaluates at wavelengths, each with its distinct values, in
 `ProgramDescription.spectrumKinds` (registry order); their `glsl` helpers are linked in that
 order.
-`standIn.ts` holds `d65StandIn`, the daylight projection of a function of wavelength that the
-Gaussian and measured kinds use as their RGB stand-in.
+`standIn.ts` holds the RGB stand-ins of spectral functions: `d65StandIn`, the daylight projection
+of a reflectance or optical constant (the Gaussian and measured kinds), and `unitLuminanceStandIn`,
+the projection of an emission spectrum scaled to unit reference CIE Y (blackbody).
 
 Outside this folder, code does not test for a particular kind at run time (no kind predicate,
 kind object, id comparison or authored-key check); tests/components/spectrumKinds.test.ts scans

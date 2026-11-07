@@ -1,7 +1,6 @@
 import type { Vec3, BlackbodyValue, ValueParam } from '../../../../compiler/types.js';
 import type { SpectrumKind, EmitContext } from '../spectrumKind.js';
-import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
-import { spectralData } from '../../spectral/data.js';
+import { unitLuminanceStandIn } from '../standIn.js';
 import { isValueParam } from '../../../param.js';
 import { formatFloat, paramToUniform } from '../../../glsl-format.js';
 import blackbodyGLSL from './blackbody.glsl?raw';
@@ -16,28 +15,12 @@ export function planckShape(lambda: number, kelvin: number): number {
         / Math.expm1(planckC2 / (lambda * kelvin));
 }
 
-/** Unit reference CIE Y, independent of the active camera sensor. Scale multiplies
- * this spectrum after normalization, so it controls reference brightness. */
+/** Unit reference CIE Y, independent of the active camera sensor (unitLuminanceStandIn). Scale
+ * multiplies this spectrum after normalization, so it controls reference brightness. The
+ * response is piecewise linear; the 0.5 nm Simpson rule is checked against an independent
+ * 0.25 nm reference. */
 export function blackbodyColor(kelvin: number): { rgb: Vec3; normalization: number } {
-    const xyz = [0, 0, 0];
-    // Simpson quadrature in each 5 nm CMF interval. The response is piecewise linear;
-    // this 0.5 nm rule is checked against an independent 0.25 nm reference.
-    for (let interval = 0; interval < cie1931Curves.length - 1; interval++) {
-        for (let sample = 0; sample <= 10; sample++) {
-            const fraction = sample / 10;
-            const lambda = 360 + 5 * (interval + fraction);
-            const weight = 0.5 / 3 * (sample === 0 || sample === 10 ? 1 : sample % 2 ? 4 : 2);
-            const value = weight * planckShape(lambda, kelvin) / spectralData.cieYIntegral;
-            for (let channel = 0; channel < 3; channel++) {
-                const response = cie1931Curves[interval][channel] * (1 - fraction)
-                    + cie1931Curves[interval + 1][channel] * fraction;
-                xyz[channel] += value * response;
-            }
-        }
-    }
-    const rgb = spectralData.xyzToRGB.map(row => row.reduce((sum, v, i) => sum + v * xyz[i], 0)) as Vec3;
-    const normalization = 1 / xyz[1];
-    return { rgb: rgb.map(v => v * normalization) as Vec3, normalization };
+    return unitLuminanceStandIn(lambda => planckShape(lambda, kelvin));
 }
 
 export function blackbodyRGB(kelvin: number, scale = 1): Vec3 {
