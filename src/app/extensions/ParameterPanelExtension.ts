@@ -17,7 +17,7 @@ import type { RegionName } from '../layout/index.js';
 import type { ParameterMetadata } from '../types.js';
 import { Panel, Folder } from '../ui/index.js';
 import { WidgetFactory } from '../ui/WidgetFactory.js';
-import type { UIComponent } from '../ui/index.js';
+import type { Input } from '../ui/core/Input.js';
 import { AppEvents } from '../events.js';
 
 export class ParameterPanelExtension extends UIExtension {
@@ -29,7 +29,9 @@ export class ParameterPanelExtension extends UIExtension {
 
     private panel!: Panel;
     private folders: Map<string, Folder> = new Map();
-    private widgets: UIComponent[] = [];
+    /** Each parameter's widget, keyed by parameter path, with the metadata it was built from. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private widgets = new Map<string, { widget: Input<any>; meta: ParameterMetadata }>();
     private isOpen = false;
 
     // The container that receives 'open' class (region or standalone wrapper)
@@ -82,6 +84,9 @@ export class ParameterPanelExtension extends UIExtension {
         // Rebuild for the new renderer's parameters on switch/recompile (#7c).
         this.on(AppEvents.RENDERER_SWITCHED, this.repopulate);
 
+        // Show values set outside the panel (orbit, keyboard, session restore, code).
+        this.on(AppEvents.PARAMETER_CHANGED, this.onParameterChanged);
+
         console.log(`ParameterPanel installed (Tab to toggle) [${this.useLayout ? 'layout' : 'standalone'}]`);
     }
 
@@ -90,8 +95,8 @@ export class ParameterPanelExtension extends UIExtension {
      * widgets/folders (keeping the panel shell) and re-runs populatePanel().
      */
     private repopulate = (): void => {
-        for (const widget of this.widgets) widget.dispose();
-        this.widgets = [];
+        for (const { widget } of this.widgets.values()) widget.dispose();
+        this.widgets.clear();
         for (const folder of this.folders.values()) folder.dispose();
         this.folders.clear();
         // Drop the "no parameters" placeholder if it was showing.
@@ -111,10 +116,10 @@ export class ParameterPanelExtension extends UIExtension {
         }
 
         // Dispose widgets
-        for (const widget of this.widgets) {
+        for (const { widget } of this.widgets.values()) {
             widget.dispose();
         }
-        this.widgets = [];
+        this.widgets.clear();
 
         // Dispose folders
         for (const folder of this.folders.values()) {
@@ -208,7 +213,7 @@ export class ParameterPanelExtension extends UIExtension {
             for (const { path, meta } of params) {
                 const widget = this.createWidgetForParam(path, meta);
                 folder.add(widget);
-                this.widgets.push(widget);
+                this.widgets.set(path, { widget, meta });
             }
 
             this.panel.add(folder);
@@ -245,7 +250,24 @@ export class ParameterPanelExtension extends UIExtension {
         return groups;
     }
 
-    private createWidgetForParam(path: string, meta: ParameterMetadata): UIComponent {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private createWidgetForParam(path: string, meta: ParameterMetadata): Input<any> {
+        return WidgetFactory.create(meta, {
+            value: this.widgetValue(path, meta),
+            onChange: (value) => this.queueUpdate(path, value)
+        });
+    }
+
+    /** Update a widget to the parameter's current value. `setValue` does not fire the
+     *  widget's onChange, so this writes nothing back to the store. A value the panel itself
+     *  wrote arrives here unchanged and leaves the widget as it is. */
+    private onParameterChanged = (data: { path: string }): void => {
+        const entry = this.widgets.get(data.path);
+        if (entry) entry.widget.setValue(this.widgetValue(data.path, entry.meta));
+    };
+
+    /** The parameter's current value in the form its widget takes. */
+    private widgetValue(path: string, meta: ParameterMetadata): unknown {
         let currentValue = this.app.getParameter(path) ?? meta.default;
 
         // A radiometric ('color') parameter may hold a SCALAR — the system's spectrum-broadcast
@@ -256,11 +278,7 @@ export class ParameterPanelExtension extends UIExtension {
         if (meta.type === 'color' && typeof currentValue === 'number') {
             currentValue = [currentValue, currentValue, currentValue];
         }
-
-        return WidgetFactory.create(meta, {
-            value: currentValue,
-            onChange: (value) => this.queueUpdate(path, value)
-        });
+        return currentValue;
     }
 
     // ============================================================================
@@ -280,10 +298,10 @@ export class ParameterPanelExtension extends UIExtension {
         }, this.THROTTLE_MS);
     }
 
+    /** One store write for everything queued, so moves of several widgets within one
+     *  throttle window reset accumulation once. */
     private flushUpdates(): void {
-        for (const [path, value] of this.updateQueue) {
-            this.app.setParameter(path, value);
-        }
+        this.app.setParameters(Object.fromEntries(this.updateQueue));
         this.updateQueue.clear();
     }
 
