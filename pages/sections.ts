@@ -38,8 +38,8 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Closed manifolds',
-        blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face',
-        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights')],
+        blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face; in vacuum and in a homogeneous fog',
+        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights'), e('torus-fog'), e('torus-crystal-fog', 'torus-crystal-fog-ref'), e('torus-lights-fog')],
     },
     {
         title: 'Instance clouds',
