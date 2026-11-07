@@ -30,3 +30,6 @@ test-data/
 *.sw?
 .witness-cache/
 .digest/
+
+# Trial assets (tools/fetch-trial-assets.mjs) — downloaded, never committed
+public/trial/

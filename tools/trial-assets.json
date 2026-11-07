@@ -1,0 +1,13 @@
+{
+  "comment": "Trial assets downloaded by tools/fetch-trial-assets.mjs into public/trial/ (gitignored). All from Poly Haven, CC0 (https://polyhaven.com/license). Each entry: Poly Haven asset id, kind, resolution, file format.",
+  "assets": [
+    { "id": "brown_photostudio_02", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "studio_small_09", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "photo_studio_loft_hall", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "kloofendal_48d_partly_cloudy_puresky", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "lilienstein", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "venice_sunset", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "fireplace", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "cayley_interior", "kind": "hdri", "res": "4k", "format": "hdr" }
+  ]
+}
