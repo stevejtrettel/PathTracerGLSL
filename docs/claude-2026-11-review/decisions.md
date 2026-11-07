@@ -97,3 +97,11 @@ P1. **Photorealism plan questions Q1–Q8** (photoreal/integration.md), taken at
     conductor keeps eta and k; Q7 zero-thickness thin_dielectric accepted; Q8 the 2D-array
     texture is an engine API addition. Undo: each lands in its own commit on the photoreal
     branch.
+
+P2. **Quotient plan questions** (quotients-plan.md), taken at the plan's recommendations so the
+    E³ 3-torus milestone can be tried overnight (owner asked to "try it in a euclidean 3torus"):
+    Hit gains an image identifier (Q1) and an arrival direction (Q2); the far clip becomes a
+    measurement field `farClip` (default unchanged outside quotients, required in quotients);
+    point/spot/beam/directional lights and skies are compile errors in E³/H³ quotients; unrotated
+    boxes spanning whole periods are allowed (walls, jungle gym); homogeneous fog as Q1b. Undo:
+    the quotient branch's commits.
