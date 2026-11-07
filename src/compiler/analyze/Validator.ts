@@ -21,7 +21,7 @@ import { AMBIENT_SPACES, curvedGeometryOf } from '../../components/ambient/index
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { AOVS } from '../../components/aov/index.js';
 import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../../components/env/index.js';
-import { PRIMITIVES, marchBoundTypes, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { PRIMITIVES, marchBoundTypes, marchBoundIn, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
@@ -1554,9 +1554,25 @@ function validateGeometryObject(
     // the intersection generator links).
     gateSpace(label, `primitive '${type}'`, spacesOf(desc.glsl));
     if (backend === 'sdf') {
-        for (const boundType of marchBoundTypes(type)) {
+        for (const boundType of marchBoundTypes(type, space)) {
             const boundDesc = PRIMITIVES[boundType];
             if (boundDesc !== undefined) gateSpace(label, `the primitive bounding its march, '${boundType}'`, spacesOf(boundDesc.glsl));
+        }
+        // In a curved space the bound is built in the object's frame from its intrinsic rows: it
+        // must sit at the object's origin (its point rows zero), with values valid in the space.
+        const mb = marchBoundIn(desc, space);
+        const boundDesc = typeof mb === 'object' ? PRIMITIVES[mb.type] : undefined;
+        if (curvedGeometryOf(space) !== undefined && typeof mb === 'object' && boundDesc !== undefined && rowsWellFormedFor(desc.params, obj.parameters)) {
+            const values = resolvePrimitiveValues(boundDesc, mb.values(resolvePrimitiveValues(desc, obj.parameters)));
+            for (const row of boundDesc.params) {
+                const v = values[row.name];
+                if (v === undefined) continue;
+                if (row.kind === 'point' && Array.isArray(v) && v.some((c) => c !== 0)) {
+                    bag.error('invalid-setting', `${label} (${type}): the '${mb.type}' bounding its march has ${row.name} [${v.join(', ')}]; in ${space} space a march bound must sit at the object's origin (place the object instead)`).add();
+                } else {
+                    validatePrimitiveConstraint(row, v, `${label} (${type}): the '${mb.type}' bounding its march: parameter '${row.name}'`, space, bag);
+                }
+            }
         }
     }
     const params = (obj.parameters ?? {}) as Record<string, unknown>;
@@ -1598,12 +1614,9 @@ function validateGeometryObject(
     // bound that clips is a compile error here, never silently chopped geometry on
     // the GPU. ~26³ twin evaluations per local object per compile: milliseconds, and
     // only for defineSDF shapes.
-    if (desc.local === true && desc.fieldTwin !== undefined) {
-        const rowsWellFormed = schema.every((s) => {
-            const v = params[s.name];
-            if (v === undefined) return !s.required;
-            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
-        });
+    // The twin is the Euclidean field (curved bodies are not sampled at compile time).
+    if (desc.local === true && desc.fieldTwin !== undefined && curvedGeometryOf(space) === undefined) {
+        const rowsWellFormed = rowsWellFormedFor(schema, obj.parameters);
         const mb = desc.marchBound;
         if (rowsWellFormed && mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
             const resolved = resolvePrimitiveValues(desc, obj.parameters);
@@ -1795,6 +1808,16 @@ function validatePrimitiveConstraint(
 // Helpers (audit-hardening H1)
 // ============================================================================
 
+
+/** Every row of `schema` is present (or optional) and of its declared shape in `parameters`. */
+function rowsWellFormedFor(schema: PrimitiveParamSpec[], parameters: unknown): boolean {
+    const params = (parameters ?? {}) as Record<string, unknown>;
+    return schema.every((s) => {
+        const v = params[s.name];
+        if (v === undefined) return !s.required;
+        return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+    });
+}
 
 function isVec3(v: unknown): v is Vec3 {
     return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');

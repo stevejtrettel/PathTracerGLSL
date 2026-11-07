@@ -38,6 +38,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
     'support.md',                          // ambient: the generated space-support table (spaceSupport.test.ts)
     'isometry.ts',                         // ambient shared part (curved-space CPU isometry algebra)
+    'sdf.glsl',                            // ambient shared part (the curved spaces' SDF vocabulary)
 ]);
 
 describe('components structure', () => {

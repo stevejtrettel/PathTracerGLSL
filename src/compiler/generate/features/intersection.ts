@@ -27,6 +27,8 @@ import {
     emitSdfIntersect,
     emitSdfNormal,
     marchBoundTypes,
+    marchBoundIn,
+    emitCurvedSdfNormal,
 } from '../../../components/geometry/index.js';
 import {
     classifySimilarity,
@@ -50,6 +52,7 @@ import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines, bvhPointWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import marchGLSL from '../../../glsl/core/march.glsl?raw';
+import curvedSdfGLSL from '../../../components/ambient/sdf.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
 import { bodyFor } from '../../../components/descriptors.js';
@@ -148,16 +151,19 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
         ...plan.instanceBatches.flatMap((b) =>
             b.prototype.backend === 'primitive' && b.prototype.intersect === 'march' ? [b.prototype.shapeType] : []),
     ];
-    for (const type of intervalSeeds) for (const bound of marchBoundTypes(type)) presentTypes.add(bound);
+    const space = plan.program.measurement.ambient;
+    for (const type of intervalSeeds) for (const bound of marchBoundTypes(type, space)) presentTypes.add(bound);
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
     // A curved space places every object by an isometry; its structs keep the intrinsic rows.
-    const curved = curvedGeometryOf(plan.program.measurement.ambient) !== undefined;
+    const curved = curvedGeometryOf(space) !== undefined;
     // Marching tolerances BEFORE the generated march block: march_epsilon()/
     // NORMAL_EPSILON are consumed ONLY by the generated intersects/normals now, so
     // the file rides exactly when something marches (exact linkage — an occupant
     // file no longer carries a marching half of its own).
     if (marchedTypes.size > 0) {
         blocks.push({ origin: 'glsl/core/march.glsl', source: marchGLSL });
+        // A curved program's fields are written against the curved SDF vocabulary.
+        if (curved) blocks.push({ origin: 'components/ambient/sdf.glsl', source: curvedSdfGLSL });
     }
     if (present.length > 0) {
         blocks.push({
@@ -168,7 +174,6 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
                     : [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
         });
     }
-    const space = plan.program.measurement.ambient;
     for (const d of present) {
         blocks.push(bodyFor(d.glsl, space, `primitive '${d.type}'`));
     }
@@ -180,13 +185,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // off-surface picks up ∇|∇f| contamination) keeps it; generation is the fallback.
     // Registry occupants stay generated-only (the contract test pins it).
     const authoredNormal = (d: ReturnType<typeof primitive>): boolean =>
-        d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(bodyFor(d.glsl, space, `primitive '${d.type}'`).source);
+        !curved && d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(bodyFor(d.glsl, space, `primitive '${d.type}'`).source);
     if (marchedTypes.size > 0) {
         blocks.push({
             origin: 'generated:sdf-march',
             source: ['// Generated marching intersects + gradient normals (fable-sdf-contract §4)',
                 ...present.filter((d) => marchedTypes.has(d.type))
-                    .flatMap((d) => authoredNormal(d) ? [emitSdfIntersect(d)] : [emitSdfIntersect(d), emitSdfNormal(d)])].join('\n'),
+                    .flatMap((d) => authoredNormal(d) ? [emitSdfIntersect(d)]
+                        : [emitSdfIntersect(d, curved), curved ? emitCurvedSdfNormal(d) : emitSdfNormal(d)])].join('\n'),
         });
     }
 
@@ -244,12 +250,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // (scene_region_at), not an intersect path: point-in-object for a marched shape has
     // no closed form to fall back on. Tabled owners read theirs from the record (the
     // prototypes here, definitions with the table).
-    const marchedResidual = residual.filter((o) => o.intersect === 'march');
+    // A curved marched object answers containment through its shape's own field (no wrapper).
+    const marchedResidual = residual.filter((o) => o.intersect === 'march' && o.isometry === undefined);
     if (marchedResidual.length > 0 || tabledSdf.length > 0) {
         blocks.push({ origin: 'generated:sdf-fields', source: generateSdfFields(marchedResidual, tabledSdf, ids) });
     }
     if (residual.length > 0) {
-        blocks.push({ origin: 'generated:primitive-dispatch', source: generatePrimitiveDispatch(residual, anyQuery, ids, chartUv) });
+        blocks.push({ origin: 'generated:primitive-dispatch', source: generatePrimitiveDispatch(residual, anyQuery, ids, chartUv, space) });
     }
 
     // The rail's addressing (glsl/core/data_texture.glsl: data_texel1d at DATA_TEX_WIDTH)
@@ -574,7 +581,8 @@ function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm
  *  call and the bound restriction (impl-plan-sdf-as-shape §1). `bound` is null for the
  *  nearest-hit dispatch (the running nearest, hit.t, is the far limit) or the occlusion
  *  distance expression for the any-query, whose acceptance is strictly before it. */
-function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null, space: string): string[] {
+    if (obj.isometry !== undefined) return curvedSdfObjectArm(obj, ids, chartUv, bound, space);
     const d = primitive(obj.type);
     const pl = emitSdfPlacement(obj.placement);
     const far = bound ?? 'hit.t';
@@ -618,6 +626,50 @@ function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, cha
         const bref = mb === 'self' ? ref : emitCtor(primitive(mb.type), mb.values(obj.parameters), pl.scale);
         lines.push(`        float b0, b1;`);
         lines.push(`        if (${bt}_interval(${rayRef}, ${bref}, b0, b1)) {`);
+        for (const l of body('b0', `min(b1, ${far})`)) lines.push(`            ${l}`);
+        lines.push(`        }`);
+    }
+    lines.push('    }');
+    return lines;
+}
+
+/** One marched object's arm in a curved space — the curved closed-form arm with the bounded march in
+ *  place of the root: the ray moved into the object's frame by G⁻¹, the bound's interval there
+ *  (`sphere_interval`, or the open interval [0, the running nearest] for an unbounded field), the
+ *  generated march, and the generated normal taken at the ray's state at the hit (point and arrival
+ *  direction) and mapped back by isometry_direction. The marched tier's spawn offset is
+ *  MARCH_CLEARANCE, an arc length. The bound must sit at the object's origin (the Validator). */
+function curvedSdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null, space: string): string[] {
+    if (chartUv) throw new Error('intersection: a curved program with a uv-reading material (the Validator should have rejected it)');
+    const d = primitive(obj.type);
+    const inv = isometryRef(obj, ids);
+    const far = bound ?? 'hit.t';
+    const lines = ['    {', `        Ray lray = make_ray(${inv} * ray.origin, ${inv} * ray.direction, ray.wl);`];
+    const constName = hoistedShapeName(obj, ids);
+    if (constName === null) lines.push(`        ${structName(d)} shape = ${objectCtor(obj)};`);
+    const ref = constName ?? 'shape';
+    const body = (t0: string, t1: string): string[] => {
+        const call = `${d.type}_sdf_intersect(lray, ${ref}, ${t0}, ${t1}, t)`;
+        if (bound !== null) return [`if (${call} && t < ${far}) return true;`];
+        return [
+            `if (${call} && t < hit.t) {`,
+            ...primitiveHitFill('    ', {
+                nWorld: `isometry_direction(${inv}, ${d.type}_sdf_normal(ambient_flow(lray, t), ${ref}))`,
+                region: obj.index,
+                uv: uvFill(d, 'hit.p', ref, false),
+                eps: 'MARCH_CLEARANCE',
+            }),
+            `}`,
+        ];
+    };
+    const mb = marchBoundIn(d, space);
+    if (mb === undefined || mb === 'unbounded') {
+        for (const l of body('0.0', far)) lines.push(`        ${l}`);
+    } else {
+        const bt = mb === 'self' ? d.type : mb.type;
+        const bref = mb === 'self' ? ref : emitCurvedCtor(primitive(mb.type), mb.values(obj.parameters));
+        lines.push(`        float b0, b1;`);
+        lines.push(`        if (${bt}_interval(lray, ${bref}, b0, b1)) {`);
         for (const l of body('b0', `min(b1, ${far})`)) lines.push(`            ${l}`);
         lines.push(`        }`);
     }
@@ -860,13 +912,13 @@ function curvedObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, 
  *  Hit. This is the merge the measurement bought — before it there were two dispatches,
  *  two aggregators, and an "SDF backend" concept threaded through the whole compiler.
  *  region_from/to are classified once by the dispatcher (§4.2). */
-function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean): string {
+function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean, space: string): string {
     const lines: string[] = ['// Generated primitive dispatch (closed forms + bounded marches, one list)'];
     lines.push('bool primitive_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
-        lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, null) : analyticObjectArm(obj, ids, chartUv, null)));
+        lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, null, space) : analyticObjectArm(obj, ids, chartUv, null)));
     }
     lines.push('    return found;');
     lines.push('}');
@@ -876,7 +928,7 @@ function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: 
         lines.push('bool primitive_intersect_any(Ray ray, float maxDist) {');
         lines.push('    float t;');
         for (const obj of objects) {
-            lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, 'maxDist') : analyticObjectArm(obj, ids, chartUv, 'maxDist')));
+            lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, 'maxDist', space) : analyticObjectArm(obj, ids, chartUv, 'maxDist')));
         }
         lines.push('    return false;');
         lines.push('}');
@@ -1192,7 +1244,7 @@ function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: Planne
     // the intersection method.
     for (const obj of objects) {
         if (table !== undefined && obj.tabled === true) continue;   // containment via the record loops below
-        if (obj.intersect === 'march') {
+        if (obj.intersect === 'march' && obj.isometry === undefined) {
             lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
             lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
             continue;
