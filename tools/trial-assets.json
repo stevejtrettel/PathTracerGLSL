@@ -12,6 +12,7 @@
     { "id": "wood_floor", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
     { "id": "marble_01", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
     { "id": "worn_plaster_wall", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
+    { "id": "large_grey_tiles", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
     { "id": "fabric_pattern_07", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["col_1", "Rough", "nor_gl"] },
     { "id": "ceramic_vase_01", "kind": "model", "res": "2k" },
     { "id": "brass_vase_03", "kind": "model", "res": "2k" },

@@ -4,6 +4,28 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Photographs: six scenes composed to look like photographs
+
+- A **Photographs** gallery section (demos/photo/): `photo-studio` (a red plastic trefoil on a
+  paper sweep, key softbox + studio HDRI fill, 100 mm f/8), `photo-sponge` (a ceramic level-4
+  Menger sponge on a wood table by a window, string lights behind as heptagonal bokeh, 100 mm
+  f/2.8), `photo-plaza` (a polished black granite trefoil on a Venice quay at sunset, the sun in
+  frame, 85 mm f/2.8), `photo-window` (Poly Haven vase, brass vase, bowl and apples on a plank
+  table against plaster, one window, 85 mm f/5.6), `photo-glass` (dark-field glass: a thin-sheet
+  Klein bottle, a solid glass ring, a frosted ball on black acrylic, 90 mm f/11) and
+  `photo-pavilion` (an Apollonian gasket as a 5 m concrete pavilion in a meadow, 24 mm f/8).
+- Shared recipe (demos/photo/camera.ts): `thinLensFromPhoto` on a 36 × 24 mm sensor, blades,
+  Gaussian pixel filter, energy-compensated microfacets, MIS, AgX. Mesh builders
+  (demos/photo/geometry.ts): parametric grids with analytic-difference normals, a paper sweep,
+  a rotation-minimizing tube around a closed curve, the Klein bottle "bottle" immersion.
+- All six are async entries (registry-iterating tests and snapshots skip them); five read
+  public/trial/. `large_grey_tiles` (Poly Haven, CC0) joins tools/trial-assets.json.
+- The brass vase uses its asset's glTF metal model (GGX, Schlick F0 = base-color map) as a
+  stand-in for a complex-index conductor; this is stated in the scene.
+- Measured on the Apple M2 (`npm run shoot`, 1280 × 853, salt 1): glass 8192 spp 251 s; studio
+  4096 spp 575 s; sponge 244 s; plaza 240 s; pavilion 330 s; window 997 s. Pictures in the
+  gitignored renders/photo/.
+
 ## 2026-11-07 — Fog in the cube 3-torus (quotients plan Q1b)
 
 [Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1b.
