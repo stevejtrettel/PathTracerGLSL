@@ -13,6 +13,7 @@ import { roughDielectricDescriptor } from './rough_dielectric/rough_dielectric.j
 import { mirrorDescriptor } from './mirror/mirror.js';
 import { checkerDescriptor } from './checker/checker.js';
 import { plasticDescriptor } from './plastic/plastic.js';
+import { thinDielectricDescriptor } from './thin_dielectric/thin_dielectric.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
@@ -22,6 +23,7 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     mirror: mirrorDescriptor,
     checker: checkerDescriptor,
     plastic: plasticDescriptor,
+    thin_dielectric: thinDielectricDescriptor,
 };
 
 /** The model's STRUCT surface: its rows plus its derived fields as pseudo-rows —
@@ -67,6 +69,16 @@ export function materialModel(id: MaterialModel): MaterialModelDescriptor {
  *  and unregistered models — both transmit nothing. */
 export function modelTransmission(id: MaterialModel): boolean {
     return id !== 'none' && (MATERIAL_MODELS[id]?.capabilities.transmission ?? false);
+}
+
+/** The model passes light to the far side of its surface without crossing the interface: its
+ *  support is the sphere but it changes no index (a thin sheet). The walk takes hit.region_to
+ *  as the medium behind any transmission, and on a zero-thickness owner's front hit the
+ *  dispatcher reports region_to = the owner itself, so in a scene with media such a model
+ *  would lose the medium behind the surface for one segment. The Validator rejects the pair. */
+export function modelTransmitsWithoutCrossing(id: MaterialModel): boolean {
+    const d = id === 'none' ? undefined : MATERIAL_MODELS[id];
+    return d !== undefined && d.capabilities.support === 'sphere' && !d.capabilities.transmission;
 }
 
 /** THE two-sided-shading predicate (fable-rough-dielectric §3.1) — the one place the

@@ -4,6 +4,43 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Thin glass sheets (`thin_dielectric`)
+
+Integration step 8 of the photorealism batch (small-materials plan, thin dielectric section),
+with the review's must-fix items applied and the index named `sheet_eta` (owner decision P1,
+Q6; Q7 accepts a zero-thickness sheet).
+
+**What:** a new material model `thin_dielectric` (pbrt-v4 `ThinDielectricBxDF`): an infinitely
+thin slab of relative index `sheet_eta` (default 1.5, positive; a plain number, so a Cauchy or
+Sellmeier value is rejected by the existing role check). Two delta lobes, both of weight 1:
+mirror reflection with probability R_tot = 2R/(1 + R), the closed sum of the internal bounces,
+and straight-through transmission (ω_i = −ω_o) with T_tot = 1 − R_tot. Capabilities: pure delta,
+support 'sphere', transmission false (no index change, no region-table row, no thin-surface
+warning). Windows, display cases and picture glass can now be single quads; a `dielectric` quad
+still refracts into its own index from the front.
+- The Validator rejects the model in a scene with any medium (the Analyzer's `hasMedia`): on a
+  zero-thickness owner's front hit `region_to` is the owner, and the walk would take it as the
+  medium behind the pane. The rule reads the declared pair "support 'sphere', transmission
+  false" through `modelTransmitsWithoutCrossing` (materials/index.ts), not the model name.
+- The registry kitchen-sink compile (glsl-compile.test.ts) holds every model that can share a
+  scene with media; thin_dielectric is compiled by the per-model AOV case.
+- The materials README occupant list gains rough_dielectric, checker and thin_dielectric; the
+  bias ledger's opaque-shadow entry names thin sheets.
+- New witness `thin-pane`: an orthographic camera over an emitter (albedo 0) with three panes
+  in horizontal bands (facing the camera, seen from the back, tilted to cos 0.5 so its mirror
+  rays miss the emitter), under pt-nee, pt-mis, pt and spectral pt-mis.
+
+**Measured:**
+- TS twin: 2R/(1 + R) equals R + T²R/(1 − R²) and the explicit series (η 1.0001, 1.33, 1.5,
+  2.4; cos in [0, 1]); the Stokes identity F(cos_t; η) = F(cos_i; 1/η) to 1e-12; reflection
+  frequency within 5σ over 10⁶ draws; T_tot(1) = 0.923077 and T_tot(0.5) = 0.836232 for η 1.5,
+  0 for the inverted η at cos 0.5.
+- Witness `thin-pane` (256 spp, tolerance 0.005): emitter 1.0000 on every key; facing pane
+  0.9226, back face 0.9227, tilted 0.8363 on keys 1–3 (expected 0.923077 / 0.836232); spectral
+  key 0.9223–0.9240 and 0.8367–0.8372. A single interface would read 0.96, an inverted η 0.
+- Digest: 281 of 282 scenes identical; the one difference is the new scene.
+- `npx vitest run`: 4442 passed.
+
 ## 2026-11-07 — Microfacet energy compensation (`measurement.microfacet`)
 
 Integration step 7 of the photorealism batch (owner decision P1, Q2), with the review's

@@ -134,9 +134,9 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Materials & texturing',
-        blurb: 'surface models and texturing: mirror + GGX showcase, the plastic coat, blackbody emission, UV charts, expression albedos',
+        blurb: 'surface models and texturing: mirror + GGX showcase, the plastic coat, thin glass panes, blackbody emission, UV charts, expression albedos',
         entries: [
-            e('chrome'), e('mirror'), e('plastic-furnace'), e('plastic-chroma'), e('hearth'), e('charts'), e('paint'),
+            e('chrome'), e('mirror'), e('plastic-furnace'), e('plastic-chroma'), e('thin-pane'), e('hearth'), e('charts'), e('paint'),
             e('expr-const', 'expr-const-ref'),
         ],
     },

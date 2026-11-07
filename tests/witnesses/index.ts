@@ -105,6 +105,9 @@ import {
 } from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
 import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from './scenes/plasticWitness.js';
+import {
+    thinPaneScene, thinPaneStrategies, THIN_PANE_POSE, THIN_PANE_REGIONS, THIN_PANE_NORMAL, THIN_PANE_TILTED,
+} from './scenes/thinPaneWitness.js';
 import { roughFurnaceExpr, veachMisVarying } from './scenes/derivedRoughnessWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
@@ -1475,6 +1478,25 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
                 label: `plastic A(1) per channel (key ${strategy + 1})`,
             })),
+        },
+    },
+    'thin-pane': {
+        scene: thinPaneScene,
+        strategies: posed(THIN_PANE_POSE.position, THIN_PANE_POSE.target, ...thinPaneStrategies),
+        exercises:
+            'thin_dielectric (a glass sheet of η 1.5) over an emitter, orthographic: the sheet\'s total reflectance 2R/(1 + R), straight-through transmission at weight 1, back-face hits on a zero-thickness owner, and the η convention at 60° incidence; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            `right half (the emitter seen directly) 1.0; facing and flipped panes T_tot(1) = ${THIN_PANE_NORMAL} (a single interface would read 0.96); the pane tilted to cos 0.5 T_tot = ${THIN_PANE_TILTED} (an inverted η reads 0), on every key`,
+        witness: {
+            // Each pane pixel is a Bernoulli draw (T_tot of the paths score 1, the rest 0): at
+            // 256 spp over a ~1200-pixel region the mean's σ is under 1e-3.
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                { kind: 'mean' as const, value: 1.0, tol: 0.005, strategy, region: THIN_PANE_REGIONS.direct, label: `emitter seen directly (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.facing, label: `pane facing the camera (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.flipped, label: `pane seen from its back (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_TILTED, tol: 0.005, strategy, region: THIN_PANE_REGIONS.tilted, label: `pane at cos 0.5 (key ${strategy + 1})` },
+            ]),
         },
     },
     'sky-lamp': {

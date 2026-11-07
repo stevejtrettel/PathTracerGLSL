@@ -11,7 +11,7 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY, hostDerivedFieldFedBy } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, hostDerivedFieldFedBy, modelTransmitsWithoutCrossing } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
@@ -1312,6 +1312,18 @@ export function validate(
         if (MATERIAL_MODELS[scene.materials[matName]?.model ?? '']?.capabilities.transmission) {
             bag.warning('invalid-setting', `Object ${i}: a transmissive material on ${thinCase} has no interior region — it will refract as η = 1`)
                 .withOriginal('scene', [`objects[${i}]`, 'material']).add();
+        }
+    }
+
+    // A model that transmits without crossing the interface (a thin sheet) and a medium anywhere
+    // in the scene: the walk would take the sheet's own region as the medium behind it after a
+    // front-face transmission through a zero-thickness surface (modelTransmitsWithoutCrossing).
+    if (features.media.hasMedia) {
+        for (const [name, mat] of Object.entries(scene.materials)) {
+            if (!modelTransmitsWithoutCrossing(mat.model)) continue;
+            bag.error('invalid-setting',
+                `Material '${name}': model '${mat.model}' passes light through its surface without changing region, which the walk cannot track through media: on a zero-thickness surface it would lose the medium behind it. Remove the media, or model the glass as a closed dielectric solid`)
+                .add();
         }
     }
 

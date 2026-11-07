@@ -153,8 +153,9 @@ export interface MaterialModelDescriptor {
          *  conflated fact when a reader asks only half of it). The reader is light
          *  SELECTION: the light tree's below-horizon cull is licensed by a
          *  hemisphere claim, so a sphere-support receiver that runs NEE must get a
-         *  two-sided query. A future translucent model answers 'sphere' with
-         *  transmission FALSE (no index change) — which is why one flag cannot serve. */
+         *  two-sided query. thin_dielectric answers 'sphere' with transmission FALSE
+         *  (light passes through with no index change), as a translucent model would —
+         *  which is why one flag cannot serve. modelTransmitsWithoutCrossing reads that pair. */
         support: 'hemisphere' | 'sphere';
         /** May emit — eligibility for the emission gate + light registry (§6.2);
          *  whether a given MATERIAL emits stays a per-value analysis. */
