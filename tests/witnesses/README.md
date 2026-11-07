@@ -72,6 +72,23 @@ are computed by the fp64 twin `scenes/s3Twins.ts` (space-free parts in `scenes/c
 independent Monte Carlo estimate, the blocker's position on every long arc and the lights' absence
 from every camera ray's geodesic. Not yet in a full sweep.
 
+## Curved-space witnesses: the other materials and the sphere light (H³ and S³)
+
+`scenes/curvedMaterialWitness.ts` (one construction per space; plan in
+docs/claude-2026-11-review/curved/next-materials-plan.md): `h3-specular`/`s3-specular` (a mirror ball,
+f0 0.9/0.5/0.05 per channel, and a glass ball, ior 1.5, in a closed box of six walls emitting six
+colors; pt, maxBounces 6; RGB window means over each ball against an exact per-ray sum over the delta
+choices) with `e3-specular`, the same scene and twin in E³ as the control; `h3-ggx`/`s3-ggx` (a ggx
+receiver under a disk light in its mirror direction, in S³ reached only through the long arc; pt,
+pt-nee, pt-mis against the twin's quadrature); `h3-rough-glass`/`s3-rough-glass` (a rough glass ball,
+roughness 0.6, lit from out of frame, in S³ by a disk and a sphere light: pt = pt-nee = pt-mis at
+1024 spp — at roughness 0.3 the same layout fails nee ≡ mis on χ² in E³ too, firefly-dominated);
+`h3-sphere-light`/`s3-sphere-light` (a lambert receiver under a sphere light; in S³ below it, lit only
+by the backward cone), `s3-sphere-light-blocker` (0) and `s3-sphere-light-antipodal` (albedo·Le
+exactly). The expected values are computed by the fp64 twins `scenes/curvedMaterialTwins.ts`;
+`curvedMaterialTwins.test.ts` recomputes them and checks the twins against independent estimates.
+Not yet in a full sweep.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

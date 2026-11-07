@@ -26,7 +26,7 @@ Ray   ambient_flow(Ray r, float t);                        // the ray moved by t
 float ambient_dot(Direction a, Direction b, Point p);      // the metric at p
 Direction ambient_normalize(Direction v, Point p);         // v at unit length in the metric at p
 Frame ambient_frame(Point p, Direction n);                 // orthonormal shading frame around n
-Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);   // v carried along the geodesic from → to (ray_spawn's direction)
 float ambient_distance(Point a, Point b);                  // geodesic distance
 Direction ambient_direction_to(Point from, Point to);      // unit start direction of the geodesic from → to
 Direction ambient_aim(Point from, Direction along, Point to, out float remaining);
@@ -131,8 +131,11 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 ## Status & the honest caveat
 
 Occupants: `euclidean/`, `hyperbolic/` (H³) and `spherical/` (S³). In both curved spaces: sphere,
-plane and disk shapes; point and disk lights; lambert; pinhole and fisheye; hg in homogeneous
-object media; in H³ also sky lookup by BSDF rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
+plane and disk shapes; point, disk and sphere lights; lambert, mirror, dielectric, ggx and
+rough_dielectric (one file each, written against the seam: the microfacet models work in the local
+frame of `ambient_frame`); pinhole and fisheye; hg in homogeneous object media; in H³ also sky lookup
+by BSDF rays (support.md has the full table). checker is not: it reads `hit.uv`, and no curved shape
+has a uv chart. Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
 similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
@@ -161,6 +164,15 @@ non-identity transform is an error there).
   uniform selection), `s3-medium` (pt = pt-nee = pt-mis for a scattering ball lit through both arcs,
   the ½ rule). The CPU geometry and the occupant's arc arithmetic are pinned by
   tests/components/spherical.test.ts.
+- Both spaces (tests/witnesses/scenes/curvedMaterialWitness.ts, against the twins of
+  curvedMaterialTwins.ts): `h3-specular`/`s3-specular` (a mirror ball and a glass ball in a box of six
+  walls of different colors, the expected value of every camera ray an exact sum over the delta
+  choices; `e3-specular` is the same scene in E³, the control), `h3-ggx`/`s3-ggx` (a ggx receiver under a disk light in its mirror direction, in S³ through
+  the long arc, pt = pt-nee = pt-mis = the quadrature), `h3-rough-glass`/`s3-rough-glass` (roughness 0.6,
+  pt = pt-nee = pt-mis; in S³ with a sphere light under the ½ rule), `h3-sphere-light`/`s3-sphere-light` (a lambert
+  receiver under a sphere light; in S³ below it, lit only by the backward cone),
+  `s3-sphere-light-blocker` (an opaque ball on every backward-cone geodesic: 0) and
+  `s3-sphere-light-antipodal` (−x inside the ball for every window point: albedo·Le exactly).
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

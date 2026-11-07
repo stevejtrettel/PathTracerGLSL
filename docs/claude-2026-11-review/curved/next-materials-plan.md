@@ -113,7 +113,7 @@ about 3× the measured noise.
 |---|---|---|---|---|
 | `h3-specular`, `s3-specular` | a closed box of six walls emitting six colors (albedo 0), a mirror ball (f0 per channel 0.9, 0.5, 0.05 — in blue the angle-dependent Schlick term is about half the signal) and a glass ball (ior 1.5), maxBounces 6 | pt | RGB window mean over each ball = twin | reflected/refracted directions, Schlick and exact Fresnel at metric cosines, the region classification (n_i/n_t), spawn on the far side, the walk inside the glass |
 | `h3-ggx`, `s3-ggx` | the h3-disk-light / s3-long-arc receiver, ggx (f0 0.5, roughness 0.5), under a disk light of radius 0.5 at distance 1 in the receiver's mirror direction (S³: the other way, facing away, so only the long arc along the mirror direction reaches it), maxBounces 1 | pt-nee, pt-mis, pt | window mean = twin under each | microfacet frame maps in the metric, the lobe's direction, eval/sample/pdf consistency, the S³ arc rule with a non-lambert receiver |
-| `h3-rough-glass`, `s3-rough-glass` | a rough glass ball (roughness 0.3, ior 1.5): H³ in the h3-medium layout; S³ with a disk light facing the ball and a **sphere light** (radius 0.3 at exp_o(0, 1.1, 0)), maxBounces 8 | pt-nee, pt-mis, pt | nee ≡ mis, pt tripwire | two-lobe eval/pdf/sample in curved frames; the two-sided query (½ arc rule in S³, for the disk and the sphere light) |
+| `h3-rough-glass`, `s3-rough-glass` | a rough glass ball (roughness 0.6, ior 1.5; see §6): H³ in the h3-medium layout; S³ with a disk light facing the ball and a **sphere light** (radius 0.3 at exp_o(0, 1.1, 0)), maxBounces 8 | pt-nee, pt-mis, pt | nee ≡ mis, pt tripwire | two-lobe eval/pdf/sample in curved frames; the two-sided query (½ arc rule in S³, for the disk and the sphere light) |
 | `h3-sphere-light` | lambert receiver under a sphere light (R 0.4 at exp_o(0,1,0)) | pt-nee, pt-mis, pt | window mean = twin | the cone sin α = sinh R/ sinh d, its pdf, the backing region's placement |
 | `s3-sphere-light` | lambert receiver above a sphere light that only the backward cone reaches (R 0.4 at exp_o(0,−1,0)) | pt-nee, pt-mis, pt | window mean = twin | the flip rule and the far-side distance (too long: the shadow ray hits the light's own ball) |
 | `s3-sphere-light-blocker` | the same plus an opaque ball of radius 0.8 about −o | pt-nee, pt-mis, pt | 0 | a distance that stops short of the ball's far side |
@@ -184,3 +184,32 @@ no Euclidean operation. Applied:
     recorded as deferred.
 13. *Tangency drift in long specular chains* (wo from ambient_flow is not re-projected; expected
     ~1e-6 per bounce): not measured separately; the specular witnesses (6 events) bound its effect.
+
+## 6. What the build found (deviation, provisional)
+
+**ray_spawn transports the direction.** The first witness run passed the mirror, ggx and sphere-light
+checks but found the glass ball 0.1–0.6% dark in H³ and S³ (not in E³: an `e3-specular` control, the
+same scene and twin in Euclidean space, passed). Bounce-budget renders of a white-walled variant
+(GPU against the twin at maxBounces 1–6) located it: in H³ paths with two internal reflections never
+arrived (mb 4 = mb 3 = 0.9982, twin 0.9999), in E³ they did. An fp64 emulation of the generated curved
+path showed why: `ray_spawn` moved the origin by hit.eps and kept wi, which is tangent at hit.p and not
+at the new origin (off by about eps·cos, 3e-5); a reflected direction inherits the arriving one's error,
+so it grows bounce by bounce (6.7e-5, 1.1e-4 after two internal reflections), the curved sphere root —
+which assumes a unit tangent ray — then puts the hit more than eps from the surface, and the next spawn
+lands outside the ball. A 16× larger eps did not help (measured). Fix: `ray_spawn` returns wi parallel-
+transported to the spawned origin (`ambient_parallel_transport`, already in every occupant; the identity
+in E³, so Euclidean programs are unchanged — checked by frames compare). In the emulation the tangency
+error stays below 1e-16 and the chain T R R R R T exits correctly. *Provisional*; undo: revert ray.glsl
+(the glass witnesses then fail).
+
+**Rough glass at roughness 0.6, 1024 spp.** At roughness 0.3 (256 and 1024 spp) the rough-glass
+equality failed in both curved spaces (H³ Δmean 2.5%, S³ χ²ᵣ 4.7), and the same H³ layout in E³ failed
+it too (χ²ᵣ 3.6 at 1024 spp): firefly-dominated, not curved. At roughness 0.6 all three pass (H³
+Δmean 0.18%, χ²ᵣ 0.51; S³ 0.23%, 0.96; E³ 0.10%, 0.86). The S³ χ²ᵣ fell from 6.2 to 4.7 when the
+samples quadrupled, which a bias would not do.
+
+**Mutations.** The planned rough-glass mutation, (1 − F) dropped in rough_dielectric_pdf only, moved
+nee against mis by 0.2% (H³) and 1.1% (S³), inside the 2% tolerance: it changes only MIS weights of the
+transmission lobe, where F is 4–10%. It was replaced by the η² factor dropped in rough_dielectric_eval
+(an eval/sample mismatch on the transmission lobe). The planned S³ ggx mutation did not apply on the
+first run (a regex miss) and was rerun.

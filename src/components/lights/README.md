@@ -31,7 +31,13 @@ into its upper hemisphere with probability 1, anything else (a two-sided receive
 each arc with probability ½, drawing one `random()`. The pdf
 carries that probability; the emitter cosine is taken against the arrival direction of the arc
 the ray travelled, which `wo` gives at a hit. The generated arms pass `q.p` and `-wo` (= the
-departure direction in E³) to Euclidean bodies, `q` and `wo` to curved ones.
+departure direction in E³) to Euclidean bodies, `q` and `wo` to curved ones. The sphere light's curved
+bodies sample the visible cone (sin α = sinh R / sinh d in H³, sin R / sin d in S³) and take the
+distance from the sphere body's `sphere_root`, so it is the root rays find. In S³ every geodesic from
+p also passes −p: the ball is seen in the forward cone and in its negation (geodesics that reach the
+ball's far side the other way round), and when −p lies in the ball (d ≥ π − R) in every direction (the
+forward cone clamped to the hemisphere); one ω is drawn in the forward cone and the arc rule chooses
+ω or −ω.
 
 Conventions (§6.1): **delta-position kinds** (point, spot) fold 1/d² — and any
 angular falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hittable,
@@ -115,7 +121,8 @@ Each selection occupant lists the ambient `spaces` it is implemented in (ambient
 
 pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2), and in curved spaces on the
 h3-* and s3-* witnesses (s3-long-arc: a light reached only through the long arc; s3-medium: the ½
-rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc); a shadow ray is aimed
+rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc; h3-sphere-light,
+s3-sphere-light and its -blocker and -antipodal variants: the curved sphere light); a shadow ray is aimed
 at the sampled light point (`ambient_aim`) and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
 surface does not block it (shadow-aim-march, shadow-aim-far). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
 inside-sphere fallback, p-independent area arms (equiangular's area exit),
