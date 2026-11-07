@@ -16,8 +16,9 @@
 //     transform has each triangle's last two corners swapped.
 // What is refused (an error, never a guess): required extensions, non-triangle-list modes,
 // skins and morph targets, sparse or non-float attribute accessors, embedded (data:) buffers,
-// textures read through a texCoord other than 0, and more than one material (loadOBJ gives a
-// mesh one material).
+// textures read through a texCoord other than 0, more than one material (loadOBJ gives a mesh
+// one material), primitives with and without a material, and a primitive without TEXCOORD_0 when
+// another primitive has it or the material has textures (parseOBJ would give its corners uv (0, 0)).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -119,7 +120,9 @@ export function gltfToObj(gltf, buffers) {
     if (!roots) throw new Error('gltf-to-obj: the file has no scene');
 
     const lines = [];
-    const materials = new Set();
+    const materials = new Set();   // each primitive's material index; undefined for none
+    const withoutUv = [];           // primitives with no TEXCOORD_0
+    let anyUv = false;
     let nv = 0, nt = 0, nn = 0;   // OBJ stream lengths so far (indices are 1-based)
 
     const visit = (nodeIndex, parent) => {
@@ -135,12 +138,13 @@ export function gltfToObj(gltf, buffers) {
                 if ((prim.mode ?? TRIANGLES) !== TRIANGLES) throw new Error(`gltf-to-obj: ${what}: mode ${prim.mode} is not a triangle list`);
                 if (prim.targets?.length) throw new Error(`gltf-to-obj: ${what}: morph targets are not supported`);
                 if (prim.attributes.POSITION === undefined) throw new Error(`gltf-to-obj: ${what}: no POSITION`);
-                if (prim.material !== undefined) materials.add(prim.material);
+                materials.add(prim.material);
                 const P = floatAttribute(gltf, buffers, prim.attributes.POSITION, 3, `${what} POSITION`);
                 const Nrm = prim.attributes.NORMAL === undefined ? null
                     : floatAttribute(gltf, buffers, prim.attributes.NORMAL, 3, `${what} NORMAL`);
                 const T = prim.attributes.TEXCOORD_0 === undefined ? null
                     : floatAttribute(gltf, buffers, prim.attributes.TEXCOORD_0, 2, `${what} TEXCOORD_0`);
+                if (T) anyUv = true; else withoutUv.push(what);
                 const count = P.length / 3;
                 for (let i = 0; i < count; i++) {
                     const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2];
@@ -172,12 +176,16 @@ export function gltfToObj(gltf, buffers) {
     const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
     for (const r of roots) visit(r, identity);
     if (nv === 0) throw new Error('gltf-to-obj: the scene has no triangle primitives');
+    if (materials.has(undefined) && materials.size > 1) {
+        throw new Error('gltf-to-obj: primitives with and without a material (the ones without would take the other\'s textures)');
+    }
     if (materials.size > 1) {
         throw new Error(`gltf-to-obj: ${materials.size} materials (loadOBJ gives a mesh one material)`);
     }
 
     const textures = {};
-    const material = materials.size === 1 ? gltf.materials[[...materials][0]] : undefined;
+    const [materialIndex] = materials;
+    const material = materialIndex === undefined ? undefined : gltf.materials[materialIndex];
     if (material) {
         const slots = {
             baseColor: material.pbrMetallicRoughness?.baseColorTexture,
@@ -192,6 +200,9 @@ export function gltfToObj(gltf, buffers) {
             if (uri === undefined) throw new Error(`gltf-to-obj: the ${role} image is embedded (no uri)`);
             textures[role] = decodeURIComponent(uri);
         }
+    }
+    if (withoutUv.length && (anyUv || Object.keys(textures).length)) {
+        throw new Error(`gltf-to-obj: ${withoutUv.join(', ')} without TEXCOORD_0, but ${anyUv ? 'another primitive has it' : 'the material has textures'} (parseOBJ would give its corners uv (0, 0))`);
     }
     const header = [
         '# Converted by tools/gltf-to-obj.mjs: vt = (u, 1 - v) of glTF TEXCOORD_0.',

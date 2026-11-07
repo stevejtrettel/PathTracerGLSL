@@ -23,14 +23,19 @@ offline (glTF → OBJ + textures).
   transform), TEXCOORD_0 written as `vt = (u, 1 − v)` (glTF's uv origin is the image's upper-left
   corner, OBJ's and the renderer's the lower-left), texture file names in the OBJ header. Required
   extensions, non-triangle modes, skins, morph targets, sparse or non-float attributes, embedded
-  buffers, texCoord ≠ 0, KHR_texture_transform and more than one material are errors.
+  buffers, texCoord ≠ 0, KHR_texture_transform, more than one material, primitives with and
+  without a material, and a primitive without TEXCOORD_0 when another primitive has it or the
+  material has textures (parseOBJ would give its corners uv (0, 0)) are errors.
 - **Demo `trial-still-life`** (async, needs the fetched files): the converted apple with its
   diffuse map on a wood-floor quad.
 
-Verified: `tests/authoring/gltfToObj.test.ts` (13 tests; seven mutations of the converter, among
-them no v flip, normals by M, no mirror swap, byteStride ignored, parent transform ignored, each
-fail it); converter → parseOBJ → compileScene lists the image and reads it in the resolver. The
-real assets: all four models convert (2,616 to 10,296 triangles, uvs inside [0, 1], normals
+Verified: `tests/authoring/gltfToObj.test.ts` (17 tests). Mutations of the converter that fail it:
+no v flip, normals by M or by N transposed, no mirror swap, byteStride ignored, parent transform
+ignored, the sign of any one of the six w terms of the quaternion matrix (a node rotates by
+q = (1, 2, 3, 4)/√30, so all four components are nonzero; expected corners from Rodrigues' formula),
+and a `matrix` node ignored or read transposed. The fetched models exercise none of the transform
+code (each is one node with only `mesh`). Converter → parseOBJ → compileScene lists the image and
+reads it in the resolver. The real assets: all four models convert (2,616 to 10,296 triangles, uvs inside [0, 1], normals
 present). On the GPU (Chromium, ANGLE Metal, 1,361 samples) the apple renders with its skin wrapped
 seamlessly. The same render with the v flip removed shows black gaps across the apple, which
 confirms the flip. Digest before and after: 280 of 280 scenes identical.

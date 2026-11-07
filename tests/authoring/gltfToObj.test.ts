@@ -1,6 +1,6 @@
 // tools/gltf-to-obj.mjs: a small glTF built here (interleaved POSITION/NORMAL with a byteStride,
-// an accessor byteOffset, uint16 indices, a TRS node hierarchy with a non-uniform scale, and a
-// mirrored node) converts to OBJ text that parseOBJ reads back with the expected scene-space
+// an accessor byteOffset, uint16 indices, a TRS node hierarchy with a non-uniform scale, a
+// mirrored node, a general rotation and a `matrix` node) converts to OBJ text that parseOBJ reads back with the expected scene-space
 // positions, normals (inverse transpose), uvs (v flipped to the OBJ origin), winding and texture
 // names. Unsupported inputs are errors. The last block runs converter → parseOBJ → compileScene
 // on a textured mesh.
@@ -109,6 +109,41 @@ describe('gltf-to-obj: geometry', () => {
         expect(uv).toEqual([[0, 1], [1, 1], [0, 0]]);
     });
 
+    it('bakes a general rotation (all four quaternion components nonzero) and a `matrix` node', () => {
+        // Node 0: q = (1, 2, 3, 4)/√30, axis k = (1,2,3)/√14 with cos θ = 2w² − 1 = 1/15 and
+        // sin θ = 4√14/15. Rodrigues, R = cos θ·I + sin θ·[k]× + (1 − cos θ)·k kᵀ, gives
+        //   R = (1/15)·[[2, −10, 11], [14, 5, 2], [−5, 10, 10]]   (rows; R·(1,2,3) = (1,2,3)).
+        // Every off-diagonal entry has a w term, so a sign error in any of them moves a corner.
+        // Node 1: `matrix` (column-major) = rows [[1, 2, 0, 5], [0, 1, 0, 6], [0, 0, 3, 7]], a shear
+        // with a translation; read as row-major, the translation would land in the bottom row.
+        const q = [1, 2, 3, 4].map((c) => c / Math.sqrt(30));
+        const { gltf, buffers } = triangleGltf({
+            scenes: [{ nodes: [0, 1] }],
+            nodes: [
+                { mesh: 0, rotation: q },
+                { mesh: 0, matrix: [1, 0, 0, 0, 2, 1, 0, 0, 0, 0, 3, 0, 5, 6, 7, 1] },
+            ],
+        });
+        const mesh = parseOBJ(gltfToObj(gltf, buffers).obj, { material: 'm' });
+        expect(mesh.indices.length).toBe(6);
+        const tri = (t: number) => [0, 1, 2].map((k) => vec(mesh.positions, mesh.indices[3 * t + k]));
+        const close = (got: number[], want: number[]) => want.forEach((x, i) => expect(got[i]).toBeCloseTo(x, 6));
+        // Rotation: a ↦ 0, b = e₀ ↦ R's column 0, c = e₁ + e₂ ↦ the sum of columns 1 and 2.
+        [[0, 0, 0], [2 / 15, 14 / 15, -5 / 15], [1 / 15, 7 / 15, 20 / 15]].forEach((p, k) => close(tri(0)[k], p));
+        // Normal (0,−1,1)/√2 ↦ R·n (R is orthogonal) = (column 2 − column 1)/√2 = (7, −1, 0)/(5√2).
+        close(vec(mesh.normals!, mesh.indices[0]), [7 / (5 * Math.SQRT2), -1 / (5 * Math.SQRT2), 0]);
+        // Matrix: a ↦ (5,6,7), b ↦ (1,0,0) + (5,6,7), c ↦ (2,1,3) + (5,6,7).
+        [[5, 6, 7], [6, 6, 7], [7, 7, 10]].forEach((p, k) => close(tri(1)[k], p));
+        // Normal by (A⁻¹)ᵀ = rows [[1, 0, 0], [−2, 1, 0], [0, 0, 1/3]]: (0,−1,1) ↦ (0,−1,1/3) ∝ (0,−3,1)/√10.
+        close(vec(mesh.normals!, mesh.indices[3]), [0, -3 / Math.sqrt(10), 1 / Math.sqrt(10)]);
+        for (let t = 0; t < 2; t++) {
+            const [a, b, c] = tri(t);
+            const g = cross(sub(b, a), sub(c, a));
+            // Both determinants are positive: the winding stays counterclockwise about the normal.
+            expect(dot(g, vec(mesh.normals!, mesh.indices[3 * t])) / Math.hypot(...g)).toBeGreaterThan(0);
+        }
+    });
+
     it('reads a primitive without indices or normals', () => {
         const { gltf, buffers } = triangleGltf({
             scenes: [{ nodes: [0] }],
@@ -159,6 +194,20 @@ describe('gltf-to-obj: refusals', () => {
     it('refuses quantized (non-float) uvs', () => refuse({
         accessors: base.accessors.map((a, i) => (i === 2 ? { ...a, componentType: 5123, normalized: true } : a)),
     }, /TEXCOORD_0 must be 2-component float/));
+    it('refuses a textured material on a primitive without TEXCOORD_0', () => refuse({
+        meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 3, material: 0 }] }],
+    }, /without TEXCOORD_0/));
+    it('refuses primitives that disagree on TEXCOORD_0 (parseOBJ would give the others uv (0, 0))', () => refuse({
+        meshes: [{ primitives: [
+            { attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3 },
+            { attributes: { POSITION: 0, NORMAL: 1 }, indices: 3 },
+        ] }],
+        materials: undefined,
+    }, /without TEXCOORD_0/));
+    it('refuses primitives with and without a material', () => {
+        const { material: _, ...bare } = prim;
+        refuse({ meshes: [{ primitives: [prim, bare] }] }, /with and without a material/);
+    });
 });
 
 describe('gltf-to-obj → parseOBJ → compiler', () => {
