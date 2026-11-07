@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     H3, S3, O, type Space, type Field, march, ballInterval, ballRoot, planeRoot, bruteRoot, marchEpsilon, MARCH_CLEARANCE,
-    sdfPoint, sdfBall, sdfPlane, sdfTube, smoothUnion, smoothIntersection, fdNormal, gradient, sculptureField, cavityField,
+    sdfPoint, sdfBall, sdfPlane, sdfTube, smoothIntersection, fdNormal, gradient, sculptureField, cavityField,
     SCULPTURE, klein, apply,
 } from '../witnesses/scenes/curvedSdfTwins.js';
 import type { V4 } from '../witnesses/scenes/curvedTwins.js';
