@@ -3,7 +3,8 @@
 // holds only the radius (the center row is folded into the placement). Arc length t is the same
 // in every frame, so the generated arm compares it with world hits unchanged. Derivations and
 // float32 measurements: components/ambient/hyperbolic/hyperbolic.md.
-// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_intersect(), sphere_normal().
+// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_root(), sphere_intersect(),
+//           sphere_normal().
 
 // Exact distance to the sphere: dist(o, p) = asinh(|p.xyz|) (the asinh form keeps precision
 // near the surface, where acosh(p.w) does not).
@@ -11,26 +12,34 @@ float sphere_sdf(Point p, Sphere sp) {
     return asinh(length(p.xyz)) - sp.radius;
 }
 
+// The root on the ball's boundary of a geodesic γ along which cosh dist(γ(t), o) = a·cosh t + b·sinh t,
+// k = a² − b² − 1 = sinh²(dist(o, the geodesic)) (Haines' perpendicular form, hyperbolic): the exit root
+// when the geodesic starts inside the ball, else the entry root. With x = eᵗ, setting the distance to
+// R gives (a+b)x² − 2 cosh R·x + (a−b) = 0, whose discriminant cosh²R − (a² − b²) is sinh²R − k
+// (clamped at 0: a caller that knows the geodesic meets the ball takes it as a tangency), and since
+// (a+b)(a−b) = 1 + k the smaller of a ± b is (1 + k)/(a + |b|) — no cancellation anywhere. The sphere
+// body and the sphere light's sampler both call it, so the light's distance is the root rays find.
+float sphere_root(float a, float b, float k, float radius, bool inside) {
+    float sr = sinh(radius);
+    float big = a + abs(b);
+    float small = (1.0 + k) / big;
+    float apb = b >= 0.0 ? big : small;   // a + b
+    float amb = b >= 0.0 ? small : big;   // a − b
+    float q = cosh(radius) + sqrt(max(sr * sr - k, 0.0));
+    return log(inside ? q / apb : amb / q);
+}
+
 // Nearest intersection strictly ahead of the ray (t > 0), floor 0 (escape is ray_spawn's
-// offset). Along γ(t) = cosh t·p + sinh t·v the 4th coordinate is a·cosh t + b·sinh t with
-// a = p.w, b = v.w; setting it to cosh R and x = eᵗ gives (a+b)x² − 2 cosh R·x + (a−b) = 0.
-// Two identities make it cancellation-free: the discriminant cosh²R − (a² − b²) equals
-// sinh²R − k with k = |p.xyz × v.xyz|² = sinh²(dist(o, the geodesic)) (Haines' perpendicular
-// form, hyperbolic), and (a+b)(a−b) = 1 + k, so the smaller of a ± b is (1 + k)/(a + |b|).
+// offset). Along γ(t) = cosh t·p + sinh t·v the 4th coordinate, cosh dist(γ(t), o), is
+// a·cosh t + b·sinh t with a = p.w, b = v.w, and k = |p.xyz × v.xyz|² (sphere_root).
 // Root selection by the inside test, never by a t-threshold: inside → the exit root.
 bool sphere_intersect(Ray ray, Sphere sp, out float t) {
     vec3 c = cross(ray.origin.xyz, ray.direction.xyz);
     float k = dot(c, c);
     float sr = sinh(sp.radius);
-    float disc = sr * sr - k;
-    if (disc < 0.0) return false;
-    float big = ray.origin.w + abs(ray.direction.w);
-    float small = (1.0 + k) / big;
-    float apb = ray.direction.w >= 0.0 ? big : small;   // a + b
-    float amb = ray.direction.w >= 0.0 ? small : big;   // a − b
-    float q = cosh(sp.radius) + sqrt(disc);
+    if (sr * sr - k < 0.0) return false;
     bool inside = dot(ray.origin.xyz, ray.origin.xyz) < sr * sr;
-    t = log(inside ? q / apb : amb / q);
+    t = sphere_root(ray.origin.w, ray.direction.w, k, sp.radius, inside);
     return t > 0.0;
 }
 
