@@ -29,6 +29,7 @@ import { nodeTexelBound } from '../../components/data/ledger.js';
 import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
+import { blackbodyTemperatureRange } from '../../components/color/spectra/blackbody/blackbody.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
@@ -919,6 +920,15 @@ export function validate(
     const exposure = strategy.view?.tonemap?.exposure;
     if (exposure !== undefined && (typeof exposure !== 'number' || !Number.isFinite(exposure) || exposure <= 0)) {
         bag.error('invalid-setting', `view.tonemap.exposure must be a finite number > 0 (got ${String(exposure)})`).add();
+    }
+    // White balance becomes a constant matrix in the display shader, computed from the
+    // blackbody's color at that temperature.
+    const whiteBalance = strategy.view?.tonemap?.whiteBalance;
+    const [minKelvin, maxKelvin] = blackbodyTemperatureRange;
+    if (whiteBalance !== undefined && (typeof whiteBalance !== 'number' || !Number.isFinite(whiteBalance)
+        || whiteBalance < minKelvin || whiteBalance > maxKelvin)) {
+        bag.error('invalid-setting',
+            `view.tonemap.whiteBalance must be a temperature in kelvin in [${minKelvin}, ${maxKelvin}] (got ${String(whiteBalance)})`).add();
     }
 
     // Procedural environment: the bake program has no uniforms (v1 pin — a live uniform would

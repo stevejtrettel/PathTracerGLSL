@@ -35,3 +35,11 @@ export const camThinlensZeroStrategy: RenderStrategy = {
     id: 'thinlens0',
     measurement: { camera: { type: 'thinlens', fov: 0.8, aperture: 0, focusDistance: 4 }, maxBounces: 10 },
 };
+
+/** A six-bladed thin lens at aperture 0 (strategy 2) — the polygon also collapses to a point,
+ *  so it must equal the pinhole arm too. */
+export const camThinlensZeroBladedStrategy: RenderStrategy = {
+    ...base,
+    id: 'thinlens0-blades',
+    measurement: { camera: { type: 'thinlens', fov: 0.8, aperture: 0, focusDistance: 4, blades: 6 }, maxBounces: 10 },
+};

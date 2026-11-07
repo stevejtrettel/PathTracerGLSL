@@ -750,6 +750,8 @@ export interface CameraPose {
  *  Numeric fields are PLAIN numbers — every camera control is always live (the
  *  instrument principle) — EXCEPT the perspective `fov`, whose `Value<number>` spelling
  *  is load-bearing: a `{param}` fov carries the slider's path and range (scenes use it).
+ *  Fields that select the projection or the pupil's shape (fisheye `projection`, thin-lens
+ *  `blades` and `bladeRotation`) are structural: compile-time defines, not controls.
  *  Per-model field docs live on the descriptors. */
 export type CameraDescription = CameraPose & {
     type: string;
@@ -762,9 +764,11 @@ export type CameraDescription = CameraPose & {
  *  support it (today `average`). */
 export type AccumulationDescription = { type: string; variance?: boolean; [key: string]: unknown };
 
-/** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` is the
- *  shared display-glue control every curve honors. */
-export type DisplayDescription = { type: string; exposure?: number; [key: string]: unknown };
+/** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` and
+ *  `whiteBalance` are the shared display glue every curve honors. `whiteBalance` is a
+ *  temperature in kelvin: the white of a Planck source at it is shown as D65 white
+ *  (components/tonemap/whiteBalance.ts). The raw probe path ('none') applies neither. */
+export type DisplayDescription = { type: string; exposure?: number; whiteBalance?: number; [key: string]: unknown };
 
 /**
  * GLSL shader program (vertex + fragment)

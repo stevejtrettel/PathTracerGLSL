@@ -50,7 +50,8 @@ export const ACCUMULATORS: Record<string, AccumulatorDescriptor> = {
         statistics: {
             variance: {
                 glsl: varianceGLSL, update: 'variance_update',
-                // Shown and saved like radiance: exposure scales it linearly (by k, not k²).
+                // Shown and saved like radiance: exposure scales it linearly (by k, not k²), and
+                // white balance applies its matrix to the per-channel variances; for looking only.
                 picture: { name: 'variance', output: 'fragMoment', previous: 'u_previousMoment', display: 'u_variance', view: 'tonemap', formats: ['hdr', 'png'] },
             },
         },

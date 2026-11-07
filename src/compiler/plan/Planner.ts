@@ -588,9 +588,15 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             },
         },
         view: {
+            // The raw probe path ('none') applies no view transform; white balance is recorded
+            // only when authored, so programs without it describe exactly as before.
             tonemap: strategy.view.tonemap.type === 'none'
                 ? { type: 'none' }
-                : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
+                : {
+                    type: strategy.view.tonemap.type,
+                    exposure: strategy.view.tonemap.exposure,
+                    ...(strategy.view.tonemap.whiteBalance !== undefined ? { whiteBalance: strategy.view.tonemap.whiteBalance } : {}),
+                },
         },
         // Seam decisions (impl-plan-exact-linkage): each generated dispatch/query exists
         // iff some included technique links it — the same conditions the techniques'

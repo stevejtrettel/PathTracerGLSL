@@ -96,9 +96,10 @@ export interface CameraModelDescriptor {
  *  camera-specific shapes: 'enum' for structural selectors (fisheye's projection) and
  *  'value-number' for the perspective fov (a finite number OR a `{param}` slider
  *  spelling carrying path/range — the one load-bearing Value<> camera field).
- *  REQUIRED XOR DEFAULT (no camera row declares a default today — every field is
- *  required — so no framework default application exists yet; add it with the first
- *  defaulted row, the lights' applyAuthoredDefaults pattern). */
+ *  A row is required, or optional with the descriptor stating what its absence means (the
+ *  thin lens: no `blades` is the disk, no `bladeRotation` is 0). No camera row declares a
+ *  `default`, so no framework default application exists; add it with the first defaulted
+ *  row, the lights' applyAuthoredDefaults pattern. */
 export interface AuthoredCameraParamSpec {
     name: string;
     shape: 'number' | 'vec3' | 'enum' | 'value-number';

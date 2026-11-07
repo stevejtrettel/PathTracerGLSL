@@ -61,7 +61,8 @@ shadow rays aimed at the light point) had targeted runs only, and these witnesse
 them: `mesh-light-smooth`, `mesh-slab-albedo`, `mesh-scale-twin`, `null-budget-view`,
 `null-budget`, `grin-long`, `shadow-aim-march`, `shadow-aim-far`, `shadow-aim-fog`,
 `emit-sat-budget`. Also added after it, with targeted runs only: `filter-edge` and the
-gaussian arm of `furnace` (the pixel filter).
+gaussian arm of `furnace` (the pixel filter); `bokeh-edge` and the six-blade arm of
+`thinlens-zero` (the bladed pupil).
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not

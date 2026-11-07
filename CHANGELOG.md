@@ -4,6 +4,45 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Bladed thin-lens pupil and white balance
+
+Integration step 13 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+camera-film plan parts B and C with the review's must-fix items). B is measurement (it changes
+the camera functional W_j); C is view (a fixed linear map of each converged pixel).
+
+**What changed:**
+- Thin lens `blades: n` (an integer ≥ 3) and `bladeRotation` (radians, 0 when not authored): the
+  pupil becomes the regular n-gon of circumradius `aperture`, with a vertex at `bladeRotation`
+  from camera right toward up. Both are compile-time defines (`LENS_BLADES`,
+  `LENS_BLADE_ROTATION`); there is no live rotation control (cut in the integration).
+  `aperture_polygon` transcribes Cycles' `regular_polygon_sample` with its rotation shifted by
+  π/n. Weight 1, so brightness does not depend on the blade count; `aperture = 0` is still the
+  pinhole.
+- `view.tonemap.whiteBalance: <kelvin>` (1000–40000): the Bradford adaptation (pbrt-v4
+  `WhiteBalance`) from the white of a Planck source at that temperature to D65, as one constant
+  matrix on linear sRGB (components/tonemap/whiteBalance.ts), so `blackbody(T)` light renders
+  neutral at `whiteBalance: T`. The display pass folds exposure into it and applies
+  `safe_color(DISPLAY_VIEW * x)`, before the clamp, since the matrix has negative entries. It
+  applies to every tonemap-view picture; on the variance picture it is for looking only. The
+  probe path (`none`) and HDR exports are unbalanced. `blackbodyColor` now also returns the XYZ
+  it integrates, which the matrix reads (one integration).
+- New witness `bokeh-edge` (disk, hexagon, triangle at 0.4 rad); `thinlens-zero` gains a
+  six-blade arm.
+
+**Measured:**
+- Twin χ² of the polygon warp against exact cell areas (n = 3, 5, 6, 6, 9, assorted rotations,
+  10⁶ samples each) passes, with no sample outside; dropping the √ or shifting the sector angle
+  fails it. White balance: M·rgb_bb(T) = (1, 1, 1) to 1e-5 for T from 1000 to 40000 K; M equals
+  an independent transcription of pbrt's formula through xy chromaticities; a test reads the
+  emitted `DISPLAY_VIEW` back column-major (a transposed matrix fails it).
+- Digest: 273 of 276 scenes identical. `cornell` and `thinlens-zero` differ in their thin-lens
+  programs' text only (the new `#ifdef LENS_BLADES` blocks in thinlens.glsl, and source-map
+  lines); glslang's preprocessor output for both is identical to before. `thinlens-zero` gains
+  the blade renderer; `bokeh-edge` is new.
+- Witnesses (targeted): `bokeh-edge` columns 79–80 read 0.1967 (disk; exact 0.1957), 0.1674
+  (hexagon; exact 0.1670) and 0.0996 (triangle; exact 0.0994), tol 0.006; `thinlens-zero` both
+  arms Δmean 0.00%, rmse 0.00%.
+
 ## 2026-11-07 — Review fixes for the Gaussian pixel filter
 
 - `docs/fable-imagery.md` P3 rewritten to match the code: Gaussian only, untruncated

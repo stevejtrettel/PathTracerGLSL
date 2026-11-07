@@ -3,6 +3,7 @@ import { spectralBlackbodySuite } from './scenes/spectralBlackbody.js';
 import { blackbodyRoutesSuite } from './scenes/blackbodyRoutes.js';
 import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
 import { filterEdgeSuite } from './scenes/filterEdgeWitness.js';
+import { bokehEdgeSuite } from './scenes/bokehEdgeWitness.js';
 // witnesses/index.ts — the GPU witness registry: the executable form of
 // docs/fable-validation-scenes.md.
 //
@@ -115,7 +116,7 @@ import {
     beamFogScene, beamFogNeeStrategy, beamFogMisStrategy,
 } from './scenes/directionalBeamWitness.js';
 import { softbeamWallScene, softbeamNeeStrategy, softbeamMisStrategy } from './scenes/softbeamWitness.js';
-import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
+import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
     conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
@@ -164,17 +165,21 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralMediaSuite,
     ...spectralTrackingSuite,
     ...filterEdgeSuite,
+    ...bokehEdgeSuite,
     'thinlens-zero': {
         scene: camCornell,
-        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),
+        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy),
         exercises:
-            'thin-lens correctness anchor: aperture = 0 (key 2) must reproduce the pinhole image (key 1) exactly — the lens disk collapses to a point. Both cameras draw xiLens, so the arms share the RNG stream.',
-        expected: 'key 1 (pinhole) and key 2 (thin-lens, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
+            'thin-lens correctness anchor: aperture = 0 must reproduce the pinhole image (key 1) exactly, with the disk pupil (key 2) and with a six-bladed one (key 3) — either pupil collapses to a point. All cameras draw xiLens, so the arms share the RNG stream.',
+        expected: 'keys 1 (pinhole), 2 (thin-lens, aperture 0) and 3 (six blades, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
         witness: {
             spp: 64,
             // Identical-stream arms (only thin-lens\'s normalize(dir·k) round-trip differs
             // in the last fp bits) → the display-space RMSE gate, not χ².
-            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' }],
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.002, rmse: 0.01, label: 'six-bladed thin-lens aperture-0 ≡ pinhole' },
+            ],
         },
     },
     'two-light': {

@@ -17,8 +17,9 @@ export function planckShape(lambda: number, kelvin: number): number {
 }
 
 /** Unit reference CIE Y, independent of the active camera sensor. Scale multiplies
- * this spectrum after normalization, so it controls reference brightness. */
-export function blackbodyColor(kelvin: number): { rgb: Vec3; normalization: number } {
+ * this spectrum after normalization, so it controls reference brightness. `xyz` is the
+ * normalized spectrum's CIE 1931 XYZ (Y = 1) and `rgb` its linear sRGB. */
+export function blackbodyColor(kelvin: number): { xyz: Vec3; rgb: Vec3; normalization: number } {
     const xyz = [0, 0, 0];
     // Simpson quadrature in each 5 nm CMF interval. The response is piecewise linear;
     // this 0.5 nm rule is checked against an independent 0.25 nm reference.
@@ -37,7 +38,11 @@ export function blackbodyColor(kelvin: number): { rgb: Vec3; normalization: numb
     }
     const rgb = spectralData.xyzToRGB.map(row => row.reduce((sum, v, i) => sum + v * xyz[i], 0)) as Vec3;
     const normalization = 1 / xyz[1];
-    return { rgb: rgb.map(v => v * normalization) as Vec3, normalization };
+    return {
+        xyz: xyz.map(v => v * normalization) as Vec3,
+        rgb: rgb.map(v => v * normalization) as Vec3,
+        normalization,
+    };
 }
 
 export function blackbodyRGB(kelvin: number, scale = 1): Vec3 {
