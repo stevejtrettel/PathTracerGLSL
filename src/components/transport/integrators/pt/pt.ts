@@ -134,7 +134,7 @@ function lightQueryFns(f: Flags): ShaderBlock {
             `    return LightQuery(hit.p, hit.frame.n, ${sided});`,
             '}',
             'LightQuery light_query_medium(Point p) {',
-            '    return LightQuery(p, vec3(0.0), false);   // no orientation at a medium event',
+            '    return LightQuery(p, Direction(0.0), false);   // no orientation at a medium event',
             '}',
         ].join('\n'),
     };
@@ -168,7 +168,13 @@ function pathState(f: Flags): ShaderBlock {
         ...kernelStateInit(f),
     );
     if (f.dispersion) lines.push('    s.wavelengths_collapsed = false;');
-    if (f.media) lines.push('    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
+    if (f.media) {
+        // In a quotient the camera may sit in any cell; the region is looked up at the point of
+        // the fundamental domain D equivalent to it, where the one scene copy lives.
+        lines.push(f.quotient
+            ? '    s.current_medium = scene_region_at(quotient_reduce(ray.origin));   // camera may start inside a medium'
+            : '    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
+    }
     if (f.nulls) lines.push('    s.null_crossings = 0;');
     if (f.transmission) lines.push('    s.eta_scale = 1.0;');
     lines.push('    return s;', '}');
@@ -373,7 +379,12 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                // a bent event is not recomputable from (origin, dir, t), so every scattering',
                 '                // arm reports position + incident direction on exit_p/exit_dir).',
                 `                if (bounce == ${N}) break;   // a scattering event: over budget`,
-                '                Point p_evt = ms.exit_p;',
+                // In a quotient the arm reports the event in the chart of the ray's origin, possibly
+                // many cells away; the vertex is moved to the equivalent point of D, so NEE, the
+                // phase continuation and the next walk start in D like every surface vertex.
+                f.quotient
+                    ? '                Point p_evt = quotient_reduce(ms.exit_p);   // the equivalent point of D'
+                    : '                Point p_evt = ms.exit_p;',
                 '                Direction wo_med = -ms.exit_dir;',
             );
             if (f.nee && !f.equiangular) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
@@ -407,7 +418,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             '        // A crossing past measurement.maxNullCrossings leaves the measured set: the path ends.',
             '        if (is_null_interface(mat)) {',
             '            s.current_medium = hit.region_to;',
-            '            s.ray = ray_spawn(hit, s.ray.direction);',
+            '            s.ray = ray_spawn(hit, ambient_flow(s.ray, hit.t).direction);   // on along the arrival direction',
             '            s.null_crossings++;',
             '            if (s.null_crossings > MAX_NULL_CROSSINGS) break;',
             '            bounce--;',
@@ -417,7 +428,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     }
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
-        '        Direction wo = -s.ray.direction;',
+        '        Direction wo = -ambient_flow(s.ray, hit.t).direction;   // back along the arrival direction',
     );
     if (aovs.length > 0) {
         // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null

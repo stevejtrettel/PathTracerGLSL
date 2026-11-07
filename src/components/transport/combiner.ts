@@ -8,7 +8,8 @@
 //
 //   strategy | combiner_w_light[_medium] (T2)  | combiner_w_emitter / combiner_w_env (T1)
 //   pt       | not emitted (T2 absent)         | return 1.0
-//   pt-nee   | return 1.0                      | 0 for samplable/non-delta, 1 otherwise
+//   pt-nee   | return 1.0                      | 0 for samplable/non-delta, 1 otherwise (and 1 for
+//            |                                 | a quotient image outside NEE's table)
 //   pt-mis   | power heuristic vs T1's density | power heuristic vs T2's density
 //
 // Every existence-dependent call (light_of, lighting_pdf, environment_pdf,
@@ -37,6 +38,11 @@ export function combinerFns(f: Flags): ShaderBlock {
             // The STORED query (fable-light-bvh §3.2 v1.5): the pmf replays exactly the
             // context the previous vertex's sampler used — byte-identical by construction.
             lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, s.ray.direction, lid, hit));');
+        } else if (f.quotient) {
+            // An image outside NEE's table has NEE density 0, so its BSDF hit keeps weight 1
+            // (partition MIS); quotient_image names the image this ray hit.
+            lines.push('    if (quotient_image(s.ray.origin, s.ray.direction, hit) < 0) return 1.0;   // an image NEE never samples');
+            lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
         } else {
             lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
         }

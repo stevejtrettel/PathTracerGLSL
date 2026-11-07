@@ -43,7 +43,15 @@ export interface SceneDescription {
 export interface AmbientSpaceDescription {
     type: 'euclidean' | 'hyperbolic' | 'spherical';
     parameters?: { curvature?: number };
+    /** A closed manifold M = X/Γ: the scene is one copy inside a fundamental domain D, and a ray
+     *  leaving D through a face continues from the paired face (components/quotient/README.md).
+     *  `torus`: the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), D = [−L/2, L/2]³ around the origin, so
+     *  coordinates authored in D read as in plain E³. Euclidean only. */
+    quotient?: QuotientDescription;
 }
+
+/** The quotient group (components/quotient registry key `kind`) and its parameters. */
+export type QuotientDescription = { kind: 'torus'; size: Vec3 };
 
 // --- Environment (what a missed ray sees) ---
 //
@@ -611,6 +619,19 @@ export interface MeasurementDescription {
      *  weight on arrival, so its expected value is that value times the transmittance along
      *  the camera ray; a sample is 0 when no such surface is reached. */
     aovs?: string[];
+    /** Truncation — limit: ∞ (exact when the scene's horizon is nearer). The far clip: an arc
+     *  length past which a segment (camera, BSDF or shadow ray) meets nothing and carries 0,
+     *  and where a missed ray finds the sky. Absent = the ambient space's default (Euclidean:
+     *  1000). Required in a quotient space (`ambientSpace.quotient`), where nothing escapes and
+     *  the clip is the only end of a segment that meets nothing; there it must be at least
+     *  twice the fundamental domain's diameter, so that every light image NEE samples is
+     *  reachable by a BSDF ray. In a quotient filled with a homogeneous fog of extinction σ
+     *  the clip's error is bounded per pixel and channel by (N+1)²·e^{−σ·farClip}·Le_max
+     *  (N = maxBounces, Le_max the largest emitted radiance, the fog's glow ε/σ included;
+     *  components/quotient/README.md derives the glow term, which the quotients plan's bound
+     *  leaves out); without fog it has no stated bound. A finite
+     *  number > 0. */
+    farClip?: number;
 }
 
 /**

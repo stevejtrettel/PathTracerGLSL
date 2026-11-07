@@ -5,7 +5,7 @@
 // Provides: dielectric_eval/sample/pdf/emission().
 // Depends on: ior_of() (generated), dielectric_fresnel() (core math — SHARED with the rough
 //             dielectric, fable-rough-dielectric §4), MaterialProperties, Hit/Frame,
-//             InteractionSample, LOBE_*, SPECTRUM_ZERO/ONE, ambient_dot.
+//             InteractionSample, LOBE_*, SPECTRUM_ZERO/ONE, ambient_dot/ambient_normalize.
 
 Spectrum dielectric_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return SPECTRUM_ZERO; } // pure delta
 float    dielectric_pdf (Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return 0.0; }
@@ -28,7 +28,7 @@ InteractionSample dielectric_sample(Direction wo, Hit hit, MaterialProperties mp
     InteractionSample s;
     if (uc < F) {
         // Reflection branch — TIR is not a special case: it is this branch with F = 1.
-        s.wi     = normalize(2.0 * cos_i * n - wo);
+        s.wi     = ambient_normalize(2.0 * cos_i * n - wo, hit.p);
         s.weight = SPECTRUM_ONE;                      // F / P(reflect = F) = 1 — exact (§2.1)
         s.pdf    = 0.0;
         s.flags  = LOBE_REFLECTION | LOBE_DELTA;
@@ -36,7 +36,7 @@ InteractionSample dielectric_sample(Direction wo, Hit hit, MaterialProperties mp
         // Transmission branch.
         float sin2_t = eta * eta * (1.0 - cos_i * cos_i);
         float cos_t  = sqrt(max(0.0, 1.0 - sin2_t));  // sin2_t < 1 guaranteed (else F was 1)
-        s.wi     = normalize(-eta * wo + (eta * cos_i - cos_t) * n);
+        s.wi     = ambient_normalize(-eta * wo + (eta * cos_i - cos_t) * n, hit.p);
 
         // THE η² FACTOR — do not omit. Radiance compresses by (n_t/n_i)² crossing into a denser
         // medium; camera paths transport radiance backwards, so throughput carries (n_i/n_t)².

@@ -30,6 +30,10 @@ import { spectralFoundationSuite } from './scenes/spectralFoundation.js';
 import type { SceneSuiteEntry } from './types.js';
 import type { RenderStrategy, Vec3 } from '../../src/compiler/types.js';
 import { withPose } from '../../src/authoring/strategy.js';
+import {
+    torusCrystal, torusCrystalRef, torusCrystalStrategy, torusLights, torusLightsStrategies,
+    torusFog, torusFogStrategy, FOG_WINDOWS, FOG_IMAGE, fogWindowRegion, torusCrystalFog, torusCrystalFogRef, torusLightsFog,
+} from './scenes/torusWitness.js';
 
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
 import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
@@ -2552,6 +2556,103 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: 0.98, tol: 0.06, region: { x: 0.18, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.05 throughput' },
                 { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
                 { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
+            ],
+        },
+    },
+    'torus-crystal': {
+        scene: torusCrystal,
+        strategies: [torusCrystalStrategy],
+        exercises:
+            'the cube 3-torus walk (components/quotient/torus): two matte balls, a glossy ball and an emissive '
+            + 'sphere in D, seen through the faces of D in every direction; pt, maxBounces 2, farClip 3.65',
+        expected:
+            'equals torus-crystal-ref (the same spheres unrolled into plain E³ out to (N+1)·R) up to float32 '
+            + 'rounding: a wrong face pairing, a wrong cell offset or a lost hit shows as a different picture',
+        witness: {
+            checks: [
+                { kind: 'twin', other: { scene: 'torus-crystal-ref' }, meanTol: 0.01, rmse: 0.05, label: 'teleporting walk ≡ unrolled crystal (pt, same salt)' },
+            ],
+        },
+    },
+    'torus-crystal-ref': {
+        scene: torusCrystalRef,
+        strategies: [torusCrystalStrategy],
+        exercises: 'the torus-crystal twin\'s other half: every lattice copy within (N+1)·R of the camera, as four instanced sphere batches in plain E³, with the same farClip',
+        expected: 'the twin target — see torus-crystal',
+    },
+    'torus-lights': {
+        scene: torusLights,
+        strategies: torusLightsStrategies,
+        exercises:
+            'partition MIS in the 3-torus (components/quotient): NEE samples one of 27 light images, MIS names the image a '
+            + 'BSDF ray hit (0 density outside the table); a sphere light near two faces and a disk light of 4× its power '
+            + 'deeper in D, a glossy ball, a jungle gym of spanning beams; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
+        expected: 'all four keys converge to the same image',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh): shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor (path-found light images) tripwire' },
+                { kind: 'noise', strategies: [2, 0], label: 'σ/µ report: pt-mis (27 images) against pt' },
+            ],
+        },
+    },
+    'torus-fog': {
+        scene: torusFog,
+        strategies: [torusFogStrategy],
+        exercises:
+            'an absorbing, emitting ambient fog in the cube 3-torus (σ_a = 0.5, ε = σ_a·Le, Le = 1) with one black sphere in D; '
+            + 'pt, farClip 4: the fog\'s glow along each camera ray measures the arc length to the first sphere image, summed '
+            + 'across the faces of D, or the far clip',
+        expected:
+            'a window seeing one sphere image reads Le·(1 − e^{−σ_a·t}) averaged over its pixels (the float64 twin\'s value, '
+            + 'tests/witnesses/torusFog.test.ts); a window seeing nothing within R reads 1 − e^{−2} = 0.864665',
+        witness: {
+            size: FOG_IMAGE,
+            spp: 64,
+            checks: FOG_WINDOWS.map((w) => ({
+                kind: 'mean' as const,
+                value: w.value,
+                tol: 0.002,
+                region: fogWindowRegion(w),
+                source: { tier: 'exact' as const, from: 'Le·(1 − e^{−σ_a·t}) over the pixel footprints, float64 twin over the sphere images' },
+                label: w.cell === 'miss'
+                    ? `window (${w.x0}, ${w.y0}): nothing within R`
+                    : `window (${w.x0}, ${w.y0}): sphere image in cell ${w.cell.join(',')} (${w.cell.reduce((s, v) => s + Math.abs(v), 0)} face crossings)`,
+            })),
+        },
+    },
+    'torus-crystal-fog': {
+        scene: torusCrystalFog,
+        strategies: [torusCrystalStrategy],
+        exercises:
+            'torus-crystal in a scattering ambient fog (σ_s = 0.3, σ_a = 0.1): medium events at points the walk reports in '
+            + 'the origin\'s chart, reduced into D; pt, maxBounces 2, farClip 3.65',
+        expected: 'equals torus-crystal-fog-ref (the same spheres and fog unrolled into plain E³ out to (N+1)·R) up to float32 rounding',
+        witness: {
+            checks: [
+                { kind: 'twin', other: { scene: 'torus-crystal-fog-ref' }, meanTol: 0.01, rmse: 0.05, label: 'teleporting walk in fog ≡ unrolled crystal in fog (pt, same salt)' },
+            ],
+        },
+    },
+    'torus-crystal-fog-ref': {
+        scene: torusCrystalFogRef,
+        strategies: [torusCrystalStrategy],
+        exercises: 'the torus-crystal-fog twin\'s other half: every lattice copy within (N+1)·R of the camera in plain E³, in the same fog, with the same farClip',
+        expected: 'the twin target — see torus-crystal-fog',
+    },
+    'torus-lights-fog': {
+        scene: torusLightsFog,
+        strategies: torusLightsStrategies,
+        exercises:
+            'torus-lights in a scattering ambient fog (σ_s = 0.25, σ_a = 0.1): partition MIS at surface and medium vertices, '
+            + 'medium event points reduced into D; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
+        expected: 'all four keys converge to the same image',
+        witness: {
+            spp: 1024,   // at 256 spp the nee/mis mean gap read 0.94% against the 1% gate; 0.33% here
+            checks: [
+                { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh) in fog: shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor in fog (path-found light images) tripwire' },
             ],
         },
     },

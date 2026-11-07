@@ -1,5 +1,6 @@
 // Pinhole camera
-// Requires: u_tanFov (= tan(fov/2)), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up
+// Requires: u_tanFov (= tan(fov/2)), u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
+//           ambient_normalize
 
 Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     // film = continuous sub-pixel point (pixel/ owns the footprint); xiLens unused (no aperture).
@@ -12,7 +13,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
     vec3 right = u_cameraRight;
     vec3 up = u_cameraUp;
 
-    vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
+    vec3 dir = ambient_normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up, u_cameraPosition);
 
     return make_ray(u_cameraPosition, dir, wl);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
 }

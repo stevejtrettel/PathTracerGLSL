@@ -58,7 +58,7 @@ float env_uniform_fraction() {
     return env_cdf_marg(int(u_envSize.y) - 1) > 0.0 ? 0.0625 : 1.0;
 }
 
-float environment_pdf(vec3 dir) {
+float environment_pdf(Direction dir) {
     float a = env_uniform_fraction();
     return (1.0 - a) * env_table_pdf(dir) + a / (4.0 * PI);
 }

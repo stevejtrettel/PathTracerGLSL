@@ -1,8 +1,9 @@
 // compiler/generate/features/environment.ts
 // Environment: what a ray sees when it hits nothing (contracts §2.10 / review C3).
 //
-// Every kind fills the same function — `environment_radiance(vec3 dir, Wavelengths wl) -> Radiance` —
-// with a different body + resources:
+// Every kind fills the same function — `environment_radiance(vec3 dir, Wavelengths wl) -> Radiance`,
+// where `dir` is the sky key a ray reaches (ambient_sky_key; in Euclidean space the ray's
+// direction) — with a different body + resources:
 //   none     → black
 //   constant → baked (or {param}-driven) color * u_envIntensity
 //   image    → the equirect map read through equirect_uv (components/env/equirect/
@@ -67,7 +68,7 @@ function sizeParamPath(chart: string): string {
 // The cheap path to the miss-MIS bookkeeping witnesses — no textures anywhere.
 // The pdf query is a separate generated block: its only readers are the MIS sites
 // (environmentPdf decision); the sampler carries its own ls.pdf inline.
-const CONSTANT_PDF = `float environment_pdf(vec3 dir) {
+const CONSTANT_PDF = `float environment_pdf(Direction dir) {
     return 1.0 / (4.0 * PI);
 }`;
 // The color is a SCENE_VALUE — `colorExpr` is its baked literal (constant) or `u_` name (driven).
@@ -98,7 +99,7 @@ function envProvides(samplable: boolean, pdf: 'none' | 'generated' | 'component'
         if (pdf !== 'none') {
             provides.push({
                 name: 'environment_pdf',
-                signature: 'float environment_pdf(vec3 dir)',
+                signature: 'float environment_pdf(Direction dir)',
                 ...(pdf === 'component' ? { componentScoped: true } : {}),
             });
         }

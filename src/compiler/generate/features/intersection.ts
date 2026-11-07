@@ -373,20 +373,26 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
             mesh: hasMesh && residualMeshes.length > 0,
             instanced: hasInstanced && !tableMode,
             table: tableMode,
-        }, thinRegions, anyQuery),
+        }, thinRegions, anyQuery, plan.program.measurement.quotient !== undefined),
     });
+    // In a quotient the dispatcher above answers for the one scene copy in D (the cell query), and
+    // scene_intersect / scene_intersect_any walk the cells a ray crosses (components/quotient).
+    const quotient = plan.program.measurement.quotient;
+    if (quotient !== undefined) {
+        blocks.push({ origin: `generated:quotient-walk`, source: generateQuotientWalks(quotient.kind, anyQuery) });
+    }
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
         { name: 'scene_intersect', signature: 'bool scene_intersect(Ray ray, out Hit hit)' },
-        { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
+        { name: 'scene_region_at', signature: 'int scene_region_at(Point p)' },
         { name: 'material_of', signature: 'int material_of(int region)' },
     ];
     if (anyQuery) {
         provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
     }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p, Wavelengths wl)' });
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, Point p, Wavelengths wl)' });
     }
 
     if (dispersion !== null && dispersion.regions.length > 0)
@@ -511,7 +517,7 @@ function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm
     if (tabledTypes.length > 0) lines.push('');
 
     for (const obj of objects) {
-        lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
+        lines.push(`float sdf_${ids.get(obj.index)!}(Point p) {`);
         if (obj.placement !== undefined && isDrivenPlacement(obj.placement)) {
             // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
             // params absorb s in-shader — distances stay exact WORLD values, so the
@@ -1120,7 +1126,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 
 function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], instanceAccel: string, ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
-    lines.push('int scene_region_at(vec3 p) {');
+    lines.push('int scene_region_at(Point p) {');
     lines.push('    int region = -1;');
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
@@ -1559,7 +1565,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
 function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
-    lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of_material(int mat, Point p, Wavelengths wl) {');
     for (const mat of materials) {
         if (mat.medium?.ior !== undefined) {
             lines.push(`    if (mat == ${mat.id}) return ${emitIndex(mat.medium.ior as IndexProperty, color)};   // '${mat.name}' — deflecting: the medium's n(p)`);
@@ -1575,7 +1581,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
     lines.push('    return 1.0;'); // non-transmissive / ambient
     lines.push('}');
     lines.push('');
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     lines.push('    if (region < 0) return 1.0;');
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const m of meshes) {
@@ -1609,7 +1615,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
 function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
     // Instanced batches CLAIMING an interior (impl-plan-instanced-containment) earn rows by
@@ -1662,8 +1668,11 @@ function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[],
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean): string {
-    const lines: string[] = ['// Generated scene_intersect dispatcher'];
+function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean, cell: boolean): string {
+    // In a quotient program this is the CELL query: the nearest hit of the scene copy in D within
+    // t_far of the ray's origin (the walk passes the cell's exit time); otherwise it is
+    // scene_intersect itself, bounded by the far clip.
+    const lines: string[] = [cell ? '// Generated cell query (the scene copy in D) — the quotient walk calls it' : '// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
     // "owner covers its own side" is FALSE for them: a back-face hit must probe the entering
@@ -1677,9 +1686,15 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     }
 
     // scene_intersect — hit.t is the running nearest (a Hit is valid only when this returns true).
-    lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
-    lines.push('    hit.wl = ray.wl;');
-    lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+    if (cell) {
+        lines.push('bool scene_intersect_cell(Ray ray, float t_far, out Hit hit) {');
+        lines.push('    hit.wl = ray.wl;');
+        lines.push('    hit.t = t_far;   // running nearest = the cell\'s exit; rest of hit undefined until a backend fills it');
+    } else {
+        lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
+        lines.push('    hit.wl = ray.wl;');
+        lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+    }
     lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');
     if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
@@ -1691,7 +1706,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
     lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ray.direction, hit.ng, hit.p) < 0.0) {');
+    lines.push('        if (ambient_dot(ambient_flow(ray, hit.t).direction, hit.ng, hit.p) < 0.0) {   // the arrival direction, at hit.p');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
@@ -1715,7 +1730,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     // scene_intersect_any — occlusion within maxDist (only when the opaque shadow
     // fast path links it; the media shadow walker re-spawns scene_intersect instead).
     if (anyQuery) {
-        lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
+        lines.push(cell ? 'bool scene_intersect_any_cell(Ray ray, float maxDist) {' : 'bool scene_intersect_any(Ray ray, float maxDist) {');
         if (arms.primitive) lines.push('    if (primitive_intersect_any(ray, maxDist)) return true;');
         if (arms.mesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
         if (arms.instanced) lines.push('    if (instanced_intersect_any(ray, maxDist)) return true;');
@@ -1725,4 +1740,53 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     }
 
     return lines.join('\n');
+}
+
+// ============================================================================
+// Quotient walks (components/quotient): scene_intersect / scene_intersect_any across the cells
+// ============================================================================
+// Generated, not static: scene_intersect_any_cell exists only where the any-hit query is planned
+// (anyQuery), so the any-hit walk is gated exactly like today's scene_intersect_any. The lattice
+// math they call is the occupant's static block.
+
+function generateQuotientWalks(kind: string, anyQuery: boolean): string {
+    if (kind !== 'torus') throw new Error(`quotient '${kind}' has no walk (Validator should have rejected it)`);
+    // The walk of components/quotient/torus/torus.md, transcribed from the float32 twin
+    // (tests/components/quotient/torusWalk.test.ts): the cell of the origin, then cells in order of
+    // arc length; each query sees the ray translated by −L∘k and started at the cell's entry point,
+    // clipped to the cell's exit, so its first hit is the nearest hit of the lifted scene.
+    const walk = (any: boolean): string[] => [
+        any ? 'bool scene_intersect_any(Ray ray, float maxDist) {' : 'bool scene_intersect(Ray ray, out Hit hit) {',
+        '    vec3 k = floor(ray.origin / TORUS_PERIOD + 0.5);                // the cell of the origin',
+        '    vec3 s = vec3(ray.direction.x >= 0.0 ? 1.0 : -1.0,',
+        '                  ray.direction.y >= 0.0 ? 1.0 : -1.0,',
+        '                  ray.direction.z >= 0.0 ? 1.0 : -1.0);              // the step on each axis',
+        '    float t_enter = 0.0;',
+        '    for (int n = 0; n < TORUS_MAX_CELLS; n++) {                      // a bound for segments ≤ MAX_DIST',
+        '        vec3 t_next = torus_face_times(ray, k, s);',
+        '        float t_exit = min(min(t_next.x, t_next.y), t_next.z);',
+        '        // The local ray starts at this cell\'s entry point, so its hit is accurate to ~|L|·eps.',
+        '        Ray local = Ray(ray.origin + ray.direction * t_enter - TORUS_PERIOD * k, ray.direction, ray.wl);',
+        ...(any ? [
+            '        if (scene_intersect_any_cell(local, min(t_exit, maxDist) - t_enter)) return true;',
+            '        if (t_exit >= maxDist) return false;',
+        ] : [
+            '        if (scene_intersect_cell(local, min(t_exit, MAX_DIST) - t_enter, hit)) {',
+            '            hit.t += t_enter;                                        // arc length from ray.origin',
+            '            return true;',
+            '        }',
+            '        if (t_exit >= MAX_DIST) return false;                        // the far clip',
+        ]),
+        '        // Cross one face: the first axis attaining t_exit (x, then y, then z).',
+        '        if (t_exit == t_next.x) k.x += s.x; else if (t_exit == t_next.y) k.y += s.y; else k.z += s.z;',
+        '        t_enter = max(t_enter, t_exit);                                 // never backward under rounding',
+        '    }',
+        '    return false;   // not reached: TORUS_MAX_CELLS bounds every segment of length ≤ MAX_DIST',
+        '}',
+    ];
+    return [
+        '// Generated torus walk (components/quotient/torus/torus.md)',
+        ...walk(false),
+        ...(anyQuery ? ['', ...walk(true)] : []),
+    ].join('\n');
 }

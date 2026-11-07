@@ -31,6 +31,7 @@ import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain, isFiniteVec3 } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
+import { validateQuotient } from './quotient.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
@@ -57,6 +58,7 @@ export function validate(
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
+    validateQuotient(scene, strategy, bag);
 
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
     // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
@@ -454,6 +456,13 @@ export function validate(
     if (maxNullCrossings !== undefined && !isLoopBudget(maxNullCrossings)) {
         bag.error('invalid-setting',
             `measurement.maxNullCrossings must be an integer from 0 to ${maxLoopBudget} — the number of null interfaces a path may cross, its shadow rays included (got ${String(maxNullCrossings)})`)
+            .add();
+    }
+
+    const farClip = strategy.measurement.farClip;
+    if (farClip !== undefined && !(typeof farClip === 'number' && Number.isFinite(farClip) && farClip > 0)) {
+        bag.error('invalid-setting',
+            `measurement.farClip must be a finite number > 0 — the arc length past which a segment meets nothing (got ${String(farClip)})`)
             .add();
     }
 

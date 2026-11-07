@@ -4,6 +4,87 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Fog in the cube 3-torus (quotients plan Q1b)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1b.
+
+**What was built:**
+- A homogeneous `ambientMedium` is allowed in a quotient (absorbing, scattering, emitting;
+  constant or `{param}` coefficients). Heterogeneous or GRIN ambient media, and media inside
+  objects, remain Validator errors.
+- In quotient programs with media, the transport loop reduces each medium event point into the
+  fundamental domain (`quotient_reduce`) before NEE, the phase sample and the next segment, and
+  looks up the camera's starting region at its reduced point. Nothing else changed: the medium
+  arms read constants, and the media shadow walker runs through the walk unchanged.
+- The declared bound (quotient README, `measurement.farClip`): with fog of extinction σ the far
+  clip changes a pixel by at most (N+1)²·e^{−σR}·Le_max per channel, Le_max including the fog's
+  glow ε/σ. The plan derives the bound for a fog that does not glow; the glow term is derived in
+  the quotient README (thought through, not checked numerically).
+- Equiangular medium light sampling is a Validator error in a quotient: it places the vertex by
+  the light's position in D and samples none of its images. (It also needs delta lights, which a
+  quotient rejects; the rule states its own reason so that relaxing either cannot bias silently.)
+- Witnesses: `torus-fog` (an emitting absorbing fog with a black sphere; eight windows certified
+  by a float64 twin as seeing one sphere image through 0–5 face crossings, or nothing within R),
+  `torus-crystal-fog` (≡ its unrolled crystal in the same fog) and `torus-lights-fog` (pt ≡ pt-nee ≡
+  pt-mis ≡ pt-mis with the light tree, in fog), registered at 1,024 spp.
+
+**Measured:** non-quotient programs unchanged: digest 278 of 278 existing scenes identical in
+every part, and `npm run frames -- compare` (the plan's gate, Q1.6 vitest 5) bit-exact, 30 of
+30 pictures, between 0c6a425 and 2f88c4d (recorded by the reviewer with WITNESS_PORT=3205;
+the comparison rerun here) and again after the review fixes. `torus-fog` 8/8 windows equal to
+the twin to 4 digits; with the walk's distance sum broken, the five windows seen across faces
+fail (e.g. 0.1746 against 0.4768). Crystal twin in fog: Δmean 0.00%, rmse 0.63%.
+`torus-lights-fog`: Δmean 0.94%, χ²ᵣ 1.27 at 256 spp, and 0.33%, χ²ᵣ 1.45 at 1,024 spp. The
+mean gap shrinks with samples; the slight χ² rise is recorded and its cause is untested.
+
+**Open:** no check catches a missing `quotient_reduce` at medium event points. With that line
+removed, `torus-lights-fog` still passed (Δmean 0.28%, χ²ᵣ 1.37). `torus-crystal-fog` (pt only)
+and `torus-fog` (no scattering) cannot catch it by construction.
+
+## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1a (vacuum); its evidence and
+twins are in docs/claude-2026-11-review/quotients/ (both committed on this branch). Fog in the
+quotient (Q1b) is not built.
+
+**What was built:**
+- `measurement.farClip` (a truncation field) over the ambient descriptor's default `farClip`;
+  `MAX_DIST` is emitted from it. Non-quotient programs are unchanged (digest: only the define
+  moved; frames: 30 of 30 pictures identical).
+- `ambientSpace.quotient: { kind: 'torus', size }` and the new component family
+  `components/quotient/` (torus occupant: static lattice math; no locked-type change, no `Hit`
+  field — the MIS side recovers the hit image by rounding).
+- In quotient programs only: the generated cell walk (`scene_intersect` / `scene_intersect_any`
+  over `scene_intersect_cell`), image-aware NEE and MIS (27 images, partition MIS: an image
+  outside the table has NEE density 0, so its BSDF hit keeps weight 1), the pt-nee emitter rule.
+- Validator rules (compiler/analyze/quotient.ts): far clip ≥ 2·diam(D), no delta lights, no sky,
+  no media, no unbounded or driven geometry, everything inside D by EPS_INTERFACE except
+  unrotated boxes spanning whole periods; emitters strictly inside.
+- Witnesses `torus-crystal` (≡ the unrolled crystal `torus-crystal-ref`: Δmean 0.01%, rmse
+  1.8%) and `torus-lights` (pt ≡ pt-nee ≡ pt-mis ≡ pt-mis with the light tree: Δmean 0.38%,
+  χ²ᵣ 1.19); the latter fails as required with a W1-like (Δ 10.2%) and a W2-like (Δ 7.5%) error.
+- vitest twins: the float32 walk (tests/components/quotient/torusWalk.test.ts) and the float64
+  partition-MIS twin with its W1/W2 controls (torusMis.test.ts).
+- Demo `torus-room`: a jungle-gym room repeating in every direction.
+- Review fixes: the plan and its evidence committed beside the code; the plan's float32-twin
+  sentence corrected (the cell sequence matched float64 on 3,993 of 4,000 rays; the 7 others
+  are edge or vertex passages); the far clip computed once in core.ts; the quotient family's
+  taxonomy is `scene` in both its README and registry; the demo text says farClip 16.
+
+**Measured along the way, cause untested:** with the glossy ball at GGX roughness 0.15,
+`torus-lights` pt-nee read 2.8% low against pt ≡ pt-mis ≡ pt-mis with the light tree (256 spp,
+χ²ᵣ 145). A matte-ball variant and a roughness-0.45 variant agree (0.06%, 0.52%). In a variant
+without beams the deficit shrank with samples (7.6% at 128 spp, 4.7% at 1,024), and the
+per-block pt-nee/pt-mis map was mostly negative with rare +46% and +84% blocks. That fits
+heavy-tailed NEE samples (27 images × a sharp lobe), but it is not shown: pt-mis cannot confirm
+the NEE side, because MIS gives NEE samples little weight exactly where the BSDF pdf is high,
+and an estimator bias in pt-nee at sharp lobes is not ruled out. The witness was moved to
+roughness 0.45, so it does not test that regime. **Decisive check (not run):** the
+roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the samples
+(4,096 and 16,384 spp) under independent salts: heavy tails predict a deficit that keeps
+shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
+deficit that stays near 2.8%.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

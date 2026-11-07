@@ -8,7 +8,7 @@
 // pattern: conditional core, never wholesale).
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
 //           microfacet_to_local(), microfacet_from_local().
-// Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot.
+// Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot/ambient_normalize.
 //
 // Convention (shared by every occupant): the local shading frame has n = +z, `a` is the
 // GGX roughness parameter α = roughness² clamped ≥ 1e-3 host-side (the descriptors' D4
@@ -18,12 +18,13 @@
 // D/G1/sample — line-for-line transcription, change one change both (§11.3).
 
 // Local shading frame, n = +z. Frame vectors are orthonormal in the ambient metric, so
-// projection goes through ambient_dot (Euclidean unpacks to dot).
+// projection goes through ambient_dot and the recombined world vector is normalized in the
+// metric at the frame's point (Euclidean unpacks to dot and normalize).
 vec3 microfacet_to_local(Frame f, Point p, Direction v) {
     return vec3(ambient_dot(v, f.t, p), ambient_dot(v, f.b, p), ambient_dot(v, f.n, p));
 }
 Direction microfacet_from_local(Frame f, vec3 v) {
-    return normalize(f.t * v.x + f.b * v.y + f.n * v.z);
+    return ambient_normalize(f.t * v.x + f.b * v.y + f.n * v.z, f.p);
 }
 
 float microfacet_D(vec3 h_local, float a) {          // Trowbridge–Reitz / GGX

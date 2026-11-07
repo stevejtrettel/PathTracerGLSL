@@ -76,19 +76,19 @@ describe('instanced containment: the region is real end to end', () => {
         // baked ior table iterated objects + closed meshes only — batches were never in it
         // (they had never had interiors). ior_of returned 1.0 for the batch region, so
         // every glass instance refracted at η = 1: perfectly transparent, invisible.
-        const ior = bodyOf(fragmentOf(glassBatchScene()), 'float ior_of(int region, vec3 p, Wavelengths wl) {');
+        const ior = bodyOf(fragmentOf(glassBatchScene()), 'float ior_of(int region, Point p, Wavelengths wl) {');
         expect(ior).toMatch(/if \(region == \d+\) return 1\.5;/);
     });
 
     it('the batch leaves the thin set, and its containment arm exists', () => {
         const frag = fragmentOf(glassBatchScene());
-        const regionAt = bodyOf(frag, 'int scene_region_at(vec3 p) {');
+        const regionAt = bodyOf(frag, 'int scene_region_at(Point p) {');
         expect(regionAt, 'the containment arm must be emitted').toContain('— containment');
         expect(regionAt, 'params tier evaluates the field at p in WORLD space').toContain('sphere_sdf(p, shape)');
         // scene_region_thin must NOT list the batch region any more. (In this scene the
         // thin set empties out entirely, so the predicate may fold away — either way, the
         // batch must not be in it.)
-        const batchRegion = /if \(region == (\d+)\) return 1\.5;/.exec(bodyOf(frag, 'float ior_of(int region, vec3 p, Wavelengths wl) {'))![1];
+        const batchRegion = /if \(region == (\d+)\) return 1\.5;/.exec(bodyOf(frag, 'float ior_of(int region, Point p, Wavelengths wl) {'))![1];
         const thinAt = frag.indexOf('bool scene_region_thin(int region) {');
         if (thinAt >= 0) {
             expect(bodyOf(frag, 'bool scene_region_thin(int region) {')).not.toContain(`region == ${batchRegion}`);
@@ -98,14 +98,14 @@ describe('instanced containment: the region is real end to end', () => {
     it('a MEDIUM-carrying batch claims an interior too (not just transmissive ones)', () => {
         // batchNeedsInterior is transmissive ∨ medium — current_medium tracking needs the
         // region just as much as ior_of does.
-        const regionAt = bodyOf(fragmentOf(glassBatchScene({ medium: true })), 'int scene_region_at(vec3 p) {');
+        const regionAt = bodyOf(fragmentOf(glassBatchScene({ medium: true })), 'int scene_region_at(Point p) {');
         expect(regionAt).toContain('— containment');
     });
 
     it('an OPAQUE batch emits no containment arm at all (exact linkage)', () => {
         const opaque = glassBatchScene();
         opaque.materials.glass = { model: 'lambert', albedo: 0.7 };
-        const regionAt = bodyOf(fragmentOf(opaque), 'int scene_region_at(vec3 p) {');
+        const regionAt = bodyOf(fragmentOf(opaque), 'int scene_region_at(Point p) {');
         expect(regionAt).not.toContain('— containment');
     });
 });

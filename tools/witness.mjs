@@ -768,7 +768,18 @@ const FRAME_CASES = [
     { id: 'oneshot', scene: 'cornell-oneshot', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'spectral', scene: 'spectral-materials', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'medium', scene: 'fog-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-mis in scattering fog: the phase pdf weighs light samples taken at medium vertices.
+    { id: 'medium-mis', scene: 'fog-area', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'grin', scene: 'grin-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-nee shadow rays through the media walker across two marched null interfaces.
+    { id: 'shadow-media', scene: 'shadow-aim-fog', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // {param}-driven placements: a rotated, scaled box and a scaled sphere through the placed arms.
+    { id: 'driven', scene: 'driven', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // Rayleigh and HG fog boxes behind the two-model medium dispatch.
+    { id: 'rayleigh', scene: 'rayleigh', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-mis under an image sky: direction-dependent sky lookups and the environment pdf.
+    { id: 'image-sky', scene: 'sky', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'fisheye', scene: 'cornell-fisheye', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     // 150×100 in 64px tiles = 3×2 tiles with partial edges (tile sizes round up to 64, app/tiling.ts).
     { id: 'tiled', scene: 'cornell-area', strategy: 0, size: [150, 100], spp: 8, tileSize: 64 },
 ];

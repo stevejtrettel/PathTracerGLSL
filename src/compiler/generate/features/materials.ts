@@ -250,7 +250,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
-        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl)' },
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, Point p, vec2 uv, int element, Wavelengths wl)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
@@ -277,7 +277,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         requires.push('scene_medium_properties');
         provides.push(
             { name: 'material_has_medium', signature: 'bool material_has_medium(int mat)' },
-            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl)' },
+            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl)' },
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
         if (media.deflecting) {
@@ -375,7 +375,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     lines.push('// a material sets exactly the fields its model reads, nothing else. `p` (shading point)');
     lines.push('// and `uv` (surface chart, fable-imagery P2) are the coordinates an expression row may');
     lines.push('// reference; `element` = Hit.element (the owner\'s sub-element) — read only by ATTRIBUTE rows.');
-    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl) {');
+    lines.push('MaterialProperties scene_material_properties(int id, Point p, vec2 uv, int element, Wavelengths wl) {');
     lines.push('    MaterialProperties props;');
     lines.push('    props.wl = wl;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
@@ -551,7 +551,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     // union core.ts builds the struct from). An absorbing-only program has extinction
     // fields and nothing else.
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; heterogeneous media read p)'];
-    lines.push('MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl) {');
+    lines.push('MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl) {');
     lines.push('    MediumProperties m;');
     lines.push('    m.wl = wl;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');

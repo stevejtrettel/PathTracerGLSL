@@ -952,6 +952,42 @@ exports[`scene-data textures (byte fingerprints) > tiny-sphere-light 1`] = `null
 
 exports[`scene-data textures (byte fingerprints) > tonemap 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > torus-crystal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-fog-ref 1`] = `
+{
+  "nodes": "4096x22 6c870d4a3bf99324",
+  "records": "4096x6 c996e477a42bb7f4",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-ref 1`] = `
+{
+  "nodes": "4096x22 6c870d4a3bf99324",
+  "records": "4096x6 c996e477a42bb7f4",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-lights 1`] = `
+{
+  "nodes": "4096x1 30c4bd8c026da13d",
+  "records": "4096x1 17dce84c7e609e13",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-lights-fog 1`] = `
+{
+  "nodes": "4096x1 30c4bd8c026da13d",
+  "records": "4096x1 17dce84c7e609e13",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-room 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > transform-bake 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > transform-bake-ref 1`] = `null`;
