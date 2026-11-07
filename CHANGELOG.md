@@ -4,6 +4,49 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Sheen: fuzz over a Lambertian base (`sheen`)
+
+Integration step 10 of the photorealism batch (small-materials plan, sheen section), with the
+review's must-fix items applied.
+
+**What:** a new material model `sheen`: OpenPBR's fuzz layer over a Lambertian base, the fuzz
+lobe being Zeltner, Burley and Chiang's linearly transformed cosine (transcribed from MaterialX
+`mx_microfacet_sheen.glsl`). With p = W·E(μ_o), f = c·p·D/μ_i + (1 − p)·ρ/π. Rows: `albedo` (ρ),
+`sheen_color` (c), `sheen_weight` (W, in [0, 1]) and `sheen_roughness` (in [0, 1]); the fits read
+the derived `sheen_r` = roughness clamped to [0.01, 1], which has a per-hit form, so the
+roughness may vary over the surface. The sampler mixes the LTC lobe (probability p) and the
+cosine lobe, with the exact mixture pdf; the weight (c·p·g + ρ(1 − p))/(p·g + 1 − p) is ρ when
+c = ρ. D depends only on the azimuth relative to ω_o, so no tangent field is needed (works on
+SDFs). Not reciprocal (E depends on μ_o); every unidirectional technique evaluates f(·|ω_o), so
+the estimators agree. Same in RGB and spectral programs.
+- The descriptor fact `microfacet: { energy }` gains `'none'`: sheen reads only the frame maps
+  of glsl/core/microfacet.glsl and calls no energy gain, so a sheen-only program links that
+  library and nothing of microfacet_energy under either `measurement.microfacet`.
+- sheen.md (model, sampling, energy identity, non-reciprocity), sheen.test.ts (TS twin),
+  tests/compiler/sheen.test.ts, one registry line, README occupant list, microfacet.glsl header
+  comment (names sheen as a present occupant).
+- Witnesses `sheen-furnace` (furnace-sky's sphere, c = ρ = 0.4: reads 0.4 over the sphere,
+  grazing rim included) and `sheen-fuzz` (fuzz alone, ρ = 0, orthographic camera over a convex
+  roof at μ_o = 0.2 and 0.5, four bands reading W·c·E(μ_o, r)); keys pt-nee, pt-mis, pt and
+  spectral pt-mis.
+
+**Measured:**
+- TS twin: E clamped into [0, 1] (raw minimum −2e-5, maximum 0.745); GLSL constants equal
+  MaterialX's; the LTC sampler's density equals D to 1e-9; ∫D = 1 to 1e-3; χ² of the mixture
+  sampler passes at μ_o ∈ {1, 0.5 (wo below the frame), 0.1} × r ∈ {0.05, 0.3, 0.5, 1} ×
+  W ∈ {0.3, 1}, and fails when the azimuth turn or the sign of b⁻¹ is broken; triple and pdf
+  agreement < 1e-12; frame rotation invariance < 1e-9; energy identity by quadrature (1e-3) and
+  by mean sample weight (3σ); c = ρ weights equal ρ to 1e-14; W = 0 is Lambert.
+- Witness `sheen-furnace` (384 spp, tolerance 0.006): sphere 0.3997, 0.4000, 0.4000 on keys 1–3,
+  (0.3998, 0.3998, 0.4000) spectral; sky 1.0000 (spectral 0.9996–1.0000).
+- Witness `sheen-fuzz` (256 spp, tolerance 0.006), expected 0.4295 / (0.3216, 0.1608, 0.0804) /
+  0.4957 / 0.3071: pt-nee 0.4282 / (0.3220, 0.1610, 0.0805) / 0.4951 / 0.3069; pt-mis 0.4292 /
+  (0.3217, 0.1609, 0.0804) / 0.4956 / 0.3071; pt 0.4296 / (0.3217, 0.1608, 0.0804) / 0.4958 /
+  0.3071; spectral pt-mis (gray bands) 0.4291–0.4292 / 0.4957–0.4960 / 0.3069–0.3072.
+- Digest: no existing scene's output changes except the microfacet.glsl comment text (26
+  scenes with a microfacet model, shader text and source map only; with that comment
+  reverted, 282 of 282 existing scenes are identical); the two new scenes are added.
+
 ## 2026-11-07 — Fix: a uv-reading material on a driven SDF object crashed the compiler
 
 `keepsLocalFrame` (compiler/plan/dataTenants.ts) lowered the object's transform as a constant

@@ -82504,7 +82504,7 @@ Ray ray_spawn(Hit hit, Direction wi) {
 
 // Microfacet distribution machinery — the FIXED stdlib every microfacet model is written
 // against (fable-rough-dielectric §4). The MODEL is swappable (ggx conductor, rough
-// dielectric, future sheen/layered/anisotropic occupants live behind the materials
+// dielectric, and sheen, which reads only the frame maps, live behind the materials
 // registry); the DISTRIBUTION is not — D, Smith G₁ and VNDF sampling are one truth here,
 // so a program containing any one microfacet occupant links them exactly once and a
 // rough-glass-only scene needs no conductor.

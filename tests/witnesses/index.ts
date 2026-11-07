@@ -108,6 +108,10 @@ import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from '
 import {
     thinPaneScene, thinPaneStrategies, THIN_PANE_POSE, THIN_PANE_REGIONS, THIN_PANE_NORMAL, THIN_PANE_TILTED,
 } from './scenes/thinPaneWitness.js';
+import {
+    sheenFurnaceScene, SHEEN_FURNACE_SPHERE,
+    sheenFuzzScene, sheenFuzzStrategies, SHEEN_FUZZ_POSE, SHEEN_FUZZ_REGIONS, SHEEN_FUZZ_VALUES,
+} from './scenes/sheenWitness.js';
 import { roughFurnaceExpr, veachMisVarying } from './scenes/derivedRoughnessWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
@@ -1496,6 +1500,47 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.facing, label: `pane facing the camera (key ${strategy + 1})` },
                 { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.flipped, label: `pane seen from its back (key ${strategy + 1})` },
                 { kind: 'mean' as const, value: THIN_PANE_TILTED, tol: 0.005, strategy, region: THIN_PANE_REGIONS.tilted, label: `pane at cos 0.5 (key ${strategy + 1})` },
+            ]),
+        },
+    },
+    'sheen-furnace': {
+        scene: sheenFurnaceScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy,
+            { ...furnaceSkyMisStrategy, id: 'spectral-pt-mis', measurement: { ...furnaceSkyMisStrategy.measurement, color: 'spectral' } }),
+        exercises:
+            'sheen (fuzz over Lambert) in the open furnace with fuzz color = base albedo = 0.4: the albedo-scaling layer (1 − W·E) and the lobe mixture; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            'every sphere pixel reads 0.4 at every angle (the directional albedo is W·c·E + (1 − W·E)·ρ = ρ when c = ρ), the sky 1.0, on all four keys',
+        witness: {
+            // 384, as plastic-furnace: the pt-nee arm's uniform-sphere sky sampling.
+            spp: 384,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                {
+                    kind: 'mean' as const, value: 0.4, tol: 0.006, strategy, region: SHEEN_FURNACE_SPHERE,
+                    label: `sheen A = ρ = 0.4 over the sphere, grazing included (key ${strategy + 1})`,
+                },
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.005, strategy,
+                    region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 },
+                    label: `sky = L = 1.0 (key ${strategy + 1})`,
+                },
+            ]),
+        },
+    },
+    'sheen-fuzz': {
+        scene: sheenFuzzScene,
+        strategies: posed(SHEEN_FUZZ_POSE.position, SHEEN_FUZZ_POSE.target, ...sheenFuzzStrategies),
+        exercises:
+            'sheen\'s fuzz lobe alone (base albedo 0) under a unit sky, orthographic, on a convex roof at μ_o = 0.2 and 0.5: the fit E, the LTC density D (NEE and MIS integrate it; it must be normalized), the LTC sampler (pt draws it), the coverage W and the fuzz color; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            `each band reads W·c·E(μ_o, r): left top ${SHEEN_FUZZ_VALUES.leftTop}, left bottom (${SHEEN_FUZZ_VALUES.leftBottom.join(', ')}), right top ${SHEEN_FUZZ_VALUES.rightTop}, right bottom ${SHEEN_FUZZ_VALUES.rightBottom}, on every key (the spectral key checks the gray bands)`,
+        witness: {
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.leftTop, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.leftTop, label: `μ_o 0.2, r 0.5 (key ${strategy + 1})` },
+                ...(strategy === 3 ? [] : [{ kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.leftBottom, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.leftBottom, label: `μ_o 0.2, r 1, W 0.5, c (1, 0.5, 0.25) (key ${strategy + 1})` }]),
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.rightTop, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.rightTop, label: `μ_o 0.5, r 1 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.rightBottom, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.rightBottom, label: `μ_o 0.5, r 0.7 (key ${strategy + 1})` },
             ]),
         },
     },

@@ -127,9 +127,10 @@ export interface MaterialModelDescriptor {
      *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
      *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
      *  (materials/microfacet_energy): `microfacet_conductor_gain` or
-     *  `microfacet_dielectric_gain`. Under measurement.microfacet 'single-scattering' the
-     *  compiler emits that gain as the constant 1. */
-    microfacet?: { energy: 'conductor' | 'dielectric' };
+     *  `microfacet_dielectric_gain`, or 'none' for a model that calls no gain (sheen reads only
+     *  the frame maps). Under measurement.microfacet 'single-scattering' the compiler emits a
+     *  gain as the constant 1. */
+    microfacet?: { energy: 'conductor' | 'dielectric' | 'none' };
     /** The model's albedo for the albedo guide (components/aov): the surface's color
      *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
      *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`

@@ -730,6 +730,10 @@ exports[`scene-data textures (byte fingerprints) > shadow-aim-march 1`] = `null`
 
 exports[`scene-data textures (byte fingerprints) > shadow-medium 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > sheen-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sheen-fuzz 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sky-lamp 1`] = `null`;

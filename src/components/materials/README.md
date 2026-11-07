@@ -70,11 +70,14 @@ LOBE_DELTA; albedo in [0, 1]; `coat_eta` is relative to the outside medium; see
 2R/(1 + R) and straight-through transmission, both of weight 1; `sheet_eta` is relative to the
 medium around it; it passes light through without changing region, so the Validator rejects it
 in scenes with media; see `thin_dielectric/thin_dielectric.md`).
+`sheen/` (OpenPBR fuzz over a Lambertian base: an LTC fuzz lobe and the base, mixed by the
+fuzz albedo E(μ_o); exact pdf, no tangent field needed, not reciprocal; see `sheen/sheen.md`).
 
 
 **Microfacet models** (`ggx`, `rough_dielectric`) declare `microfacet: { energy }`: the gate
 for `glsl/core/microfacet.glsl` and the energy gain their GLSL multiplies into eval and the
-sample weight. `microfacet_energy/` is the shared part behind the gains (not an occupant):
+sample weight. `sheen` declares `energy: 'none'`: it reads only the library's frame maps and
+calls no gain. `microfacet_energy/` is the shared part behind the gains (not an occupant):
 the energy table, its TS twin and builder, and `microfacet_energy.glsl`, linked under
 `measurement.microfacet: 'energy-compensated'`; otherwise the compiler emits each gain as 1.
 Their roughness rows lie in [0, 1], the table's range (`microfacet_energy/microfacet_energy.md`).
