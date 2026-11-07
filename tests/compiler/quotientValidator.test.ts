@@ -272,6 +272,12 @@ describe('Seifert–Weber Validator rules', () => {
         // A disk object is bounded by its radius.
         expect(swErrors((s) => { s.objects.push({ type: 'disk', parameters: { center: along(0.6), radius: 0.45, normal: [1, 0, 0] }, material: 'm' }); })
             .some((m) => /object 1 crosses a face of D/.test(m))).toBe(true);
+        // A shape with an H³ body but no ballBound (a small box at o) and a quad light have no ball to
+        // check: errors, not silent acceptance.
+        expect(swErrors((s) => { s.objects.push({ type: 'box', parameters: { halfSize: [0.1, 0.1, 0.1] }, material: 'm' }); })
+            .some((m) => /object 1 \(box\) declares no bounding ball/.test(m))).toBe(true);
+        expect(swErrors((s) => { s.lights.push({ kind: 'quad', corner: [-0.1, 0.3, -0.1], edge1: [0.2, 0, 0], edge2: [0, 0, 0.2], emission: 1 }); })
+            .some((m) => /light 1 \(quad\) has no bound for its backing 'quad'/.test(m))).toBe(true);
     });
 
     it('requires every light inside D, and rejects delta lights', () => {

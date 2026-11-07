@@ -76,7 +76,10 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
             bag.error('invalid-setting', `${label}: light ${i} (${light.kind}) has driven geometry — it needs a compile-time bound inside D`).add();
             return;
         }
-        if (placement.lightInside(k.region.primitive, k.region.parameters(a) as Record<string, number | number[]>) === false) {
+        const inside = placement.lightInside(k.region.primitive, k.region.parameters(a) as Record<string, number | number[]>);
+        if (inside === null) {
+            bag.error('invalid-setting', `${label}: light ${i} (${light.kind}) has no bound for its backing '${k.region.primitive}' (no ballBound), so it cannot be checked inside D`).add();
+        } else if (!inside) {
             bag.error('invalid-setting', `${label}: light ${i} (${light.kind}) is not inside D by ${QUOTIENT_MARGIN} — each light image must be one copy of a light in D`).add();
         }
     });
@@ -117,7 +120,7 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
 
 /** How a quotient checks that the scene lies in D: world boxes for a torus, geodesic balls for a
  *  group acting on a curved space. `lightInside` answers for a light's backing primitive (null:
- *  no bound to check, left to other rules); `object` reports an object's errors. */
+ *  it has no bound, an error); `object` reports an object's errors. */
 interface PlacementRules {
     lightInside(primitive: string, parameters: Record<string, number | number[]>): boolean | null;
     object(obj: ObjectDescription, at: string, emits: boolean, bag: DiagnosticBag): void;
@@ -193,7 +196,12 @@ function ballPlacement(geom: CurvedGeometry, ballInside: (c: Vec4, r: number) =>
                 return;
             }
             const b = ball(obj.type, obj.parameters as Record<string, number | number[]>, obj.transform);
-            if (b === null) return;   // no curved body: the space gate reports it
+            if (b === null) {
+                // A shape with no ballBound (box, cylinder, quad, a defineSDF field) has no ball to
+                // check, so it cannot be placed in D.
+                bag.error('invalid-setting', `${at} (${obj.type}) declares no bounding ball (ballBound), so it cannot be checked inside D`).add();
+                return;
+            }
             if (!ballInside(b.c, b.r + m)) {
                 bag.error('invalid-setting', `${at} crosses a face of D (its bounding ball, radius ${b.r}, must lie inside D by ${m}; objects spanning faces need copies on both sides, which a quotient does not make)`).add();
             }
