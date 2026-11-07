@@ -338,6 +338,10 @@
     z-index: 1000;
 }
 
+.stats-panel.hidden {
+    display: none;
+}
+
 .stats-panel-state {
     font-weight: var(--ui-font-weight-medium);
     margin-bottom: var(--ui-space-xs);
