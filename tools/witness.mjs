@@ -33,17 +33,18 @@
 // rerun with --headed. Perf frames are never cached (milliseconds are machine state,
 // not pure functions of the inputs). Run perf alone on a quiet machine.
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
+import { devServer } from './devServer.mjs';
 
 // WITNESS_PORT lets runs from separate worktrees use separate dev servers; a run reuses a
 // server already on its port, so two worktrees on one port would test each other's code.
-const PORT = Number(process.env.WITNESS_PORT ?? 3000);
-const BASE_URL = `http://localhost:${PORT}`;
+const server = devServer(Number(process.env.WITNESS_PORT ?? 3000));
+const BASE_URL = server.baseUrl;
 const DEFAULT_SIZE = [160, 120];
 const DEFAULT_SPP = 64;
 const RENDER_TIMEOUT_MS = 8 * 60 * 1000; // per (scene, strategy) render
@@ -135,45 +136,6 @@ function cacheWrite(key, obj) {
         writeFileSync(join(CACHE_DIR, `${key}.json`), JSON.stringify(obj));
     } catch (e) { process.stdout.write(`  (cache write failed: ${e})\n`); }
 }
-
-// ---------------------------------------------------------------------------
-// Dev server: reuse a running one, else spawn `npm run dev` and kill it on exit.
-async function serverUp() {
-    try {
-        const res = await fetch(`${BASE_URL}/lab.html`, { signal: AbortSignal.timeout(1500) });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
-let devServer = null;
-async function ensureServer() {
-    if (await serverUp()) return;
-    process.stdout.write('starting dev server… ');
-    devServer = spawn('npm', ['run', 'dev', '--', '--port', String(PORT), '--strictPort'], {
-        cwd: new URL('..', import.meta.url).pathname,
-        stdio: 'ignore',
-        detached: false,
-    });
-    for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 500));
-        if (await serverUp()) {
-            console.log('up.');
-            return;
-        }
-    }
-    throw new Error(`dev server did not come up on :${PORT} within 30s`);
-}
-
-function cleanup() {
-    if (devServer && !devServer.killed) devServer.kill();
-}
-process.on('exit', cleanup);
-process.on('SIGINT', () => {
-    cleanup();
-    process.exit(130);
-});
 
 // ---------------------------------------------------------------------------
 // Stats (all on linear HDR RGBA float arrays, bottom-left origin — readPixels order)
@@ -984,7 +946,7 @@ async function recordTiledCase(browser, c, dir) {
 
 async function framesRecord(dir) {
     if (existsSync(join(dir, 'manifest.json'))) throw new Error(`${dir} already holds a record; choose a new directory`);
-    await ensureServer();
+    await server.ensure();
     const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const t0 = Date.now();
     try {
@@ -1006,7 +968,7 @@ async function framesRecord(dir) {
         console.log(`frames: ${cases.length} cases recorded in ${dir} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
     } finally {
         await browser.close();
-        cleanup();
+        server.stop();
     }
 }
 
@@ -1154,7 +1116,7 @@ const YELLOW = s => `\x1b[33m${s}\x1b[0m`;
 const modeChecks = spec => spec.checks.filter(c => perfMode ? c.kind === 'perf' : c.kind !== 'perf');
 
 async function main() {
-    await ensureServer();
+    await server.ensure();
 
     // Numeric sweep: SwiftShader (deterministic software rasterizer — the frame cache
     // depends on it). Perf: the real GPU (ANGLE Metal on macOS); --headed as the
@@ -1279,13 +1241,13 @@ async function main() {
         process.exitCode = failed + disagreed;
     } finally {
         await browser.close();
-        cleanup();
+        server.stop();
     }
 }
 
 const framesAt = argv.indexOf('--frames');
 (framesAt >= 0 ? framesMain(argv.slice(framesAt + 1)) : main()).catch(err => {
     console.error(err);
-    cleanup();
+    server.stop();
     process.exit(1);
 });

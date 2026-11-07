@@ -478,6 +478,25 @@ pt-nee, pt-mis and pt; `spectral-plastic` (gray 0.5, frame mean 0.316313).
   sphere on the same stream); the two plastic entries use 384 spp, like `fog-sky`.
 - Digest: the 274 existing suite scenes are identical; 3 new scenes.
 
+## 2026-11-07 — `npm run shoot`: finished pictures on the real GPU
+
+- `tools/shoot.mjs` (`npm run shoot -- <scene-id...> [--spp N] [--size WxH] [--out dir]
+  [--format png|hdr|both] [--salt S] [--renderer K] [--tile PX] [--swiftshader]`) opens each
+  gallery scene in headless Chromium with ANGLE's Metal backend, renders it with the App's
+  production render (or its tiled render, with `--tile` or above 4K UHD) and saves through
+  the App's writers, so files carry the export stamp. It prints the GL renderer string and
+  refuses a software renderer unless `--swiftshader` asks for one.
+- The dev-server start/reuse/stop code moved from `tools/witness.mjs` to `tools/devServer.mjs`,
+  shared by both tools; the witness runner behaves as before (furnace witness passes).
+- Measured on the Apple M2: `sky` and `sdf-shapes` at 1280×853 × 1024 spp took 18–21 s each;
+  the 60 Hz animation-frame clock (one sample per frame) sets a floor of spp/60 s. A tiled
+  GPU render equals a one-piece render bit for bit (`sdf-shapes`, 640×427, 256 px tiles).
+- GPU against SwiftShader at the same salt (320×213 × 64 spp): `sdf-shapes` agrees to a
+  relative mean difference of 2·10⁻⁶ (98.6% of pixels identical). `sky` under NEE or MIS reads
+  0.23% darker on the GPU at three salts (red 0.35%, blue 0.10%; lit surfaces only, the sky seen
+  directly is identical); under pure path tracing the two agree to 0.05%. The cause is not
+  found (one trial, declaring the environment CDF samplers `highp`, gave the same numbers).
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.
