@@ -60,9 +60,9 @@ light-sampling-twins, camera-placement-authoring).
   form 0.13%.
 - **Plane** (totally geodesic, ⟨x, N⟩ = 0 with N = (cosh(offset)·n, −sinh(offset))): distance
   asinh(⟨p, N⟩) (with the sign restored around asinh, which GLSL evaluates badly for large
-  negative arguments); intersection e^{2t} = (W − P)/(W + P) with P = ⟨p,N⟩, W = ⟨v,N⟩; the normal
-  is N on the plane.
-- **Disk** (radius ρ in the plane through o ⊥ n): the plane root, then |h.xyz|² ≤ sinh²ρ.
+  negative arguments); intersection e^{2t} = (W − P)/(W + P) with P = ⟨p,N⟩, W = ⟨v,N⟩ (the
+  occupant's `hyperbolic_plane_root`, shared with the disk); the normal is N on the plane.
+- **Disk** (radius ρ in the plane through o ⊥ n): the same plane root, then |h.xyz|² ≤ sinh²ρ.
 - **Point light**: irradiance I·cos θ/sinh²d (flux 4πI through every geodesic sphere).
 - **Disk light**: area 2π(cosh ρ − 1) = 4π sinh²(ρ/2); uniform-area radius sinh(r/2) = √u·sinh(ρ/2)
   (cosh r = 1 + u(cosh ρ − 1)); area → solid angle dω = cos_l·dA/sinh²d with cos_l against the

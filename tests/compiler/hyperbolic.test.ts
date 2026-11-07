@@ -45,9 +45,9 @@ describe('H³ placements and light rows', () => {
         expect(glsl).toContain(`const mat4 isometry_object_1 = ${formatMat4(H.inverse(g))};`);
         const center = formatVec4(mat4Apply(g, ORIGIN));
         const normal = formatVec4(mat4Apply(g, tangentAtOrigin([0, -1, 0])));
-        expect(glsl).toContain(`DiskLight(${center}, 0.6, ${normal},`);
+        expect(glsl).toContain(`DiskLight(${center}, 1.2, ${normal},`);
         // the shape keeps its intrinsic rows: radius and the normal as a tangent vector at o
-        expect(glsl).toContain('Disk(0.6, Direction(0.0, -1.0, 0.0, 0.0))');
+        expect(glsl).toContain('Disk(1.2, Direction(0.0, -1.0, 0.0, 0.0))');
         expect(glsl).toMatch(/struct Disk \{\s*float radius;\s*Direction normal;\s*\}/);
     });
 
@@ -74,6 +74,15 @@ describe('H³ placements and light rows', () => {
         const moved = u.compute!({ 'ball.position': [0.1, -0.2, 0.3] }) as number[];
         const want = H.inverse(placementIsometry(H, [0.1, -0.2, 0.3], IDENTITY_QUAT, [0.2, 0, 0]));
         moved.forEach((x, i) => expect(x).toBeCloseTo(want[i], 12));
+    });
+
+    it('the h3-sky-ball witness reaches its ball through the mat4 uniform', () => {
+        const entry = h3Suite['h3-sky-ball'];
+        const r = compiler.compileScene(entry.scene, entry.strategies).renderers[0];
+        expect(r.uniforms.find((x) => x.uniform === 'u_object0Isometry')!.type).toBe('mat4');
+        const glsl = [...r.shaders.values()].map((p) => p.fragment).join('\n');
+        expect(glsl).toContain('uniform mat4 u_object0Isometry;');
+        expect(glsl).not.toContain('const mat4 isometry_object_0');
     });
 
     it('the camera uniforms are the vec4 frame at exp_o(position)', () => {

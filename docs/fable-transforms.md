@@ -114,7 +114,7 @@ The authoring language starts life as one pure function (outside the compiler �
 compiler never sees trees):
 
 ```ts
-flattenGroups(tree: SceneNode[]): ObjectDescription[]
+flattenGroups(tree: SceneNode[], space: string): ObjectDescription[]
 // composes each leaf's root→leaf similarity chain into ONE Transform,
 // stamps `name` with the node path, emits leaves in document order
 // (region-id stability), and leaves primitive params LOCAL (untouched).
@@ -131,6 +131,10 @@ flattenGroups(tree: SceneNode[]): ObjectDescription[]
   emits a scene description; dynamic mints param paths for driven-influenced leaves at
   description time, then re-composes and pushes TRS values through the ParameterStore
   on every change.
+- `space` is the scene's `ambientSpace.type`. The composition is that of Euclidean
+  similarities; in a curved space (the ambient descriptor has `curved`) a group with a
+  non-identity transform is an error, since isometries of a curved space compose
+  differently and that composition is not implemented. Identity groups pass.
 - A JS-aliased node appearing under two parents flattens to two independent leaves
   (two regions, two lights) — legal, documented, *not* instancing. Real instancing
   arrives with meshes and shared BVHs.

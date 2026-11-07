@@ -5,7 +5,7 @@
 // Provides: MAX_DIST, fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
-//           isometry_direction().
+//           isometry_direction(); for the H³ bodies, hyperbolic_form() and hyperbolic_plane_root().
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 
 // MAX_DIST — the far clip, an arc length: nothing beyond it is geometry. float32 cosh overflows
@@ -112,6 +112,18 @@ Direction ambient_aim(Point from, Direction along, Point to, out float remaining
 // coordinates and for any t. At o it is the view direction itself.
 vec3 ambient_sky_key(Point p, Direction v) {
     return normalize((p + v).xyz);
+}
+
+// The first t > 0 at which the ray meets the totally geodesic plane {x : ⟨x, N⟩ = 0}, N a unit
+// spacelike 4-vector (the plane and disk bodies). Along γ(t), ⟨γ(t), N⟩ = P·cosh t + W·sinh t with
+// P = ⟨p, N⟩, W = ⟨v, N⟩, zero where tanh t = −P/W, i.e. e^{2t} = (W − P)/(W + P). A root at t > 0
+// exists iff P and W have opposite signs and |W| > |P|. Floor 0 (escape is ray_spawn's offset).
+bool hyperbolic_plane_root(Ray ray, vec4 N, out float t) {
+    float P = hyperbolic_form(ray.origin, N);
+    float W = hyperbolic_form(ray.direction, N);
+    if (P * W >= 0.0 || abs(W) <= abs(P)) return false;
+    t = 0.5 * log((W - P) / (W + P));
+    return true;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

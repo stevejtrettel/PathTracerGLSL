@@ -44,11 +44,17 @@ They share the standalone float-framebuffer runner with `witness:color` and run 
 
 ## Curved-space witnesses (H³)
 
-`scenes/h3Witness.ts`: `h3-furnace` (six emissive planes, every path Σ_{k≤6} 0.8^k), `h3-disk-light`
-and `h3-point-light` (a lambert disk receiver against closed forms integrated over the readout
-window), `h3-medium` (a scattering ball, pt = pt-nee = pt-mis). The window means are computed by
-the fp64 twin `scenes/h3Twins.ts`; `h3Twins.test.ts` recomputes them and checks the twin against
-the on-axis closed form and an independent Monte Carlo estimate. Not yet in a full sweep.
+`scenes/h3Witness.ts`: `h3-furnace` (six emissive planes, every path Σ_{k≤6} 0.8^k, pinhole and
+fisheye), `h3-disk-light` (a lambert disk receiver under a disk light of geodesic radius 1.2, large
+enough that a Euclidean inverse-CDF radius would be off by about 4.5%) and `h3-point-light` (the
+same receiver under two point lights, power and uniform selection), against closed forms integrated
+over the readout window; `h3-medium` (a scattering ball and a floor, pt = pt-nee = pt-mis, with the
+light out of frame so the frame mean is the ball and the floor); `h3-sky` (the sky 1 + key read at
+each camera ray's ideal endpoint, pinhole and fisheye); `h3-sky-ball` (a lambert ball under a
+constant sky reads ρ·L; its {param}-driven placement must put it where the frame mean says). The
+expected values are computed by the fp64 twin `scenes/h3Twins.ts`; `h3Twins.test.ts` recomputes
+them and checks the twin against the on-axis closed form, an independent Monte Carlo estimate, the
+limit that defines the sky key and a marched ball test. Not yet in a full sweep.
 
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 

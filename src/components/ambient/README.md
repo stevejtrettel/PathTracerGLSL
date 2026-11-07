@@ -128,15 +128,21 @@ rays (support.md has the full table). Places that are Euclidean beyond the seam 
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
 similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
-`flattenGroups` (the authoring layer composes transformed groups as similarities, so a curved
-scene must not use transformed groups yet).
+`flattenGroups` (it composes groups as Euclidean similarities, so in a curved space a group with a
+non-identity transform is an error there).
 
 ## Invariants & witnesses
 
-- H³ (tests/witnesses/scenes/h3Witness.ts): `h3-furnace` (six emissive planes, Σ_{k≤6} 0.8^k
-  exactly), `h3-disk-light` and `h3-point-light` (a lambert disk receiver against closed forms
-  integrated over the readout window by tests/witnesses/scenes/h3Twins.ts), `h3-medium` (pt =
-  pt-nee = pt-mis for a scattering ball). The CPU geometry, the column-major layout and
+- H³ (tests/witnesses/scenes/h3Witness.ts; every occupant and estimator key listed under
+  hyperbolic in support.md is rendered by one of them, the environment row through a constant and
+  a procedural sky — no H³ witness renders an image sky): `h3-furnace` (six emissive planes,
+  Σ_{k≤6} 0.8^k exactly, through a pinhole and a fisheye), `h3-disk-light` and `h3-point-light`
+  (a lambert disk receiver against closed forms integrated over the readout window by
+  tests/witnesses/scenes/h3Twins.ts; the latter under power and uniform selection of two
+  lights), `h3-medium` (pt = pt-nee = pt-mis for a scattering ball, the light out of frame),
+  `h3-sky` (a direction-dependent sky read at the sky key, pinhole and fisheye), `h3-sky-ball`
+  (a lambert ball reads ρ·L under a constant sky; its placement is the {param}-driven mat4
+  uniform). The CPU geometry, the column-major layout and
   `isometry_direction`'s arithmetic are pinned by tests/components/hyperbolic.test.ts.
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).

@@ -266,6 +266,10 @@ exports[`scene-data textures (byte fingerprints) > h3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-point-light 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > h3-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sky-ball 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > haze 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > hearth 1`] = `null`;

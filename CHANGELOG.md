@@ -4,6 +4,32 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — H³ review fixes: witnesses that can fail, groups, procedural skies
+
+Review of the H³ step (curved-space design §2.3).
+
+- **h3-medium** now keeps its light out of frame: a disk light of radius 1.5 above and behind
+  the camera. Before, the light's 598 visible pixels carried 91.5% of the frame mean, so the
+  whole-frame gates could not see a bias of about 20% in the ball or floor. A phase sample from
+  the ball now reaches the light with probability 0.12 to 0.26, so MIS differs from NEE: the
+  largest per-pixel difference is 0.074 at the same salt (0.0016 before).
+- **h3-disk-light** uses a light of geodesic radius 1.2, up from 0.6. A Euclidean inverse-CDF
+  radius now raises E by 4.8% on axis (0.44% at radius 0.6), about 7× the 0.002 tolerance.
+- **New witnesses:** `h3-sky` (the sky 1 + key read at each camera ray's ideal endpoint, through
+  a pinhole and a fisheye placed away from o) and `h3-sky-ball` (a lambert ball under a constant
+  sky reads ρ·L; its placement is the {param}-driven mat4 uniform). `h3-furnace` also renders
+  through a fisheye. `h3-point-light` has two lights, under power and uniform selection. Every
+  key listed under hyperbolic is now rendered (support.md), the sky through constant and
+  procedural skies.
+- **Procedural skies in H³ crashed the App.** It baked the sampling table of every procedural
+  sky, but no chart has a hyperbolic body. `compileEnvironmentBake` now returns null for a sky
+  that is not sampled as a light, since no program reads its table.
+  `environmentSampledAsLight` (Analyzer.ts) is the one rule, shared with the Analyzer.
+- **`flattenGroups(nodes, space)`** takes the ambient space. In a curved space a group with a
+  transform is an error, because the function composes Euclidean similarities.
+- The H³ plane and disk bodies share the occupant's `hyperbolic_plane_root` and call
+  `hyperbolic_form` directly. Before, they called `ambient_dot` on a point.
+
 ## 2026-11-07 — Hyperbolic space H³ (curved-space step 2)
 
 [Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.3 and Part 1, after three reviews.

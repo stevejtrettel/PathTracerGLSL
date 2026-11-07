@@ -10,8 +10,11 @@
 // Off-axis receiver points have no closed form for the disk, so E is a quadrature over the disk in
 // geodesic polar coordinates about its center (dA = sinh s ds dφ); tests/witnesses/h3Twins.test.ts
 // checks it against the on-axis closed form and against an independent cosine-sampled estimate.
-// The camera ray of a pixel follows the pinhole occupant (pinhole.glsl) with the frame the
-// compiler ships (curvedCameraBasis), and the window is the runner's regionBounds.
+// The camera ray of a pixel follows the pinhole and fisheye occupants (pinhole.glsl, fisheye.glsl)
+// with the frame the compiler ships (curvedCameraBasis), and the window is the runner's
+// regionBounds. The sky witnesses read the sky key normalize((p + v).xyz) (h3Twins.test.ts checks it
+// against the direction of γ(t) from o as t grows) and a closed-form ball test (checked against
+// marching the ray).
 
 import type { WitnessRegion } from '../types.js';
 import type { Vec3Tuple } from '../../../src/components/geometry/similarity.js';
@@ -124,38 +127,84 @@ export function cameraRay(pose: { position: Vec3Tuple; target: Vec3Tuple }, fov:
     return { p: b.position as V4, v: unit(d) };
 }
 
-/** A receiver: the lambert disk of geodesic radius rho about o in the plane y = 0 (normal +y). */
-export interface Receiver { rho: number; albedo: number }
-
-/** The mean over the runner's readout window of the receiver's radiance (albedo/π)·E(x), each pixel
- *  integrated over its footprint (box filter) with sub×sub stratified points. A point of the window
- *  that misses the receiver contributes 0, as in the render (no sky, nothing behind); `missed` counts
- *  them so a fixture can require full coverage. */
-export function windowMean(
-    pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], region: WitnessRegion,
-    receiver: Receiver, irradiance: (x: V4, nx: V4) => number, sub = 2,
-): { mean: number; missed: number } {
+/** The equidistant fisheye ray through film point (fx, fy) (fisheye.glsl: θ = ρ·fov/2 about the
+ *  view axis, ρ the aspect-corrected film radius; corners reach past the inscribed circle). */
+export function fisheyeRay(pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], fx: number, fy: number): { p: V4; v: V4 } {
+    const b = curvedCameraBasis(hyperbolicGeometry, pose.position, pose.target);
     const [W, H] = size;
-    const x0 = Math.max(0, Math.floor(region.x * W)), y0 = Math.max(0, Math.floor(region.y * H));
-    const x1 = Math.min(W, Math.ceil((region.x + region.w) * W)), y1 = Math.min(H, Math.ceil((region.y + region.h) * H));
-    const N: V4 = [0, 1, 0, 0];
-    let sum = 0, n = 0, missed = 0;
+    const cx = ((2 * fx) / W - 1) * (W / H), cy = (2 * fy) / H - 1;
+    const rho = Math.hypot(cx, cy);
+    const theta = rho * fov / 2;
+    const d: V4 = [0, 0, 0, 0];
+    for (let i = 0; i < 4; i++) d[i] = Math.cos(theta) * b.forward[i] + Math.sin(theta) * ((cx / rho) * b.right[i] + (cy / rho) * b.up[i]);
+    return { p: b.position as V4, v: unit(d) };
+}
+
+/** The ideal endpoint of the ray (p, v) as a unit vector of R³: normalize((p + v).xyz). */
+export function skyKey(p: V4, v: V4): [number, number, number] {
+    const k = [p[0] + v[0], p[1] + v[1], p[2] + v[2]];
+    const l = Math.hypot(k[0], k[1], k[2]);
+    return [k[0] / l, k[1] / l, k[2] / l];
+}
+
+/** Whether the ray (p, v), starting outside the geodesic ball of radius R about c, meets it at some
+ *  t > 0. Along γ(t), cosh dist(γ(t), c) = A·cosh t + B·sinh t with A = −⟨p, c⟩, B = −⟨v, c⟩; its
+ *  minimum over t is √(A² − B²), reached where tanh t = −B/A (t > 0 iff B < 0). */
+export function hitsBall(p: V4, v: V4, c: V4, R: number): boolean {
+    const A = -form(p, c), B = -form(v, c);
+    return B < 0 && Math.sqrt(A * A - B * B) <= Math.cosh(R);
+}
+
+/** The mean over the runner's readout region (default: the whole frame) of the per-ray RGB radiance
+ *  `radiance(p, v)`, each pixel integrated over its footprint (box filter) with sub×sub stratified
+ *  points. */
+export function regionMean(
+    ray: (fx: number, fy: number) => { p: V4; v: V4 }, size: [number, number], region: WitnessRegion | undefined,
+    radiance: (p: V4, v: V4) => [number, number, number], sub = 2,
+): [number, number, number] {
+    const [W, H] = size;
+    const r = region ?? { x: 0, y: 0, w: 1, h: 1 };
+    const x0 = Math.max(0, Math.floor(r.x * W)), y0 = Math.max(0, Math.floor(r.y * H));
+    const x1 = Math.min(W, Math.ceil((r.x + r.w) * W)), y1 = Math.min(H, Math.ceil((r.y + r.h) * H));
+    const sum: [number, number, number] = [0, 0, 0];
+    let n = 0;
     for (let py = y0; py < y1; py++) {
         for (let px = x0; px < x1; px++) {
             for (let sy = 0; sy < sub; sy++) {
                 for (let sx = 0; sx < sub; sx++) {
-                    const { p, v } = cameraRay(pose, fov, size, px + (sx + 0.5) / sub, py + (sy + 0.5) / sub);
-                    const t = planeRoot(p, v, N);
+                    const { p, v } = ray(px + (sx + 0.5) / sub, py + (sy + 0.5) / sub);
+                    const L = radiance(p, v);
+                    sum[0] += L[0]; sum[1] += L[1]; sum[2] += L[2];
                     n++;
-                    if (t === null) { missed++; continue; }
-                    const x = flow(p, v, t);
-                    if (dist(x, [0, 0, 0, 1]) > receiver.rho) { missed++; continue; }
-                    sum += (receiver.albedo / Math.PI) * irradiance(x, N);
                 }
             }
         }
     }
-    return { mean: sum / n, missed };
+    return [sum[0] / n, sum[1] / n, sum[2] / n];
+}
+
+/** A receiver: the lambert disk of geodesic radius rho about o in the plane y = 0 (normal +y). */
+export interface Receiver { rho: number; albedo: number }
+
+/** The mean over the runner's readout window of the receiver's radiance (albedo/π)·E(x) through the
+ *  pinhole camera (regionMean). A point of the window that misses the receiver contributes 0, as in
+ *  the render (no sky, nothing behind); `missed` counts them so a fixture can require full
+ *  coverage. */
+export function windowMean(
+    pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], region: WitnessRegion,
+    receiver: Receiver, irradiance: (x: V4, nx: V4) => number, sub = 2,
+): { mean: number; missed: number } {
+    const N: V4 = [0, 1, 0, 0];
+    let missed = 0;
+    const [mean] = regionMean((fx, fy) => cameraRay(pose, fov, size, fx, fy), size, region, (p, v) => {
+        const t = planeRoot(p, v, N);
+        if (t === null) { missed++; return [0, 0, 0]; }
+        const x = flow(p, v, t);
+        if (dist(x, [0, 0, 0, 1]) > receiver.rho) { missed++; return [0, 0, 0]; }
+        const L = (receiver.albedo / Math.PI) * irradiance(x, N);
+        return [L, L, L];
+    }, sub);
+    return { mean, missed };
 }
 
 /** Gauss–Legendre nodes and weights on [−1, 1] (Newton on the Legendre recurrence). */

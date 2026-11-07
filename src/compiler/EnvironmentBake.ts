@@ -15,6 +15,7 @@ import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from '../glsl/shared/fullscreen.vert.glsl?raw';
 import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../components/env/index.js';
 import { bodyFor } from '../components/descriptors.js';
+import { environmentSampledAsLight } from './analyze/Analyzer.js';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 
@@ -27,9 +28,12 @@ export function envTableSize(env: { tableSize?: [number, number] }, chart: strin
     return env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
 }
 
+/** The bake renderer of the scene's procedural sky, or null when there is nothing to bake: the
+ *  sky is not procedural, or it is not sampled as a light (its formula is evaluated directly and
+ *  no program reads a table). */
 export function compileEnvironmentBake(scene: SceneDescription, chart: string = DEFAULT_ENV_CHART): CompiledRenderer | null {
     const env = scene.environment;
-    if (env?.type !== 'procedural') return null;
+    if (env?.type !== 'procedural' || !environmentSampledAsLight(env)) return null;
 
     const [w, h] = envTableSize(env, chart);
     const rendererId = `envbake-${scene.id}-${chart}`;
