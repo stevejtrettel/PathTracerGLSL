@@ -5,17 +5,16 @@
 // asinh(⟨p, N⟩), positive on the side `normal` points to. Derivations:
 // components/ambient/hyperbolic/hyperbolic.md.
 // Provides (struct GENERATED from descriptor rows): plane_sdf(), plane_intersect(), plane_normal().
-// Depends on: hyperbolic_form(), hyperbolic_plane_root() (the H³ occupant).
+// Depends on: hyperbolic_plane_vector(), hyperbolic_plane_distance(), hyperbolic_plane_root() (the H³
+//             occupant).
 
 Direction plane_N(Plane pl) {
-    return Direction(cosh(pl.offset) * pl.normal.xyz, -sinh(pl.offset));
+    return hyperbolic_plane_vector(pl.normal, pl.offset);
 }
 
-// Exact signed distance; asinh of |x| with the sign restored (GLSL's asinh loses precision for
-// large negative arguments).
+// Exact signed distance.
 float plane_sdf(Point p, Plane pl) {
-    float s = hyperbolic_form(p, plane_N(pl));
-    return sign(s) * asinh(abs(s));
+    return hyperbolic_plane_distance(p, plane_N(pl));
 }
 
 // The geodesic's root on ⟨x, N⟩ = 0 (hyperbolic_plane_root in the occupant).

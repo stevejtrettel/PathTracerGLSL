@@ -3,7 +3,8 @@
 // holds only the radius (the center row is folded into the placement). Arc length t is the same
 // in every frame, so the generated arm compares it with world hits unchanged. Derivations and
 // float32 measurements: components/ambient/hyperbolic/hyperbolic.md.
-// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_intersect(), sphere_normal().
+// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_intersect(), sphere_normal(),
+//           sphere_interval().
 
 // Exact distance to the sphere: dist(o, p) = asinh(|p.xyz|) (the asinh form keeps precision
 // near the surface, where acosh(p.w) does not).
@@ -39,4 +40,26 @@ bool sphere_intersect(Ray ray, Sphere sp, out float t) {
 Direction sphere_normal(Point p, Sphere sp) {
     float r = length(p.xyz);
     return Direction(p.w * p.xyz / r, r);
+}
+
+// The ray's interval inside the ball, [entry, exit] with the entry clamped to 0 (an origin inside
+// enters at once) — what a marched shape bounded by this ball searches. The roots of
+// sphere_intersect: x = eᵗ solves (a+b)x² − 2 cosh R·x + (a−b) = 0, entry (a−b)/q and exit q/(a+b) with
+// q = cosh R + √disc. False when the geodesic misses the ball or leaves it behind the origin; a
+// geodesic of H³ meets a ball in one segment, so nothing lies beyond the exit.
+bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
+    vec3 c = cross(ray.origin.xyz, ray.direction.xyz);
+    float k = dot(c, c);
+    float sr = sinh(sp.radius);
+    float disc = sr * sr - k;
+    if (disc < 0.0) return false;
+    float big = ray.origin.w + abs(ray.direction.w);
+    float small = (1.0 + k) / big;
+    float apb = ray.direction.w >= 0.0 ? big : small;   // a + b
+    float amb = ray.direction.w >= 0.0 ? small : big;   // a − b
+    float q = cosh(sp.radius) + sqrt(disc);
+    t1 = log(q / apb);
+    if (t1 <= 0.0) return false;
+    t0 = max(log(amb / q), 0.0);
+    return true;
 }

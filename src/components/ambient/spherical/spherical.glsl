@@ -7,7 +7,9 @@
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
 //           isometry_direction(); for the S³ bodies, spherical_cos_sin(), spherical_asin(),
-//           spherical_plane_root(), spherical_light_arc() and spherical_light_arc_probability().
+//           spherical_plane_root(), spherical_plane_vector(), spherical_plane_distance(),
+//           spherical_light_arc() and spherical_light_arc_probability(); for marched fields,
+//           sdf_plane() and sdf_tube() (the rest of the vocabulary is components/ambient/sdf.glsl).
 // Depends on: Point/Direction (types.glsl), Ray/Frame/LightQuery (structs), PI/TWO_PI and
 //             FP_UNCERTAINTY_REL/ABS (math), random() (the sampler, emitted before this block).
 
@@ -150,6 +152,36 @@ bool spherical_plane_root(Ray ray, vec4 N, out float t) {
     t = mod(atan(-P, W), PI);
     if (t <= 0.0) t += PI;
     return true;
+}
+
+// The unit 4-vector N of the great sphere perpendicular to n (a unit tangent vector at o) at signed
+// distance −offset from o, as in E³'s dot(p, n) + offset = 0: N = (cos(offset)·n.xyz, sin(offset)),
+// so that exp_o(λ·n)·N = sin(λ + offset).
+Direction spherical_plane_vector(Direction n, float offset) {
+    vec2 cs = spherical_cos_sin(offset);
+    return Direction(cs.x * n.xyz, cs.y);
+}
+
+// Exact signed distance from p to the great sphere {x : x·N = 0}: asin(p·N), positive on the side N
+// points to.
+float spherical_plane_distance(Point p, Direction N) {
+    return spherical_asin(clamp(dot(p, N), -1.0, 1.0));
+}
+
+// Marched fields: the signed distance to the great sphere perpendicular to n (a unit tangent vector
+// at o) at signed distance −offset from o — the plane rows' meaning.
+float sdf_plane(Point p, Direction n, float offset) {
+    return spherical_plane_distance(p, spherical_plane_vector(n, offset));
+}
+
+// Marched fields: the distance from p to the great circle through the point a with unit tangent
+// u ∈ T_a, minus r (a tube of radius r about it; r < π/2). p⊥ = p − (p·a)·a − (p·u)·u is the part of p
+// off the plane span(a, u) of R⁴: |p⊥| = sin d and (p·a)² + (p·u)² = cos² d, so d = atan(sin d, cos d)
+// (no acos: SwiftShader's is inaccurate, and the atan form keeps precision near 0 and π/2).
+float sdf_tube(Point p, Point a, Direction u, float r) {
+    float pa = dot(p, a), pu = dot(p, u);
+    vec4 w = p - pa * a - pu * u;
+    return atan(length(w), sqrt(pa * pa + pu * pu)) - r;
 }
 
 // Whether the receiver of query q is a one-sided surface: !q.two_sided with n ≠ 0 (n is the hit's
