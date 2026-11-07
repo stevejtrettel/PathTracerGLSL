@@ -379,6 +379,7 @@ export class RenderExecutor {
 
         for (const [uniformName, textureId] of Object.entries(textures)) {
             let texture: WebGLTexture;
+            let target: GLenum = gl.TEXTURE_2D;
             if (textureId.startsWith(EXTERN_PREFIX)) {
                 // Registry-resolved external texture (e.g. an environment map). A missing
                 // key is a HARD, NAMED error — never a silent unit-0 sample (§2.10 (3)).
@@ -389,14 +390,15 @@ export class RenderExecutor {
                         `Extern texture '${name}' (input '${uniformName}') is not registered — ` +
                         `load it before rendering (registered: ${this.textureRegistry?.names().join(', ') || 'none'})`);
                 }
-                texture = registered;
+                texture = registered.texture;
+                target = registered.target;
             } else {
                 // Framebuffer-backed texture (handles _current/_previous + :N MRT suffix)
                 texture = this.resourceManager.getTexture(textureId);
             }
 
             gl.activeTexture(gl.TEXTURE0 + textureUnit);
-            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.bindTexture(target, texture);
 
             const location = this._uniformLocation(program, uniformName);
             if (location) {

@@ -447,6 +447,13 @@ export class Engine {
         this.textureRegistry.register(name, factory.createRGBA32UI(data, width, height));
     }
 
+    /** Register an RGBA8 2D-array texture under `name`, one layer per image (all one size),
+     *  bindable via `extern:<name>`. The app decodes the images and owns the name. */
+    registerImageArray(name: string, layers: TexImageSource[], width: number, height: number): void {
+        const factory = new TextureFactory(this.gl);
+        this.textureRegistry.register(name, factory.createRGBA8Array(layers, width, height), this.gl.TEXTURE_2D_ARRAY);
+    }
+
     registerEnvironmentTable(
         rgb: Float32Array,
         width: number,

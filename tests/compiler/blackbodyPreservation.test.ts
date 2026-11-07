@@ -24,7 +24,7 @@ describe('blackbody forms survive planning', () => {
                 const row = LIGHT_KINDS[light.kind].params.find(p => p.role !== undefined)!;
                 expect(light.values[row.name]).toEqual(form);
             }
-            const plan = planRenderers(analyze(scene), scene, [minimalStrategy], bag).plans[0];
+            const plan = planRenderers(analyze(scene), scene, [minimalStrategy], bag, []).plans[0];
             if (site === 'sky') expect(plan.program.environment).toMatchObject({ color: form });
             expect(plan.program.emitters.driven).toBe(false);
         });
@@ -68,7 +68,7 @@ describe('driven blackbody bindings and selection update together', () => {
                 const params = { 'lamp.kelvin': kelvin, 'lamp.scale': scale };
                 expect(rgb.compute!(params)).toEqual(blackbodyRGB(kelvin, scale));
                 const constantScene = blackbodyFixture(site, blackbodyRGB(kelvin, scale));
-                const plan = planRenderers(analyze(constantScene), constantScene, [minimalStrategy], new DiagnosticBag('test')).plans[0];
+                const plan = planRenderers(analyze(constantScene), constantScene, [minimalStrategy], new DiagnosticBag('test'), []).plans[0];
                 const select = renderer.uniforms.find(u => u.uniform === 'u_light_selpdf');
                 if (site !== 'sky') {
                     expect(select).toBeDefined();

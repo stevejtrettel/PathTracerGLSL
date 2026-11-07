@@ -27,6 +27,9 @@ export interface SceneDescription {
     lights: LightDescription[];
     /** What a ray sees when it hits nothing. Defaults to `none` (black). */
     environment?: EnvironmentDescription;
+    /** Images a material's color rows may read, by name (a row's value `{ texture: name }`). Only
+     *  the images some material reads are loaded. */
+    textures?: Record<string, ImageTextureDescription>;
     /**
      * Material name of the AMBIENT medium (§2.4) — what region −1 is filled with; absent =
      * vacuum. A foggy world is just `ambientMedium: 'fog'`. material_of(-1) resolves to it.
@@ -312,9 +315,25 @@ export interface SellmeierIndex { sellmeier: { B: Vec3; C: Vec3 }; }
 export type SpectralIndex = CauchyIndex | SellmeierIndex;
 export type IndexProperty = ScalarProperty | SpectralIndex;
 
+/** An 8-bit image file (PNG or JPEG) and how its codes encode the values: 'srgb' (the sRGB
+ *  transfer curve, for colors) or 'linear' (codes/255, for data). Required: neither the file
+ *  extension nor an embedded profile says which. All of a scene's read images share one size. */
+export interface ImageTextureDescription {
+    url: string;
+    colorspace: 'srgb' | 'linear';
+}
+
+/** A color row read from a declared image at the hit's uv: bilinear between texels decoded to
+ *  linear, repeating, with uv scaled by `uvScale` first (a number scales both axes; default 1).
+ *  uv (0, 0) is the image's bottom-left corner. Reflectance rows only; not on spheres. */
+export interface TextureValue {
+    texture: string;
+    uvScale?: number | [number, number];
+}
+
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
-export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue | TextureValue;
 
 /** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
 export type NamedSpectrumValue = BlackbodyValue | GaussianValue;
@@ -510,15 +529,32 @@ export interface MaterialDescription {
      * shapes `true` is a Validator error (V1-C2) — emissive SDFs stay path-only and still glow.
      */
     sampleAsLight?: boolean;
+    /** Bump mapping: a height field tilts the shading normal (materials/README, "Shading-normal
+     *  perturbation"). Any surface model; not 'none'. */
+    bump?: BumpDescription;
     /**
      * Open vocabulary (materials-§7): the legal property keys are the material's own
      * model's schema rows, not this interface — a new model's new property (`sheen: 0.7`)
      * is authored directly, and the Validator warns on any key the model does not read.
      * The named fields above are the current models' properties, kept for
-     * autocomplete/docs. The meta-keys (MATERIAL_META_KEYS: model/medium/sampleAsLight)
+     * autocomplete/docs. The meta-keys (MATERIAL_META_KEYS: model/medium/sampleAsLight/bump)
      * are reserved (registry-test-enforced against row-source collisions).
      */
-    [key: string]: MaterialProperty | MaterialModel | MediumDescription | boolean | undefined;
+    [key: string]: MaterialProperty | MaterialModel | MediumDescription | BumpDescription | boolean | undefined;
+}
+
+/** The keys of a bump record. */
+export const BUMP_KEYS = ['height', 'step'] as const;
+
+/** A bump: the surface is displaced along its outward normal by h(p) for shading only (the
+ *  geometry and its silhouette are unchanged). */
+export interface BumpDescription {
+    /** h(p) in world units: a float GLSL expression in the world point `p` (and its declared
+     *  params); it may call the Perlin functions. */
+    height: GlslExpression;
+    /** The central-difference step along the surface, in world units. Required: it is a length
+     *  in the scene's units, so no default fits every scene (README: the error law). */
+    step: number;
 }
 
 // --- Lights ---

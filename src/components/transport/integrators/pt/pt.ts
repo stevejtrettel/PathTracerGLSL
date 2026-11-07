@@ -108,6 +108,7 @@ function walkRequires(f: Flags, p: ProgramDescription): string[] {
     if (f.dispersion) req.push('surface_uses_dispersion');
     // The generated light-query constructor's runtime arm (fable-rough-dielectric §3.3).
     if (f.twoSided) req.push('material_two_sided');
+    if (f.perturbed) req.push('material_shading_frame');
     return req;
 }
 
@@ -430,6 +431,11 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
         '        Direction wo = -ambient_flow(s.ray, hit.t).direction;   // back along the arrival direction',
     );
+    if (f.perturbed) {
+        // A bumped material shades in its perturbed frame. Every later reader — the guides, NEE's
+        // cosine, the light query, the BSDF ops — sees this one frame, so the techniques agree.
+        lines.push('        hit.frame = material_shading_frame(mat, hit, wo);   // bump: the shading normal (materials/README)');
+    }
     if (aovs.length > 0) {
         // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null
         // surface, reached with no scattering event or GRIN traversal before it (nulls keep

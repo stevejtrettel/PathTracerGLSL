@@ -24,6 +24,7 @@ import mediumEmissionGLSL from '../../../components/transport/volume/analytic/em
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 import mediumDeltaTrackingGLSL from '../../../components/transport/volume/delta_tracking/delta_tracking.glsl?raw';
 import mediumGrinGLSL from '../../../components/transport/volume/grin/grin.glsl?raw';
+import shadingNormalGLSL from '../../../glsl/core/shading_normal.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -75,11 +76,22 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: `components/materials/${model}/${model}.glsl`, source: materialModel(model).glsl });
     }
 
+    // Bump (materials/README, "Shading-normal perturbation"): the authored height fields, the
+    // static gradient / frame / mask functions that call them, and the per-material frame the
+    // walk swaps in. Ahead of the dispatch, whose bumped arms call the mask.
+    const perturbed = plan.program.materials.perturbed ?? [];
+    if (perturbed.length > 0) {
+        const bumped = perturbed.map((id) => plan.materials.find((m) => m.id === id)!);
+        blocks.push({ origin: 'generated:bump-height', source: generateBumpHeight(bumped) });
+        blocks.push({ origin: 'glsl/core/shading_normal.glsl', source: shadingNormalGLSL });
+        blocks.push({ origin: 'generated:shading-frame', source: generateShadingFrame(bumped) });
+    }
+
     // The generated §3.3 dispatch, after the model libraries it calls. Ops are seam
     // decisions (impl-plan-exact-linkage): eval's only caller is the light technique,
     // pdf's the surface MIS weight — a dispatch nothing links is not emitted.
     const { surfaceEval, surfacePdf } = plan.program.materials;
-    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? []) });
+    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? [], perturbed) });
     // The albedo guide's per-model fact (components/aov/albedo), only where an AOV calls it.
     if (plan.program.materials.albedo) {
         blocks.push({ origin: 'generated:albedo-dispatch', source: generateAlbedoDispatch(plan.materials) });
@@ -216,6 +228,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 f.source === EMISSION_KEY, plan.program.measurement.color, f.role,
             );
         }
+        // A bump height's declared sliders (float uniforms read by bump_height).
+        if (mat.bump !== undefined) mintValueUniform(mat.bump.height, 'float', 'float', uniforms, parameters, seen);
         if (mat.medium !== null) {
             // E2: RTE coefficients are magnitudes (σ > 1 is routine) — HDR widgets.
             mintValueUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen, true);
@@ -269,6 +283,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     }
     if (plan.program.materials.albedo) {
         provides.push({ name: 'material_albedo', signature: 'Spectrum material_albedo(int mat, Hit hit, MaterialProperties mp)' });
+    }
+    if (perturbed.length > 0) {
+        provides.push({ name: 'material_shading_frame', signature: 'Frame material_shading_frame(int mat, Hit hit, Direction wo)' });
     }
     // Self-requires: the generated medium_sample/medium_transmittance bodies call the
     // properties lookup themselves — honest linkage for the seam-unused check.
@@ -899,7 +916,7 @@ function generateAlbedoDispatch(materials: PlannedMaterial[]): string {
 // present. Lambert-only collapses to a passthrough; a second model (dielectric)
 // is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
 
-function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean, emissionCones: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>): string {
+function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean, emissionCones: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>, perturbed: number[]): string {
     // Group SURFACE material ids by model, preserving first-appearance order. 'none' materials
     // never reach this dispatch: transport's null-interface branch continues before any surface
     // op (§3.6), so they contribute no arm.
@@ -941,6 +958,20 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
                     lines.push(`    if (mat == ${cone.materialId}) return ${model}_emission(${op.args}) * step(${formatFloat(cone.cosDivergence)}, dot(wo, ${formatVec3(cone.direction)}));`);
                 }
             }
+            // Bumped materials (perturbed ids, grouped by model) get masked arms ahead of the
+            // model arms: eval and pdf are zero off the mask, a masked sample is killed. Emission
+            // reads no frame and takes the model arm.
+            if (op.name !== 'emission') {
+                for (const model of order) {
+                    const ids = idsByModel.get(model)!.filter((id) => perturbed.includes(id));
+                    if (ids.length === 0) continue;
+                    const cond = ids.map((id) => `mat == ${id}`).join(' || ');
+                    const call = `${model}_${op.name}(${op.args})`;
+                    lines.push(op.name === 'sample'
+                        ? `    if (${cond}) return shading_masked(${call}, hit);`
+                        : `    if (${cond}) return shading_side_consistent(hit, wi) ? ${call} : ${op.name === 'eval' ? 'SPECTRUM_ZERO' : '0.0'};`);
+                }
+            }
             for (const model of order) {
                 if (model === fallback) continue;
                 const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
@@ -951,4 +982,33 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
         lines.push('}');
     }
     return lines.join('\n');
+}
+
+// ============================================================================
+// Bump (materials/README, "Shading-normal perturbation")
+// ============================================================================
+
+/** The authored height fields, h(p) in world units, by material id. Only `p` (and the
+ *  expression's declared slider uniforms) is in scope. The last bumped material is the
+ *  default arm: shading_normal.glsl calls this only with a bumped id. */
+function generateBumpHeight(bumped: PlannedMaterial[]): string {
+    const lines = ['// Generated bump heights h(p), world units (materials/README, "Shading-normal perturbation")', 'float bump_height(int mat, Point p) {'];
+    bumped.forEach((m, i) => {
+        const h = `(${m.bump!.height.source})`;
+        lines.push(i < bumped.length - 1 ? `    if (mat == ${m.id}) return ${h};` : `    return ${h};`);
+    });
+    lines.push('}');
+    return lines.join('\n');
+}
+
+/** The shading frame of material `mat` at a hit seen from `wo`: perturbed for bumped ids (each
+ *  with its authored finite-difference step), the hit's own frame otherwise. */
+function generateShadingFrame(bumped: PlannedMaterial[]): string {
+    return [
+        '// Generated shading frame: bumped materials tilt the normal by their height field',
+        'Frame material_shading_frame(int mat, Hit hit, Direction wo) {',
+        ...bumped.map((m) => `    if (mat == ${m.id}) return shading_frame_perturbed(hit, wo, bump_surface_gradient(${m.id}, hit, ${formatFloat(m.bump!.step)}));`),
+        '    return hit.frame;',
+        '}',
+    ].join('\n');
 }

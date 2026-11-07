@@ -245,10 +245,10 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
     }
 
     // Feature-declared external textures (§2.10): the sampler declaration matches the
-    // pass-input name PipelineBuilder threads through as `extern:<name>`. Integer
+    // pass-input name PipelineBuilder threads through as `extern:<name>`. Integer and array
     // samplers carry explicit highp (no default precision for them in ES 3.00).
     for (const t of textures) {
-        const precision = t.samplerType === 'usampler2D' || t.precision === 'highp' ? 'highp ' : '';
+        const precision = t.samplerType !== undefined || t.precision === 'highp' ? 'highp ' : '';
         lines.push(`uniform ${precision}${t.samplerType ?? 'sampler2D'} ${t.name};`);
     }
 

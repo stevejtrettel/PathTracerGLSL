@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { planRenderers } from '../../src/compiler/plan/Planner.js';
+import { lowerImageTextures } from '../../src/compiler/analyze/imageTextures.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { witnessSuite } from '../witnesses/index.js';
 import { demoSuite } from '../../demos/index.js';
@@ -34,10 +35,13 @@ describe('ProgramDescription structural snapshot (the link map)', () => {
         for (const strategy of entry.strategies) {
             it(`${key} + ${strategy.id}`, () => {
                 const bag = new DiagnosticBag('compiler');
-                const features = analyze(entry.scene);
-                validate(features, entry.scene, strategy, bag);
+                // The stages in the Compiler's order: image textures are lowered before Analyze.
+                const { scene, images } = lowerImageTextures(entry.scene, bag);
                 bag.throwIfErrors();
-                const renderPlan = planRenderers(features, entry.scene, [strategy], bag).plans[0];
+                const features = analyze(scene);
+                validate(features, scene, strategy, bag);
+                bag.throwIfErrors();
+                const renderPlan = planRenderers(features, scene, [strategy], bag, images).plans[0];
                 bag.throwIfErrors();
                 expect(renderPlan.program).toMatchSnapshot();
             });

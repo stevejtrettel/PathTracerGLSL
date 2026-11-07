@@ -255,6 +255,18 @@ export interface MaterialsDesc {
     /** The `material_albedo` dispatch exists: some listed AOV requires it (its descriptor's
      *  `requires`). PRESENT only when true, so programs without it are unchanged. */
     albedo?: true;
+    /** The Perlin noise library (glsl/core/perlin.glsl) is included: some material row or bump
+     *  height is a GLSL expression, and expressions may call it. PRESENT only when true, so programs
+     *  without material expressions are unchanged. */
+    noise?: true;
+    /** Ids of the materials whose shading normal is perturbed (a bump), ascending. The walk
+     *  replaces the hit's frame through material_shading_frame and these ids get masked
+     *  interaction arms. PRESENT only when non-empty, so programs without one are unchanged. */
+    perturbed?: number[];
+    /** The image lookup (glsl/shared/image_texture.glsl) and the material image array are
+     *  declared: some material row reads an image texture. PRESENT only when true, so programs
+     *  without one are unchanged. */
+    images?: true;
 }
 
 export type LightingDesc =
@@ -525,6 +537,9 @@ export interface PlannedMaterial {
     model: MaterialModel;
     values: Record<string, ResolvedProperty>;
     medium: PlannedMedium | null;                               // interior medium (§3.5); null = no medium block
+    /** The authored bump (materials/README, "Shading-normal perturbation"). PRESENT only on
+     *  bumped materials. */
+    bump?: { height: GlslExpression; step: number };
 }
 
 /**

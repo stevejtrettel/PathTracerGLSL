@@ -178,6 +178,138 @@ Gaussian as `measurement.pixel`, always stamped.
   bit-identical; `furnace` 0.4000 on all three arms; `spectral-furnace` and `cornell-area`
   (including its tiled check) pass.
 
+## 2026-11-07 — Trial asset pipeline: Poly Haven textures and glTF models
+
+Photographic scenes need real texture sets and models. Owner decision 20: models are converted
+offline (glTF → OBJ + textures).
+
+- **`tools/trial-assets.json`** gains four 2k JPG texture sets (albedo, roughness and OpenGL normal
+  map each): `wood_floor`, `marble_01`, `worn_plaster_wall`, `fabric_pattern_07`; and four models:
+  `ceramic_vase_01`, `brass_vase_03`, `wooden_bowl_02`, `food_apple_01`. Every map and model
+  texture is 2048 × 2048 (measured), so any of them can share a scene (one array layer size).
+  `rough_linen` was dropped for being 2048 × 2052.
+- **`tools/fetch-trial-assets.mjs`** fetches textures (one file per listed map) into
+  `public/trial/textures/<id>/` and models (the .gltf, its .bin and textures, at the paths the
+  .gltf names) into `public/trial/models/<id>/`, MD5-checked, then converts each model to
+  `<id>.obj`.
+- **`tools/gltf-to-obj.mjs`**: triangle primitives of the default scene, node transforms baked
+  (T·R·S, parent · child; normals by the inverse transpose; winding swapped under a mirroring
+  transform), TEXCOORD_0 written as `vt = (u, 1 − v)` (glTF's uv origin is the image's upper-left
+  corner, OBJ's and the renderer's the lower-left), texture file names in the OBJ header. Required
+  extensions, non-triangle modes, skins, morph targets, sparse or non-float attributes, embedded
+  buffers, texCoord ≠ 0, KHR_texture_transform, more than one material, primitives with and
+  without a material, and a primitive without TEXCOORD_0 when another primitive has it or the
+  material has textures (parseOBJ would give its corners uv (0, 0)) are errors.
+- **Demo `trial-still-life`** (async, needs the fetched files): the converted apple with its
+  diffuse map on a wood-floor quad.
+
+Verified: `tests/authoring/gltfToObj.test.ts` (17 tests). Mutations of the converter that fail it:
+no v flip, normals by M or by N transposed, no mirror swap, byteStride ignored, parent transform
+ignored, the sign of any one of the six w terms of the quaternion matrix (a node rotates by
+q = (1, 2, 3, 4)/√30, so all four components are nonzero; expected corners from Rodrigues' formula),
+and a `matrix` node ignored or read transposed. The fetched models exercise none of the transform
+code (each is one node with only `mesh`). Converter → parseOBJ → compileScene lists the image and
+reads it in the resolver. The real assets: all four models convert (2,616 to 10,296 triangles, uvs inside [0, 1], normals
+present). On the GPU (Chromium, ANGLE Metal, 1,361 samples) the apple renders with its skin wrapped
+seamlessly. The same render with the v flip removed shows black gaps across the apple, which
+confirms the flip. Digest before and after: 280 of 280 scenes identical.
+
+## 2026-11-07 — Image textures for color rows
+
+Photorealism integration step 9 (docs/claude-2026-11-review/photoreal/image-textures/plan.md, with
+its review's must-fix items). Color rows only: `channel` float rows (roughness maps) wait for
+derived rows computed per hit (integration step 6), which this branch does not have.
+
+- **Authoring**: `scene.textures[name] = { url, colorspace: 'srgb' | 'linear' }` (colorspace
+  required) and the row value `{ texture: name, uvScale? }` in reflectance rows (albedo, f0,
+  transmittance, checker colors).
+- **One value form downstream** (review must-fix 4): `compiler/analyze/imageTextures.ts` checks
+  every texture value and declaration before Analyze, assigns layers in first-use order, and
+  lowers each value to the RGB expression `image_texture(layer, uv, srgb).rgb`. Validate, Plan and
+  the spectrum kinds see an ordinary expression (lifted after the filter in spectral programs; the
+  uv charts turn on). Errors: undeclared names, unknown keys, a bad `uvScale`, emission / index /
+  float rows, keys that are not rows of the model, bad declarations, and a textured material used
+  by a sphere (decision P1 Q4; review must-fix 1).
+- **`src/glsl/shared/image_texture.glsl`**: pbrt-v4's field at zero footprint (t = 1 − v, texel
+  centers at half-integers, decode before the bilinear blend, repeat wrap) with four `texelFetch`es
+  on `u_material_textures` (`highp sampler2DArray`), no mipmaps. Linkage:
+  `program.materials.images` (present only when true) and `SceneDataPlan.images` (present only
+  when non-empty).
+- **Engine** (decision P1 Q8, an engine API addition): the texture registry keeps each texture's
+  bind target, the executor binds with it, and `registerImageArray` builds an RGBA8 2D array
+  (`texStorage3D`, one level). **App** (`app/images.ts`): fetch, reject a PNG whose bit depth is not
+  8, decode with no color-space conversion or premultiplication, require one size; uploaded with
+  the scene data (so also on recompile and context restore).
+- **Sampler budget**: `samplerRoster` counts `sampler2DArray` with `sampler2D`/`usampler2D`.
+- **Tests**: `tests/glsl/imageTexture.test.ts` (twin: texel centers, seams, period mean, exact
+  quadrant means, decode-after-blend fails; the witness PNG encoder), `tests/compiler/imageTextures.test.ts`
+  (checks, lowering, layer order, exact linkage, lift after the filter, glslang, the budget),
+  `tests/app/images.test.ts`, `tests/engine/externTextures.test.ts` (bind targets).
+- **Witnesses**: `image-texture` (an sRGB RGB 4×4 image on an orthographic quad under a unit sky,
+  pt / pt-nee / pt-mis, four quadrants per channel), `image-texture-linear`,
+  `image-texture-spectral` (gray image). The image's columns differ as much as its rows and its
+  channels are arranged differently (review must-fix 2). GPU mutations each fail every quadrant
+  check at the twin's predicted values: no v flip, no half-texel offset, a u mirror, decode after
+  the blend.
+- **Digest**: every existing scene identical; the three witnesses are new.
+
+## 2026-11-07 — Procedural bump mapping
+
+Photorealism integration step 5 (docs/claude-2026-11-review/photoreal/integration.md): Stage A of
+the normal-mapping plan, with its review's must-fix items. Stage B (normal-map images, which need
+a tangent on `Hit`) is deferred, to be planned with anisotropic GGX after image textures.
+
+- **Authoring**: the material meta-key `bump: { height, step }`. `height` is a float GLSL
+  expression in the world point `p` (sliders and the Perlin functions allowed); `step` is the
+  central-difference step in world units and is required (review must-fix 3: a world-length
+  default is a guess about scene scale). Validator errors: bump on model 'none', a non-expression
+  height, a missing or non-positive step, unknown keys.
+- **`src/glsl/core/shading_normal.glsl`**: the surface gradient by central differences along
+  geodesics (`ambient_geodesic`, so no uv chart and no Euclidean assumption), the perturbed frame
+  n − σ∇_S h with σ from `region_to == region_owner`, the Schüssler/Mitsuba flip, and the mask
+  (wi·ng)(wi·n'') > 0 in eval, pdf and sample.
+- **Linkage**: `program.materials.perturbed` (bumped ids, present only when non-empty). The walk
+  swaps `hit.frame` for `material_shading_frame(mat, hit, wo)` before the guides, NEE, the light
+  query and sampling; bumped ids get masked interaction arms; the Perlin library is included for
+  a bump height too.
+- **Tests**: `tests/glsl/shadingNormal.test.ts` (twin: flip guarantee, χ² of the masked sampler
+  with a rejected cell, the triple, albedo ≤ 1, BSDF/NEE/MIS agreement on the tilted plane with
+  radiance below the surface, and the values a missing mask or flip reads there, σ,
+  and the float32 finite-difference error law), `tests/compiler/bump.test.ts` (Validator rules,
+  linkage, glslang).
+- **Witnesses**: `bump-tilt` (the lune ρ(1+cos 45°)/2 = 0.341421 in flipped and unflipped rows,
+  with a non-samplable emitter of radiance 2 under the plane, so a missing mask reads 0.458579 and
+  a missing flip 0.682843 in the far rows; review must-fix 1, and the review of the build: a black
+  occluder there hid a missing mask) and
+  `bump-sides` (σ and the gradient sign, with light 2 chosen so the correct value is ρ, not 0;
+  review must-fix 2).
+- **Digest**: every existing scene identical; `bump-tilt` and `bump-sides` are new.
+
+## 2026-11-07 — Perlin noise for material expressions
+
+Photorealism integration step 4 (docs/claude-2026-11-review/photoreal/integration.md): Part A
+of the procedural-textures plan, with its review's must-fix items. Part B (the object-space
+point `q`) is deferred to its own plan.
+
+- **`src/glsl/core/perlin.glsl`**: `perlin_noise`, `perlin_fbm`, `perlin_turbulence`, a
+  transcription of pbrt-v4 `noise.cpp` at zero ray-differential footprint. That includes
+  Turbulence's `+0.2·ωⁿ` residual for the octaves pbrt leaves out (review F3). No octave
+  clamp: the octave count is part of the authored scene.
+- **Linkage**: included when some material row is a GLSL expression
+  (`materials.noise`, from `materialHasExpression`, which `materialReadsUv` now calls).
+  Medium expressions do not include it.
+- **Tests**: `tests/glsl/perlinTwin.ts` (fp32 twin, table parsed from the GLSL) matches pbrt's
+  compiled `noise.cpp` **bit for bit** on 300 points × 5 functions
+  (`tools/perlin-golden` → `tests/fixtures/perlin-pbrt-golden.json`); the table equals pbrt's
+  `NoisePerm`; the stated bounds hold on 10⁵ samples. `perlinLinkage.test.ts` checks
+  inclusion, absence and a glslang compile.
+- **GPU probe** `npm run witness:textures`: SwiftShader matches the twin exactly (max error 0)
+  at 4096 points, and an expression row read back through the generated resolver matches to
+  3.6e-8. A cubic fade (error 0.18) and a residual-free turbulence (error 0.16) are rejected.
+- **Demo** `procedural-textures`: marble on a Menger sponge, wood on a torus, stone on a sphere.
+- **Digest**: 267 of 275 scenes identical. The 7 scenes with material expressions differ by
+  exactly the perlin block and its source-map lines. `procedural-textures` is new.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

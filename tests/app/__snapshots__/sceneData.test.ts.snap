@@ -58,6 +58,10 @@ exports[`scene-data textures (byte fingerprints) > bokeh-edge 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > bump-sides 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bump-tilt 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > cacti 1`] = `
 {
   "indices": "4096x2 52acce35509eb4a8",
@@ -286,6 +290,12 @@ exports[`scene-data textures (byte fingerprints) > hundred-spheres 1`] = `
   "records": "4096x1 0da2482c95cd5bcb",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > image-texture 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-linear 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-spectral 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > instance-fog 1`] = `
 {
@@ -653,6 +663,8 @@ exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
 exports[`scene-data textures (byte fingerprints) > proc-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > proc-sky-rotated 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > procedural-textures 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rayleigh 1`] = `null`;
 

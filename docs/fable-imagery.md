@@ -112,6 +112,9 @@ the fill site has `p` in scope; `mintValueUniform` mints expression params):
   the C5 no-reader warning extends.
 - Witness: `expr-const-twin` — an expression that evaluates to a constant ≡ the
   constant material (identical-stream equality).
+- Solid noise: material expressions may call `perlin_noise`, `perlin_fbm` and
+  `perlin_turbulence` (glsl/core/perlin.glsl, a transcription of pbrt-v4's noise.cpp),
+  linked when some material row is an expression. They take any point, usually `p`.
 
 ## P3 — Pixel reconstruction filter (gaussian) — BUILT Nov 2026
 
@@ -156,7 +159,9 @@ verify harness (render → exportPNG → decode → nonzero + stamp present).
 - **Bloom/vignette**: view-layer sugar, dilutes the pass.
 - **Firefly clamping**: BIAS dressed as polish — if ever, it enters as a declared
   measurement truncation through the front door.
-- **Normal/bump mapping**: needs tangent frames from UVs — the natural SEQUEL to P1.
+- **Normal-map images**: need tangent frames from UVs — the natural SEQUEL to P1. Procedural
+  bump mapping (a height expression in `p`, no chart needed) is built: see
+  src/components/materials/README.md, "Shading-normal perturbation".
 
 ## 7. Decision forks (owner)
 

@@ -8,7 +8,7 @@ import { PIXEL_MODELS } from '../../components/pixel/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole, BUMP_KEYS } from '../types.js';
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
@@ -32,6 +32,7 @@ import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { blackbodyTemperatureRange } from '../../components/color/spectra/blackbody/blackbody.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain, isFiniteVec3 } from './propertyValidation.js';
+import { unknownKeysProblem } from '../../components/param.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 import { validateQuotient } from './quotient.js';
 
@@ -308,6 +309,37 @@ export function validate(
         } else {
             bag.error('invalid-setting',
                 `Material '${name}': unknown material model '${mat.model}' (registered models: ${Object.keys(MATERIAL_MODELS).join(', ')}; 'none' = no optical surface)`)
+                .add();
+        }
+    }
+
+    // Bump (materials/README, "Shading-normal perturbation"): { height, step } on a surface model.
+    // The height is a float expression in p (a non-float or a uv reference fails at the shader
+    // compile: the generated height function has only p in scope). The step is required: it is
+    // a length in the scene's units, so no default would be right for every scene.
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        const bump: unknown = mat.bump;
+        if (bump === undefined) continue;
+        const label = `Material '${name}': bump`;
+        if (mat.model === 'none') {
+            bag.error('invalid-setting', `${label} needs a surface to shade — model 'none' has no shading normal`).add();
+            continue;
+        }
+        if (bump === null || typeof bump !== 'object' || Array.isArray(bump)) {
+            bag.error('invalid-setting', `${label} must be { height: <GLSL expression in p>, step: <world length> }`).add();
+            continue;
+        }
+        const keys = unknownKeysProblem(bump, BUMP_KEYS);
+        if (keys !== null) bag.error('invalid-setting', `${label} has ${keys}`).add();
+        const { height, step } = bump as { height?: unknown; step?: unknown };
+        if (!isGlslExpression(height)) {
+            bag.error('invalid-setting', `${label}.height must be a GLSL expression { kind: 'glsl', source } — a float in the world point p`).add();
+        } else {
+            for (const message of valueProblems(height, { shape: 'scalar' }, `${label}.height`)) bag.error('invalid-setting', message).add();
+        }
+        if (typeof step !== 'number' || !Number.isFinite(step) || step <= 0) {
+            bag.error('invalid-setting',
+                `${label}.step must be a finite number > 0 (the finite-difference step, in world units; required — choose it small next to the relief's features and large next to |p|·2⁻²⁴, see the error law in materials/README)`)
                 .add();
         }
     }

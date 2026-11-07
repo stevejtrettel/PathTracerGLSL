@@ -35,6 +35,9 @@ export function flags(p: ProgramDescription) {
          *  an image NEE never samples, and the walk reduces the camera's start point and each
          *  medium event point into the fundamental domain. */
         quotient: p.measurement.quotient !== undefined,
+        /** Some material's shading normal is perturbed (a bump): the walk replaces the hit's
+         *  frame with material_shading_frame before anything reads it. */
+        perturbed: p.materials.perturbed !== undefined,
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
          *  env-only programs, where BOTH selection sides fold to the constant 1. */

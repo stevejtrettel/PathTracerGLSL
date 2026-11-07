@@ -8,6 +8,7 @@ import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
 import { ENV_EXTERN_NAMES } from '../components/env/index.js';
 import { packSceneData } from './sceneData.js';
+import { uploadImages } from './images.js';
 import type { PackedChannel } from '../components/data/pack.js';
 import { channelExtern, NODESQ_EXTERN, type DataChannel } from '../components/data/channels.js';
 import type { RenderStrategy, PictureFormat } from '../compiler/types.js';
@@ -296,9 +297,11 @@ export class App {
 
     /**
      * Build and register the shared scene-data textures the loaded renderers were compiled
-     * against, by executing the compiler's scene-data plan. Must run before the first frame.
+     * against, by executing the compiler's scene-data plan: the packed data channels and the
+     * material image array. Must run before the first frame.
      */
     private async _uploadSceneGeometry(plan: SceneDataPlan): Promise<void> {
+        if (plan.images !== undefined) await uploadImages(plan.images, this.engine);
         const packed = await packSceneData(plan);
         if (packed === null) return;
         for (const [c, channel] of Object.entries(packed.channels) as Array<[DataChannel, PackedChannel]>) {

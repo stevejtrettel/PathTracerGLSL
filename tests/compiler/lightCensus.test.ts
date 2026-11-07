@@ -60,7 +60,7 @@ function planOf(s: SceneDescription, st: RenderStrategy) {
     const features = analyze(s);
     validate(features, s, st, bag);
     bag.throwIfErrors();
-    return { features, plan: planRenderers(features, s, [st], bag).plans[0] };
+    return { features, plan: planRenderers(features, s, [st], bag, []).plans[0] };
 }
 
 /** An authored area light must describe the region it desugars to (pt ≡ pt-nee needs them

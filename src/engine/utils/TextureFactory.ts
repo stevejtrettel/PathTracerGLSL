@@ -149,4 +149,29 @@ export class TextureFactory {
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
         return texture;
     }
+
+    /**
+     * Create an RGBA8 2D-array texture, one layer per image, all `width` × `height`, read with
+     * texelFetch (the shader filters). The bytes are stored as decoded: an ImageBitmap carries
+     * its own color-space and alpha handling (set where it is created), and WebGL ignores the
+     * UNPACK_* conversion flags for it. One level, NEAREST: no mipmaps.
+     */
+    createRGBA8Array(layers: TexImageSource[], width: number, height: number): WebGLTexture {
+        const gl = this.gl;
+        const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+        if (width > max || height > max) {
+            throw new Error(`Image textures are ${width}×${height}, over this device's MAX_TEXTURE_SIZE of ${max}`);
+        }
+        const texture = gl.createTexture();
+        if (!texture) throw new Error('Failed to create texture');
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, width, height, layers.length);
+        layers.forEach((layer, i) => {
+            gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, gl.RGBA, gl.UNSIGNED_BYTE, layer);
+        });
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+        return texture;
+    }
 }

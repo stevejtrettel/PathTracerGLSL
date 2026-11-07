@@ -77,7 +77,7 @@ export const EMISSION_KEY = 'emission';
 
 /** The keys a material carries besides its model's rows, on every model. No row source may
  *  use one (tests/components/materialsContract.test.ts). */
-export const MATERIAL_META_KEYS = ['model', 'medium', 'sampleAsLight'] as const;
+export const MATERIAL_META_KEYS = ['model', 'medium', 'sampleAsLight', 'bump'] as const;
 
 /** The schema declares which surface models consume the adjacent regions' index. */
 export function modelIndexRow(id: MaterialModel): PropertySchema | undefined {

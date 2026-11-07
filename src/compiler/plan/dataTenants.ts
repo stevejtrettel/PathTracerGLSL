@@ -52,7 +52,14 @@ export function materialReadsUv(name: string, scene: SceneDescription): boolean 
     const mat = scene.materials[name];
     if (mat === undefined) return false;
     return (MATERIAL_MODELS[mat.model ?? '']?.capabilities.readsUv ?? false)
-        || Object.values(mat).some(isGlslExpression);
+        || materialHasExpression(name, scene);
+}
+
+/** Is some row of material `name` a GLSL expression (a formula evaluated per hit by the
+ *  generated material resolver)? Medium coefficients are not material rows. */
+export function materialHasExpression(name: string, scene: SceneDescription): boolean {
+    const mat = scene.materials[name];
+    return mat !== undefined && Object.values(mat).some(isGlslExpression);
 }
 
 /** A PATTERNED + rotated analytic shape keeps its own LOCAL frame (fable-imagery P1b): its

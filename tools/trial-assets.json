@@ -1,5 +1,5 @@
 {
-  "comment": "Trial assets downloaded by tools/fetch-trial-assets.mjs into public/trial/ (gitignored). All from Poly Haven, CC0 (https://polyhaven.com/license). Each entry: Poly Haven asset id, kind, resolution, file format.",
+  "comment": "Trial assets downloaded by tools/fetch-trial-assets.mjs into public/trial/ (gitignored). All from Poly Haven, CC0 (https://polyhaven.com/license). Each entry names a Poly Haven asset id, its kind and resolution: an hdri gives its file format; a texture lists the maps to fetch (Poly Haven map names: Diffuse = albedo (a set with color variants names them col_1, col_2, ...), Rough = roughness, nor_gl = OpenGL-convention normal map) and their format (every 2k map here is 2048 x 2048, so any of them can share a scene: a scene's images share one layer size); a model is fetched as glTF with its .bin and textures and converted to OBJ by tools/gltf-to-obj.mjs.",
   "assets": [
     { "id": "brown_photostudio_02", "kind": "hdri", "res": "4k", "format": "hdr" },
     { "id": "studio_small_09", "kind": "hdri", "res": "4k", "format": "hdr" },
@@ -8,6 +8,14 @@
     { "id": "lilienstein", "kind": "hdri", "res": "4k", "format": "hdr" },
     { "id": "venice_sunset", "kind": "hdri", "res": "4k", "format": "hdr" },
     { "id": "fireplace", "kind": "hdri", "res": "4k", "format": "hdr" },
-    { "id": "cayley_interior", "kind": "hdri", "res": "4k", "format": "hdr" }
+    { "id": "cayley_interior", "kind": "hdri", "res": "4k", "format": "hdr" },
+    { "id": "wood_floor", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
+    { "id": "marble_01", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
+    { "id": "worn_plaster_wall", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["Diffuse", "Rough", "nor_gl"] },
+    { "id": "fabric_pattern_07", "kind": "texture", "res": "2k", "format": "jpg", "maps": ["col_1", "Rough", "nor_gl"] },
+    { "id": "ceramic_vase_01", "kind": "model", "res": "2k" },
+    { "id": "brass_vase_03", "kind": "model", "res": "2k" },
+    { "id": "wooden_bowl_02", "kind": "model", "res": "2k" },
+    { "id": "food_apple_01", "kind": "model", "res": "2k" }
   ]
 }

@@ -21,6 +21,9 @@ import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
 import { AMBIENT_SPACES, farClipOf } from '../../../components/ambient/index.js';
 import { formatFloat } from '../../../components/glsl-format.js';
 import { QUOTIENTS } from '../../../components/quotient/index.js';
+import perlinGLSL from '../../../glsl/core/perlin.glsl?raw';
+import imageTextureGLSL from '../../../glsl/shared/image_texture.glsl?raw';
+import { MATERIAL_TEXTURES_EXTERN } from '../../analyze/imageTextures.js';
 
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -136,10 +139,22 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     if (plan.program.materials.models.some((m) => MATERIAL_MODELS[m]?.usesMicrofacet === true)) {
         blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
     }
+    // Perlin noise for GLSL-expression material rows, ahead of the generated resolver
+    // that evaluates them.
+    if (plan.program.materials.noise === true) {
+        blocks.push({ origin: 'glsl/core/perlin.glsl', source: perlinGLSL });
+    }
+    // The image lookup the lowered texture values call (analyze/imageTextures.ts), ahead of the
+    // generated resolver, and the image array it reads.
+    const textures = [...(color.textures ?? [])];
+    if (plan.program.materials.images === true) {
+        blocks.push({ origin: 'glsl/shared/image_texture.glsl', source: imageTextureGLSL });
+        textures.push({ name: 'u_material_textures', source: `extern:${MATERIAL_TEXTURES_EXTERN}`, samplerType: 'sampler2DArray' });
+    }
 
     return {
         ...emptyContribution('core'),
-        textures: color.textures ?? [],
+        textures,
         blocks,
         defines,
         provides: [

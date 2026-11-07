@@ -29,7 +29,7 @@ function baseScene(): SceneDescription {
 }
 
 function runPlan(scene: SceneDescription) {
-    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag('test')).plans[0];
+    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag('test'), []).plans[0];
 }
 
 describe('explicit-light desugar (§6.2)', () => {

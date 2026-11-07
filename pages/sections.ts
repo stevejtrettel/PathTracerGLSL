@@ -62,7 +62,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Meshes',
         blurb: 'triangle meshes: BVH traversal, emissive mesh lights, closed-mesh containment (glass, fog, nesting)',
         entries: [
-            e('meshes'), e('models'), e('cacti'),
+            e('meshes'), e('models'), e('trial-still-life'), e('cacti'),
             e('mesh-furnace'),
             e('mesh-quad-twin', 'mesh-quad-ref'),
             e('mesh-light-twin', 'mesh-light-ref'), e('mesh-light-smooth'), e('mesh-slab-albedo'), e('mesh-scale-twin', 'mesh-scale-twin-ref'),
@@ -139,10 +139,12 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Materials & texturing',
-        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos',
+        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos, bump mapping, image textures',
         entries: [
-            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'),
+            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
             e('expr-const', 'expr-const-ref'),
+            e('bump-tilt'), e('bump-sides'),
+            e('image-texture', 'image-texture-linear', 'image-texture-spectral'),
         ],
     },
     {
