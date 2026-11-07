@@ -36,10 +36,10 @@ export const BVH_LEAF_SIZE = 2;   // stop splitting at ≤ this many triangles
  *  the sweep without touching mesh BLAS trees. */
 export const TLAS_LEAF_SIZE = 2;
 export const BVH_BINS = 12;       // SAH candidate planes per axis
-/** GLSL traversal stack depth (bvh.glsl). A well-balanced SAH tree needs ~2·log₂(N)+slack,
- *  so 64 covers millions of items; buildBVHNodesFlat warns if a (degenerate) tree would
- *  exceed it — the walk guards against overflow but would silently drop subtrees past the
- *  stack. ONE source: the feature emits `#define BVH_STACK_DEPTH` from this const. */
+/** GLSL traversal stack entries (bvh.glsl). A tree of depth D needs D + 1, and SAH trees
+ *  sit far below 64 even for millions of items; buildBVHNodesFlat refuses a tree that
+ *  needs more (past the stack the walk skips subtrees). ONE source: the feature emits
+ *  `#define BVH_STACK_DEPTH` from this const. */
 export const BVH_STACK_DEPTH = 64;
 /** The Ize 2013 far-plane pad (~2 ulps): fp32 slab arithmetic can shrink the interval so
  *  tf < tn by an ulp on a true hit — the multiply keeps the interval alive. Conservative
@@ -86,7 +86,7 @@ export interface BVHResult {
     nodeCount: number;
     /** Triangle vertex indices re-emitted in BVH-leaf order (length 3·T) — the new index texture. */
     reindexedTriangles: Uint32Array;
-    /** Max stack depth a DFS traversal needs (for sizing BVH_STACK_DEPTH). */
+    /** Depth of the deepest node (root = 0); the walks need maxDepth + 1 stack entries. */
     maxDepth: number;
     /** The root node's local AABB — the prototype box when this mesh is an instance prototype. */
     rootBox: AABB;
@@ -364,10 +364,13 @@ export function buildBVHNodesFlat(boxes: Float64Array, n: number, leafSize: numb
         },
     });
 
-    // The GLSL walk's fixed stack would silently drop subtrees past BVH_STACK_DEPTH (it guards the
-    // array bound, so no crash — just missing geometry). Warn if a (near-)degenerate tree risks it.
-    if (maxDepth >= BVH_STACK_DEPTH) {
-        console.warn(`BVH depth ${maxDepth} >= BVH_STACK_DEPTH ${BVH_STACK_DEPTH} for ${n} items — the GLSL walk may drop deep subtrees; raise BVH_STACK_DEPTH or check for degenerate geometry.`);
+    // Every GLSL walk pops a node and pushes both children of an internal one. At an internal
+    // node of depth d (root 0) the stack holds at most one pending sibling per depth 1..d,
+    // then the two children: d + 2 entries. The deepest internal node sits at maxDepth − 1,
+    // so a walk needs maxDepth + 1 entries. Past BVH_STACK_DEPTH it skips the children
+    // (missing geometry), so such a tree is refused.
+    if (maxDepth + 1 > BVH_STACK_DEPTH) {
+        throw new Error(`BVH: the walk over this tree (${n} items, depth ${maxDepth}) needs ${maxDepth + 1} stack entries, but BVH_STACK_DEPTH is ${BVH_STACK_DEPTH}; past it the walk skips subtrees. Raise BVH_STACK_DEPTH (components/accel/bvh/bvh.ts) or fix the degenerate input.`);
     }
 
     // A VIEW, not a copy: `.slice` here copied ~90MB at 1.4M items (nodeCount ≈ 1.4N at

@@ -4,7 +4,7 @@
 // is proven against BRUTE FORCE here; GLSL correctness then reduces to the bit-layout
 // round-trip (decode mirrors pack) + the GPU equality witness.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
     buildCWBVH,
     decodeCWBVHNode,
@@ -267,13 +267,39 @@ describe('cwbvh: coincident centroids', () => {
     });
 });
 
+/** Degenerate input: `m` stations at x = r^i (a geometric sequence, so SAH peels a few
+ *  stations per level and the tree is deep), `k` small boxes per station. */
+function geometricStations(m: number, k: number, r: number): Float64Array {
+    const boxes = new Float64Array(6 * m * k);
+    for (let i = 0; i < m; i++) {
+        const x = Math.pow(r, i);
+        for (let j = 0; j < k; j++) {
+            const y = j * 0.01, z = (j % 3) * 0.01;
+            boxes.set([x, y, z, x + 0.005, y + 0.005, z + 0.005], 6 * (i * k + j));
+        }
+    }
+    return boxes;
+}
+
 describe('CWBVH stack depth', () => {
-    it('a 50k-item cloud sits far below the walk\'s stack, and builds without the depth warning', () => {
-        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('a 50k-item cloud sits far below the walk\'s stack', () => {
         const { boxes } = sphereCloud(50_000, 7);
         const t = buildCWBVH(boxes, 50_000);
         expect(t.maxDepth).toBeLessThan(CWBVH_STACK_DEPTH / 2);
-        expect(warn).not.toHaveBeenCalled();
-        warn.mockRestore();
+    });
+
+    it('a tree whose walk needs more stack entries than CWBVH_STACK_DEPTH is refused at build time', () => {
+        // 200 stations of 8 boxes: every wide node on the deep path has two or more internal
+        // children, so the walk may hold one pending group per level. A replay of the walk that
+        // takes every child, in all 8 octant orders, measured 28 entries — past the 24 the
+        // GLSL stack holds, where the walk would skip groups (missing geometry).
+        expect(() => buildCWBVH(geometricStations(200, 8, 1.5), 1600)).toThrow(/needs 28 stack entries.*CWBVH_STACK_DEPTH is 24/);
+    });
+
+    it('depth alone does not decide: a chain with one internal child per node holds no pending groups', () => {
+        // One box per station: each wide node's only internal child is the rest of the chain,
+        // so taking it never leaves a remainder to push, whatever the depth.
+        const t = buildCWBVH(geometricStations(200, 1, 1.5), 200);
+        expect(t.maxDepth).toBeGreaterThan(CWBVH_STACK_DEPTH);
     });
 });

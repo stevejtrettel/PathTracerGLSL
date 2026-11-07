@@ -44,9 +44,9 @@ export const CWBVH_MAX_PRIMS_PER_NODE = 24;
  *  test ≈ a node step, so 1.0 is the second perf-witness arm. */
 export const CWBVH_C_NODE = 1.0;
 export const CWBVH_C_PRIM_DEFAULT = 0.3;
-/** Wide-walk stack depth: tree depth is ~log₈ N (+ leaf groups), so 24 covers any
- *  realistic tree with a wide margin (the binary walk needs 64). buildCWBVH warns when a
- *  tree is deep enough to reach it. */
+/** Wide-walk stack entries: tree depth is ~log₈ N (+ leaf groups), so 24 covers any
+ *  realistic tree with a wide margin. buildCWBVH refuses a tree whose walk could need
+ *  more. */
 export const CWBVH_STACK_DEPTH = 24;
 
 /** Ledger padding bound (fable-data-rail §4 style): wide internal nodes branch ≥ 2
@@ -63,7 +63,7 @@ export interface CWBVHResult {
     /** Item permutation: wide-leaf order → original item index (the binary builder's
      *  `order` contract — callers re-emit per-item payloads in this order). */
     order: Uint32Array;
-    /** Max node-group stack depth a DFS traversal needs. */
+    /** Depth of the deepest wide node (root = 1). */
     maxDepth: number;
 }
 
@@ -216,6 +216,7 @@ export function buildCWBVH(boxes: Float64Array, n: number, cPrim: number = CWBVH
     let nodeCursor = 0;
     let itemCursor = 0;
     let maxDepth = 0;
+    let stackEntries = 0;
 
     // ── Slot assignment (design doc §4): slot bit i = ((childCentroid − parentCentroid)_i > 0),
     // first-fit scan on collision. The diagonal ray d_s (bit 0 → +, 1 → −) that
@@ -232,8 +233,11 @@ export function buildCWBVH(boxes: Float64Array, n: number, cPrim: number = CWBVH
     // order (the traversal addresses child popc(imask & below(slot)) past childBase);
     // leaf children's items are appended in slot order (offsets < 24). DFS: reserve
     // the child block, then recurse in slot order (paper §3.3 layout preference). ──
-    const emit = (node: number, wideIdx: number, depth: number): void => {
+    // `entries` = the most stack entries the walk can hold while it takes this node from
+    // its group (see the check after the emit).
+    const emit = (node: number, wideIdx: number, depth: number, entries: number): void => {
         if (depth > maxDepth) maxDepth = depth;
+        if (entries > stackEntries) stackEntries = entries;
         const members = childrenOf(node);
 
         // Aggregate box (the node's own bounds — quantization frame, Eq. 1) from the
@@ -353,20 +357,23 @@ export function buildCWBVH(boxes: Float64Array, n: number, cPrim: number = CWBVH
         let ci = 0;
         for (let s = 0; s < 8; s++) {
             const mi = slotOf[s];
-            if (mi >= 0 && !isLeafChild(members[mi])) emit(members[mi], childBase + ci++, depth + 1);
+            if (mi >= 0 && !isLeafChild(members[mi])) emit(members[mi], childBase + ci++, depth + 1, entries + (internalCount >= 2 ? 1 : 0));
         }
     };
 
     nodeCursor = 1;
-    emit(0, 0, 1);
+    emit(0, 0, 1, 0);
     if (nodeCursor !== wideCount) throw new Error(`cwbvh: emitted ${nodeCursor} nodes, counted ${wideCount}`);
     if (itemCursor !== n) throw new Error(`cwbvh: emitted ${itemCursor} items of ${n}`);
-    // The GLSL walk pushes at most one pending group per level it descends, into a fixed
-    // stack of CWBVH_STACK_DEPTH entries; past that it drops the group (a guarded bound, so
-    // no crash, but missing geometry). A step limit may never decide the picture, so say so
-    // whenever a tree is deep enough to reach it.
-    if (maxDepth >= CWBVH_STACK_DEPTH) {
-        console.warn(`CWBVH depth ${maxDepth} >= CWBVH_STACK_DEPTH ${CWBVH_STACK_DEPTH} for ${n} items — the GLSL walk may drop deep subtrees; raise CWBVH_STACK_DEPTH or check for degenerate input.`);
+    // The walk's stack holds groups (the internal children of one node), not nodes: taking
+    // one child of a group pushes the group's untaken rest, if any. A group can be pending
+    // only if it has two or more internal children, and in the worst case (every child hit,
+    // the path child taken first) every such group on the root path is pending at once —
+    // so the walk needs `stackEntries` entries: the most such groups on any root path. The
+    // root enters as a one-child group and is never pushed. Past CWBVH_STACK_DEPTH the walk
+    // skips the group (missing geometry), so such a tree is refused.
+    if (stackEntries > CWBVH_STACK_DEPTH) {
+        throw new Error(`cwbvh: the walk over this tree (${n} items, depth ${maxDepth}) needs ${stackEntries} stack entries, but CWBVH_STACK_DEPTH is ${CWBVH_STACK_DEPTH}; past it the walk skips subtrees. Raise CWBVH_STACK_DEPTH (components/accel/cwbvh/cwbvh.ts) or fix the degenerate input.`);
     }
     return { nodes, nodeCount: wideCount, order, maxDepth };
 }
