@@ -11,7 +11,7 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
@@ -1012,21 +1012,18 @@ export function validate(
             }
         }
 
-        // Schema discipline (R2, the C5 silent-inert class): a {param}-DRIVEN property the
-        // material's model doesn't read would be a live knob wired to nothing — warn.
-        // (Constants on undeclared fields stay silent: harmless authoring slack.)
-        // The property list is the registry-wide union of row sources (materials-§7) —
-        // no hardcoded vocabulary here.
-        if (mat.model !== 'none') {
-            const declared = new Set(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? []);
-            const allSources = new Set(Object.values(MATERIAL_MODELS).flatMap((d) => d?.properties.map((f) => f.source as string) ?? []));
-            for (const prop of allSources) {
-                const value = (mat as unknown as Record<string, unknown>)[prop];
-                if (value !== undefined && isValueParam(value) && !declared.has(prop)) {
-                    bag.warning('invalid-setting',
-                        `Material '${name}': '${prop}' is {param}-driven but model '${mat.model}' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)`)
-                        .add();
-                }
+        // Unknown keys warn (the typo class, as for lights, cameras and primitives): a
+        // material's keys are the meta-keys plus its own model's row sources ('none' has no
+        // rows), constant or {param}-driven alike. Emission and the region-table rows are
+        // skipped here: the rules above already say why they are ignored on this model.
+        // An unregistered model was rejected above.
+        if (mat.model === 'none' || MATERIAL_MODELS[mat.model] !== undefined) {
+            const known = new Set<string>([...MATERIAL_META_KEYS, ...(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? [])]);
+            for (const [key, value] of Object.entries(mat)) {
+                if (value === undefined || known.has(key) || key === EMISSION_KEY || regionTableSources.has(key)) continue;
+                bag.warning('invalid-setting',
+                    `Material '${name}': unknown field '${key}' is ignored by model '${mat.model}' (valid: ${[...known].join(', ')})`)
+                    .add();
             }
         }
     }

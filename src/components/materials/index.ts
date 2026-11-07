@@ -75,6 +75,10 @@ export function modelTwoSidedShading(id: MaterialModel): boolean {
  *  declaring model's region-table row), never by name. */
 export const EMISSION_KEY = 'emission';
 
+/** The keys a material carries besides its model's rows, on every model. No row source may
+ *  use one (tests/components/materialsContract.test.ts). */
+export const MATERIAL_META_KEYS = ['model', 'medium', 'sampleAsLight'] as const;
+
 /** The schema declares which surface models consume the adjacent regions' index. */
 export function modelIndexRow(id: MaterialModel): PropertySchema | undefined {
     return MATERIAL_MODELS[id]?.properties.find(row => row.role === 'index' && row.storage === 'region-table');

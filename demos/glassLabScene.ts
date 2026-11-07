@@ -82,7 +82,6 @@ export const glassLabScene: SceneDescription = {
         glass: {
             model: 'dielectric',
             ior: { param: 'glass.ior', default: 1.5, min: 1.05, max: 2.0 },
-            albedo: [0.98, 0.98, 0.98],
             medium: { sigma_a: [0.3, 5.0, 7.0] },
         },
         // The rough control's material: the SAME ior dial and the SAME ruby interior,

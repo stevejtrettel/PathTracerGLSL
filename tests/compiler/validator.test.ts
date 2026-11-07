@@ -452,7 +452,47 @@ describe('Validator — schema discipline warnings (R2)', () => {
         const bag = run(s => {
             s.materials['m'] = { model: 'lambert', roughness: { param: 'm.rough', default: 0.5 } };
         });
-        expect(bag.getWarnings().some(w => /'roughness' is \{param\}-driven but model 'lambert' does not read it/.test(w.message))).toBe(true);
+        expect(bag.getWarnings().some(w => /unknown field 'roughness' is ignored by model 'lambert'/.test(w.message))).toBe(true);
+    });
+
+    it("warns on a constant key the material's model does not read, naming the model's keys", () => {
+        const typo = run(s => {
+            s.materials['m'] = { model: 'lambert', albdeo: [1, 0, 0] };
+        });
+        expect(typo.getWarnings().map(w => w.message)).toContain(
+            "Material 'm': unknown field 'albdeo' is ignored by model 'lambert' (valid: model, medium, sampleAsLight, albedo, emission)");
+        const glassAlbedo = run(s => {
+            s.materials['m'] = { model: 'dielectric', ior: 1.5, albedo: [0.9, 0.9, 0.9] };
+        });
+        expect(glassAlbedo.getWarnings().map(w => w.message)).toContain(
+            "Material 'm': unknown field 'albedo' is ignored by model 'dielectric' (valid: model, medium, sampleAsLight, transmittance, ior)");
+    });
+
+    it("warns on a key on model 'none', which reads no surface properties", () => {
+        const bag = run(s => {
+            s.materials['m'] = { model: 'none', medium: { sigma_a: 0.1 }, albedo: 0.5 };
+        });
+        expect(bag.getWarnings().some(w => /unknown field 'albedo' is ignored by model 'none'/.test(w.message))).toBe(true);
+    });
+
+    it('gives an unread emission or ior only its own warning', () => {
+        const emission = run(s => {
+            s.materials['m'] = { model: 'dielectric', ior: 1.5, emission: { param: 'm.glow', default: [1, 1, 1] } };
+        });
+        expect(emission.getWarnings().map(w => w.message)).toEqual([
+            "Material 'm': emission is set but model 'dielectric' cannot emit (its emission is identically zero) — the value is ignored"]);
+        const ior = run(s => {
+            s.materials['m'] = { model: 'lambert', ior: 1.5 };
+        });
+        expect(ior.getWarnings().map(w => w.message)).toEqual([
+            "Material 'm': ior is ignored for model 'lambert' (non-transmissive regions are pinned to 1.0 in ior_of)"]);
+    });
+
+    it('accepts every key a model reads, and the meta-keys, without warnings', () => {
+        const bag = run(s => {
+            s.materials['m'] = { model: 'lambert', albedo: 0.5, emission: 0, sampleAsLight: false, medium: { sigma_a: 0.1 } };
+        });
+        expect(bag.getWarnings()).toEqual([]);
     });
 
     it('warns when a non-emissive-capable model carries an emission value', () => {

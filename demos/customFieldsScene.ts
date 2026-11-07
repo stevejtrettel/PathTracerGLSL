@@ -122,7 +122,7 @@ export const customFieldsScene: SceneDescription = {
         stone: { model: 'lambert', albedo: [0.34, 0.32, 0.3] },
         bronze: { model: 'ggx', f0: [0.85, 0.62, 0.36], roughness: 0.3 },
         copper: { model: 'ggx', f0: [0.92, 0.55, 0.4], roughness: 0.14 },
-        glass: { model: 'dielectric', ior: 1.5, albedo: [0.94, 0.97, 0.95] },
+        glass: { model: 'dielectric', ior: 1.5 },
     },
     lights: [
         {

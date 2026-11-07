@@ -81,7 +81,7 @@ export const fieldGlass: SceneDescription = {
     ],
     materials: {
         floor: { model: 'lambert', albedo: [0.45, 0.43, 0.4] },
-        glass: { model: 'dielectric', ior: 1.5, albedo: [0.95, 0.97, 0.95] },
+        glass: { model: 'dielectric', ior: 1.5 },
     },
     lights: [
         {

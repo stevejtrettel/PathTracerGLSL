@@ -97,7 +97,7 @@ export const sdfShapesScene: SceneDescription = {
         floor: { model: 'lambert', albedo: [0.42, 0.4, 0.38] },
         stone: { model: 'lambert', albedo: [0.36, 0.33, 0.3] },
         pale_stone: { model: 'lambert', albedo: [0.6, 0.57, 0.5] },
-        glass: { model: 'dielectric', ior: 1.5, albedo: [0.92, 0.97, 0.94] },
+        glass: { model: 'dielectric', ior: 1.5 },
         brass: { model: 'ggx', f0: [0.86, 0.68, 0.32], roughness: 0.22 },
         copper: { model: 'ggx', f0: [0.92, 0.55, 0.4], roughness: 0.12 },
     },

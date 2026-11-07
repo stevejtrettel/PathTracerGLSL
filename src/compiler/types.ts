@@ -503,12 +503,12 @@ export interface MaterialDescription {
      */
     sampleAsLight?: boolean;
     /**
-     * OPEN VOCABULARY (A6, materials-§7): the legal property keys are the model's
-     * SCHEMA ROWS, not this interface — a new model's new property (`sheen: 0.7`)
-     * is authored directly; the Validator warns on keys no present model declares.
+     * Open vocabulary (materials-§7): the legal property keys are the material's own
+     * model's schema rows, not this interface — a new model's new property (`sheen: 0.7`)
+     * is authored directly, and the Validator warns on any key the model does not read.
      * The named fields above are the current models' properties, kept for
-     * autocomplete/docs. Meta-keys (model/medium/sampleAsLight) are reserved
-     * (registry-test-enforced against row-source collisions).
+     * autocomplete/docs. The meta-keys (MATERIAL_META_KEYS: model/medium/sampleAsLight)
+     * are reserved (registry-test-enforced against row-source collisions).
      */
     [key: string]: MaterialProperty | MaterialModel | MediumDescription | boolean | undefined;
 }

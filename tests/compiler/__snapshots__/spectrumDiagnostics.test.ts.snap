@@ -906,7 +906,7 @@ exports[`spectrum diagnostics > emission slider min -1 on a non-emitting model 1
 {
   "rgb": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (1 error, 2 warnings):
+      "threw": "CompilationError: Compilation failed (1 error, 1 warning):
   - Material 'glass': emission parameter min components must be >= 0",
     },
     "validator": {
@@ -914,14 +914,13 @@ exports[`spectrum diagnostics > emission slider min -1 on a non-emitting model 1
         "Material 'glass': emission parameter min components must be >= 0",
       ],
       "warnings": [
-        "Material 'glass': 'emission' is {param}-driven but model 'dielectric' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)",
         "Material 'glass': emission is set but model 'dielectric' cannot emit (its emission is identically zero) — the value is ignored",
       ],
     },
   },
   "spectral": {
     "compile": {
-      "threw": "CompilationError: Compilation failed (1 error, 2 warnings):
+      "threw": "CompilationError: Compilation failed (1 error, 1 warning):
   - Material 'glass': emission parameter min components must be >= 0",
     },
     "validator": {
@@ -929,7 +928,6 @@ exports[`spectrum diagnostics > emission slider min -1 on a non-emitting model 1
         "Material 'glass': emission parameter min components must be >= 0",
       ],
       "warnings": [
-        "Material 'glass': 'emission' is {param}-driven but model 'dielectric' does not read it — the knob would control nothing (schemas: fable-module-anatomy §3)",
         "Material 'glass': emission is set but model 'dielectric' cannot emit (its emission is identically zero) — the value is ignored",
       ],
     },
