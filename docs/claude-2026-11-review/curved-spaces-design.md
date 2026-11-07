@@ -1,20 +1,21 @@
 # Curved spaces: design (H³ and S³ first)
 
-Status: model-written design, 2026-11-06. The owner approved the direction (decisions 9–11, 22 in
-[decisions.md](decisions.md)); choices the owner has not seen are marked **(provisional)** and
-collected in §7. Evidence: [curved/facts.md](curved/facts.md) (every number below was measured by
-a script in `curved/` and re-run by an independent checker unless marked *reasoning*).
+Status: model-written design, revised 2026-11-07 after three independent reviews
+([curved/design-review.md](curved/design-review.md)). The owner approved the direction
+(decisions 9–11, 22 in [decisions.md](decisions.md)); choices the owner has not seen are
+collected in §7 with why and how to undo them. Evidence: [curved/facts.md](curved/facts.md).
+Every number below was measured by a script under `curved/` and re-run by an independent
+checker, unless marked *reasoning*.
 
 ## Part 1 — the model
 
-**The space.** A scene lives in one Riemannian 3-manifold X, fixed per program:
-E³, H³ (curvature −1) or S³ (curvature +1). H²×R is a later goal; nothing here blocks it.
-Points are stored in the standard linear model: R³ for E³; the hyperboloid
-⟨p,p⟩ = −1, p₄ > 0 in Minkowski R^{3,1} for H³; the unit sphere in R⁴ for S³. A tangent
-vector at p is a 4-vector orthogonal to p under the model's form. Curvature is fixed at ±1;
-size lives in the shapes' parameters.
+**The space.** A scene lives in one Riemannian 3-manifold X, fixed per program: E³, H³
+(curvature −1) or S³ (curvature +1); H²×R later. Points are stored in the standard linear
+model: R³; the hyperboloid ⟨p,p⟩ = −1, p₄ > 0 in Minkowski R^{3,1}; the unit sphere in R⁴. A
+tangent vector at p is a 4-vector orthogonal to p under the model's form. Curvature is fixed
+at ±1; sizes live in the shapes' parameters. `scene.ambientSpace` already names the space.
 
-**Rays.** A ray is a point of the unit tangent bundle (p, v). The geodesic flow φ_t moves it:
+**Rays.** A ray is a point (p, v) of the unit tangent bundle; the geodesic flow moves it:
 
 | | position γ(t) | velocity γ′(t) |
 |---|---|---|
@@ -22,181 +23,202 @@ size lives in the shapes' parameters.
 | H³ | cosh t · p + sinh t · v | sinh t · p + cosh t · v |
 | S³ | cos t · p + sin t · v | −sin t · p + cos t · v |
 
-Radiance is constant along a geodesic in vacuum, so the transport loop is unchanged: it
-asks "first hit along this ray", shades at the hit with the *arrival* velocity, and spawns a
-new ray. Arc length t is the ray parameter in every space; isometries preserve it.
+Radiance is constant along geodesics in vacuum, so the transport loop keeps its shape: first
+hit along the ray, shade with the *arrival* velocity, spawn. Arc length t is the ray parameter
+everywhere and isometries preserve it.
 
-**Shading.** Materials and phase functions work in an orthonormal tangent frame at the hit
-(the existing `microfacet_to_local` / `ambient_frame` route). Their math is unchanged; only
-`normalize` and `dot` on world directions must go through the space's metric.
+**Shading.** Materials and phase functions work in an orthonormal tangent frame. Their math is
+unchanged; `normalize` and `dot` on world directions go through the space's metric, and phase
+functions must be told the point where they scatter (they are not today).
 
-**Light.** Next-event estimation converts area to solid angle with the area density of
-geodesic spheres A(r) in place of r²: r² (E³), sinh² r (H³), sin² r (S³). The cosine at the
-light uses the geodesic's arrival direction there. Point-light irradiance is I·cos/A(r).
-A geodesic ball of radius R at distance d subtends a cone with sin α = S(R)/S(d), S = sinh
-or sin. (All verified by Monte Carlo twins: cosine sampling, area sampling, MIS and cone
-sampling agree with each other and with closed forms; closed furnaces pass for pt, pt-nee
-and pt-mis.)
+**Light.** Next-event estimation converts area to solid angle with the area density of geodesic
+spheres A(r) in place of r²: r² (E³), sinh² r (H³), sin² r (S³). The emitter cosine uses the
+geodesic's arrival direction there. Point-light irradiance is I·cos/A(r). A geodesic disk of
+radius ρ has area 2π(cosh ρ − 1) (H³) or 2π(1 − cos ρ) (S³), and uniform area samples have
+radius acosh(1 + u(cosh ρ − 1)) resp. acos(1 − u(1 − cos ρ)) — not the Euclidean
+concentric-disk map. A geodesic ball of radius R at distance d subtends a cone with
+sin α = S(R)/S(d) (S = sinh or sin; in S³ only for R < d < π − R). These were verified by Monte
+Carlo twins in which cosine sampling, area sampling, MIS and cone sampling agree with each
+other and with closed forms.
 
-**Several geodesics.** E³ and H³ have exactly one geodesic between two points. S³ has two,
-of lengths d and 2π − d, leaving in opposite directions, with the same density sin² d.
-Both carry light. A light sample in S³ therefore picks an arc: for a one-sided receiver
-(the existing `LightQuery.two_sided == false` claim) the arc leaving into the upper
-hemisphere, with probability 1 — per sample this equals summing both arcs; otherwise each arc
-with probability ½. The MIS side knows the arc from the traveled length (t > π ⇒ long arc).
-*(Reasoning, checked against the twins' summed-arc estimator; the ½ rule was measured.)*
+**Several geodesics (S³).** Two geodesics join any two points of S³, of lengths d and 2π − d;
+they leave in opposite directions, arrive in opposite directions, and have the same density
+sin² d. Both carry light. A light sample picks the arc inside the light's sample body, before
+the emitter's back-face test:
+- a one-sided surface receiver (`!q.two_sided && q.n ≠ 0`) takes the arc that leaves into its
+  upper hemisphere, with probability 1 — per sample this equals summing both arcs;
+- a two-sided receiver or a medium event takes each arc with probability ½.
+The MIS pdf needs no arc information: the selection factor is the same for both arcs, A is the
+same, and cos_y comes from the arrival velocity at the emitter hit. (Measured in
+`curved/review-mc/arc_rule.ts`: every surface case |z| ≤ 1.55 against cosine sampling; the medium case
+loses half the light if the one-sided rule is applied without `n ≠ 0`.)
+
+**Shadow rays** are defined by a destination *and the arc they are on*: one seam returns the
+direction at the current origin and the remaining length along that arc. E³: normalize and
+length. S³: the short-arc direction if it agrees with the ray's direction, else its negation
+with length 2π − d. This keeps occluders on the far part of a long arc in the test.
 
 **Far boundary and sky.**
-- E³: unchanged (far clip 1000, sky looked up by direction).
-- H³: the sky is a picture on the sphere at infinity. A ray (p, v) ends at the ideal point
-  normalize((p+v).xyz) — exact, independent of t. The far clip is a declared arc length
-  T = 10 (cosh overflows float32 near 89; everything cut is far below a pixel). First
-  version: a constant sky is sampled by NEE (uniform directions, pdf 1/4π at any point);
-  image and procedural skies are looked up by BSDF rays only (an estimator choice: the
-  converged image is the same).
-- S³: no sky. Every geodesic closes after 2π, so 2π is an exact search limit in vacuum and a
-  ray that meets nothing carries zero radiance.
+- E³: unchanged.
+- H³: the sky is a picture on the sphere at infinity, looked up at the ray's ideal endpoint
+  normalize((p+v).xyz), exact for any t. Far clip: a declared arc length T = 10 (cosh overflows
+  float32 near 89). With the scene inside the working radius, T cuts only the grazing band of
+  each plane near its ideal circle (≈ 2 sinh h · e^{−2T} rad). First version: every sky is
+  lookup-only from BSDF rays (`sampleAsLight: true` is an error in H³); an image sky must say
+  `sampleAsLight: false` — no silent default change. An H³ scene lit only by a sky therefore
+  runs `pt` only.
+- S³: no sky (an authored environment is an error). Every geodesic closes after 2π, so the
+  search interval (0, 2π) is exact in vacuum; a ray that meets nothing carries zero radiance; a
+  ray leaving an open disk returns to its back face at ≈ 2π, which is correct physics.
 
-**Objects.** A curved scene places each object by an isometry g (rotation and translation,
-no scale). Each shape is canonical at the origin of its own frame; its sizes are parameters.
-An authored point v ∈ R³ (a camera position, a placement position, a light position) means
-exp_o(v), the point reached by flowing distance |v| from the origin in direction v̂. In E³
-that is v itself, so nothing authored today changes meaning. First shapes, each with an
-exact distance and a closed-form intersection checked against brute force:
+**Objects.** Each object is placed by an isometry g (no scale); each shape is canonical at the
+origin of its own frame with its sizes as parameters. An authored point v ∈ R³ (camera
+position, placement position, light position) means exp_o(v), the point at distance |v| from
+the origin in direction v̂ — in E³ that is v itself. A `direction` row (a disk's normal) is a
+tangent vector at the canonical origin, applied before the placement. A light backed by a
+primitive region reads the same placement as its region, produced by one CPU function.
 
-| shape | E³ meaning | H³ / S³ meaning |
-|---|---|---|
-| sphere | ball | geodesic ball |
-| plane | plane | totally geodesic plane (a linear hyperplane of R⁴) |
-| disk | disk | geodesic disk in such a plane |
+First shapes (exact distance, closed-form intersection checked against brute force):
+geodesic ball (sphere), totally geodesic plane (plane), geodesic disk (disk). The first subset
+has **no marched shape**: the march, its epsilon and curved finite-difference normals arrive
+with the torus. Next tier, also verified: box (three slabs), cylinder (capped tube about a
+geodesic), torus (tube about a circle; marched; bounding ball R + r). Recorded for later, not
+built: a Euclidean SDF evaluated in an object's Klein chart is a safe sphere-tracing step in H³
+(the chart never stretches distances, measured), which would let every Euclidean fractal and
+`defineSDF` field render in H³ as its Klein image; S³ needs the stereographic chart for the same
+trick.
 
-Next tier (also verified, built after the first H³ witness passes): box (three slabs),
-cylinder (capped tube about a geodesic), torus (tube about a circle; marched). Menger,
-apollonian, bottle, knob and scene-local `defineSDF` fields have no curved meaning: compile
-errors. (A Euclidean field in a chart, divided by the chart's stretch bound, is a safe later
-route; recorded, not built.)
+**Precision.** Float32 hyperboloid coordinates lose accuracy like e^{2D} at distance D from the
+world origin (camera-ray direction error 5e-4 rad at D = 4; a pixel is ~1e-3). Working radius:
+the camera and the scene stay within about 3 of the world origin. Documented, not checked (§7).
+Spawn offsets use fp_uncertainty = REL·p₄ (all four coordinates), and points are renormalized
+by recomputing p₄ from p.xyz (radial renormalization is measured to be worse). S³ coordinates
+are bounded by 1 and have no such limit.
 
-**Precision.** In float32, hyperboloid coordinates lose accuracy like e^{2D} at distance D
-from the world origin (measured: camera-ray direction error 5e-4 rad at D = 4, a pixel is
-~1e-3). The first version declares a working radius: the camera and the scene stay within
-about 3 of the world origin. Camera-relative coordinates would remove the limit but make
-every world constant camera-dependent; not now. S³ coordinates are bounded by 1 and have no
-such limit.
-
-**Who implements what.** Each space-dependent component (shapes, lights, cameras, materials,
-phase functions, environment charts, guides) keys its GLSL by space. A component supports a
-space exactly when it has a body for it; nothing is assumed for a space it does not name.
-One compiler check turns an unsupported combination into an error naming the component, the
-space and the spaces it does support. A generated support table (a snapshot test, so it can
-never go stale) is the human-readable answer to "who implements what".
+**Who implements what.** Each space-dependent component family keys its GLSL by space; a
+component supports a space exactly when it has a body for it (no wildcard). Features that
+have no descriptor (meshes, instancing, table dispatch including the Planner's size-based
+default, tracking and GRIN media, ambient media, equiangular NEE, sky sampling, emissive-object
+sampling, scale ≠ 1) are rejected by one named function in the style of `spectralLimitations`,
+checking resolved values (after defaults). A snapshot test prints both as one support table.
+Shared files without a descriptor (ray.glsl, the shadow walkers, microfacet.glsl) are not in
+the table: witnesses establish them.
 
 ## Part 2 — how it is wired
 
 ### 2.1 The ambient occupant supplies
 
-| function | E³ body (today's arithmetic) | why |
+| | E³ body (today's arithmetic) | why |
 |---|---|---|
-| `Point`, `Direction` types | `vec3` (descriptor fact `pointType`, emitted before structs) | H³/S³ use `vec4` |
-| `Ray ambient_flow(Ray r, float t)` | `make_ray(r.origin + r.direction * t, r.direction, r.wl)` | arrival direction at hits and medium exits |
-| `Point ambient_geodesic(Point o, Direction d, float t)` | `o + d * t` (kept; position only) | |
+| `types.glsl`: `Point`, `Direction` | `#define Point vec3`, `#define Direction vec3` (moved from structs.glsl; emitted right after the color model's types, the same convention) | H³/S³ use vec4 |
+| `Ray ambient_flow(Ray r, float t)` | `Ray(r.origin + r.direction * t, r.direction, r.wl)` | arrival direction |
+| `Point ambient_geodesic(Point o, Direction d, float t)` | `o + d * t`; curved occupants define it through the same formula as ambient_flow | |
 | `float ambient_dot(a, b, p)` | `dot(a, b)` | metric |
-| `Direction ambient_normalize(Direction v, Point p)` | `normalize(v)` | H³ normalize is not Euclidean |
-| `Frame ambient_frame(Point p, Direction n)` | unchanged | tangent frame |
-| `float ambient_distance(Point a, Point b)` | `length(b - a)` | shadow-ray lengths |
-| `Direction ambient_direction_to(Point a, Point b)` | unchanged | short arc; S³ long-arc callers negate it |
+| `Direction ambient_normalize(Direction v, Point p)` | `normalize(v)` | |
+| `Frame ambient_frame(Point p, Direction n)` | unchanged | |
+| `Direction ambient_aim(Point from, Direction along, Point to, out float remaining)` | `remaining = length(to - from); return normalize(to - from);` | shadow rays (arc-aware in S³) |
+| `Direction ambient_direction_to(Point a, Point b)` | unchanged (callers move to ambient_aim) | |
 | `vec3 ambient_sky_key(Point p, Direction v)` | `v` | sky lookup |
-| `MAX_DIST` | `1000.0` | far clip per space |
-| `fp_uncertainty(Point p)` | today's body | H³ reads all four coordinates |
+| `MAX_DIST` | `1000.0` | far clip |
+| `fp_uncertainty(Point p)` | today's body (constants stay in math.glsl) | spawn offsets |
 
-`ambient_parallel_transport(v, from, to)` has no caller; it is kept as the seam for planned
-work, with its signature changed to the unambiguous (point, direction, length) form when a
-caller arrives. Its current (from, to) form is singular at antipodes in S³.
+`ambient_parallel_transport` stays as it is (no caller; in-progress seam).
 
-### 2.2 Step 1 — Euclidean refactor, bit-identical (no curved code)
+### 2.2 Step 1 — Euclidean respelling, bit-identical, no new mechanism
 
-Route every site in the first subset's shared code through §2.1, with E³ bodies equal to
-today's expressions, and make components key their GLSL by space. Sites (from the
-inventory, `curved/bypass-inventory/notes.md`):
+1. **Coverage first.** Add frame cases to `tools/witness.mjs` so every respelled file is
+   rendered: shadow-aim-fog (media walker through null interfaces), one driven/placed-analytic
+   scene, one rayleigh scene, one image-sky scene. Record the baseline (`npm run frames --
+   record`) on the unmodified tree, and a digest.
+2. **Respell** (each E³ body is the same IEEE arithmetic):
+   - arrival direction: `wo = -s.ray.direction` and the null re-spawn in pt.ts, the side test in
+     the dispatcher (intersection.ts), `exit_dir` in the analytic medium arm, the null re-spawn
+     in shadow/media → `ambient_flow(ray, t).direction`;
+   - shadow aim and length in shadow/opaque, shadow/media, techniques/light → `ambient_aim`;
+   - `normalize` on world directions in lambert, checker, mirror, dielectric,
+     core/microfacet.glsl, pinhole, fisheye → `ambient_normalize`;
+   - sky lookup → `ambient_sky_key`;
+   - `MAX_DIST`, `fp_uncertainty` → the occupant; `Point`/`Direction` → the occupant's types file;
+   - literal `vec3` meaning a point or direction in generated signatures (`scene_region_at`,
+     `scene_material_properties`, `ior_of`/`ior_of_material`, `scene_medium_properties`,
+     `sdf_<id>`, `environment_pdf`, LightQuery constructors) → `Point`/`Direction`.
+3. **Phase functions** (a contract change, its own commit): `<id>_eval/_sample/_pdf` and the
+   generated `interaction_medium_*` seams gain `Point p`; `dot` → `ambient_dot`. The sampling
+   basis stays `build_basis` in this commit (bit-identical); it is replaced by `ambient_frame`
+   in step 2, where a curved key needs it, verified by medium witnesses (the sampled
+   directions change, their distribution does not).
+4. **Not in step 1:** the SDF march and the Euclidean placed-arm local points (no curved path
+   reaches them), light samplers (curved bodies are separate), placements, keyed descriptors.
 
-- Arrival direction: `wo = -s.ray.direction` (pt.ts), null-interface re-spawn (pt.ts,
-  shadow/media/media.glsl), side test in the dispatcher (intersection.ts), `exit_dir` in the
-  analytic medium arm → `ambient_flow(ray, t).direction`.
-- Straight-line points in generated code (the SDF march, local hit points) → `ambient_geodesic`.
-- Shadow distances (`length(light_p - origin)` in shadow/opaque and shadow/media) →
-  `ambient_distance`.
-- `normalize` on world directions in lambert, checker, mirror, dielectric, hg, rayleigh and
-  core/microfacet.glsl → `ambient_normalize`.
-- Sky lookup `environment_radiance(s.ray.direction)` → `ambient_sky_key(origin, direction)`.
-- `MAX_DIST` and `fp_uncertainty` move to the occupant (same text).
-- `Point`/`Direction` emitted from the occupant's `pointType`; literal `vec3` in generated
-  signatures that mean a point or a direction (`scene_region_at`,
-  `scene_material_properties`, `LightQuery` constructors) → `Point`/`Direction`.
-- Descriptor GLSL keyed by space for the space-dependent families; estimator descriptors
-  without GLSL get a `spaces` list; one `spaceGate` helper at the existing registry gates;
-  a support-matrix snapshot test.
+**Verification.** `npm run frames -- compare` bit-exact on every case (measured on SwiftShader;
+GLSL ES 3.00 has no `precise`). Digest before/after: only respellings, reviewed by kind of line.
+`npx tsc --noEmit`, `npx vitest run` (shaderConstants.ts follows MAX_DIST to the occupant;
+generated-GLSL and program snapshots updated). Seam-unused warnings must not rise.
 
-Not in step 1: light samplers (they get separate curved bodies; their E³ bodies stay
-byte-identical), placements (curved objects use a new mat4 arm; the E³ fold and tiers stay).
+### 2.3 Step 2 — H³, smallest useful subset
 
-**Verification, written first.** `npm run frames -- record` before and after on the fixed
-cases, `npm run frames -- compare` must report bit-exact pictures. `npm run digest` before
-and after: the shader-text differences must be only the respellings above (reviewed by kind
-of line). `npx tsc --noEmit`, `npx vitest run` (the support-matrix snapshot is new). The
-seam-unused warning count must not rise.
+- **Mechanism (first commit):** descriptor GLSL keyed by space for geometry, lights, materials,
+  volume_scattering, camera, env charts and aov; `spaces` lists on the GLSL-less estimator
+  descriptors; one gate helper at the existing registry gates (a light kind and its backing
+  primitive gated together); `curvedLimitations(scene, strategy, space)` for the features
+  without descriptors; the support-table snapshot. Now the gate can fail.
+- **Occupant** `components/ambient/hyperbolic/` (§2.1 functions; distance by the stable asinh
+  form, with the acosh branch only if a measurement shows in-scene separations need it).
+- **Bodies:** sphere, plane, disk shapes; point and disk lights (disk: curved area and
+  inverse-CDF radius; pdf via A(r) and the arrival cosine); lambert; pinhole and fisheye (one
+  shared file each, listed under both spaces; frame computed on the CPU, target-centered up
+  rule); hg (basis via ambient_frame) and the analytic homogeneous medium inside objects;
+  equirect/octahedral/constant sky lookup.
+- **Placement:** one inverse isometry `mat4` per object (baked literal when constant, uniform
+  when driven — mat4 uniforms exist end to end); normals map by J·((J n)·G⁻¹) with
+  J = diag(1,1,1,−1); column-major, pinned by a test; point rows fold into the placement as a
+  pre-translation; scale ≠ 1 is an error. A missing uv chart is an error for uv-reading
+  materials (no planar fallback).
+- **Emissive geometric objects** are not light-sampled in curved spaces in this version (BSDF
+  hits see them, MIS weight 1); authored point and disk lights are.
+- **Not here:** App orbit/fly controls (today's controls write Vec3 position/target, which are
+  valid poses under exp_o; isometric controls belong to the App redesign), other materials,
+  the sphere light, marched shapes. Each later occupant arrives with its own witness.
 
-### 2.3 Step 2 — H³, first subset
-
-- `components/ambient/hyperbolic/`: the §2.1 functions (stable distance: asinh form for small
-  d, acosh for large; renormalize by recomputing p₄ from p.xyz; `fp_uncertainty` = REL·p₄).
-- Per-space bodies: sphere, plane, disk shapes; point, sphere and disk lights; pinhole and
-  fisheye cameras (uniforms keep their names, become vec4 P, F, R, U); constant, equirect
-  and octahedral sky charts (lookup only); lambert, ggx, mirror, dielectric, rough_dielectric,
-  checker, hg, rayleigh list the same file under `hyperbolic` once step 1 made them
-  metric-clean.
-- Placement: one `mat4` inverse isometry per object, a baked literal when constant, a
-  uniform when driven (mat4 uniforms already exist end to end). Normals map by J·(Jn·G⁻¹)
-  with J = diag(1,1,1,−1). Authored point rows (sphere center) fold into the placement as a
-  pre-translation; `vector`/`area` rows are compile errors (the existing ParamKind fact).
-  Scale ≠ 1 is a compile error. Matrices are column-major; a test pins the layout.
-- Emissive geometric objects are not light-sampled in curved spaces in the first version:
-  BSDF hits still see them (MIS weight 1). Authored point/sphere/disk lights are sampled.
-- Compile errors in curved spaces: meshes, instancing, table dispatch, the light tree,
-  tracking and GRIN media, equiangular NEE, directional/spot/beam/softbeam/quad lights,
-  ambient media, orthographic/thin-lens/equirect/cylindrical cameras, and the scene-local
-  fields above.
-- App: camera controls get a small per-space TS module (exp, log, transvection, orbit, fly);
-  orbit uses the target-centered up rule **(provisional)**.
-
-**Witnesses** (new fixtures, derived values exact):
-1. H³ closed furnace: camera inside an emitting lambert ball, albedo 0.8, maxBounces 6 →
-   L = Σ_{k≤6} 0.8^k = 3.951424; pt, pt-nee, pt-mis.
-2. H³ disk-light irradiance on a white lambert receiver at a closed-form value from the
-   twins; pt, pt-nee, pt-mis must agree (this is the test that catches a wrong A(r)).
-3. H³ point light: I·cos/sinh² d on the same receiver.
-4. Euclidean suite unchanged (frames compare).
+**Witnesses** (new fixtures; small disk receiver, maxBounces 1, no sky, closed forms integrated
+over the readout window):
+1. H³ furnace, pt only: spawn, intersection and emission bookkeeping (L = Σ_{k≤6} 0.8^k).
+2. H³ disk light on a lambert receiver; pt = pt-nee = pt-mis and the closed form (catches A(r),
+   the curved area sampler, the emitter arrival cosine).
+3. H³ point light: I·cos/sinh² d.
+4. H³ homogeneous scattering ball lit by an outside disk light; pt = pt-nee = pt-mis (catches the
+   phase metric, exit_dir, the medium shadow walker).
+5. Euclidean suite unchanged (frames compare).
 
 ### 2.4 Step 3 — S³
 
-Occupant with the S³ formulas; arcs per §1; `MAX_DIST` = 2π; no sky (an authored
-environment is a compile error); S³ cone sampler with the second (backward) cone and the
-whole-sphere branch when the ball contains −x; `march_epsilon` not grown near the antipode.
-Witnesses: S³ furnace; one-sided disk below the receiver lit only through the long arc
-(closed form 1.250217 in the twin's configuration); pt = pt-nee = pt-mis.
+Occupant with the S³ formulas (J = I for normals: G⁻¹ = Gᵀ); search interval (0, 2π); no sky;
+arc choice inside the point and disk light bodies (the body takes the LightQuery; the ½ choice
+draws one extra `random()`); curved pdf bodies take the arrival direction (`wo`) from the
+combiner — a signature change to the curved pdf bodies only. Witnesses, pt = pt-nee = pt-mis:
+a one-sided disk below a small disk receiver lit only through the long arc; the same with an
+opaque blocker on the long arc beyond distance d (expected 0); a medium ball (½ rule); the S³
+furnace, pt only. The receiver is not a plane (a great sphere would block every long arc).
 
 ### 2.5 Later
 
-Box, cylinder, torus, quad as a centered (a, b) rectangle; meshes through Klein (H³) and
-gnomonic (S³) charts, where geodesic triangles are flat; image-sky NEE in H³ with the
-Jacobian 1/((x+v)₄)²; H²×R (direction-dependent A, no straight chart); quotients
-(E³ 3-torus first).
+Box, cylinder, torus (with the march through ambient_flow and curved normals), quad as a
+centered (a, b) rectangle, the sphere light (cone sampler; S³ flip rule: sample the forward
+cone, flip ω below n or with probability ½, light distance 2π − far root), other materials with
+witnesses, Klein-chart Euclidean SDFs in H³, meshes through Klein/gnomonic charts, image-sky NEE
+in H³ (Jacobian 1/((x+v)₄)², evaluated at the scattering vertex), H²×R, isometric App controls,
+quotients ([quotients plan](quotients-plan.md) when written).
 
 ## 7. Provisional choices (model's, unconfirmed)
 
-1. Camera up rule: target-centered (an orbit is an exact rotation about the target).
-2. Curved ambient media: compile error in the first version.
-3. H³ far clip T = 10 as a declared measurement constant.
-4. S³ arc rule as in §1 (one-sided: the upper arc; otherwise ½ each).
-5. Emissive geometric objects not light-sampled in curved spaces at first.
-6. Curvature fixed at ±1; `ambientSpace.parameters.curvature` becomes an error.
-7. Precision limit documented, not checked by the compiler.
-8. Authored point rows fold into the placement; vector/area rows are errors.
+| # | choice | why | undo |
+|---|---|---|---|
+| 1 | camera up rule target-centered | an orbit is an exact rotation about the target | swap the CPU frame function |
+| 2 | ambient (unbounded) media: error in curved spaces | exact S³ value needs unbounded segments; H³ sky leaks through a clipped fog | lift the limitation row |
+| 3 | H³ far clip T = 10 | float32 range; cuts only sub-pixel bands inside the working radius | one constant in the occupant |
+| 4 | S³ arc rule (one-sided: upper arc; else ½) | measured unbiased; no extra shadow rays | sample both arcs instead |
+| 5 | emissive geometric objects not light-sampled in curved spaces | sampling them needs the placement in the emitter path; MIS keeps it unbiased | add them to the roster later |
+| 6 | curvature fixed at ±1; `parameters.curvature` is an error | sizes carry the scale; one formula per space | accept a curvature scale |
+| 7 | H³ working radius documented, not checked | a check is one more mechanism; owner prefers fewer guards | add a Validator rule |
+| 8 | phase basis: build_basis kept in step 1, ambient_frame in step 2 | keeps step 1 bit-identical; step 2 is verified by witnesses | keep a build_basis seam per space |
+| 9 | first H³ subset without marched shapes and with only lambert | each further occupant needs its own witness | add with witnesses (next tier) |

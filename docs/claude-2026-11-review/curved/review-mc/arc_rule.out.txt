@@ -1,0 +1,29 @@
+--- one-sided disk BELOW, facing away (long arc only) D=1 rho=0.6
+  A cosine (reference)                         mean 1.252421  se 0.0015
+  upper arc w.p. 1                             mean 1.250031  se 0.00016  z vs A -1.55
+  MIS(A, upper arc), pdf w/o arc factor        mean 1.250414  se 0.00025  z vs A -1.29
+  1/2 rule                                     mean 1.249004  se 0.0013  z vs A -1.71
+--- one-sided disk crossing horizon D=1.4 rho=1 polar=1.5 tilt=0.3
+  A cosine (reference)                         mean 0.6265435  se 0.0013
+  upper arc w.p. 1                             mean 0.6260261  se 0.00076  z vs A -0.35
+  MIS(A, upper arc), pdf w/o arc factor        mean 0.6263854  se 0.00064  z vs A -0.11
+  1/2 rule                                     mean 0.6253099  se 0.0012  z vs A -0.70
+--- one-sided disk crossing horizon, normal flipped
+  A cosine (reference)                         mean 0.4699728  se 0.0011
+  upper arc w.p. 1                             mean 0.4696824  se 0.00066  z vs A -0.22
+  MIS(A, upper arc), pdf w/o arc factor        mean 0.4697915  se 0.00056  z vs A -0.14
+  1/2 rule                                     mean 0.4696998  se 0.0010  z vs A -0.18
+--- two-sided disk crossing horizon
+  A cosine (reference)                         mean 1.094355  se 0.0015
+  upper arc w.p. 1                             mean 1.095392  se 0.00065  z vs A 0.64
+  MIS(A, upper arc), pdf w/o arc factor        mean 1.095295  se 0.00056  z vs A 0.59
+  1/2 rule                                     mean 1.094017  se 0.0014  z vs A -0.16
+--- ball crossing horizon d=1.3 R=0.6 polar=1.45 (one-sided receiver)
+  A cosine (reference)                         mean 0.3173448  se 0.00095
+  cone + flip to upper                         mean 0.3165822  se 0.00020  z vs A -0.79
+  MIS(A, cone+flip) pdf 1/Omega                mean 0.3165790  se 0.00020  z vs A -0.79
+--- medium vertex (n = 0, two_sided = false), two-sided disk, isotropic phase
+  uniform-sphere reference                     mean 0.1350760  se 0.00034
+  1/2 rule                                     mean 0.1352738  se 0.0000070  z vs ref 0.58
+  literal one-sided rule, test > 0             mean 0.06763691  se 0.0000035  z vs ref -197.29
+  literal one-sided rule, test >= 0            mean 0.06763691  se 0.0000035  z vs ref -197.29
