@@ -19,7 +19,8 @@ literal define; a `{param}` fov becomes a live uniform aliased through the same
 define, so the GLSL is unchanged either way — the §2.8 Value<T> pattern). Model-unique
 params (thin-lens `u_aperture`/`u_focusDistance`) are declared on the occupant's
 descriptor (`params(cam)`) and merged in by the feature; the registry is
-`camera/index.ts` and adding a camera is one folder + one line there.
+`camera/index.ts` and adding a camera is one folder + one line there. The descriptor's `glsl`
+lists the file under each ambient space it is implemented in (ambient/README.md).
 
 ## Camera randomness — two categories, two seams (owner-decided July 2026)
 

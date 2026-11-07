@@ -7,6 +7,12 @@ import type { SceneFeatures } from './types.js';
 import { samplableEmitterObjects } from '../plan/dataTenants.js';
 
 
+/** Scattering is computed in this program: some medium may scatter and the measurement does
+ *  not ignore scattering. The program then links the phase model of every medium. */
+export function scatteringComputed(features: SceneFeatures, scattering: 'full' | 'ignored'): boolean {
+    return features.media.hasScatteringMedia && scattering === 'full';
+}
+
 export function analyze(scene: SceneDescription): SceneFeatures {
     // --- Media (§3.5/§3.6, fable-volumetric-component.md) ---
     // (No geometry backend counts, per-model flags, or heterogeneous flag here — C4:

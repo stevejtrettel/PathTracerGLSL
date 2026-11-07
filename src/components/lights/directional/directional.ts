@@ -11,7 +11,7 @@ import lightDirectionalGLSL from './directional.glsl?raw';
 
 export const directionalLightDescriptor: LightKindDescriptor = {
     kind: 'directional',
-    glsl: lightDirectionalGLSL,
+    glsl: { euclidean: { origin: 'components/lights/directional/directional.glsl', source: lightDirectionalGLSL } },
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
     // NO deltaQuery fact: anisotropic delta with no position row at all — there is no
     // point to place the equiangular pivot at (the Validator's structural rejection).

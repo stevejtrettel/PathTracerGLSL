@@ -186,5 +186,8 @@ never mutated by intersection — it is a pure seed.
 ## Deferred (not this contract)
 
 Curved ambient occupants (H³/S³ first — docs/claude-2026-11-review/curved-spaces-design.md;
-`Point`→`vec4` there); BVH under non-straight geodesics
+`Point`→`vec4` there). Which components run in which space is decided outside the loop: each
+space-dependent occupant has a GLSL body per space it implements, and the Validator rejects a
+program that uses one without a body (components/ambient/README.md, "Who implements what").
+BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

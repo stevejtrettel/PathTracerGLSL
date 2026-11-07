@@ -9,7 +9,7 @@ import thinlensGLSL from './thinlens.glsl?raw';
 
 export const thinlensDescriptor: CameraModelDescriptor = {
     type: 'thinlens',
-    glsl: thinlensGLSL,
+    glsl: { euclidean: { origin: 'components/camera/thinlens/thinlens.glsl', source: thinlensGLSL } },
     authoredParams: [
         { name: 'fov', shape: 'value-number', required: true, constraint: { kind: 'interval', min: 0, max: Math.PI } },   // RADIANS, full vertical angle: tan(fov/2) must exist — a degree value (45) is caught here
         { name: 'aperture', shape: 'number', required: true, constraint: { kind: 'nonnegative' } },   // 0 ≡ pinhole (the witness anchor)

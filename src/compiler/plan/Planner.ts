@@ -6,6 +6,7 @@ import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/i
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads, SpectralIndex } from '../types.js';
 import { isValueParam, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import { scatteringComputed } from '../analyze/Analyzer.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
@@ -13,7 +14,8 @@ import { isRadiometric } from '../../components/descriptors.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
-import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS, phaseModelOf } from '../../components/volume_scattering/index.js';
+import { DEFAULT_ENV_CHART } from '../../components/env/index.js';
 import { PRIMITIVES, primitive, primitiveBounds, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
@@ -34,13 +36,13 @@ import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMes
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads, objectDispatchOf } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
-import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
+import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
  *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
@@ -516,8 +518,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const measurement = resolveMeasurement(scene, strategy);
     const scattering = measurement.scattering;
     const vs = strategy.estimator.volumeSampling ?? 'analytic';
-    const scatteringArms = features.media.hasScatteringMedia
-        && scattering === 'full'
+    const scatteringArms = scatteringComputed(features, scattering)
         && (vs === 'analytic' || vs === 'delta-tracking');
     // Heterogeneous media (fable-heterogeneous-media.md; emission P5): some medium
     // ROUTES to a null-collision arm, so the delta/ratio occupant is included.
@@ -554,8 +555,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // Object dispatch (hoisted so regionLookup shares the decision — one truth):
     // scene-dependent default (T6) past MARCHED_TABLE_THRESHOLD; an explicit
     // strategy always wins.
-    const objectDispatch = strategy.estimator.objectDispatch
-        ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
+    const objectDispatch = objectDispatchOf(scene, strategy);
 
     // Dispersion needs a spectral program: RGB evaluates every index at the d line.
     const dispersion = measurement.color === 'spectral' ? planDispersion(scenePlan) : { record: null, kinds: new Set<string>() };
@@ -575,7 +575,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 ? (strategy.estimator.mediumLightSampling ?? 'vertex')
                 : 'vertex',
             envSampler: {
-                chart: strategy.estimator.envSampler ?? 'equirect',
+                chart: strategy.estimator.envSampler ?? DEFAULT_ENV_CHART,
                 compensation: strategy.estimator.envCompensation ?? false,
             },
             // 'exponential' is reserved-not-built: the Validator rejects it before
@@ -670,7 +670,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // live (the phase is invoked only at scatter events); [] otherwise.
             models: scatteringArms
                 ? Object.keys(VOLUME_SCATTERING_MODELS).filter((k) =>
-                    Object.values(scene.materials).some((m) => m.medium !== undefined && (m.medium.model ?? 'hg') === k))
+                    Object.values(scene.materials).some((m) => m.medium !== undefined && phaseModelOf(m.medium) === k))
                 : [],
         },
         emitters: {
@@ -945,7 +945,7 @@ export function resolveMaterialValues(
  *  are the medium's OWN model's schema rows (union fields of other present models fall
  *  back to their row defaults at emit time). */
 function resolveMedium(med: MediumDescription): PlannedMedium {
-    const model = med.model ?? 'hg';
+    const model = phaseModelOf(med);
     const values: PlannedMedium['values'] = {};
     for (const row of VOLUME_SCATTERING_MODELS[model]?.properties ?? []) {
         values[row.source] = resolveScalarProperty(

@@ -19,7 +19,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
-import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF } from '../../components/intersection/index.js';
+import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF, MARCHED_TABLE_THRESHOLD, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
 
 /** Which optional data structures a program reads — read off its decisions, which are the
@@ -127,6 +127,19 @@ export function batchPlacementRecordOf(b: InstancedObject, scene: SceneDescripti
     if (resolveBackend(b.prototype.type, b.prototype.backend) === 'sdf') return 'frame';
     if (paramsRecordFloats(b.prototype.type) === null) return 'frame';
     return materialReadsUv(b.prototype.material, scene) ? 'frame' : 'params';
+}
+
+/** The scene's MARCHED objects: non-instanced primitive objects whose backend resolves to
+ *  the SDF march. */
+export function marchedObjectCount(scene: SceneDescription): number {
+    return scene.objects.filter((o) => isPrimitiveObject(o) && resolveBackend(o.type, o.backend) === 'sdf').length;
+}
+
+/** The object dispatch a program runs: the strategy's choice when it makes one, else 'table'
+ *  from MARCHED_TABLE_THRESHOLD marched objects on, else DEFAULT_OBJECT_DISPATCH. */
+export function objectDispatchOf(scene: SceneDescription, strategy: RenderStrategy): string {
+    return strategy.estimator.objectDispatch
+        ?? (marchedObjectCount(scene) >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
 }
 
 /** The ONE samplable-mesh-emitter predicate (fable-mesh-lights): shared by the ledger's

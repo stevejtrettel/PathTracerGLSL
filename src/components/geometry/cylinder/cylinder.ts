@@ -14,7 +14,7 @@ export const cylinderDescriptor: PrimitiveDescriptor = {
         { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
         { name: 'halfHeight', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],
-    glsl: cylinderGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/cylinder/cylinder.glsl', source: cylinderGLSL } },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
     // exactly, so a marched arm is confined to precisely this shape's interval.

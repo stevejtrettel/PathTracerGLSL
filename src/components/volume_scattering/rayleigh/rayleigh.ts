@@ -7,6 +7,6 @@ import rayleighGLSL from './rayleigh.glsl?raw';
 
 export const rayleighDescriptor: VolumeScatteringModelDescriptor = {
     id: 'rayleigh',
-    glsl: rayleighGLSL,
+    glsl: { euclidean: { origin: 'components/volume_scattering/rayleigh/rayleigh.glsl', source: rayleighGLSL } },
     properties: [],
 };

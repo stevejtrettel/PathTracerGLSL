@@ -14,6 +14,7 @@
 import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from '../glsl/shared/fullscreen.vert.glsl?raw';
 import { ENV_CHARTS } from '../components/env/index.js';
+import { bodyFor } from '../components/descriptors.js';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
 
@@ -57,7 +58,7 @@ export function compileEnvironmentBake(scene: SceneDescription, chart: string = 
         '}',
         '',
         ...ENV_CHARTS[chart].needs.map((f) => f.source),   // the files the chart calls into
-        ENV_CHARTS[chart].glsl,   // D3: from the chart registry
+        bodyFor(ENV_CHARTS[chart].glsl, scene.ambientSpace.type, `environment chart '${chart}'`).source,
         '',
         '// gl_FragCoord centers at +0.5, so uv hits texel centers; readback row j then',
         '// corresponds to θ = π(j+½)/H — the exact convention the CPU CDF builder assumes.',

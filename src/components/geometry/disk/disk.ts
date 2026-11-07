@@ -27,7 +27,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
         // (plane's normal stays required: it IS the plane's identity).
         { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
     ],
-    glsl: diskGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL } },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry
     uvChart: true,            // polar (r/R, θ/2π) — disk_uv (fable-imagery P1)

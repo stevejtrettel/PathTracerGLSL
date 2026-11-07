@@ -7,7 +7,7 @@ import lightSphereGLSL from './sphere.glsl?raw';
 
 export const sphereLightDescriptor: LightKindDescriptor = {
     kind: 'sphere',
-    glsl: lightSphereGLSL,
+    glsl: { euclidean: { origin: 'components/lights/sphere/sphere.glsl', source: lightSphereGLSL } },
     delta: false,
     // Authored input (besides kind/emission): authored `position` maps to the registry
     // row `center` in toValues — the proof the authored language needs its own schema.

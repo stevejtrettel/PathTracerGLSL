@@ -23,6 +23,7 @@ import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { cameraModel, type CameraControl, type CameraDerived } from '../../../components/camera/index.js';
 import { cameraBasis } from '../../../components/camera/basis.js';
+import { bodyFor } from '../../../components/descriptors.js';
 import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
 
 /** Mint a control's slider (and, for a pass-through, its raw uniform). No derivation. */
@@ -105,9 +106,8 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
         provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl)' }],
-        // Origin DERIVED from the registry key (D2: the materials way — the path
-        // convention is the one truth; no hand-written origin to drift).
-        blocks: [{ origin: `components/camera/${model.type}/${model.type}.glsl`, source: model.glsl }],
+        // The model's body for the program's space (its origin travels with it).
+        blocks: [bodyFor(model.glsl, plan.program.measurement.ambient, `camera '${model.type}'`)],
         uniforms: [
             { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
             basisUniform('u_cameraForward', (b) => b.forward),

@@ -18,7 +18,8 @@ lives in and whether it is MIS-compensated changes noise, never the answer — X
 ## What an occupant supplies
 
 The chart GLSL (`direction ↔ uv`, exact cell solid angle, and uniform-solid-angle
-`env_chart_sample(cell, xi, size)` within a cell), a CPU
+`env_chart_sample(cell, xi, size)` within a cell), keyed by the ambient spaces it is
+implemented in (ambient/README.md; a chart serves sampling only), a CPU
 loader/builder counterpart in the engine path where needed (the baked-table pipeline),
 and — because compensation and two-stage selection are cross-chart — nothing else:
 `environment.ts` owns the radiance bodies, the baked-CDF plumbing (`extern:` textures),

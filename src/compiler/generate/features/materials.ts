@@ -15,7 +15,7 @@ import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
 import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
-import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
+import { bodyFor, type MaterialDerivedSpec } from '../../../components/descriptors.js';
 import { isRadiometric } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
@@ -72,7 +72,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
     for (const model of plan.program.materials.models) {
-        blocks.push({ origin: `components/materials/${model}/${model}.glsl`, source: materialModel(model).glsl });
+        blocks.push(bodyFor(materialModel(model).glsl, plan.program.measurement.ambient, `material model '${model}'`));
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls. Ops are seam
@@ -175,7 +175,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // mp.model (twin of the surface interaction dispatch; eval/pdf are seam
             // decisions like the surface ops).
             for (const m of plan.program.media.models) {
-                blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: VOLUME_SCATTERING_MODELS[m].glsl });
+                blocks.push(bodyFor(VOLUME_SCATTERING_MODELS[m].glsl, plan.program.measurement.ambient, `phase model '${m}'`));
             }
             blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models, media.mediumEval, media.mediumPdf) });
         }

@@ -37,7 +37,8 @@ emitting-side normal is ONE compile-time formula shared with the backing geometr
 (quad: `quadNormal`; disk: `unitVec3` through the primitive's `canonicalize`) — hit
 side and sample side agree bit-exactly by construction.
 
-**Descriptor** (`<kind>.ts`): `kind`, `glsl`, `delta`, `authoredParams` (the kind's
+**Descriptor** (`<kind>.ts`): `kind`, `glsl` (the file per ambient space it is implemented
+in; ambient/README.md — a kind is gated together with the primitive backing it), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
 loop derives unknown-key/required/shape checks from it and runs `validateAuthored`
 only on well-shaped input; the desugar-totality contract test keeps it honest
@@ -85,6 +86,7 @@ records channel, the tree rides nodes — `accel/light_tree` builds) and replace
 CDF with the generated pick/trail-pmf walk pair. Kinds opt into the tree via the
 `treeBounds` descriptor fact (mesh lights use its `'data'` form: the App supplies the box
 from the BLAS root); kinds without it (directional, beam) are Validator-rejected under 'bvh'.
+Each selection occupant lists the ambient `spaces` it is implemented in (ambient/README.md).
 
 ## Invariants & witnesses
 

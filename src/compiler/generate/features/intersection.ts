@@ -49,6 +49,7 @@ import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import marchGLSL from '../../../glsl/core/march.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
+import { bodyFor } from '../../../components/descriptors.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
@@ -162,8 +163,9 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
                 ...present.map((d) => structFromRows(structName(d), [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
         });
     }
+    const space = plan.program.measurement.ambient;
     for (const d of present) {
-        blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
+        blocks.push(bodyFor(d.glsl, space, `primitive '${d.type}'`));
     }
     // Generated marching boilerplate (fable-sdf-contract §4): the loop + the 4-tap
     // gradient, emitted per MARCHED type from its one authored field. AFTER the
@@ -173,7 +175,7 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // off-surface picks up ∇|∇f| contamination) keeps it; generation is the fallback.
     // Registry occupants stay generated-only (the contract test pins it).
     const authoredNormal = (d: ReturnType<typeof primitive>): boolean =>
-        d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(d.glsl);
+        d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(bodyFor(d.glsl, space, `primitive '${d.type}'`).source);
     if (marchedTypes.size > 0) {
         blocks.push({
             origin: 'generated:sdf-march',

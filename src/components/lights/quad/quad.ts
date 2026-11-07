@@ -16,7 +16,7 @@ function quadArea(edge1: number[], edge2: number[]): number {
 
 export const quadLightDescriptor: LightKindDescriptor = {
     kind: 'quad',
-    glsl: lightQuadGLSL,
+    glsl: { euclidean: { origin: 'components/lights/quad/quad.glsl', source: lightQuadGLSL } },
     delta: false,
     // Authored input (besides kind/emission) — same names as the registry rows for quad.
     authoredParams: [

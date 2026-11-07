@@ -13,7 +13,7 @@ import lightDiskGLSL from './disk.glsl?raw';
 
 export const diskLightDescriptor: LightKindDescriptor = {
     kind: 'disk',
-    glsl: lightDiskGLSL,
+    glsl: { euclidean: { origin: 'components/lights/disk/disk.glsl', source: lightDiskGLSL } },
     delta: false,
     // Authored input (besides kind/emission): position → row `center`; optional normal.
     // The normal's default lives ON THE ROW (D1) — applied once by the framework, so

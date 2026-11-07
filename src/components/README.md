@@ -28,6 +28,12 @@ computes exactly that and nothing else.
 - Every family root carries a `README.md` stating its taxonomy section, its kind
   (mix-many / pick-one), the occupant contract, and the add-an-occupant recipe —
   enforced by `tests/components/structure.test.ts`.
+- **Support per space**: the space-dependent families (geometry, lights, materials,
+  volume_scattering, camera, env charts, aov) key a descriptor's `glsl` by ambient space,
+  one `{ origin, source }` body per space the occupant has been checked in; the GLSL-less
+  estimator occupants (light selection, mesh and instance traversal, object dispatch) list
+  their `spaces`. No wildcard. The rule, the gate and the generated table are in
+  `ambient/README.md`.
 - GLSL conventions all occupants share: `Spectrum/Point/Direction/Radiance` typedefs
   (never raw `vec3` for radiometric values, §2.5), metric products via `ambient_dot`,
   bare f without cosines (§2.2), no `#ifdef`s — the compiler specializes by inclusion

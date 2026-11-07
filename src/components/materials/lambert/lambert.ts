@@ -6,7 +6,7 @@ import lambertGLSL from './lambert.glsl?raw';
 
 export const lambertDescriptor: MaterialModelDescriptor = {
     id: 'lambert',
-    glsl: lambertGLSL,
+    glsl: { euclidean: { origin: 'components/materials/lambert/lambert.glsl', source: lambertGLSL } },
     // Fields read (matches lambert.glsl's header): albedo, emission.
     properties: [
         { name: 'albedo', glslType: 'Spectrum', role: 'reflectance', source: 'albedo', default: 0.8, storage: 'field' },

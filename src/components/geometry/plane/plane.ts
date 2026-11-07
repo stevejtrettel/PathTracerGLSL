@@ -25,7 +25,7 @@ export const planeDescriptor: PrimitiveDescriptor = {
         { name: 'normal', kind: 'direction', shape: 'vec3', required: true, constraint: { kind: 'min-length', value: 1e-8 } },
         { name: 'offset', kind: 'length', shape: 'number', required: false, default: 0.0 },
     ],
-    glsl: planeGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/plane/plane.glsl', source: planeGLSL } },
     provides: { sdf: true, analytic: true },
     // THE unbounded shape (impl-plan-sdf-as-shape §2.3): a plane has no finite bound to
     // declare, so a marched plane is always visited and marches the open interval. This

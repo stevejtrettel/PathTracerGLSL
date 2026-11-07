@@ -19,7 +19,7 @@ import lightMeshGLSL from './mesh.glsl?raw';
 
 export const meshLightDescriptor: LightKindDescriptor = {
     kind: 'mesh',
-    glsl: lightMeshGLSL,
+    glsl: { euclidean: { origin: 'components/lights/mesh/mesh.glsl', source: lightMeshGLSL } },
     delta: false,
     // No authored route: a `{ kind: 'mesh' }` light record is always rejected — author an
     // emissive mesh OBJECT instead (validateAuthored fires on any well-shaped attempt).

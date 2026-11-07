@@ -13,6 +13,11 @@ export const VOLUME_SCATTERING_MODELS: Record<string, VolumeScatteringModelDescr
     rayleigh: rayleighDescriptor,
 };
 
+/** The phase model a medium scatters with: the one it names, else Henyey–Greenstein. */
+export function phaseModelOf(medium: { model?: string }): string {
+    return medium.model ?? 'hg';
+}
+
 /** True iff the volume scattering model has a live occupant — the Validator's gate. */
 export function isMediumModelSupported(id: string): boolean {
     return VOLUME_SCATTERING_MODELS[id] !== undefined;

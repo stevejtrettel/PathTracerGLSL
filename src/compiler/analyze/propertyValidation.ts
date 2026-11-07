@@ -18,7 +18,7 @@ import type { SpectrumKind } from '../../components/color/spectra/spectrumKind.j
 import { SLIDER_KEYS, unknownKeysProblem, valueParamProblems } from '../../components/param.js';
 import type { SpectrumRole, RowConstraint, PropertySchema } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS, phaseModelOf } from '../../components/volume_scattering/index.js';
 
 /** The one interpreter of RowConstraint, with one message voice for every family's rows.
  *  Scalar rules apply per component; min-length needs a vec3. */
@@ -77,7 +77,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             report(valueProblems(v, contract, label));
         }
 
-        const phase = VOLUME_SCATTERING_MODELS[mat.medium.model ?? 'hg'];
+        const phase = VOLUME_SCATTERING_MODELS[phaseModelOf(mat.medium)];
         for (const field of phase?.properties ?? []) {
             report(valueProblems((mat.medium as unknown as Record<string, unknown>)[field.source], rowSetting(field), `Material '${name}': medium.${field.source}`));
         }

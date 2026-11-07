@@ -18,7 +18,7 @@ import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 import { LIGHT_KINDS } from '../../../components/lights/index.js';
 import { EMISSION_KEY, MATERIAL_MODELS } from '../../../components/materials/index.js';
 import { PRIMITIVES } from '../../../components/geometry/index.js';
-import type { LightKindDescriptor } from '../../../components/descriptors.js';
+import { bodyFor, type LightKindDescriptor } from '../../../components/descriptors.js';
 import { structFromRows } from '../schema.js';
 
 import shadowOpaqueGLSL from '../../../components/transport/shadow/opaque/opaque.glsl?raw';
@@ -116,7 +116,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
         });
     }
     for (const kind of presentKinds) {
-        blocks.push({ origin: `components/lights/${kind}/${kind}.glsl`, source: LIGHT_KINDS[kind].glsl });
+        blocks.push(bodyFor(LIGHT_KINDS[kind].glsl, plan.program.measurement.ambient, `light kind '${kind}'`));
     }
 
     // Under 'bvh' the registry lights are TABLE-resident and selection is the

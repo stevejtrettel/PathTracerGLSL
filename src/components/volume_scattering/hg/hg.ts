@@ -8,7 +8,7 @@ import phaseHgGLSL from './hg.glsl?raw';
 
 export const hgDescriptor: VolumeScatteringModelDescriptor = {
     id: 'hg',
-    glsl: phaseHgGLSL,
+    glsl: { euclidean: { origin: 'components/volume_scattering/hg/hg.glsl', source: phaseHgGLSL } },
     // Fields read (matches phase_hg.glsl's header): phase_g.
     properties: [
         { name: 'phase_g', glslType: 'float', source: 'phase_g', default: 0, storage: 'field' },

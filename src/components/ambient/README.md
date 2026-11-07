@@ -47,6 +47,38 @@ signatures and the generated signatures (`scene_region_at`, `scene_material_prop
 constructors) write points and tangent vectors as `Point` and `Direction`; hand-written
 locals inside component bodies (the cameras' look-at frames, for one) still say `vec3`.
 
+## Who implements what
+
+An occupant supports a space exactly when it says so; compiling in a space is no evidence of
+being correct there (a point light falls off as 1/r² in E³ and 1/sinh² r in H³).
+
+- **Occupants with GLSL** (geometry, lights, materials, volume_scattering, camera, env
+  charts, aov): the descriptor's `glsl` is a `SpaceBodies` record (components/descriptors.ts),
+  one body `{ origin, source }` per space, keyed by the AMBIENT_SPACES key. A body correct in
+  several spaces is listed under each space it has been checked in, with one origin. There is
+  no wildcard key. Generators take the body with `bodyFor(d.glsl, space, …)`; a scene-local
+  SDF (`defineSDF`) has a Euclidean body.
+- **Estimator occupants emitted from TypeScript** (light selection, mesh traversal, instance
+  traversal, object dispatch) carry a `spaces` list.
+- **The gate**: the Validator checks each occupant at its registry gate with `spaceGate`
+  (compiler/analyze/curved.ts), one message: `<occupant> has no <space> implementation
+  (implemented in: …)`. A light kind is gated with the primitive backing it; a marched
+  primitive with the primitive bounding its march; an emissive object with its light kind; a
+  phase model and an env chart where the program links them.
+- **Features without a descriptor** are rows of `SPACE_LIMITATIONS`, checked by
+  `curvedLimitations(scene, strategy, features)` on resolved values, together with the
+  estimator occupants the program resolves to (defaults applied, including the size-based
+  table dispatch): mesh objects, instanced objects, scale ≠ 1, tracking media, GRIN media,
+  an ambient medium, equiangular medium NEE, an environment, an environment sampled as a
+  light, emissive objects sampled as lights.
+- **The table**: [`support.md`](support.md) is generated from all of the above by
+  tests/components/spaceSupport.test.ts (`npx vitest run -u` rewrites it). Shared files with
+  no descriptor (ray.glsl, the shadow walkers, microfacet.glsl) are not in it: the witnesses
+  of each space establish them.
+
+Adding a space: one occupant folder and one registry line here, then a body or a `spaces`
+entry for each occupant checked in the new space, and the limitation rows it lifts.
+
 ## Status & the honest caveat
 
 Sole occupant: `euclidean/`. Several places are Euclidean beyond the seam and need new
@@ -59,4 +91,5 @@ geometry).
 ## Invariants & witnesses
 
 None space-specific yet (one occupant). A respelling of the seam must leave every Euclidean
-scene bit-identical (`npm run frames -- compare`).
+scene bit-identical (`npm run frames -- compare`). The gate and the limitation rows are
+exercised with a test-only space registered in memory (tests/compiler/spaceGate.test.ts).

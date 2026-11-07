@@ -7,7 +7,7 @@ import checkerGLSL from './checker.glsl?raw';
 
 export const checkerDescriptor: MaterialModelDescriptor = {
     id: 'checker',
-    glsl: checkerGLSL,
+    glsl: { euclidean: { origin: 'components/materials/checker/checker.glsl', source: checkerGLSL } },
     // Fields read (matches checker.glsl's header): the two cell albedos + the uv tiling
     // scale (cells per uv unit — remember uv itself is the placeholder planar chart).
     properties: [

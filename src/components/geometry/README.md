@@ -90,7 +90,8 @@ classification, region tables ("descriptors declare facts; generators decide").
 ## Adding a primitive (the recipe)
 
 1. `geometry/<type>/<type>.glsl` — the math, per the symbol contract.
-2. `geometry/<type>/<type>.ts` — the descriptor.
+2. `geometry/<type>/<type>.ts` — the descriptor; its `glsl` lists the file under each ambient
+   space it is implemented in (`{ euclidean: { origin, source } }`; ambient/README.md).
 3. One line in `index.ts` (`PRIMITIVES`).
 
 Placement (constant folds, wrapper tiers, driven uniforms), regions, and epsilons

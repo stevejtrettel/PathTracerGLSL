@@ -15,7 +15,7 @@ export const mengerDescriptor: PrimitiveDescriptor = {
         { name: 'size', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
         { name: 'iterations', kind: 'scalar', shape: 'number', required: false, default: 5, constraint: { kind: 'positive' } },
     ],
-    glsl: mengerGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/menger/menger.glsl', source: mengerGLSL } },
     provides: { sdf: true, analytic: false },
     marchBound: {
         type: 'box',

@@ -34,7 +34,8 @@ Conventions (pinned; see contracts §2/§3 and trace-loop-contract):
   (§3.1); pure-delta models set `nonDeltaLobes: false` so NEE skips them.
 - `uc` selects among lobes; `u` is the 2D draw. Single-lobe models ignore `uc`.
 
-**Descriptor** (`<id>.ts`): `id`, `glsl` (?raw), `properties` (the §3.4 schema — the
+**Descriptor** (`<id>.ts`): `id`, `glsl` (the file per ambient space it is implemented in —
+ambient/README.md), `properties` (the §3.4 schema — the
 fields this model READS; a field exists in `MaterialProperties` only because some
 present model declares it), `capabilities { nonDeltaLobes, transmission, emissive }`, and
 `albedo` — the model's color for the albedo guide (components/aov): `{ row }`, one of its own

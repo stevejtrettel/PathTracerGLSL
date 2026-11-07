@@ -6,12 +6,13 @@
 import type { RenderPlan } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { AOVS } from '../../../components/aov/index.js';
+import { bodyFor } from '../../../components/descriptors.js';
 
 export function contributeAov(plan: RenderPlan): FeatureContribution {
     const aovs = (plan.program.measurement.aovs ?? []).map((name) => AOVS[name]);
     return {
         ...emptyContribution('aov'),
-        blocks: aovs.map((a) => ({ origin: `components/aov/${a.name}/${a.name}.glsl`, source: a.glsl })),
+        blocks: aovs.map((a) => bodyFor(a.glsl, plan.program.measurement.ambient, `AOV '${a.name}'`)),
         provides: aovs.map((a) => ({
             name: `${a.name}_aov`,
             signature: `vec3 ${a.name}_aov(int mat, Hit hit, Direction wo, MaterialProperties props, Spectrum weight)`,

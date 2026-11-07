@@ -39,7 +39,8 @@ Conventions:
   `c = ambient_dot(wi, −wo, p)` — forward convention. pbrt's `+2gc` pairs with the opposite dot;
   mixing them desyncs eval from sample. The haze witness's g-drag catches it.
 
-**Descriptor** (`<id>.ts`): `id`, `glsl`, `properties` (fields declared into
+**Descriptor** (`<id>.ts`): `id`, `glsl` (the file per ambient space it is implemented in;
+ambient/README.md), `properties` (fields declared into
 `MediumProperties` — same §3.4 schema machinery as materials, second family; e.g.
 `phase_g`). **Registry line** in `index.ts`.
 

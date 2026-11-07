@@ -1,23 +1,26 @@
 // compiler/analyze/Validator.ts
 
 import { spectralLimitations } from './spectral.js';
+import { spaceGate, curvedLimitations } from './curved.js';
+import { scatteringComputed } from './Analyzer.js';
+import { spacesOf } from '../../components/descriptors.js';
 import { rgbPreviewWarnings } from './rgbPreview.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, sceneRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole } from '../types.js';
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights, marchedObjectCount } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { AOVS } from '../../components/aov/index.js';
-import { ENV_CHARTS } from '../../components/env/index.js';
+import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../../components/env/index.js';
 import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
@@ -28,7 +31,7 @@ import { nodeTexelBound } from '../../components/data/ledger.js';
 import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
-import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
+import { isMediumModelSupported, phaseModelOf, VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
@@ -57,6 +60,17 @@ export function validate(
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
+    // The space gate (analyze/curved.ts): every occupant the program runs must implement the
+    // program's space. Skipped for an unregistered space, which has its own error above.
+    const space = features.ambientSpace;
+    const spaceKnown = AMBIENT_SPACES[space] !== undefined;
+    const gateSpace = (where: string, occupant: string, implementedIn: readonly string[]): void => {
+        const reason = spaceKnown ? spaceGate(occupant, implementedIn, space) : null;
+        if (reason !== null) bag.error('invalid-setting', `${where}: ${reason}`).add();
+    };
+    if (spaceKnown) {
+        for (const reason of curvedLimitations(scene, strategy, features)) bag.error('invalid-setting', reason).add();
+    }
 
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
     // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
@@ -84,6 +98,12 @@ export function validate(
                 `Light ${i}: unknown light kind '${light.kind}' (registered kinds: ${Object.keys(LIGHT_KINDS).join(', ')})`)
                 .add();
             continue;
+        }
+        // A light kind and the primitive backing it run together, so both must implement the space.
+        gateSpace(`Light ${i}`, `light kind '${light.kind}'`, spacesOf(d.glsl));
+        if (d.region !== undefined) {
+            const backing = PRIMITIVES[d.region.primitive];
+            if (backing !== undefined) gateSpace(`Light ${i}`, `its backing primitive '${d.region.primitive}'`, spacesOf(backing.glsl));
         }
         // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
         // missing required / wrong shape error, then the row's declarative constraint
@@ -162,7 +182,7 @@ export function validate(
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         if (isInstancedObject(obj)) continue;   // prototype validated with its batch below
-        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag);
+        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag, gateSpace);
     }
 
     // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
@@ -290,13 +310,24 @@ export function validate(
         }
     }
 
+    // Emissive objects are lights too: their light kind must implement the space (the shape
+    // itself is gated with the object).
+    for (const emitter of samplableEmitterObjects(scene)) {
+        gateSpace(`Object ${emitter.index}`, `light kind '${emitter.kind}'`, spacesOf(LIGHT_KINDS[emitter.kind].glsl));
+    }
+
     // Model registration (the B1 treatment — model ids are strings, the registry + this
     // check gatekeep): unknown models are REJECTED with the registered set, never passed
     // through to emit calls on symbols no include defines. 'none' is structural
     // vocabulary (§3.6), not a registry key; 'emissive' keeps its migration message
     // (review C4: it used to fail at the GPU as an undeclared identifier).
     for (const [name, mat] of Object.entries(scene.materials)) {
-        if (mat.model === 'none' || MATERIAL_MODELS[mat.model] !== undefined) continue;
+        if (mat.model === 'none') continue;
+        const model = MATERIAL_MODELS[mat.model];
+        if (model !== undefined) {
+            gateSpace(`Material '${name}'`, `material model '${mat.model}'`, spacesOf(model.glsl));
+            continue;
+        }
         if (mat.model === 'emissive') {
             bag.error('invalid-setting',
                 `Material '${name}': model 'emissive' is not a model — use emission on a surface model (e.g. lambert with albedo 0), or model 'none' with a medium block for a pure volume region`)
@@ -365,6 +396,9 @@ export function validate(
                 bag.error('invalid-setting',
                     `Material '${name}': medium.model '${mat.medium.model}' is not a registered volume scattering model`)
                     .add();
+            } else if (scatteringComputed(features, strategy.measurement.scattering ?? 'full')) {
+                const phase = phaseModelOf(mat.medium);
+                gateSpace(`Material '${name}'`, `phase model '${phase}'`, spacesOf(VOLUME_SCATTERING_MODELS[phase].glsl));
             }
             // GRIN media matrix (impl-plan-grin-media — the Jul 22 batches lifted the v1
             // blanket rejections): a deflecting medium may EMIT (per-step collection with
@@ -486,6 +520,12 @@ export function validate(
             `envSampler '${chart}' is not a registered environment chart (registered: ${Object.keys(ENV_CHARTS).join(', ')})`)
             .add();
     }
+    // A chart is linked only where a tabulated sky (image, procedural) is sampled as a light.
+    const resolvedChart = ENV_CHARTS[chart ?? DEFAULT_ENV_CHART];
+    if (resolvedChart !== undefined && features.environment.samplable && strategy.estimator.directLighting !== 'none'
+        && (scene.environment?.type === 'image' || scene.environment?.type === 'procedural')) {
+        gateSpace('estimator.envSampler', `environment chart '${resolvedChart.id}'`, spacesOf(resolvedChart.glsl));
+    }
 
     // T5: a compensated env table deliberately has pdf = 0 where L > 0 — unbiased ONLY when
     // BSDF sampling covers those directions with MIS weighting. NEE-only would lose energy.
@@ -499,9 +539,7 @@ export function validate(
     // volumeSampling rules held byte-identical private copies) — impl-plan-medium-
     // emission P5: a constant-ε SCATTERING medium routes to the tracking arms too,
     // under the computed measurement only.
-    const trackScattering = strategy.measurement.scattering ?? 'full';
-    const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
-        m.medium !== undefined && mediumRoutesToTracking(m.medium, mediumScatters(m.medium, trackScattering)));
+    const sceneNeedsTracking = sceneRoutesToTracking(scene, strategy.measurement.scattering ?? 'full');
 
     // Equiangular medium NEE — v1 scope pins (impl-plan-equiangular §3).
     if (strategy.estimator.mediumLightSampling === 'equiangular') {
@@ -694,8 +732,7 @@ export function validate(
     // just stops. The default already picks 'table' past the threshold; this is for the
     // scene that asks anyway, so the failure arrives as a sentence instead of a hang.
     if (objectDispatch === 'unrolled') {
-        const marched = scene.objects.filter((o) => isPrimitiveObject(o)
-            && resolveBackend(o.type, o.backend) === 'sdf').length;
+        const marched = marchedObjectCount(scene);
         if (marched >= MARCHED_TABLE_THRESHOLD) {
             bag.warning('invalid-setting',
                 `estimator.objectDispatch 'unrolled' with ${marched} marched objects: the shader emits one march loop PER OBJECT and compile time grows superlinearly (128 objects did not finish compiling on an M1 Pro). 'table' compiles in constant time — drop the pin unless this arm is a deliberate reference.`)
@@ -759,6 +796,7 @@ export function validate(
             .suggest(`Registered cameras: ${Object.keys(CAMERA_MODELS).join(', ')}`)
             .add();
     } else {
+        gateSpace('measurement.camera', `camera '${cameraType}'`, spacesOf(cameraModelDesc.glsl));
         // The model's authored-field schema (D2): the validation the old typed union used
         // to do at compile time, now registry-declared — unknown-key / required / shape /
         // enum / constraint, the lights loop's grammar.
@@ -897,6 +935,8 @@ export function validate(
                     bag.error('invalid-setting', `measurement.aovs: unknown AOV ${JSON.stringify(name)} — known: ${legal.map((v) => `'${v}'`).join(', ')}`).add();
                 } else if (aovs.indexOf(name) !== i) {
                     bag.error('invalid-setting', `measurement.aovs lists '${name}' twice`).add();
+                } else {
+                    gateSpace('measurement.aovs', `AOV '${name}'`, spacesOf(AOVS[name].glsl));
                 }
             });
             if (aovs.length > 0 && (strategy.measurement.color ?? 'rgb') !== 'rgb') {
@@ -1143,7 +1183,7 @@ export function validate(
             }
         }
         const proto = obj.prototype;
-        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
+        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag, gateSpace);
         // (A closed mesh PROTOTYPE was rejected here until instanced containment landed —
         // impl-plan-instanced-containment. Solid instances now claim an interior through
         // the same three-tier query their un-instanced siblings use, so `closed: true`
@@ -1403,7 +1443,10 @@ export function validate(
  * `label` prefixes messages (`Object 3`, `Object 3 prototype`); `path` prefixes
  * diagnostic origins (`objects[3]` / `objects[3].prototype`).
  */
-function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag): void {
+function validateGeometryObject(
+    obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag,
+    gateSpace: (where: string, occupant: string, implementedIn: readonly string[]) => void,
+): void {
     if ('kind' in obj) {
         const vertexCount = obj.positions.length / 3;
         // Finite as well as well-shaped: the scene-wide finiteness sweep skips typed arrays,
@@ -1491,7 +1534,15 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     }
     // Parameter schema (C7). Unimplemented types / unhonorable pins skip it — those
     // carry their own diagnostics.
-    if (!desc || resolveBackend(type, obj.backend) === undefined) return;
+    const backend = desc !== undefined ? resolveBackend(type, obj.backend) : undefined;
+    if (!desc || backend === undefined) return;
+    // The shape's body, and for a marched shape the analytic primitive bounding its march.
+    gateSpace(label, `primitive '${type}'`, spacesOf(desc.glsl));
+    const bound = desc.marchBound;
+    if (backend === 'sdf' && bound !== undefined && bound !== 'self' && bound !== 'unbounded') {
+        const boundDesc = PRIMITIVES[bound.type];
+        if (boundDesc !== undefined) gateSpace(label, `the primitive bounding its march, '${bound.type}'`, spacesOf(boundDesc.glsl));
+    }
     const params = (obj.parameters ?? {}) as Record<string, unknown>;
     const schema = desc.params;
     const known = new Map(schema.map((s) => [s.name, s]));
