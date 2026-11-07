@@ -81,6 +81,12 @@ exports[`scene-data textures (byte fingerprints) > clamp 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > clamp-ref 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > conductor-gold 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect-ref 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > conjugation 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > conjugation-base 1`] = `null`;
@@ -746,6 +752,10 @@ exports[`scene-data textures (byte fingerprints) > shadow-aim-march 1`] = `null`
 
 exports[`scene-data textures (byte fingerprints) > shadow-medium 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > sheen-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sheen-fuzz 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sky-lamp 1`] = `null`;
@@ -788,6 +798,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-blackbody-tree 1`] =
   "records": "4096x1 aecdcae316b2858e",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > spectral-colorchecker-d65 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-colored-furnace 1`] = `null`;
 
@@ -898,6 +910,13 @@ exports[`scene-data textures (byte fingerprints) > spectral-materials 1`] = `
 {
   "nodes": "4096x1 5fe3415bc91cdd80",
   "records": "4096x1 fb8c08c3814c9d0f",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-measured-lamps 1`] = `
+{
+  "nodes": "4096x1 7bb8a806d83cff31",
+  "records": "4096x1 8ece9f215a148954",
 }
 `;
 
@@ -1028,6 +1047,8 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
   "records": "4096x1 6c9d2fd456f110cf",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > veach-metals 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
 

@@ -36,8 +36,10 @@ const ALLOWED_ROOT_FILES = new Set([
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'values.ts',                           // colour shared questions about authored spectrum values
     'spectrumKind.ts',                     // color/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)
+    'standIn.ts',                          // color/spectra shared part (the daylight RGB stand-in of a function of wavelength)
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
     'microfacet.ts',                       // materials shared part (the α derived field every microfacet model reads)
+    'microfacetTwin.ts',                   // materials shared part (TS twin of glsl/core/microfacet.glsl's lobe + the §11.3 harness the models' tests run)
 ]);
 
 describe('components structure', () => {

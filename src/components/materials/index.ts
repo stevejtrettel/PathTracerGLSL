@@ -14,6 +14,9 @@ import { mirrorDescriptor } from './mirror/mirror.js';
 import { checkerDescriptor } from './checker/checker.js';
 import { plasticDescriptor } from './plastic/plastic.js';
 import { thinDielectricDescriptor } from './thin_dielectric/thin_dielectric.js';
+import { sheenDescriptor } from './sheen/sheen.js';
+import { conductorDescriptor } from './conductor/conductor.js';
+import { roughConductorDescriptor } from './rough_conductor/rough_conductor.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
@@ -24,6 +27,9 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     checker: checkerDescriptor,
     plastic: plasticDescriptor,
     thin_dielectric: thinDielectricDescriptor,
+    sheen: sheenDescriptor,
+    conductor: conductorDescriptor,
+    rough_conductor: roughConductorDescriptor,
 };
 
 /** The model's STRUCT surface: its rows plus its derived fields as pseudo-rows —

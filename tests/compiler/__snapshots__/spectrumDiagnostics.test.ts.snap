@@ -960,6 +960,148 @@ exports[`spectrum diagnostics > cauchy too few coefficients 1`] = `
 }
 `;
 
+exports[`spectrum diagnostics > conductor eta as a number and k as a scalar slider 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > conductor eta as an RGB triple 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - spectral material 'm' property 'eta' is an RGB triple; an optical constant in a spectral program takes a number, a scalar {param} or a named spectrum kind such as { measured: … }",
+    },
+    "validator": {
+      "errors": [
+        "spectral material 'm' property 'eta' is an RGB triple; an optical constant in a spectral program takes a number, a scalar {param} or a named spectrum kind such as { measured: … }",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > conductor eta as an expression 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': eta is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': eta is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not an expression",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': eta is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': eta is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not an expression",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > conductor k as a vec3 slider 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': k is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not a vec3 {param}",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': k is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not a vec3 {param}",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': k is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not a vec3 {param}",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': k is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not a vec3 {param}",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > conductor k slider min 0 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': k parameter min must be > 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': k parameter min must be > 0",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': k parameter min must be > 0",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': k parameter min must be > 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
 exports[`spectrum diagnostics > emission slider min -1 on a non-emitting model 1`] = `
 {
   "rgb": {
@@ -1478,6 +1620,264 @@ exports[`spectrum diagnostics > material emission slider default -1 1`] = `
     "validator": {
       "errors": [
         "Material 'm': emission components must be >= 0",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the measured table 'metal-Au-eta' is an optical spectrum, and this setting takes a reflectance value",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the measured table 'metal-Au-eta' is an optical spectrum, and this setting takes a reflectance value",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the measured table 'metal-Au-eta' is an optical spectrum, and this setting takes a reflectance value",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the measured table 'metal-Au-eta' is an optical spectrum, and this setting takes a reflectance value",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured gold conductor 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured illuminant as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the measured table 'illuminant-D65' is an emission spectrum, and this setting takes a reflectance value",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the measured table 'illuminant-D65' is an emission spectrum, and this setting takes a reflectance value",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: the measured table 'illuminant-D65' is an emission spectrum, and this setting takes a reflectance value",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: the measured table 'illuminant-D65' is an emission spectrum, and this setting takes a reflectance value",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured out-of-gamut patch as albedo 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+        "Material 'm': albedo: its RGB stand-in (-0.028, 0.249, 0.383) lies outside [0, 1]; RGB renders clip it, spectral renders are exact",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [
+        "Material 'm': albedo: its RGB stand-in (-0.028, 0.249, 0.383) lies outside [0, 1]; RGB renders clip it, spectral renders are exact",
+      ],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured patch as albedo, illuminant as light and sky 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured patch as emission 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the measured table 'colorchecker-white-9.5' is a reflectance spectrum, and this setting takes an emission value",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the measured table 'colorchecker-white-9.5' is a reflectance spectrum, and this setting takes an emission value",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Light 0 (point): emission: the measured table 'colorchecker-white-9.5' is a reflectance spectrum, and this setting takes an emission value",
+    },
+    "validator": {
+      "errors": [
+        "Light 0 (point): emission: the measured table 'colorchecker-white-9.5' is a reflectance spectrum, and this setting takes an emission value",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured patch with a scale 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: scale applies only to emission tables, and 'colorchecker-red' is a reflectance spectrum",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: scale applies only to emission tables, and 'colorchecker-red' is a reflectance spectrum",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: scale applies only to emission tables, and 'colorchecker-red' is a reflectance spectrum",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: scale applies only to emission tables, and 'colorchecker-red' is a reflectance spectrum",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured table as a bare string 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: measured must be an object { table, scale? }",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: measured must be an object { table, scale? }",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': albedo: measured must be an object { table, scale? }",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': albedo: measured must be an object { table, scale? }",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > measured unknown table 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': eta: unknown measured spectrum "metal-Fe-eta" (optical tables: metal-Ag-eta, metal-Ag-k, metal-Al-eta, metal-Al-k, metal-Au-eta, metal-Au-k, metal-Cu-eta, metal-Cu-k, metal-CuZn-eta, metal-CuZn-k)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': eta: unknown measured spectrum "metal-Fe-eta" (optical tables: metal-Ag-eta, metal-Ag-k, metal-Al-eta, metal-Al-k, metal-Au-eta, metal-Au-k, metal-Cu-eta, metal-Cu-k, metal-CuZn-eta, metal-CuZn-k)",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': eta: unknown measured spectrum "metal-Fe-eta" (optical tables: metal-Ag-eta, metal-Ag-k, metal-Al-eta, metal-Al-k, metal-Au-eta, metal-Au-k, metal-Cu-eta, metal-Cu-k, metal-CuZn-eta, metal-CuZn-k)",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': eta: unknown measured spectrum "metal-Fe-eta" (optical tables: metal-Ag-eta, metal-Ag-k, metal-Al-eta, metal-Al-k, metal-Au-eta, metal-Au-k, metal-Cu-eta, metal-Cu-k, metal-CuZn-eta, metal-CuZn-k)",
       ],
       "warnings": [],
     },

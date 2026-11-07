@@ -72,14 +72,28 @@ LOBE_DELTA; albedo in [0, 1]; `coat_eta` is relative to the outside medium; see
 2R/(1 + R) and straight-through transmission, both of weight 1; `sheet_eta` is relative to the
 medium around it; it passes light through without changing region, so the Validator rejects it
 in scenes with media; see `thin_dielectric/thin_dielectric.md`).
+`sheen/` (OpenPBR fuzz over a Lambertian base: an LTC fuzz lobe and the base, mixed by the
+fuzz albedo E(μ_o); exact pdf, no tangent field needed, not reciprocal; see `sheen/sheen.md`).
+`conductor/` (smooth metal with the exact conductor Fresnel term of a complex index η + iκ,
+per wavelength lane; rows `eta` and `k` have role `optical` and take numbers, a scalar
+`{param}` or a [measured](../color/spectra/measured/README.md) table; see
+`conductor/conductor.md`), `rough_conductor/` (the GGX lobe with that Fresnel term; shares
+`eta`, `k` with `conductor` and `roughness` with `ggx`; single scattering only).
 
 
 **Microfacet models** (`ggx`, `rough_dielectric`) declare `microfacet: { energy }`: the gate
 for `glsl/core/microfacet.glsl` and the energy gain their GLSL multiplies into eval and the
-sample weight. `microfacet_energy/` is the shared part behind the gains (not an occupant):
+sample weight. `sheen` declares `energy: 'none'`: it reads only the library's frame maps and
+calls no gain. `rough_conductor` declares `energy: 'not-built'`: its gain would need the
+hemispherical average of its Fresnel term per lane, and `'energy-compensated'` rejects it. `microfacet_energy/` is the shared part behind the gains (not an occupant):
 the energy table, its TS twin and builder, and `microfacet_energy.glsl`, linked under
 `measurement.microfacet: 'energy-compensated'`; otherwise the compiler emits each gain as 1.
 Their roughness rows lie in [0, 1], the table's range (`microfacet_energy/microfacet_energy.md`).
+
+Optical rows (`role: 'optical'`, the conductors' `eta` and `k`) are Spectrum fields evaluated
+per wavelength lane and never collapsed. They take a number, an RGB triple (RGB programs only),
+a scalar `{param}` (a float slider) or a named kind with the optical role; not an expression, a
+vec3 slider or a per-instance attribute.
 
 Index-consuming models mark their region-table row with `role: 'index'`.
 `modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics

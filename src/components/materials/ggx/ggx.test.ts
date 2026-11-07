@@ -1,10 +1,9 @@
 // The §11.3 pdf–histogram harness, GGX instance (fable-compiler-contracts §11.3,
 // fable-validation-scenes §6 H). This TS twin is a line-for-line transcription of
-// ggx.glsl's model math PLUS the shared distribution machinery it calls
-// (glsl/core/microfacet.glsl: D, Smith G₁, VNDF — carved out in
-// fable-rough-dielectric §4, so this twin now covers the stdlib every microfacet
-// occupant links) in the local frame (identity Frame; ambient_dot = dot) — change one,
-// change both. Three checks per (inclination × roughness) config from the spec grid:
+// ggx.glsl's model math; the shared machinery it calls (glsl/core/microfacet.glsl:
+// D, Smith G₁, VNDF and the F-free reflection lobe microfacet_reflect_*, the stdlib every
+// microfacet occupant links) has its twin, and the harness, in components/materials/microfacetTwin.ts —
+// change one, change both. Three checks per (inclination × roughness) config from the spec grid:
 //   1. χ² histogram: sampled wi frequencies vs ∫pdf over each bin (32×16 hemispherical
 //      grid + a rejected-sample cell). Expected counts use adaptive per-bin refinement —
 //      plain midpoint×Δω under-resolves the roughness-0.1 lobe and fails spuriously.
@@ -19,122 +18,31 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { conductorGain, energyTable, schlickAverage } from '../microfacet_energy/build.js';
 import { microfacetEnergyData } from '../microfacet_energy/data.js';
+import {
+    type V3, type TwinSample, alphaOf, dirOf, lcg, reflectEval, reflectPdf, reflectSample, samplerConsistency,
+} from '../microfacetTwin.js';
 
-// ── The twin (local frame: n = +z) ─────────────────────────────────────────────
+// ── The model (local frame: n = +z); the lobe twin is components/materials/microfacetTwin.ts ──
 
-type V3 = [number, number, number];
-const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm = (a: V3): V3 => { const l = Math.hypot(...a); return [a[0] / l, a[1] / l, a[2] / l]; };
-
-function ggxD(h: V3, a: number): number {
-    const t = h[2] * h[2] * (a * a - 1.0) + 1.0;
-    return (a * a) / (Math.PI * t * t);
-}
-function ggxG1(v: V3, a: number): number {
-    const c = Math.abs(v[2]);
-    return (2.0 * c) / (c + Math.sqrt(a * a + (1.0 - a * a) * c * c));
-}
-function alphaOf(roughness: number): number {
-    return Math.max(1e-3, roughness * roughness);
-}
 // Scalar f0 (monochrome spectrum) — F multiplies weight and eval identically.
 function schlick(f0: number, cosOH: number): number {
     return f0 + (1.0 - f0) * Math.pow(1.0 - Math.abs(cosOH), 5.0);
 }
 
+// ggx: the lobe times Schlick's F at the lobe's half-vector cosine.
 function ggxEval(wi: V3, wo: V3, roughness: number, f0: number): number {
-    if (wi[2] * wo[2] <= 0.0) return 0.0;
-    const a = alphaOf(roughness);
-    const h = norm([wi[0] + wo[0], wi[1] + wo[1], wi[2] + wo[2]]);
-    const F = schlick(f0, dot(wo, h));
-    return F * (ggxD(h, a) * ggxG1(wi, a) * ggxG1(wo, a) / (4.0 * Math.abs(wi[2]) * Math.abs(wo[2])));
+    const l = reflectEval(wi, wo, alphaOf(roughness));
+    if (l.f === 0.0) return 0.0;
+    return schlick(f0, l.cosH) * l.f;
 }
 
 function ggxPdf(wi: V3, wo: V3, roughness: number): number {
-    if (wi[2] * wo[2] <= 0.0) return 0.0;
-    const a = alphaOf(roughness);
-    const h = norm([wi[0] + wo[0], wi[1] + wo[1], wi[2] + wo[2]]);
-    return (ggxG1(wo, a) * ggxD(h, a)) / (4.0 * Math.abs(wo[2]));
+    return reflectPdf(wi, wo, alphaOf(roughness));
 }
-
-interface TwinSample { wi: V3; weight: number; pdf: number; rejected: boolean }
 
 function ggxSample(woIn: V3, roughness: number, f0: number, u1: number, u2: number): TwinSample {
-    const side = woIn[2] < 0.0 ? -1.0 : 1.0;
-    const wo: V3 = [woIn[0] * side, woIn[1] * side, woIn[2] * side];
-    const a = alphaOf(roughness);
-    const vh = norm([a * wo[0], a * wo[1], wo[2]]);
-    const lensq = vh[0] * vh[0] + vh[1] * vh[1];
-    const T1: V3 = lensq > 0.0 ? [-vh[1] / Math.sqrt(lensq), vh[0] / Math.sqrt(lensq), 0.0] : [1, 0, 0];
-    const T2: V3 = [vh[1] * T1[2] - vh[2] * T1[1], vh[2] * T1[0] - vh[0] * T1[2], vh[0] * T1[1] - vh[1] * T1[0]];
-    const rr = Math.sqrt(u1), phi = 2.0 * Math.PI * u2;
-    const t1 = rr * Math.cos(phi);
-    let t2 = rr * Math.sin(phi);
-    const s_ = 0.5 * (1.0 + vh[2]);
-    t2 = (1.0 - s_) * Math.sqrt(Math.max(0.0, 1.0 - t1 * t1)) + s_ * t2;
-    const tz = Math.sqrt(Math.max(0.0, 1.0 - t1 * t1 - t2 * t2));
-    const nh: V3 = [
-        t1 * T1[0] + t2 * T2[0] + tz * vh[0],
-        t1 * T1[1] + t2 * T2[1] + tz * vh[1],
-        t1 * T1[2] + t2 * T2[2] + tz * vh[2],
-    ];
-    const h = norm([a * nh[0], a * nh[1], Math.max(1e-6, nh[2])]);
-    const oh = dot(wo, h);
-    const wil: V3 = [2.0 * oh * h[0] - wo[0], 2.0 * oh * h[1] - wo[1], 2.0 * oh * h[2] - wo[2]];
-    if (wil[2] <= 0.0) return { wi: woIn, weight: 0, pdf: 0, rejected: true };
-    const F = schlick(f0, oh);
-    return {
-        wi: [wil[0] * side, wil[1] * side, wil[2] * side],
-        weight: F * ggxG1(wil, a),
-        pdf: (ggxG1(wo, a) * ggxD(h, a)) / (4.0 * Math.abs(wo[2])),
-        rejected: false,
-    };
-}
-
-// ── Harness plumbing ───────────────────────────────────────────────────────────
-
-// Deterministic LCG (no Math.random in tests — reproducible failures).
-function lcg(seed: number) {
-    let s = seed >>> 0;
-    return () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 4294967296);
-}
-
-const PHI_BINS = 32, COS_BINS = 16;
-
-function binOf(wi: V3): number {
-    const row = Math.min(COS_BINS - 1, Math.floor(wi[2] * COS_BINS));
-    const phi = Math.atan2(wi[1], wi[0]);                       // [-π, π]
-    const col = Math.min(PHI_BINS - 1, Math.floor(((phi + Math.PI) / (2 * Math.PI)) * PHI_BINS));
-    return row * PHI_BINS + col;
-}
-
-function dirOf(cosT: number, phi: number): V3 {
-    const s = Math.sqrt(Math.max(0, 1 - cosT * cosT));
-    return [s * Math.cos(phi), s * Math.sin(phi), cosT];
-}
-
-/** ∫ pdf dω over one (cosθ, φ) cell — adaptive midpoint with one-level lookahead
- *  (subdivide while coarse and refined disagree): the roughness-0.1 lobe is far
- *  narrower than a bin, so fixed midpoint×Δω would fail the χ² spuriously. */
-function integrateCell(pdf: (wi: V3) => number, c0: number, c1: number, p0: number, p1: number, depth: number): number {
-    const area = (c1 - c0) * (p1 - p0);
-    const coarse = pdf(dirOf((c0 + c1) / 2, (p0 + p1) / 2)) * area;
-    if (depth >= 10) return coarse;
-    const cm = (c0 + c1) / 2, pm = (p0 + p1) / 2;
-    const fine = (area / 4) * (
-        pdf(dirOf((c0 + cm) / 2, (p0 + pm) / 2)) + pdf(dirOf((cm + c1) / 2, (p0 + pm) / 2)) +
-        pdf(dirOf((c0 + cm) / 2, (pm + p1) / 2)) + pdf(dirOf((cm + c1) / 2, (pm + p1) / 2)));
-    if (Math.abs(fine - coarse) <= 1e-4 * Math.abs(fine) + 1e-12) return fine;
-    return (
-        integrateCell(pdf, c0, cm, p0, pm, depth + 1) + integrateCell(pdf, cm, c1, p0, pm, depth + 1) +
-        integrateCell(pdf, c0, cm, pm, p1, depth + 1) + integrateCell(pdf, cm, c1, pm, p1, depth + 1));
-}
-
-/** χ² critical value via Wilson–Hilferty, z = 3.0902 ⇒ p ≈ 0.001. */
-function chi2Crit(dof: number): number {
-    const z = 3.0902;
-    const t = 1 - 2 / (9 * dof) + z * Math.sqrt(2 / (9 * dof));
-    return dof * t * t * t;
+    const l = reflectSample(woIn, alphaOf(roughness), u1, u2);
+    return { wi: l.wi, weight: schlick(f0, l.cosH) * l.weight, pdf: l.pdf, rejected: l.pdf === 0 };
 }
 
 // ── The spec grid (validation-scenes §6): cosθo ∈ {0.9, 0.5, 0.1} × r ∈ {0.1, 0.4, 0.8} ──
@@ -149,52 +57,15 @@ describe('GGX §11.3 pdf–histogram consistency (TS twin of ggx.glsl)', () => {
         for (const r of ROUGHNESSES) {
             it(`cosθo=${cosO} roughness=${r}: histogram matches pdf (χ²), triple + pdf agreement`, () => {
                 const wo = dirOf(cosO, 0);
-                const rand = lcg(1234567 + cosO * 1000 + r * 100);
-                const counts = new Float64Array(PHI_BINS * COS_BINS);
-                let rejects = 0;
-                let worstTriple = 0, worstPdfAgree = 0;
-
-                for (let i = 0; i < N; i++) {
-                    const s = ggxSample(wo, r, F0, rand(), rand());
-                    if (s.rejected) { rejects++; continue; }
-                    counts[binOf(s.wi)]++;
-                    // Per-sample checks on a deterministic 1-in-64 slice (cost control):
-                    if ((i & 63) === 0) {
-                        const ev = ggxEval(s.wi, wo, r, F0) * Math.abs(s.wi[2]);
-                        const lhs = s.weight * s.pdf;
-                        worstTriple = Math.max(worstTriple, Math.abs(lhs - ev) / Math.max(ev, 1e-12));
-                        const q = ggxPdf(s.wi, wo, r);
-                        worstPdfAgree = Math.max(worstPdfAgree, Math.abs(q - s.pdf) / Math.max(s.pdf, 1e-12));
-                    }
-                }
-
+                const c = samplerConsistency(N, lcg(1234567 + cosO * 1000 + r * 100),
+                    (u1, u2) => ggxSample(wo, r, F0, u1, u2),
+                    (wi) => ggxEval(wi, wo, r, F0) * Math.abs(wi[2]),
+                    (wi) => ggxPdf(wi, wo, r));
                 // 2 & 3 — exact identities up to float noise (h reconstruction in the pdf).
-                expect(worstTriple).toBeLessThan(1e-4);
-                expect(worstPdfAgree).toBeLessThan(1e-3);
-
+                expect(c.worstTriple).toBeLessThan(1e-4);
+                expect(c.worstPdfAgree).toBeLessThan(1e-3);
                 // 1 — χ² against integrated expected counts, small-E bins pooled.
-                const pdfW = (wi: V3) => ggxPdf(wi, wo, r);
-                let chi2 = 0, cells = 0, pooledE = 0, pooledO = 0, totalE = 0;
-                for (let row = 0; row < COS_BINS; row++) {
-                    for (let col = 0; col < PHI_BINS; col++) {
-                        const E = N * integrateCell(pdfW,
-                            row / COS_BINS, (row + 1) / COS_BINS,
-                            -Math.PI + (col * 2 * Math.PI) / PHI_BINS,
-                            -Math.PI + ((col + 1) * 2 * Math.PI) / PHI_BINS, 0);
-                        totalE += E;
-                        const O = counts[row * PHI_BINS + col];
-                        if (E < 5) { pooledE += E; pooledO += O; continue; }
-                        chi2 += ((O - E) * (O - E)) / E;
-                        cells++;
-                    }
-                }
-                const rejectE = Math.max(0, N - totalE);
-                pooledE += rejectE < 5 ? rejectE : 0;
-                pooledO += rejectE < 5 ? rejects : 0;
-                if (rejectE >= 5) { chi2 += ((rejects - rejectE) ** 2) / rejectE; cells++; }
-                if (pooledE >= 5) { chi2 += ((pooledO - pooledE) ** 2) / pooledE; cells++; }
-                expect(chi2, `χ²=${chi2.toFixed(1)} over ${cells} cells (crit ${chi2Crit(cells - 1).toFixed(1)})`)
-                    .toBeLessThan(chi2Crit(cells - 1));
+                expect(c.chi2, `χ²=${c.chi2.toFixed(1)} over ${c.cells} cells (crit ${c.crit.toFixed(1)})`).toBeLessThan(c.crit);
             });
         }
     }
@@ -207,6 +78,54 @@ describe('GGX §11.3 pdf–histogram consistency (TS twin of ggx.glsl)', () => {
             const r = 0.05 + 0.9 * rand();
             const f = ggxEval(a, b, r, F0), g = ggxEval(b, a, r, F0);
             expect(Math.abs(f - g)).toBeLessThan(1e-9 * Math.max(1, f));
+        }
+    });
+});
+
+// ── The F-free lobe's contract with the models that wrap it ─────────────────────────────
+// A reflection-only microfacet model is F(cos_h) times the lobe, with an energy gain read at
+// cos_o. Its eval and sample agree only if the lobe's sample reports, for the direction it
+// drew, the same cos_h and cos_o its eval reports for that direction.
+
+describe('F-free GGX reflection lobe (microfacet_reflect_*)', () => {
+    it('sample and eval report the same Fresnel and gain arguments; dead samples weigh 0', () => {
+        const rand = lcg(7);
+        let live = 0, dead = 0;
+        for (let i = 0; i < 20000; i++) {
+            const side = rand() < 0.5 ? -1 : 1;
+            const d = dirOf(0.02 + 0.98 * rand(), 2 * Math.PI * rand());
+            const wo: V3 = [d[0], d[1], d[2] * side];
+            const a = alphaOf(0.05 + 0.95 * rand());
+            const s = reflectSample(wo, a, rand(), rand());
+            if (s.pdf === 0) {
+                dead++;
+                expect(s.weight).toBe(0);
+                expect(s.wi).toEqual(wo);
+                expect(Number.isFinite(s.cosH) && Number.isFinite(s.cosO)).toBe(true);
+                continue;
+            }
+            live++;
+            expect(s.wi[2] * wo[2]).toBeGreaterThan(0);
+            const e = reflectEval(s.wi, wo, a);
+            expect(Math.abs(e.cosH - s.cosH)).toBeLessThan(1e-9);
+            expect(Math.abs(e.cosO - s.cosO)).toBeLessThan(1e-12);
+            expect(Math.abs(e.f * Math.abs(s.wi[2]) - s.weight * s.pdf)).toBeLessThan(1e-6 * e.f * Math.abs(s.wi[2]));
+        }
+        expect(live).toBeGreaterThan(0);
+        expect(dead).toBeGreaterThan(0);
+    });
+
+    it('eval is 0 across the surface', () => {
+        expect(reflectEval([0, 0.6, 0.8], [0, 0.6, -0.8], 0.3).f).toBe(0);
+        expect(reflectPdf([0, 0.6, 0.8], [0, 0.6, -0.8], 0.3)).toBe(0);
+    });
+
+    it('ggx.glsl reaches D, G₁ and VNDF sampling only through the lobe', () => {
+        const glsl = readFileSync(new URL('./ggx.glsl', import.meta.url), 'utf8');
+        const code = glsl.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
+        expect(code).not.toMatch(/microfacet_(D|G1|sample_vndf|to_local|from_local)\s*\(/);
+        for (const fn of ['microfacet_reflect_eval', 'microfacet_reflect_pdf', 'microfacet_reflect_sample']) {
+            expect(code).toContain(`${fn}(`);
         }
     });
 });

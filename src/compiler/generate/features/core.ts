@@ -145,8 +145,8 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         blocks.push({ origin: `components/quotient/${q.kind}/${q.kind}.glsl`, source: q.glsl });
     }
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).
-    for (const id of plan.program.spectrumKinds) {
-        const helpers = kindById(id).glsl;
+    for (const { id, values } of plan.program.spectrumKinds) {
+        const helpers = kindById(id).glsl?.(values);
         if (helpers !== undefined) blocks.push(helpers);
     }
     // Microfacet stdlib (fable-rough-dielectric §4): D / Smith G₁ / VNDF / the frame maps,
@@ -154,11 +154,13 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // program with no microfacet occupant carries none of it, and one with several
     // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
     // Then the energy gains those models call (materials/microfacet_energy): the table
-    // lookups under 'energy-compensated', otherwise a gain of 1 for each kind present.
+    // lookups under 'energy-compensated', otherwise a gain of 1 for each kind present. A
+    // model declaring energy 'none' or 'not-built' calls no gain, so it links neither.
     const textures = [...(color.textures ?? [])];
-    const gains = [...new Set(plan.program.materials.models.flatMap((m) => MATERIAL_MODELS[m]?.microfacet?.energy ?? []))];
+    const microfacet = plan.program.materials.models.flatMap((m) => MATERIAL_MODELS[m]?.microfacet ?? []);
+    const gains = [...new Set(microfacet.flatMap(({ energy }) => energy === 'conductor' || energy === 'dielectric' ? [energy] : []))];
+    if (microfacet.length > 0) blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
     if (gains.length > 0) {
-        blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
         if (plan.program.measurement.microfacet === 'energy-compensated') {
             blocks.push({ origin: 'components/materials/microfacet_energy/microfacet_energy.glsl', source: microfacetEnergyGLSL });
             textures.push({ name: 'u_microfacetEnergy', source: `extern:${microfacetEnergyAsset.id}`, precision: 'highp' });

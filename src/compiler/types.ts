@@ -336,7 +336,7 @@ export interface TextureValue {
 export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue | TextureValue;
 
 /** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
-export type NamedSpectrumValue = BlackbodyValue | GaussianValue;
+export type NamedSpectrumValue = BlackbodyValue | GaussianValue | MeasuredValue;
 
 /** Authored temperature and reference brightness, preserved through scene planning.
  * RGB evaluates the signed projection of the same normalized Planck spectrum. */
@@ -355,10 +355,19 @@ export interface GaussianValue {
     gaussian: { center: number; width: number; peak: number; floor?: number };
 }
 
+/** A measured spectrum, by table name (color/spectra/measured/README.md): a metal's optical
+ *  constant (`metal-<Ag|Al|Au|Cu|CuZn>-<eta|k>`), a ColorChecker reflectance
+ *  (`colorchecker-<patch>`) or a CIE illuminant (`illuminant-<A|D65|FL2|FL11|LED-B3>`). Each table
+ *  goes in settings of its own role. `scale`, on illuminants only, is the reference CIE Y of the
+ *  emission (default 1), in renderer-relative units. */
+export interface MeasuredValue {
+    measured: { table: string; scale?: Value<number> };
+}
+
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
  * minus GlslExpression). The Model B split surface for radiometric values that are read at a
  * point but never vary spatially: light emission and the constant-env color. */
-export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
+export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
 export type MaterialProperty = ScalarProperty | SpectrumProperty | SpectralIndex;

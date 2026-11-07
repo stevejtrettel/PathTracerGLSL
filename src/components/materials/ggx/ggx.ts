@@ -18,7 +18,7 @@ export const ggxDescriptor: MaterialModelDescriptor = {
     ],
     // alpha = max(1e-3, roughness²), the microfacet models' shared derived field.
     derived: [microfacetAlpha],
-    // D / G1 / VNDF / frame maps from glsl/core/microfacet.glsl; the conductor energy gain.
+    // The F-free reflection lobe of glsl/core/microfacet.glsl; the conductor energy gain.
     microfacet: { energy: 'conductor' },
     albedo: { row: 'f0' },   // reflectance at normal incidence
     capabilities: {

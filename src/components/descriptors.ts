@@ -42,13 +42,25 @@ export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<
  *  (reflectance, a fraction in [0,1]; coefficient, a rate per unit length). */
 export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
 
-/** A spectrum setting's role: a radiometric role, or a refractive index. The role belongs to the
- *  setting, never to the value in it; it decides how RGB converts, and the allowed domain. */
-export type SpectrumRole = RadiometricRole | 'index';
+/** A spectrum setting's role: a radiometric role, a refractive index, or an optical constant.
+ *  The role belongs to the setting, never to the value in it; it decides how RGB converts, and
+ *  the allowed domain.
+ *    index   — a real refractive index, one number per path (a dispersive index forces the
+ *              one-time hero collapse);
+ *    optical — a dimensionless optical constant (a metal's η or κ), one number per wavelength
+ *              lane, never collapsed. */
+export type SpectrumRole = RadiometricRole | 'index' | 'optical';
 
-/** Whether a role reads light or a multiplier of light, as opposed to an index. */
+/** Whether a role reads light or a multiplier of light, as opposed to an index or an optical
+ *  constant. */
 export function isRadiometric(role: SpectrumRole | undefined): role is RadiometricRole {
-    return role !== undefined && role !== 'index';
+    return role !== undefined && role !== 'index' && role !== 'optical';
+}
+
+/** Whether a setting of this role is a Spectrum evaluated per wavelength lane: the radiometric
+ *  roles and the optical constants. */
+export function isLaneSpectrum(role: SpectrumRole | undefined): role is RadiometricRole | 'optical' {
+    return isRadiometric(role) || role === 'optical';
 }
 
 /**
@@ -123,13 +135,16 @@ export interface MaterialModelDescriptor {
     /** DERIVED fields: join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
     /** Present when this model is written against glsl/core/microfacet.glsl (D / Smith G₁ /
-     *  VNDF / the frame maps): the include gate for that library, declared rather than a
+     *  VNDF / the F-free reflection lobe / the frame maps): the include gate for that library, declared rather than a
      *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
      *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
      *  (materials/microfacet_energy): `microfacet_conductor_gain` or
-     *  `microfacet_dielectric_gain`. Under measurement.microfacet 'single-scattering' the
-     *  compiler emits that gain as the constant 1. */
-    microfacet?: { energy: 'conductor' | 'dielectric' };
+     *  `microfacet_dielectric_gain`; 'none' for a model with no GGX lobe to compensate (sheen
+     *  reads only the frame maps); 'not-built' for a model whose GGX lobe has no gain yet
+     *  (rough_conductor: its F_avg is per lane), which measurement.microfacet
+     *  'energy-compensated' rejects rather than render it single-scattering. Under
+     *  'single-scattering' the compiler emits a gain as the constant 1. */
+    microfacet?: { energy: 'conductor' | 'dielectric' | 'none' | 'not-built' };
     /** The model's albedo for the albedo guide (components/aov): the surface's color
      *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
      *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`

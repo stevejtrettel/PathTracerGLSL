@@ -380,6 +380,168 @@ point `q`) is deferred to its own plan.
 - **Digest**: 267 of 275 scenes identical. The 7 scenes with material expressions differ by
   exactly the perlin block and its source-map lines. `procedural-textures` is new.
 
+## 2026-11-07 — Measured colors: ColorChecker reflectances and CIE illuminants
+
+The photorealism step "measured-colors": the `measured` kind now also covers the reflectance and
+emission roles, so scenes can use real measured surface colors and real light spectra.
+
+**What:**
+- `unitLuminanceStandIn(g)` (color/spectra/standIn.ts): blackbody's projection of an emission
+  spectrum at unit reference Y, now shared (separate refactor commit; digest identical).
+- 24 ColorChecker Classic reflectances (BabelColor average, 380–730 nm at 10 nm) and five CIE
+  illuminants (A and D65 every 5 nm over 360–830 nm, FL2, FL11 and LED-B3 at 5 nm over 380–780 nm)
+  in color/spectra/measured/colors.ts, written by tools/spectral/measured-colors.mjs from the
+  downloaded source files (source URLs in the file; each illuminant checked against
+  colour-science's copy).
+- The measured value is spelled `{ measured: { table, scale? } }` (was `{ measured: 'name' }`),
+  like every other named kind. Each table has its own role (metal → optical, patch → reflectance,
+  illuminant → emission); another role, an unknown table or a `scale` on a non-emission table is
+  an error. An illuminant is normalized to unit reference CIE Y and multiplied by `scale` (a
+  constant or a slider), the blackbody convention; D65 at scale 1 is RGB white.
+- A table not reaching 360 or 830 nm holds its end values (pbrt-v4's FromInterleaved).
+- RGB stand-ins: a patch's D65 projection (within 0.0020 of colour-science for all 24); an
+  illuminant's unit-luminance RGB times scale (D65 (1, 1, 1); A matches Planck at 2856 K).
+- Light tree: a measured illuminant on a light-table row keeps its table index and
+  scale × normalization in the row header (packed code 2); the reader chooses among the
+  program's illuminants.
+- Kind contract: a `fields` entry may be a name (a string); `validate` is given the slot's role;
+  `packed.read` is given the kind's values in the program and is null when none can sit in a
+  light row. `SpectrumValue` (light emission, sky color) takes any named kind.
+
+**Verified:** tests/components/measured.test.ts (patches against colour-science 0.4.4 within
+0.0025, measured worst 0.0020; normalizations against an independent quadrature, 1e-6; D65 white
+to 1e-5; A against Planck, 1e-4; search twin; linkage; light-table rows; validation),
+tests/compiler/measuredColors.test.ts, new spectrumDiagnostics cases. Digest: the 288 existing
+synchronous scenes identical; two witness scenes added. Witnesses `spectral-colorchecker-d65`
+(orange patch under a measured D65 sky, exact) and `spectral-measured-lamps` (A and FL11 quad
+lamps, power vs tree, NEE vs MIS).
+
+## 2026-11-07 — Measured metals: `conductor`, `rough_conductor`, the `optical` role, the `measured` kind
+
+Integration step 12 of the photorealism batch (conductor plan and review; owner decision P1/Q3,
+provisional). Single scattering only.
+
+**What:**
+- `d65StandIn(g)` (color/spectra/standIn.ts): the Gaussian kind's daylight projection, now shared
+  (separate refactor commit; digest identical).
+- Spectrum role `optical`: a metal's η or κ, a Spectrum per wavelength lane, never
+  hero-collapsed; lifts like a coefficient (identity in RGB, exact for gray values in spectral
+  programs). An optical slot takes a constant, a scalar `{param}` (a float slider on a vec3
+  uniform) or a named kind; not an expression, a vec3 slider or a per-instance attribute. In a
+  spectral program an RGB triple there is an error (the spectral model's third limitation).
+- Spectrum kind `measured`: `{ measured: 'metal-Au-eta' }` and the other nine pbrt-v4 tables
+  (Ag, Al, Au, Cu, CuZn; eta and k), copied verbatim with source URL, commit and line numbers;
+  Apache-2.0 text at public/licenses/pbrt-v4.txt. Spectral programs evaluate a table per lane
+  (binary search over const arrays, linear interpolation); RGB programs use its d65StandIn.
+  The kind contract's `glsl` became a function of the values in use, so a program links one
+  helper per table it names; `ProgramDescription.spectrumKinds` records each kind with its
+  values.
+- `conductor_fresnel` in glsl/core/math.glsl (Mitsuba 3's real form, one clamped root; reference
+  implementations §7c), TS twin materials/conductor/fresnel.ts.
+- Materials `conductor` (delta, weight F) and `rough_conductor` (the shared F-free GGX lobe times
+  F(|ωₒ·h|)), rows `eta` (default 0) and `k` (default 1, > 0): the defaults are a perfect mirror.
+  `rough_conductor` declares `microfacet: { energy: 'not-built' }`;
+  `measurement.microfacet: 'energy-compensated'` rejects it.
+- The GGX lobe twin and the §11.3 harness moved from ggx.test.ts to
+  materials/microfacetTwin.ts, so ggx and rough_conductor tests share one copy.
+
+**Measured:** rough_conductor.test.ts: twin vs pbrt's complex FrComplex ≤ 1e-12 (five metals,
+360–830 nm), float32 within 4e-6 of double, limits, 0 ≤ F ≤ 1, χ²/triple/pdf for gold (450 and
+650 nm), aluminium and F ≡ 1. Witnesses (SwiftShader, 14/14): `conductor-gold` spectral reads
+(1.0219, 0.7822, 0.3435) at 0° and (0.9939, 0.8056, 0.4358) at 70° against (1.0218, 0.7823,
+0.3435) and (0.9939, 0.8056, 0.4359); RGB (0.9747, 0.8034, 0.3560) and (0.9713, 0.8171, 0.4449),
+exact; `conductor-perfect` ⇄ `-ref` Δmean 0.00%, rmse 0.00% on pt-mis, pt-nee and pt;
+`veach-metals` mis ≡ nee Δmean 1.10% (RGB), 0.52% (spectral), pt tripwire 1.25%. Reruns,
+15/15: `mirror`, `veach-mis`, `furnace`, `eta`, `spectral-mirror`, `spectral-materials`,
+`spectral-gaussian-plane`; `npm run witness:color` 17 cases pass, 5 defects rejected. Digest: every
+synchronous suite scene's shader text differs only by math.glsl's new function and two comment
+pointers (microfacet.glsl, ggx.glsl), and the rest only by source-map line numbers; closures,
+uniforms, parameters, scene data and warnings identical. RGB gold is slightly worse than
+Schlick with the right f0 (worst 0.047 against 0.029); aluminium much better (0.002 against
+0.118).
+
+**Not built:** the energy gain for rough_conductor (F_avg per lane), expression or per-instance
+η/κ, correction for the outside medium's index.
+
+## 2026-11-07 — The F-free GGX reflection lobe in microfacet.glsl (refactor)
+
+Integration step 11 of the photorealism batch (conductor review, item 2): the prerequisite for
+`rough_conductor`, so that it and `ggx` differ only in their Fresnel line instead of copying the
+lobe.
+
+**What:** `glsl/core/microfacet.glsl` gains `microfacet_reflect_eval` (f/F, with the Fresnel
+argument |ωₒ·h| and the energy-gain argument |cos θₒ| as out parameters; 0 across the surface),
+`microfacet_reflect_pdf`, and `microfacet_reflect_sample` (returning `MicrofacetReflectSample`:
+wi, the F-free weight G₁(ωᵢ), pdf, cos_h, cos_o; a dead sample has weight 0 and pdf 0).
+`ggx.glsl` now multiplies Schlick's F and the conductor energy gain into these and does nothing
+else. The TS twin in ggx.test.ts has the same split, plus tests that the lobe's sample and eval
+report the same cos_h and cos_o for the drawn direction and that ggx.glsl reaches D, G₁ and VNDF
+sampling only through the lobe. Frame cases `rough-furnace` and `mirror` added to
+`npm run frames` (separate commit).
+
+**Measured:** `npm run frames -- compare` before/after: 26 of 26 pictures bit-identical (12
+cases, including `ggx` = veach-mis under MIS, `rough-furnace`, `mirror`, `spectral`). Digest:
+the 28 scenes that link microfacet.glsl differ, and in them only the shader text and source
+maps; removing the old and new texts of microfacet.glsl and ggx.glsl leaves all 67 differing
+shaders identical. `ms-furnace` (energy-compensated ggx and rough glass, pt / pt-nee / pt-mis /
+spectral): 34 of 34 checks pass.
+
+## 2026-11-07 — Sheen: fuzz over a Lambertian base (`sheen`)
+
+Integration step 10 of the photorealism batch (small-materials plan, sheen section), with the
+review's must-fix items applied.
+
+**What:** a new material model `sheen`: OpenPBR's fuzz layer over a Lambertian base, the fuzz
+lobe being Zeltner, Burley and Chiang's linearly transformed cosine (transcribed from MaterialX
+`mx_microfacet_sheen.glsl`). With p = W·E(μ_o), f = c·p·D/μ_i + (1 − p)·ρ/π. Rows: `albedo` (ρ),
+`sheen_color` (c), `sheen_weight` (W, in [0, 1]) and `sheen_roughness` (in [0, 1]); the fits read
+the derived `sheen_r` = roughness clamped to [0.01, 1], which has a per-hit form, so the
+roughness may vary over the surface. The sampler mixes the LTC lobe (probability p) and the
+cosine lobe, with the exact mixture pdf; the weight (c·p·g + ρ(1 − p))/(p·g + 1 − p) is ρ when
+c = ρ. D depends only on the azimuth relative to ω_o, so no tangent field is needed (works on
+SDFs). Not reciprocal (E depends on μ_o); every unidirectional technique evaluates f(·|ω_o), so
+the estimators agree. Same in RGB and spectral programs.
+- The descriptor fact `microfacet: { energy }` gains `'none'`: sheen reads only the frame maps
+  of glsl/core/microfacet.glsl and calls no energy gain, so a sheen-only program links that
+  library and nothing of microfacet_energy under either `measurement.microfacet`.
+- sheen.md (model, sampling, energy identity, non-reciprocity), sheen.test.ts (TS twin),
+  tests/compiler/sheen.test.ts, one registry line, README occupant list, microfacet.glsl header
+  comment (names sheen as a present occupant).
+- Witnesses `sheen-furnace` (furnace-sky's sphere, c = ρ = 0.4: reads 0.4 over the sphere,
+  grazing rim included) and `sheen-fuzz` (fuzz alone, ρ = 0, orthographic camera over a convex
+  roof at μ_o = 0.2 and 0.5, four bands reading W·c·E(μ_o, r)); keys pt-nee, pt-mis, pt and
+  spectral pt-mis.
+
+**Measured:**
+- TS twin: E clamped into [0, 1] (raw minimum −2e-5, maximum 0.745); GLSL constants equal
+  MaterialX's; the LTC sampler's density equals D to 1e-9; ∫D = 1 to 1e-3; χ² of the mixture
+  sampler passes at μ_o ∈ {1, 0.5 (wo below the frame), 0.1} × r ∈ {0.05, 0.3, 0.5, 1} ×
+  W ∈ {0.3, 1}, and fails when the azimuth turn or the sign of b⁻¹ is broken; triple and pdf
+  agreement < 1e-12; frame rotation invariance < 1e-9; energy identity by quadrature (1e-3) and
+  by mean sample weight (3σ); c = ρ weights equal ρ to 1e-14; W = 0 is Lambert.
+- Witness `sheen-furnace` (384 spp, tolerance 0.006): sphere 0.3997, 0.4000, 0.4000 on keys 1–3,
+  (0.3998, 0.3998, 0.4000) spectral; sky 1.0000 (spectral 0.9996–1.0000).
+- Witness `sheen-fuzz` (256 spp, tolerance 0.006), expected 0.4295 / (0.3216, 0.1608, 0.0804) /
+  0.4957 / 0.3071: pt-nee 0.4282 / (0.3220, 0.1610, 0.0805) / 0.4951 / 0.3069; pt-mis 0.4292 /
+  (0.3217, 0.1609, 0.0804) / 0.4956 / 0.3071; pt 0.4296 / (0.3217, 0.1608, 0.0804) / 0.4958 /
+  0.3071; spectral pt-mis (gray bands) 0.4291–0.4292 / 0.4957–0.4960 / 0.3069–0.3072.
+- Digest: no existing scene's output changes except the microfacet.glsl comment text (26
+  scenes with a microfacet model, shader text and source map only; with that comment
+  reverted, 282 of 282 existing scenes are identical); the two new scenes are added.
+
+## 2026-11-07 — Fix: a uv-reading material on a driven SDF object crashed the compiler
+
+`keepsLocalFrame` (compiler/plan/dataTenants.ts) lowered the object's transform as a constant
+similarity, and the SDF branch of `planScene` asks it for every object, driven or not. A
+`checker` (or any expression material) on a driven, rotated SDF shape with a uv chart threw
+"driven transform reached the constant lowering". The predicate now answers false for a driven
+transform: a driven object is never folded, and its arm already follows its rigid frame (the
+analytic branch and the table adapter test `isDrivenTransform` first and were unaffected).
+Found when the registry kitchen-sink compile (glsl-compile.test.ts) assigned `checker` to a
+driven SDF object after a new material model shifted its material rotation. Tests: the
+predicate for a driven sphere, and a checker on a driven SDF sphere compiles. No suite scene
+used the combination, so no compiled output changes.
+
 ## 2026-11-07 — Thin glass sheets (`thin_dielectric`)
 
 Integration step 8 of the photorealism batch (small-materials plan, thin dielectric section),

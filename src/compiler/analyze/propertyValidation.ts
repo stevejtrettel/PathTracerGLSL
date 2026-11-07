@@ -12,6 +12,9 @@
 // A material row that feeds a derived field computed only on the host (MaterialDerivedSpec.fn,
 // no per-hit form) takes only a constant or a slider: the derived value is computed from the
 // row's numbers, and a formula or a named kind has no numbers there.
+// An optical row (a metal's η, κ) takes a constant, a scalar slider (a float widget) or a named
+// kind: a formula's RGB result and a colored slider have no per-wavelength reading in a spectral
+// program, and one rule serves both color models.
 // A formula's numbers are not known before the render; its domain is the author's contract.
 
 import { GLSL_EXPRESSION_KEYS, isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
@@ -64,6 +67,10 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
                     report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);
                     continue;
                 }
+                if (field.role === 'optical' && (isGlslExpression(value) || (isValueParam(value as never) && Array.isArray((value as { default?: unknown }).default)))) {
+                    report([`${label} is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not ${isGlslExpression(value) ? 'an expression' : 'a vec3 {param}'}`]);
+                    continue;
+                }
                 report(valueProblems(value, rowSetting(field), label));
             }
         }
@@ -114,9 +121,10 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
     const beside = unknownKeysProblem(value, [kind.id]);
     if (beside !== null) return [`${label}: the ${kind.label} value has ${beside}`];
     if (setting.role === undefined || !kind.roles.includes(setting.role)) {
-        const role = kind.roles[0];
-        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role} form`];
+        const roles = kind.roles.length === 1 ? kind.roles[0] : `${kind.roles.slice(0, -1).join(', ')} or ${kind.roles[kind.roles.length - 1]}`;
+        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(roles) ? 'an' : 'a'} ${roles} form`];
     }
+    const role = setting.role;
     const problems: string[] = [];
     const fields = kind.fields;
     if (fields !== undefined) {
@@ -131,10 +139,14 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
         for (const [name, field] of Object.entries(fields)) {
             const number = (numbers as Record<string, unknown>)[name];
             if (number === undefined && field.optional) continue;
+            if (field.name) {
+                if (typeof number !== 'string') problems.push(`${label}: ${kind.label} ${name} must be a name`);
+                continue;
+            }
             problems.push(...numberProblems(number, field.triple ? 'vec3' : 'scalar', field.domain, `${label}: ${kind.label} ${name}`, field.slider ?? false));
         }
     }
-    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message));
+    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message), role);
     return problems;
 }
 
