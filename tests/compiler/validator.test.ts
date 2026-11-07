@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
+import { PRIMITIVES } from '../../src/components/geometry/index.js';
 import type { SceneDescription, RenderStrategy, PrimitiveObject, GlslExpression } from '../../src/compiler/types.js';
 
 function baseScene(): SceneDescription {
@@ -421,6 +422,37 @@ describe('Validator — hardening pack (H1)', () => {
             s.objects.push({ type: 'sphere', parameters: { center: [0, 0, 0], radius: 0 }, material: 'm' });
         });
         expect(bag.getErrors().some(e => /sphere.*radius/.test(e.message))).toBe(true);
+    });
+
+    it('rejects a NaN or infinite camera position/target (the strategy is outside the scene finiteness sweep)', () => {
+        for (const bad of [Number.NaN, Infinity, -Infinity]) {
+            for (const field of ['position', 'target'] as const) {
+                const bag = run((_s, st) => {
+                    st.measurement.camera = { ...st.measurement.camera, position: [0, 0, 5], target: [0, 0, 0], [field]: [0, bad, 0] };
+                });
+                expect(bag.getErrors().some(e => e.message === `measurement.camera.${field} must be a vec3 of finite numbers`)).toBe(true);
+            }
+        }
+    });
+
+    it('rejects a non-finite transform position and rotation axis', () => {
+        const pos = run(s => { (s.objects[0] as PrimitiveObject).transform = { position: [0, Number.NaN, 0] }; });
+        expect(pos.getErrors().some(e => /transform\.position must be a vec3 of finite numbers/.test(e.message))).toBe(true);
+        const axis = run(s => { (s.objects[0] as PrimitiveObject).transform = { rotation: { axis: [0, Infinity, 0], angle: 1 } }; });
+        expect(axis.getErrors().some(e => /rotation axis must be a nonzero vec3 of finite numbers/.test(e.message))).toBe(true);
+    });
+
+    it("runs a primitive's coupled rules only on finite rows; a NaN vec3 row gets the shape error", () => {
+        const spy = vi.spyOn(PRIMITIVES.quad as { validateValues(v: unknown): string[] }, 'validateValues');
+        try {
+            const bag = run(s => {
+                s.objects.push({ type: 'quad', parameters: { corner: [0, 0, 0], edge1: [1, 0, 0], edge2: [0, Number.NaN, 1] }, material: 'm' });
+            });
+            expect(spy).not.toHaveBeenCalled();
+            expect(bag.getErrors().some(e => /parameter 'edge2' must be a vec3 of finite numbers/.test(e.message))).toBe(true);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });
 

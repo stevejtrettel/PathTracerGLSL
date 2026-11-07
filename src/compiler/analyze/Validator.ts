@@ -29,7 +29,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
+import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain, isFiniteVec3 } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -788,7 +788,7 @@ export function validate(
             const numeric = p.shape === 'value-number' && isValueParam(v) ? (v as { default?: unknown }).default : v;
             const shapeOk =
                 p.shape === 'enum' ? typeof v === 'string' && (p.values ?? []).includes(v)
-                : p.shape === 'vec3' ? isVec3(v)
+                : p.shape === 'vec3' ? isFiniteVec3(v)
                 : typeof numeric === 'number' && Number.isFinite(numeric);
             if (!shapeOk) {
                 const want = p.shape === 'enum' ? `one of ${(p.values ?? []).join(' | ')}`
@@ -836,13 +836,13 @@ export function validate(
     {
         const cam = strategy.measurement.camera;
         for (const field of ['position', 'target'] as const) {
-            if (cam[field] !== undefined && !isVec3(cam[field])) {
+            if (cam[field] !== undefined && !isFiniteVec3(cam[field])) {
                 bag.error('invalid-setting',
                     `measurement.camera.${field} must be a vec3 of finite numbers`)
                     .add();
             }
         }
-        if (isVec3(cam.position) && isVec3(cam.target)
+        if (isFiniteVec3(cam.position) && isFiniteVec3(cam.target)
             && Math.hypot(cam.position[0] - cam.target[0], cam.position[1] - cam.target[1], cam.position[2] - cam.target[2]) < 1e-8) {
             bag.error('invalid-setting',
                 `measurement.camera position and target coincide — the look-at frame is degenerate (no view direction)`)
@@ -1335,7 +1335,7 @@ export function validate(
 
         if (t.position !== undefined) {
             const pos = isValueParam(t.position) ? t.position.default : t.position;
-            if (pos !== undefined && !isVec3(pos)) {
+            if (pos !== undefined && !isFiniteVec3(pos)) {
                 bag.error('invalid-transform', `Object ${i}: transform.position${isValueParam(t.position) ? ' default' : ''} must be a vec3 of finite numbers`)
                     .withOriginal('scene', [`objects[${i}]`, `transform.position`])
                     .add();
@@ -1473,7 +1473,7 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
         const rowsOk = desc.params.every((s) => {
             const v = obj.parameters[s.name];
             if (v === undefined) return !s.required;
-            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isFiniteVec3(v);
         });
         if (rowsOk) {
             // RESOLVED values (fable-sdf-contract §3's pin): a rule reading an
@@ -1532,7 +1532,7 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
         const rowsWellFormed = schema.every((s) => {
             const v = params[s.name];
             if (v === undefined) return !s.required;
-            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isVec3(v);
+            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isFiniteVec3(v);
         });
         const mb = desc.marchBound;
         if (rowsWellFormed && mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
@@ -1615,7 +1615,7 @@ function validateRotation(rotation: unknown, index: number, bag: DiagnosticBag):
     }
     if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
         const aa = rotation as { axis: unknown; angle: unknown };
-        if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < AXIS_DEGENERATE_LENGTH) {
+        if (!isFiniteVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < AXIS_DEGENERATE_LENGTH) {
             bag.error('invalid-transform', `Object ${index}: rotation axis must be a nonzero vec3 of finite numbers (the axis is always constant — drive the angle)`)
                 .withOriginal('scene', at('.axis')).add();
         }
@@ -1688,7 +1688,7 @@ function validateScale(scale: unknown, index: number, bag: DiagnosticBag): void 
 function placementProblem(t: unknown): string | null {
     if (t === null || typeof t !== 'object') return 'a placement must be a transform { position?, rotation?, scale? }';
     const { position, rotation, scale } = t as { position?: unknown; rotation?: unknown; scale?: unknown };
-    if (position !== undefined && !isVec3(position)) return 'position must be a vec3 of finite numbers';
+    if (position !== undefined && !isFiniteVec3(position)) return 'position must be a vec3 of finite numbers';
     if (scale !== undefined) {
         const problem = scaleProblem(scale);
         if (problem === 'nonuniform') return 'scale must be one number (a similarity has one scale; nonuniform scale is not a transform)';
@@ -1701,7 +1701,7 @@ function placementProblem(t: unknown): string | null {
             if (problem === 'degenerate') return 'the quaternion rotation is degenerate (norm ≈ 0)';
         } else if (typeof rotation === 'object' && rotation !== null && 'axis' in rotation && 'angle' in rotation) {
             const { axis, angle } = rotation as { axis: unknown; angle: unknown };
-            if (!isVec3(axis) || Math.hypot(...(axis as Vec3)) < AXIS_DEGENERATE_LENGTH) return 'the rotation axis must be a nonzero vec3 of finite numbers';
+            if (!isFiniteVec3(axis) || Math.hypot(...(axis as Vec3)) < AXIS_DEGENERATE_LENGTH) return 'the rotation axis must be a nonzero vec3 of finite numbers';
             if (typeof angle !== 'number' || !Number.isFinite(angle)) return 'the rotation angle must be a finite number (radians)';
         } else {
             return 'rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]';
@@ -1726,10 +1726,6 @@ function validatePrimitiveConstraint(
 // Helpers (audit-hardening H1)
 // ============================================================================
 
-
-function isVec3(v: unknown): v is Vec3 {
-    return Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number');
-}
 
 /**
  * Recursive sweep over GLSL expressions with declared params. Each parameter is a slider of a

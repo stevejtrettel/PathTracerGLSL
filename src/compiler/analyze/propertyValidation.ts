@@ -199,6 +199,6 @@ function isFiniteNumber(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isFiniteVec3(value: unknown): value is [number, number, number] {
+export function isFiniteVec3(value: unknown): value is [number, number, number] {
     return Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
 }
