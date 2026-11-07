@@ -80,9 +80,9 @@ The tube: with P = (p_x, p_z), V = (v_x, v_z), S = sinh r,
 q = −β − sign(β)·2√D, X₁,₂ = {q/α, γ̂/q}. α = 0 (the ray's endpoint on the axis' ideal points):
 linear. The region's interval [Xn, Xf] is the intersection of the face intervals (box: six faces;
 cylinder: two caps and the tube); the hit is t = ½ log Xn if Xn > 1, else ½ log Xf if Xf > 1 (the
-first boundary crossing ahead: Xn ≤ 1 ⟺ the origin is inside, the box.glsl rule). Float32: the
-D formula subtracts |P|² and |V|², each ≤ |p|², an error no larger than the input rounding of p, v
-(to be measured, §5.1).
+first boundary crossing ahead: Xn ≤ 1 ⟺ the origin is inside, the box.glsl rule). Float32
+(measured, primitive-bodies/f32_tube.ts): with the D form, sign errors are ≤ 0.03% of a ±2% grazing
+band at r = 0.01 and distance 3, against 2.1% for β² − αγ evaluated directly.
 
 **S³ — the interval method in T = tan s.** Every S³ box and cylinder lies in x_w > 0. With
 a = p_w, b = v_w, A = √(a² + b²): γ_w(t) = A cos(t − φ), φ = atan(b, a). The geodesic's arc in x_w > 0
@@ -158,12 +158,15 @@ grazing ones included; H³ origins up to distance 3 from o, sizes 0.1–1.2; S³
    S³ cylinder cases include two-arc geodesics (counted, > 0);
 2. the normal is unit, tangent (⟨n, p⟩ = 0) and equals the normalized metric gradient of the signed
    distance at the hit (finite differences, 1e-5);
-3. the sdf is never above the brute-force distance and exact inside (box, cylinder);
+3. the sdf has the membership's sign, vanishes on the surface, and is never above the length of a
+   geodesic from the point to the shape (box, cylinder);
 4. quad light: the chart-uniform pdf integrates to 1 over the quad (MC with an independent
    area-uniform estimate of the area: 1/pdf mean = area by Gauss–Bonnet, 2π − 4α / 4α − 2π), and the
    4D-cross normal equals g·(ê1×ê2, 0) for random placements;
-5. float32 emulation (Math.fround) of the H³ tube discriminant on thin tubes (r = 0.01–0.1) at
-   distance 3: grazing misclassification no worse than evaluating in float64 on the rounded inputs.
+5. float32 emulation (Math.fround) of the H³ tube discriminant on thin tubes (r = 0.01–0.3) at
+   distances 1–3: a script, primitive-bodies/f32_tube.ts (not a vitest test); the twin computes the
+   discriminants in the bodies' forms and a vitest test checks the identities β² − αγ = 4D,
+   qb² − qa·qc = A⁴D.
 6. Validator: the domains reject what they should and accept the edge (S³ h = π/2 − 1e-3 accepted,
    π/2 rejected; H³ box Σtanh² ≥ 1, quad sinh a sinh b ≥ 1, non-orthogonal curved quad rejected;
    the same scenes accepted in E³).

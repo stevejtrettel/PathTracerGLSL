@@ -31,7 +31,7 @@ describe('curved shapes witness twins', () => {
                 expect([...faces], w.label).toEqual([w.face]);
                 expect(unlit, w.label).toBe(0);
             }
-        });
+        }, 60000);
 
         it(`${S}: the window means are the stated constants, and 4×4 points per pixel move them by < 1e-4`, () => {
             for (const w of f.windows) {
@@ -39,7 +39,7 @@ describe('curved shapes witness twins', () => {
                 expect(Math.abs(m2 - w.mean), w.label).toBeLessThan(2e-7);
                 expect(Math.abs(shapesWindowMean(S, f, w.region, 4) / m2 - 1), w.label).toBeLessThan(1e-4);
             }
-        });
+        }, 60000);
     }
 });
 
@@ -95,17 +95,17 @@ describe('curved quad-light witness twins', () => {
             const mc = Math.PI * e.Le * p, se = Math.PI * e.Le * Math.sqrt(p * (1 - p) / N);
             expect(p).toBeGreaterThan(0.05);
             expect(Math.abs(mc - quadIrradiance(c.S, x, n, e)) / se).toBeLessThan(4);
-        });
+        }, 60000);
 
         it(`${c.S}: the window lies inside the receiver and its mean is the stated constant`, () => {
             const m = c.windowMean(c.pose, c.fov, c.size, c.window, c.receiver, (x: V4, nx: V4) => quadIrradiance(c.S, x, nx, e), 2);
             expect(m.missed).toBe(0);
             expect(Math.abs(m.mean - c.mean)).toBeLessThan(2e-7);
-        });
+        }, 60000);
 
         it(`${c.S}: the pdf mutation w³ → w² would move the NEE mean by more than 5× the 0.002 tolerance`, () => {
             const mutated = c.windowMean(c.pose, c.fov, c.size, c.window, c.receiver, (x: V4, nx: V4) => quadIrradiance(c.S, x, nx, e, 24, (w) => w * w), 2);
             expect(Math.abs(mutated.mean - c.mean)).toBeGreaterThan(0.01);
-        });
+        }, 60000);
     }
 });

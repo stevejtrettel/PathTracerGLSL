@@ -44,7 +44,7 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
   light pt-nee 0.1750 / pt-mis 0.1750 / pt 0.1767 vs 0.1749918, S³ 0.3238 / 0.3238 / 0.3241 vs
   0.3237615. Mutations: w³ → w² in the quad-light pdf gives pt-nee 0.1606 (H³) and 0.3864 (S³),
   the values the twin predicts, and fails 5 checks; the tube normal's y-part sign flipped fails the
-  tube windows (MUTATION_RESULT). Dropping the tube normal's C/s factors renders identically:
+  tube windows (H³ 0.0913 vs 0.1083, S³ 0.2362 vs 0.2120; predicted 0.0913, 0.2360). Dropping the tube normal's C/s factors renders identically:
   ambient_frame projects every vector of that plane onto the same tangent line.
 
 ## 2026-11-07 — S³ review fixes: the light query's normal, radius domains

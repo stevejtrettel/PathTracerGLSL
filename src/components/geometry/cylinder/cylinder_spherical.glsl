@@ -65,8 +65,7 @@ bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
         spherical_crossing(ray, hi, best);
     } else {
         float q = -qb - (qb >= 0.0 ? 1.0 : -1.0) * A2 * sqrt(D);
-        if (q == 0.0) return false;
-        float r1 = q / qa, r2 = qc / q;
+        float r1 = q / qa, r2 = q == 0.0 ? 0.0 : qc / q;   // q = 0: qb = D = 0, the double root T = 0
         float t1 = min(r1, r2), t2 = max(r1, r2);
         if (qa > 0.0) {
             float l = max(lo, t1), h = min(hi, t2);

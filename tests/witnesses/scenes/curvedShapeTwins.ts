@@ -61,13 +61,14 @@ function clip(iv: Interval, lo: number, hi: number): Interval | null {
     return r.lo <= r.hi ? r : null;
 }
 
-/** The set where qa·u² + 2·qb·u + qc ≤ 0, as at most two intervals. Stable roots: q = −qb − sign(qb)·√disc. */
-function quadraticSet(qa: number, qb: number, qc: number): Interval[] {
+/** The set where qa·u² + 2·qb·u + qc ≤ 0, as at most two intervals, given its discriminant
+ *  disc = qb² − qa·qc in the cancellation-free form the bodies compute. Stable roots:
+ *  q = −qb − sign(qb)·√disc, then q/qa and qc/q (both 0 when q = 0: the double root). */
+function quadraticSet(qa: number, qb: number, qc: number, disc: number): Interval[] {
     if (qa === 0) {
         const iv = linear({ lo: -Infinity, hi: Infinity }, qc, 2 * qb);
         return iv === null ? [] : [iv];
     }
-    const disc = qb * qb - qa * qc;
     if (disc < 0) return qa > 0 ? [] : [{ lo: -Infinity, hi: Infinity }];
     const q = -qb - (qb >= 0 ? 1 : -1) * Math.sqrt(disc);
     const r1 = q / qa, r2 = q === 0 ? 0 : qc / q;
@@ -171,16 +172,30 @@ export function cylinderIntersect(S: Space, p: V4, v: V4, r: number, h: number):
         // 4X(|γ_xz|² − S²) = α X² + 2β X + γ̂.
         const pv = [P[0] + V[0], P[1] + V[1]], mv = [P[0] - V[0], P[1] - V[1]];
         const alpha = pv[0] ** 2 + pv[1] ** 2, gamma = mv[0] ** 2 + mv[1] ** 2;
-        const beta = P[0] ** 2 + P[1] ** 2 - V[0] ** 2 - V[1] ** 2 - 2 * s2;
-        tube = quadraticSet(alpha, beta, gamma);
+        const k = P[0] ** 2 + P[1] ** 2 - V[0] ** 2 - V[1] ** 2;
+        tube = quadraticSet(alpha, k - 2 * s2, gamma, 4 * tubeDiscriminantH3(P, V, s2));
     } else {
         // (|Ṽ|² − A²S²)T² + 2(P̃·Ṽ)T + (|P̃|² − A²S²), P̃ = aP + bV, Ṽ = aV − bP.
         const A2 = a * a + b * b;
         const Pt = [a * P[0] + b * V[0], a * P[1] + b * V[1]], Vt = [a * V[0] - b * P[0], a * V[1] - b * P[1]];
-        tube = quadraticSet(Vt[0] ** 2 + Vt[1] ** 2 - A2 * s2, Pt[0] * Vt[0] + Pt[1] * Vt[1], Pt[0] ** 2 + Pt[1] ** 2 - A2 * s2);
+        tube = quadraticSet(Vt[0] ** 2 + Vt[1] ** 2 - A2 * s2, Pt[0] * Vt[0] + Pt[1] * Vt[1], Pt[0] ** 2 + Pt[1] ** 2 - A2 * s2, A2 * A2 * tubeDiscriminantS3(P, V, s2));
     }
     const ivs = tube.map((iv) => clip(iv, caps.lo, caps.hi)).filter((iv): iv is Interval => iv !== null);
     return firstCrossing(S, ivs, a, b);
+}
+
+/** The H³ tube discriminant D = S²(S² − (|P|² − |V|²)) − (P×V)² (P, V the xz parts of the ray's
+ *  origin and direction, S² = sinh² r): β² − αγ = 4D (cylinder_hyperbolic.glsl). */
+export function tubeDiscriminantH3(P: number[], V: number[], s2: number): number {
+    const cr = P[0] * V[1] - P[1] * V[0];
+    return s2 * (s2 - (P[0] ** 2 + P[1] ** 2 - V[0] ** 2 - V[1] ** 2)) - cr * cr;
+}
+
+/** The S³ tube discriminant D = S²(|P|² + |V|² − S²) − (P×V)² (S² = sin² r): qb² − qa·qc = A⁴·D
+ *  (cylinder_spherical.glsl). */
+export function tubeDiscriminantS3(P: number[], V: number[], s2: number): number {
+    const cr = P[0] * V[1] - P[1] * V[0];
+    return s2 * (P[0] ** 2 + P[1] ** 2 + V[0] ** 2 + V[1] ** 2 - s2) - cr * cr;
 }
 
 /** The tube's signed distance and the caps', whose larger picks the face p lies on. */

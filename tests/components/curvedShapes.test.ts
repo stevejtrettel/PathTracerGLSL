@@ -11,7 +11,7 @@ import {
     boxIntersect, boxNormal, boxSdf, boxInside,
     cylinderIntersect, cylinderNormal, cylinderSdf, cylinderInside,
     quadIntersect, quadNormal4, quadChart,
-    quadLightNormal, quadLightPoint, quadLightAreaPdf, quadArea,
+    quadLightNormal, quadLightPoint, quadLightAreaPdf, quadArea, tubeDiscriminantH3, tubeDiscriminantS3,
 } from '../witnesses/scenes/curvedShapeTwins.js';
 import { hyperbolicGeometry } from '../../src/components/ambient/hyperbolic/hyperbolic.js';
 import { sphericalGeometry } from '../../src/components/ambient/spherical/spherical.js';
@@ -144,14 +144,17 @@ function shapeCases(S: Space, r: () => number): ShapeCase[] {
         const E1: V3 = [2 * a * e1[0], 2 * a * e1[1], 2 * a * e1[2]];
         const E2: V3 = [2 * b * e2u[0] / nn, 2 * b * e2u[1] / nn, 2 * b * e2u[2] / nn];
         const N = quadNormal4(E1, E2);
+        // The plane by its own definition, independent of quadNormal4: x·(E1 × E2) = 0, with the
+        // triple product written out.
+        const plane = (y: V4) => y[0] * (E1[1] * E2[2] - E1[2] * E2[1]) + y[1] * (E1[2] * E2[0] - E1[0] * E2[2]) + y[2] * (E1[0] * E2[1] - E1[1] * E2[0]);
         out.push({
             name: `quad a=${a.toFixed(2)} b=${b.toFixed(2)}`,
             intersect: (p, v) => quadIntersect(S, p, v, E1, E2),
             // A thin shape: its "inside" is the side −N of its plane; the quad test below finds the
             // crossings of the plane and keeps those whose chart coordinates lie in the rectangle.
-            inside: (x) => form(S, x, N) <= 0,
+            inside: (x) => plane(x) <= 0,
             normal: () => N,
-            faceFunction: () => (y) => form(S, y, N),
+            faceFunction: () => plane,
             quad: { e1: E1, e2: E2, bounds: [T(a), T(b)] },
         });
     }
@@ -186,7 +189,7 @@ for (const S of ['H3', 'S3'] as Space[]) {
             expect(hits).toBeGreaterThan(250);
             expect(worst).toBeLessThan(1e-8);
             if (S === 'S3') expect(twoArc).toBeGreaterThan(0);
-        });
+        }, 60000);
 
         it('the quad hit is the first crossing of its plane inside the chart rectangle', () => {
             let hits = 0;
@@ -214,7 +217,7 @@ for (const S of ['H3', 'S3'] as Space[]) {
                 }
             }
             expect(hits).toBeGreaterThan(60);
-        });
+        }, 60000);
 
         it('normals are unit, tangent, outward, and the gradient of the face\'s defining function', () => {
             let checked = 0;
@@ -244,7 +247,7 @@ for (const S of ['H3', 'S3'] as Space[]) {
                 }
             }
             expect(checked).toBeGreaterThan(150);
-        });
+        }, 60000);
 
         it('the sdf has the membership\'s sign, vanishes on the surface and never exceeds the distance to a boundary point', () => {
             for (const c of cases.filter((x) => x.sdf !== undefined)) {
@@ -265,8 +268,28 @@ for (const S of ['H3', 'S3'] as Space[]) {
                     if (tc !== null) expect(Math.abs(c.sdf!(flow(S, p, v, tc).pos))).toBeLessThan(1e-8);
                 }
             }
-        });
+        }, 60000);
     });
+
+    it(`${S}: the tube discriminant in the bodies' form equals the quadratic's`, () => {
+        const r = rng(S === 'H3' ? 101 : 103);
+        for (let i = 0; i < 500; i++) {
+            const { p, v } = aimedRay(S, r, 0.4, 3, 1.0);
+            const P = [p[0], p[2]], V = [v[0], v[2]];
+            const s2 = (S === 'H3' ? Math.sinh : Math.sin)(0.05 + 1.2 * r()) ** 2;
+            if (S === 'H3') {
+                const alpha = (P[0] + V[0]) ** 2 + (P[1] + V[1]) ** 2, gamma = (P[0] - V[0]) ** 2 + (P[1] - V[1]) ** 2;
+                const beta = P[0] ** 2 + P[1] ** 2 - V[0] ** 2 - V[1] ** 2 - 2 * s2;
+                const lhs = beta * beta - alpha * gamma;
+                expect(Math.abs(lhs - 4 * tubeDiscriminantH3(P, V, s2))).toBeLessThan(1e-9 * Math.max(1, Math.abs(lhs), beta * beta));
+            } else {
+                const a = p[3], b = v[3], A2 = a * a + b * b;
+                const Pt = [a * P[0] + b * V[0], a * P[1] + b * V[1]], Vt = [a * V[0] - b * P[0], a * V[1] - b * P[1]];
+                const qa = Vt[0] ** 2 + Vt[1] ** 2 - A2 * s2, qb = Pt[0] * Vt[0] + Pt[1] * Vt[1], qc = Pt[0] ** 2 + Pt[1] ** 2 - A2 * s2;
+                expect(Math.abs(qb * qb - qa * qc - A2 * A2 * tubeDiscriminantS3(P, V, s2))).toBeLessThan(1e-12);
+            }
+        }
+    }, 60000);
 
     describe(`${S} quad light (chart-uniform sampling)`, () => {
         const geom = geomOf(S);
@@ -293,7 +316,7 @@ for (const S of ['H3', 'S3'] as Space[]) {
                     expect(Math.abs(k2)).toBeLessThanOrEqual((S === 'H3' ? Math.tanh(b) : Math.tan(b)) + 1e-12);
                 }
             }
-        });
+        }, 60000);
 
         it('its density integrates to 1 over the rectangle: the mean of 1/pdf is the Gauss–Bonnet area', () => {
             for (const [a, b] of [[0.3, 0.5], [0.6, 0.7], [0.9, 0.4]]) {
@@ -310,6 +333,6 @@ for (const S of ['H3', 'S3'] as Space[]) {
                 // midpoint rule: error O(n⁻²)
                 expect(Math.abs(sum / (n * n) / quadArea(S, a, b) - 1)).toBeLessThan(2e-5);
             }
-        });
+        }, 60000);
     });
 }

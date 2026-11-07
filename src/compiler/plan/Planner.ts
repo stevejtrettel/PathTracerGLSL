@@ -228,10 +228,8 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             // Curved: the closed form in the object's own frame (a marched object is rejected in
             // curved spaces — SPACE_LIMITATIONS), placed by its isometry.
             const index = objectIndex++;
-            objects.push({
-                index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name,
-                ...curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index),
-            });
+            const { parameters, isometry } = curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index);
+            objects.push({ index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name, parameters, isometry });
             continue;
         }
 
@@ -324,13 +322,9 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
                 // Curved: the region is placed by the isometry its anchor makes, and the light's world
                 // rows are that isometry applied (curvedLightWorld), so the sampled disk or quad is the
                 // one rays hit.
-                const regionParameters = d.region.parameters(authored);
-                objects.push({
-                    index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form',
-                    ...curvedPlacement(geom, d.region.primitive, regionParameters, undefined, regionId),
-                });
-                const world = curvedLightWorld(geom, d, values, curvedShape(d.region.primitive, regionParameters).pre);
-                return { id, kind: entry.kind, regionId, values, world };
+                const { parameters, isometry, pre } = curvedPlacement(geom, d.region.primitive, d.region.parameters(authored), undefined, regionId);
+                objects.push({ index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form', parameters, isometry });
+                return { id, kind: entry.kind, regionId, values, world: curvedLightWorld(geom, d, values, pre) };
             }
             // Canonicalization (the disk's unit normal) is the same formula the kind's toValues
             // applies, so hit side and sample side stay bit-identical.
@@ -916,14 +910,14 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
     };
 }
 
-/** A curved object's intrinsic parameters and its placement: the inverse of
- *  g = T(position)·R(rotation)·T(point row), baked when the transform is constant, a mat4 uniform
- *  when it is {param}-driven. */
-function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; isometry: IsometryPlacement } {
+/** A curved object's intrinsic parameters, its anchor `pre` (curvedShape) and its placement: the
+ *  inverse of g = T(position)·R(rotation)·T(pre), baked when the transform is constant, a mat4
+ *  uniform when it is {param}-driven. */
+function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; pre: Vec3Tuple; isometry: IsometryPlacement } {
     const { parameters, pre } = curvedShape(type, rawParameters);
-    if (isDrivenTransform(transform)) return { parameters, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
+    if (isDrivenTransform(transform)) return { parameters, pre, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
     const g = placementOf(transform);
-    return { parameters, isometry: { kind: 'constant', inverse: geom.inverse(placementIsometry(geom, g.translation, g.rotation, pre)) } };
+    return { parameters, pre, isometry: { kind: 'constant', inverse: geom.inverse(placementIsometry(geom, g.translation, g.rotation, pre)) } };
 }
 
 /** The curved-space lowering of a driven transform: one mat4 uniform `u_object<i>Isometry`, the
