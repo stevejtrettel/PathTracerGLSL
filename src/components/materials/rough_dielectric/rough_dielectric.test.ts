@@ -21,6 +21,10 @@
 // or a wrong Fresnel argument shows up.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { dielectricGain, energyTable } from '../microfacet_energy/build.js';
+import { microfacetEnergyData } from '../microfacet_energy/data.js';
 
 // ── The twin (local frame: n = +z, wo always in the UPPER hemisphere per §4.1) ──
 
@@ -434,5 +438,40 @@ describe('rough dielectric §11.3 pdf–histogram consistency (TS twin of rough_
         };
         expect(spread(0.02)).toBeLessThan(spread(0.2));
         expect(spread(0.2)).toBeLessThan(spread(0.6));
+    });
+});
+
+// ── Energy compensation (measurement.microfacet 'energy-compensated') ──────────────────
+// rough_dielectric.glsl multiplies both lobes of eval and of the sample weight by
+// microfacet_dielectric_gain(μₒ, α, η) and leaves the pdf alone. The sampled distribution
+// (and the χ² above) is unchanged. Whether the GLSL eval and sample apply the same gain is
+// checked on the GPU by the ms-furnace witness (pt, pt-nee and pt-mis read eval and the
+// sample weight in different proportions); a TS twin multiplies both by one gainOf and
+// cannot see it. What the twin checks is the gain's value: by sampling, the mean
+// compensated energy weight of a lossless interface is 1 on both sides.
+
+const table = energyTable(
+    readFileSync(join(__dirname, '../microfacet_energy/data/energy.bin')),
+    microfacetEnergyData.width, microfacetEnergyData.height);
+const gainOf = (wo: V3, roughness: number, eta: number) => dielectricGain(table, wo[2], alphaOf(roughness), eta);
+function compensatedSample(wo: V3, roughness: number, eta: number, uc: number, u1: number, u2: number): TwinSample {
+    const s = sampleBsdf(wo, roughness, eta, uc, u1, u2);
+    return { ...s, weight: s.weight * gainOf(wo, roughness, eta) };
+}
+
+describe('rough dielectric energy-compensated twin', () => {
+    it('lossless interface by sampling: the mean compensated energy weight is 1 on both sides', () => {
+        // Energy weight = the sample weight with the transmitted lobe's η² radiance factor undone.
+        for (const [etaName, eta] of ETAS) for (const cosO of [0.9, 0.5, 0.1]) for (const r of [0.4, 1.0]) {
+            const wo = dirOf(cosO, 0);
+            const rand = lcg(31 + Math.round(cosO * 1000) + Math.round(r * 100) + Math.round(eta * 10));
+            const n = 1 << 16;
+            let sum = 0;
+            for (let i = 0; i < n; i++) {
+                const s = compensatedSample(wo, r, eta, rand(), rand(), rand());
+                sum += s.wi[2] < 0 ? s.weight / (eta * eta) : s.weight;
+            }
+            expect(Math.abs(sum / n - 1), `${etaName} cosθo=${cosO} roughness=${r}: ${sum / n}`).toBeLessThan(0.015);   // Monte Carlo, 2¹⁶ samples
+        }
     });
 });

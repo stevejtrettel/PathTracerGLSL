@@ -54,6 +54,7 @@ export interface ProgramDescription {
         maxBounces: number;
         maxNullCrossings: number;
         scattering: 'full' | 'ignored';
+        microfacet: 'single-scattering' | 'energy-compensated';
         shadows: 'opaque-dielectrics';
         color: 'rgb' | 'spectral';
         sensor: string;

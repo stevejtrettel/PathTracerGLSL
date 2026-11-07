@@ -24,6 +24,7 @@ import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralMaterialsSuite } from './scenes/spectralMaterials.js';
+import { microfacetEnergySuite } from './scenes/microfacetEnergyWitness.js';
 import { spectralTrackingSuite } from './scenes/spectralTracking.js';
 import { spectralMediaSuite } from './scenes/spectralMedia.js';
 import { spectralSkiesSuite } from './scenes/spectralSkies.js';
@@ -120,6 +121,11 @@ import {
     roughGrin, roughGrinRef, roughGrinStrategy,
 } from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
+import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from './scenes/plasticWitness.js';
+import {
+    thinPaneScene, thinPaneStrategies, THIN_PANE_POSE, THIN_PANE_REGIONS, THIN_PANE_NORMAL, THIN_PANE_TILTED,
+} from './scenes/thinPaneWitness.js';
+import { roughFurnaceExpr, veachMisVarying } from './scenes/derivedRoughnessWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
     diskBake, diskBakeRef, diskBakeStrategy,
@@ -176,6 +182,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralGaussianSuite,
     ...spectralDispersionSuite,
     ...spectralMaterialsSuite,
+    ...microfacetEnergySuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
     ...spectralTrackingSuite,
@@ -1455,6 +1462,69 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             ]),
         },
     },
+    'plastic-furnace': {
+        scene: plasticFurnaceScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic (smooth 1.5 coat over a white Lambertian base) in the open furnace: the coat\'s delta lobe and the diffuse lobe in one model, K, the 1/η² compression, the lobe selection, and NEE/MIS seeing only the diffuse lobe',
+        expected:
+            'with R = 1 the directional albedo is 1 at every angle, so every pixel, sphere or sky, reads 1.0 on all three keys',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].flatMap(strategy => [
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.008, strategy,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: `plastic A = 1 at the sphere center (key ${strategy + 1})`,
+                },
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.005, strategy,
+                    label: `plastic A = 1 over the whole frame, grazing rim included (key ${strategy + 1})`,
+                },
+            ]),
+        },
+    },
+    'plastic-chroma': {
+        scene: plasticChromaScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic with a colored base (0.8, 0.5, 0.2) under a 1.5 coat in the open furnace: the per-channel bounce series R/(1 − R·K)',
+        expected:
+            'sphere center = A(1) = (0.632833, 0.316071, 0.127997) on all three keys (Mitsuba\'s default linear form would read 0.232 in blue)',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].map(strategy => ({
+                kind: 'mean' as const, value: PLASTIC_CHROMA_CENTER, tol: 0.008, strategy,
+                region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                label: `plastic A(1) per channel (key ${strategy + 1})`,
+            })),
+        },
+    },
+    'thin-pane': {
+        scene: thinPaneScene,
+        strategies: posed(THIN_PANE_POSE.position, THIN_PANE_POSE.target, ...thinPaneStrategies),
+        exercises:
+            'thin_dielectric (a glass sheet of η 1.5) over an emitter, orthographic: the sheet\'s total reflectance 2R/(1 + R), straight-through transmission at weight 1, back-face hits on a zero-thickness owner, and the η convention at 60° incidence; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            `right half (the emitter seen directly) 1.0; facing and flipped panes T_tot(1) = ${THIN_PANE_NORMAL} (a single interface would read 0.96); the pane tilted to cos 0.5 T_tot = ${THIN_PANE_TILTED} (an inverted η reads 0), on every key`,
+        witness: {
+            // Each pane pixel is a Bernoulli draw (T_tot of the paths score 1, the rest 0): at
+            // 256 spp over a ~1200-pixel region the mean's σ is under 1e-3.
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                { kind: 'mean' as const, value: 1.0, tol: 0.005, strategy, region: THIN_PANE_REGIONS.direct, label: `emitter seen directly (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.facing, label: `pane facing the camera (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.flipped, label: `pane seen from its back (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_TILTED, tol: 0.005, strategy, region: THIN_PANE_REGIONS.tilted, label: `pane at cos 0.5 (key ${strategy + 1})` },
+            ]),
+        },
+    },
     'sky-lamp': {
         scene: skyLampScene,
         strategies: posed([0, 1.4, 5], [0, 0.9, 0], skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy),
@@ -2309,6 +2379,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             ],
         },
     },
+    'veach-mis-varying': {
+        scene: veachMisVarying,
+        strategies: posed([0, 1.3, 5.5], [0, 0.55, 0], veachMisStrategy, veachNeeStrategy, veachPtStrategy),
+        exercises:
+            'GGX roughness authored as a formula of the shading point (0.05 → 0.6 along x, one material on all four '
+            + 'plates): α = max(1e-3, roughness²) is computed per hit in the material lookup, and every scoring '
+            + 'site (BSDF sample, its MIS pdf, NEE eval and pdf) must read the same per-hit α',
+        expected:
+            'keys 1 (pt-mis), 2 (pt-nee), 3 (pt) converge to the same image, each plate a gradient from a sharp '
+            + 'reflection (left) to a broad one (right); divergence implicates a scoring site reading α from another point',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.03, label: 'varying-roughness GGX mis ≡ nee' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 1.2, label: 'varying-roughness GGX pt tripwire' },
+            ],
+        },
+    },
     // ── Rough dielectric (fable-rough-dielectric §5) ────────────────────────────
     // All four gates are PRE-CALIBRATION estimates until the owner's first sweep
     // (impl-plan-rough-dielectric T4); the energy numbers are RECORDED there, since
@@ -2764,6 +2852,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             checks: (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
                 { kind: 'mean' as const, value: grayQuadrantRadiance(q), tol: 0.008, region: QUADRANTS[q], label: `${q} = gray albedo mean (spectral)` }
             )),
+        },
+    },
+    'rough-furnace-expr': {
+        scene: roughFurnaceExpr,
+        strategies: posed([0, 0, 4.2], [0, 0, 0], roughFurnaceStrategy),
+        exercises:
+            'rough-furnace with each roughness authored as a GLSL formula evaluating to its constant: α is computed per '
+            + 'hit in the material lookup instead of on the host',
+        expected:
+            'the same image as rough-furnace up to float rounding: same integrand, same random numbers, α equal to '
+            + 'the host value within rounding',
+        witness: {
+            spp: 64,
+            checks: [
+                // Identical stream; the small tolerances absorb only the rounding of α in fp32
+                // against the host-computed literal (the expr-const tolerances).
+                { kind: 'twin', other: { scene: 'rough-furnace' }, meanTol: 0.002, rmse: 0.01, label: 'per-hit α ≡ host α' },
+            ],
         },
     },
 };

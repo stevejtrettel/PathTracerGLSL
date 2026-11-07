@@ -563,6 +563,10 @@ exports[`scene-data textures (byte fingerprints) > models 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > ms-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > ms-furnace-control 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > null-budget 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > null-budget-view 1`] = `null`;
@@ -651,6 +655,10 @@ exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-128 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > plastic-chroma 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > plastic-furnace 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > porcelain 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
@@ -680,6 +688,8 @@ exports[`scene-data textures (byte fingerprints) > regions-transformed 1`] = `nu
 exports[`scene-data textures (byte fingerprints) > regions-transformed-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > rough-furnace-expr 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-grin 1`] = `null`;
 
@@ -909,6 +919,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-packed-ref 1`] = `
 
 exports[`scene-data textures (byte fingerprints) > spectral-plane 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > spectral-plastic 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-proc-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-rayleigh-furnace 1`] = `null`;
@@ -959,6 +971,8 @@ exports[`scene-data textures (byte fingerprints) > submerged 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > sun 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sun-haze 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > thin-pane 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > thinlens-zero 1`] = `null`;
 
@@ -1016,6 +1030,8 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > veach-mis-varying 1`] = `null`;
 
 exports[`scene-data textures — instanced sphere lights with per-instance emission > instance-lights with an emission attribute 1`] = `
 {

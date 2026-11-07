@@ -20,7 +20,8 @@ same material; dispersion is the third and awaits the spectral era).
 
 With the shading frame's `n` toward `region_from`, `wo` is always in the upper
 hemisphere and `η = n_i/n_t` comes from the hit's regions. `α = max(1e-3, roughness²)`
-is derived host-side (D4).
+is the derived field `alpha` (components/materials/microfacet.ts), computed on the host for a
+constant or {param} roughness and per hit for one that varies over the surface.
 
 **Sampling.** Draw a visible microfacet normal `m` by VNDF; `F = dielectric_fresnel(wo·m, η)`
 picks the lobe (`uc < F` → reflect about `m`, else refract through it). TIR is not a
@@ -61,7 +62,7 @@ The two failure modes worth naming, both caught by the twin
 - **No Schlick.** A dielectric's Fresnel is exact and cheap; `f0` is a conductor's
   vocabulary and this model declares no such row.
 
-## Energy (a declared truncation, now MEASURED)
+## Energy (a declared truncation, measured)
 
 Single-scattering microfacet transmission loses energy as roughness grows — the
 multiple-scattering terms between facets are simply absent from the model. This is a
@@ -97,11 +98,11 @@ a render. At 0.2 it is ≤ 2.4% (worst case, grazing). The curve only bites abov
 and hardest on the EXIT side at grazing, where the escape-from-TIR geometry needs the
 inter-facet bounces the model omits: 8–23% at roughness 0.5, up to 39% at 0.7.
 
-**Consequence for the deferred compensation:** ordinary frosted glass (roughness
-0.1–0.3) does not need it. A scene authored above ~0.5 does, and it will read as glass
-that is too dark and insufficiently saturated. That is the trigger condition — the
-tables above are already the shape a Turquin-style fit would tabulate, so the work when
-it comes is a fit plus one multiply, not a re-derivation.
+**Compensation:** `measurement.microfacet: 'energy-compensated'` multiplies both lobes by
+1/A(μₒ, α, η) read from a table of exactly these albedos (materials/microfacet_energy), so
+the interface loses nothing; the default `'single-scattering'` keeps the loss above, as a
+declared truncation. Ordinary frosted glass (roughness 0.1–0.3) barely needs it; above ~0.5
+the uncompensated glass reads too dark and insufficiently saturated.
 
 ## Rows
 

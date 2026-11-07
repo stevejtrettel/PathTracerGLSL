@@ -12,7 +12,7 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS, hostDerivedFieldFedBy, modelTransmitsWithoutCrossing } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
@@ -917,6 +917,7 @@ export function validate(
     // i.e. changed the integral, instead of failing).
     const measurementEnums: Array<[string, unknown, readonly string[]]> = [
         ['scattering', strategy.measurement.scattering, ['full', 'ignored']],
+        ['microfacet', strategy.measurement.microfacet, ['single-scattering', 'energy-compensated']],
         ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
         ['color', strategy.measurement.color, ['rgb', 'spectral']],
         ['response', strategy.measurement.response, ['radiance']],
@@ -1271,12 +1272,13 @@ export function validate(
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
-                // Rows feeding a DERIVED field (ggx roughness → alpha) are CPU-derived once
-                // per material — a per-instance input would need per-instance derived slots
-                // (precompute-and-ship an extra table column). Deferred; reject-not-degrade.
-                const derived = MATERIAL_MODELS[model]?.derived?.find((d) => d.inputs.includes(key));
+                // A row feeding a derived field computed only on the host (plastic coat_eta →
+                // coat_fdr) is read once per material; a per-instance value would need a
+                // per-instance derived column, which the table does not have. A field with a
+                // per-hit form (ggx roughness → alpha) is computed from the attribute itself.
+                const derived = hostDerivedFieldFedBy(model, key);
                 if (derived !== undefined) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}' — per-instance derived rows are deferred (the derived value is computed once per material)`)
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}', which is computed once per material on the host`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
@@ -1361,6 +1363,18 @@ export function validate(
         if (MATERIAL_MODELS[scene.materials[matName]?.model ?? '']?.capabilities.transmission) {
             bag.warning('invalid-setting', `Object ${i}: a transmissive material on ${thinCase} has no interior region — it will refract as η = 1`)
                 .withOriginal('scene', [`objects[${i}]`, 'material']).add();
+        }
+    }
+
+    // A model that transmits without crossing the interface (a thin sheet) and a medium anywhere
+    // in the scene: the walk would take the sheet's own region as the medium behind it after a
+    // front-face transmission through a zero-thickness surface (modelTransmitsWithoutCrossing).
+    if (features.media.hasMedia) {
+        for (const [name, mat] of Object.entries(scene.materials)) {
+            if (!modelTransmitsWithoutCrossing(mat.model)) continue;
+            bag.error('invalid-setting',
+                `Material '${name}': model '${mat.model}' passes light through its surface without changing region, which the walk cannot track through media: on a zero-thickness surface it would lose the medium behind it. Remove the media, or model the glass as a closed dielectric solid`)
+                .add();
         }
     }
 

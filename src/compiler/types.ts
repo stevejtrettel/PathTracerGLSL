@@ -640,6 +640,14 @@ export interface MeasurementDescription {
     /** Truncation — limit: 'full'. 'ignored' renders scattering media absorbing-only
      *  (the research A/B formerly expressed as volumeIntegrator 'none' on a scattering scene). */
     scattering?: 'full' | 'ignored';
+    /** Truncation — limit: multiple scattering on the Smith microsurface (Heitz 2016, not
+     *  built). 'single-scattering' (the default) keeps one bounce between microfacets, so
+     *  rough conductors and rough glass lose energy (E = 1 − ln 2 ≈ 0.31 for a white
+     *  conductor at roughness 1, normal incidence). 'energy-compensated' restores that energy
+     *  with a gain on ωₒ (Turquin 2019; components/materials/microfacet_energy): exact in
+     *  total for a white conductor and a lossless dielectric, up to the table's error
+     *  (≤ 0.6%), approximate in the angular shape and color of the restored energy. */
+    microfacet?: 'single-scattering' | 'energy-compensated';
     /** Truncation — limit: transparent-shadow refinement (contracts §10.2). The §6.3 v1
      *  policy (shadow rays treat dielectric interfaces as opaque), now a DECLARED bias. */
     shadows?: 'opaque-dielectrics';

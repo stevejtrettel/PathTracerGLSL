@@ -9,6 +9,9 @@
 //     the setting's domain, the row's own constraint or else its role's;
 //   - kind: a named kind sits in a setting of one of its roles, its declared numbers pass the
 //     same checks, and its own rules hold.
+// A material row that feeds a derived field computed only on the host (MaterialDerivedSpec.fn,
+// no per-hit form) takes only a constant or a slider: the derived value is computed from the
+// row's numbers, and a formula or a named kind has no numbers there.
 // A formula's numbers are not known before the render; its domain is the author's contract.
 
 import { GLSL_EXPRESSION_KEYS, isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
@@ -17,7 +20,7 @@ import { namedKindOf } from '../../components/color/spectra/index.js';
 import type { SpectrumKind } from '../../components/color/spectra/spectrumKind.js';
 import { SLIDER_KEYS, unknownKeysProblem, valueParamProblems } from '../../components/param.js';
 import type { SpectrumRole, RowConstraint, PropertySchema } from '../../components/descriptors.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, hostDerivedFieldFedBy } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
 
 /** The one interpreter of RowConstraint, with one message voice for every family's rows.
@@ -53,7 +56,15 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.model !== 'none') {
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-                report(valueProblems((mat as unknown as Record<string, unknown>)[field.source], rowSetting(field), `Material '${name}': ${field.source}`));
+                const value = (mat as unknown as Record<string, unknown>)[field.source];
+                const label = `Material '${name}': ${field.source}`;
+                const derived = hostDerivedFieldFedBy(mat.model, field.source);
+                const kind = namedKindOf(value);
+                if (derived !== undefined && (kind !== undefined || isGlslExpression(value))) {
+                    report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);
+                    continue;
+                }
+                report(valueProblems(value, rowSetting(field), label));
             }
         }
 

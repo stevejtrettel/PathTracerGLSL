@@ -3,6 +3,7 @@ import type { SceneSuiteEntry } from '../types.js';
 import { etaScene } from './dielectricWitness.js';
 import { mirrorScene } from './mirrorWitness.js';
 import { glassInclusion } from './roughDielectricWitness.js';
+import { spectralPlasticScene, SPECTRAL_PLASTIC_FRAME } from './plasticWitness.js';
 
 export const spectralMaterials: SceneDescription = {
     id: 'spectral-materials', name: 'Spectral surface materials',
@@ -32,6 +33,9 @@ export const spectralMaterialStrategies: RenderStrategy[] = (['nee', 'mis'] as c
     view: { tonemap: { type: 'agx' } },
 }));
 const base = spectralMaterialStrategies[0];
+/** A unit sphere at the origin filling the frame (fov 0.2 at distance 4): camera cosines ≥ 0.828. */
+const nearNormalStrategy: RenderStrategy = { ...base, measurement: { ...base.measurement,
+    camera: { type: 'pinhole', fov: 0.2, position: [0, 0, 4], target: [0, 0, 0] } } };
 export const spectralMaterialsSuite: Record<string, SceneSuiteEntry> = {
     'spectral-materials': {
         scene: spectralMaterials, strategies: spectralMaterialStrategies,
@@ -42,11 +46,19 @@ export const spectralMaterialsSuite: Record<string, SceneSuiteEntry> = {
     },
     'spectral-mirror': {
         scene: { ...mirrorScene, id: 'spectral-mirror' },
-        strategies: [{ ...base, measurement: { ...base.measurement,
-            camera: { type: 'pinhole', fov: 0.2, position: [0, 0, 4], target: [0, 0, 0] } } }],
+        strategies: [nearNormalStrategy],
         exercises: 'Grey Schlick mirror at near-normal incidence under D65: F ≈ f0 = 0.5',
         witness: { size: [32, 32], spp: 512, checks: [
             { kind: 'mean', value: 0.5, tol: 0.004, label: 'spectral mirror f0' },
+        ] },
+    },
+    'spectral-plastic': {
+        scene: spectralPlasticScene,
+        strategies: [nearNormalStrategy],
+        exercises: 'Plastic (gray 0.5 base under a 1.5 coat) at near-normal incidence in the spectral program: the coat\'s delta lobe and the diffuse lobe in one model, with roulette',
+        expected: 'frame mean of the directional albedo A(μ) over camera cosines ≥ 0.828: 0.316313 (A(1) = 0.316071)',
+        witness: { size: [32, 32], spp: 512, checks: [
+            { kind: 'mean', value: SPECTRAL_PLASTIC_FRAME, tol: 0.004, label: 'spectral plastic A(μ)' },
         ] },
     },
     'spectral-eta': {

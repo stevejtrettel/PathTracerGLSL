@@ -310,6 +310,174 @@ point `q`) is deferred to its own plan.
 - **Digest**: 267 of 275 scenes identical. The 7 scenes with material expressions differ by
   exactly the perlin block and its source-map lines. `procedural-textures` is new.
 
+## 2026-11-07 — Thin glass sheets (`thin_dielectric`)
+
+Integration step 8 of the photorealism batch (small-materials plan, thin dielectric section),
+with the review's must-fix items applied and the index named `sheet_eta` (owner decision P1,
+Q6; Q7 accepts a zero-thickness sheet).
+
+**What:** a new material model `thin_dielectric` (pbrt-v4 `ThinDielectricBxDF`): an infinitely
+thin slab of relative index `sheet_eta` (default 1.5, positive; a plain number, so a Cauchy or
+Sellmeier value is rejected by the existing role check). Two delta lobes, both of weight 1:
+mirror reflection with probability R_tot = 2R/(1 + R), the closed sum of the internal bounces,
+and straight-through transmission (ω_i = −ω_o) with T_tot = 1 − R_tot. Capabilities: pure delta,
+support 'sphere', transmission false (no index change, no region-table row, no thin-surface
+warning). Windows, display cases and picture glass can now be single quads; a `dielectric` quad
+still refracts into its own index from the front.
+- The Validator rejects the model in a scene with any medium (the Analyzer's `hasMedia`): on a
+  zero-thickness owner's front hit `region_to` is the owner, and the walk would take it as the
+  medium behind the pane. The rule reads the declared pair "support 'sphere', transmission
+  false" through `modelTransmitsWithoutCrossing` (materials/index.ts), not the model name.
+- The registry kitchen-sink compile (glsl-compile.test.ts) holds every model that can share a
+  scene with media; thin_dielectric is compiled by the per-model AOV case.
+- The materials README occupant list gains rough_dielectric, checker and thin_dielectric; the
+  bias ledger's opaque-shadow entry names thin sheets.
+- New witness `thin-pane`: an orthographic camera over an emitter (albedo 0) with three panes
+  in horizontal bands (facing the camera, seen from the back, tilted to cos 0.5 so its mirror
+  rays miss the emitter), under pt-nee, pt-mis, pt and spectral pt-mis.
+
+**Measured:**
+- TS twin: 2R/(1 + R) equals R + T²R/(1 − R²) and the explicit series (η 1.0001, 1.33, 1.5,
+  2.4; cos in [0, 1]); the Stokes identity F(cos_t; η) = F(cos_i; 1/η) to 1e-12; reflection
+  frequency within 5σ over 10⁶ draws; T_tot(1) = 0.923077 and T_tot(0.5) = 0.836232 for η 1.5,
+  0 for the inverted η at cos 0.5.
+- Witness `thin-pane` (256 spp, tolerance 0.005): emitter 1.0000 on every key; facing pane
+  0.9226, back face 0.9227, tilted 0.8363 on keys 1–3 (expected 0.923077 / 0.836232); spectral
+  key 0.9223–0.9240 and 0.8367–0.8372. A single interface would read 0.96, an inverted η 0.
+- Digest: 281 of 282 scenes identical; the one difference is the new scene.
+- `npx vitest run`: 4442 passed.
+
+## 2026-11-07 — Microfacet energy compensation (`measurement.microfacet`)
+
+Integration step 7 of the photorealism batch (owner decision P1, Q2), with the review's
+must-fix items applied.
+
+**What:** a new measurement truncation `measurement.microfacet: 'single-scattering' |
+'energy-compensated'`, default `'single-scattering'` (existing images unchanged; always
+recorded in the program description and the export stamp). Compensated, `ggx` and
+`rough_dielectric` multiply eval and the sample weight by a gain on ωₒ (Turquin 2019, as
+Blender Cycles ships it): 1 + F_ms(1 − E)/E for the conductor (F_avg = f0 + (1 − f0)/21 for
+Schlick), 1/A on both lobes for glass. Sampling and pdfs are unchanged. The gains read one
+built-in table, `ggx-smith-energy-v1` (RGBA32F, 32 × 32·32, 512 KiB: the energy albedo over
+√μ, √α and the index coordinate z, both sides of the interface, and E_avg), built by
+`tools/microfacet-energy/generate.ts` from `components/materials/microfacet_energy/build.ts`
+and uploaded by the App with a hash check like the spectral tables. Under
+`'single-scattering'` the compiler emits each present gain as the constant 1.
+- The descriptor fact `usesMicrofacet: true` became `microfacet: { energy: 'conductor' |
+  'dielectric' }`: the include gate and the gain in one fact. The integration's third value,
+  `'none'` (a microfacet model with no gain, for sheen), is left to the sheen step, since
+  nothing declares it yet; adding it means `core.ts`'s gain list must skip it.
+- The roughness rows of `ggx` and `rough_dielectric` are constrained to [0, 1] (the table's
+  range), and `ggx`'s f0 to [0, 1] (it keeps the conductor gain's bounce series convergent),
+  through the existing row constraint, in every program. No suite scene authors values
+  outside. Known gap: a `{param}` slider authored without `min` or `max` passes, and
+  `setParam` can move it past 1, where the lookup extrapolates and the gain is wrong
+  (negative by roughness 1.5); the panel's slider stays in [0, 1]. The plan's Validator test
+  for this case was not written (microfacet_energy.md "Limits").
+- New witnesses: `ms-furnace` (white conductors at roughness 0.3 / 0.6 / 1, clear glass at
+  ior 1.5 and roughness 0.3 / 0.6 / 1, ior 1.33 at 1 and ior 2.0 at 0.6, in a samplable white
+  sky, under pt, pt-nee, pt-mis and spectral pt-mis) and `ms-furnace-control` (one white
+  conductor at roughness 1: single scattering reads 1 − ln 2 at the center, compensated 1).
+  Two `npm run frames` cases (`ggx`: veach-mis MIS, `rough-glass`: rough-mis MIS).
+
+**Measured:**
+- `frames compare` before/after: 22 of 22 pictures bit-identical, including the new `ggx` and
+  `rough-glass` cases and `spectral` (spectral-materials).
+- Digest: 255 of 279 existing scenes identical; the 24 scenes with `ggx` or
+  `rough_dielectric` differ only in the gain lines (the multiply by the gain, the generated
+  gain-of-1 functions, `ggx_fresnel_average`), comments and source-map line numbers; uniforms,
+  closures, parameters and scene data are identical. 2 new scenes.
+- TS: the table reproduces from `build.ts` bit for bit; furnace error through the lookup
+  (150 random conductor points, 70 per glass side): within the plan's bounds (max < 5e-3 /
+  8e-3, mean < 5e-4 / 1e-3); a colored conductor never exceeds 1 + 1e-3; the compensated
+  twins' mean sample weights in the furnace are 1 within 1.5%. Whether the GLSL eval and
+  sample apply the same gain is checked only by the `ms-furnace` witness (a TS twin applies
+  one gain to both).
+- Witnesses (SwiftShader, 512 spp): every `ms-furnace` sphere reads 1 within 0.5% under pt,
+  pt-mis and spectral pt-mis (tolerance 0.01) and within 1.2% under pt-nee (roughness ≥ 0.6,
+  tolerance 0.05); sky 1.0000. With eval's gain removed by hand, pt-nee read 0.36 (conductor,
+  roughness 1) and pt-mis 0.72: the witness checks the eval side. `ms-furnace-control`: 0.3052
+  (single scattering, expected 0.3069 ± 0.005) and 0.9999. Unchanged: `rough-furnace`
+  (1.0000; 0.9999 / 0.9978 / 0.9021), `veach-mis`, `rough-mis` (nee vs mis 0.23%, pt rmse
+  39.76%), `spectral-materials` (NEE vs MIS 0.23%).
+- The largest suite program binds 8 samplers; a compensated program adds 1.
+- Not used in the witness: glass at ior 2.4 and roughness 1. The gain makes sample weights
+  exceed 1, and inside strongly trapping glass the result is heavy-tailed (it read 2% low at
+  1024 spp under three of four estimators). A TS random walk inside that sphere (build.ts's
+  sampling and lookup, energy weights, 4 × 10⁷ paths over the witness region) reads 0.999
+  (four runs of 10⁷: 0.989 to 1.007); its batches of 4.6 × 10⁵ paths, the region's count at
+  1024 spp, range from 0.954 to 1.084. The same walk for the witness's glass spheres reads 1
+  within 0.07% (2 × 10⁶ paths each); the 64-bounce truncation's share is 4 × 10⁻⁵ at ior 1.5
+  and roughness 0.3 and no path at the others.
+
+## 2026-11-07 — Derived material fields computed per hit when their input varies
+
+Integration step 6 of the photorealism batch (owner decision P1, Q1; the image-textures
+review's must-fix 5).
+
+**What:** a derived material field (`MaterialDerivedSpec`) may declare a per-hit form `glsl`
+beside its host form `fn`. When every input is a constant or a `{param}`, nothing changes: the
+host computes it (a literal or a compute-closure uniform). When an input varies over the
+surface (a GLSL expression or a per-instance attribute), the material lookup computes it per
+hit from the inputs' struct fields, after assigning them:
+`props.alpha = max(1e-3, props.roughness * props.roughness);`. The microfacet α is declared
+once (`components/materials/microfacet.ts`) and used by `ggx` and `rough_dielectric`. A field
+without a per-hit form (plastic's `coat_fdr`, a quadrature) keeps the rule that its input is a
+constant or a `{param}`, now also for per-instance attributes. So an expression or per-instance
+roughness compiles; a Cauchy or blackbody value on a roughness row gets the row's own message
+("Cauchy is an index form"). This reverses the recorded rule "GLSL never recomputes a pure
+function of its own rows" for spatial inputs only.
+
+**Witnesses added:** `rough-furnace-expr` (twin of `rough-furnace` with each roughness written
+as a formula for its constant) and `veach-mis-varying` (one GGX material on the four plates,
+roughness 0.05 → 0.6 along x; pt-mis, pt-nee and pt agree).
+
+**Measured:**
+- Digest: of the 277 existing suite scenes, 255 are identical. The other 22 (every scene with
+  `ggx` or `rough_dielectric`) differ only in GLSL comment text: rewritten comments in
+  `ggx.glsl`, `rough_dielectric.glsl` and `microfacet.glsl`, with the same line count. A script
+  compared the kept text with `//` comments removed and found 0 differences in 98 differing
+  parts. Code-only changes, before the comments were edited, gave 277 of 277 identical. There
+  are 2 new scenes.
+- Contract test: the per-hit form of α, evaluated as JavaScript, equals `fn` exactly on an
+  11-point grid. A compiler test checks the emitted lines (literal, uniform, per-hit for
+  expression and per-instance roughness, in RGB and spectral) and runs glslang on them.
+- Witnesses (SwiftShader): `rough-furnace-expr` against `rough-furnace` Δmean 0.00%, rmse
+  0.00%. `veach-mis-varying`: mis vs nee Δmean 0.04% (χ²ᵣ 0.01), pt Δmean 0.32% (rmse 84% ≤
+  120%). These existing witnesses pass unchanged: `veach-mis`, `rough-smooth-limit` (0.5543),
+  `rough-furnace` (background 1.0000; 0.9999 / 0.9978 / 0.9021), and `rough-mis` (nee vs mis
+  0.23%; the pt tripwire rmse 39.76% against its 40% gate, rerun alone after the first run
+  timed out under load).
+
+## 2026-11-07 — `plastic`: a smooth clear coat over a Lambertian base
+
+Integration step 3 of the photorealism batch
+(docs/claude-2026-11-review/photoreal/coated/plan.md, with its review's must-fix items).
+
+**What:** a new material occupant, `src/components/materials/plastic/` (Mitsuba 3 `plastic`,
+`nonlinear = true`): a delta coat lobe F(μ_o) and the base seen through the coat,
+R/(1 − R·K)·(1 − F_i)(1 − F_o)/(π η²). The coat's internal diffuse reflectance K is a
+host-derived field (`coat_fdr`) computed by exact quadrature, not Mitsuba's fit. Settings:
+`albedo` (confined to [0, 1] in both color models, because R/(1 − R·K) has a pole at R = 1/K)
+and `coat_eta` (the coat's index relative to the outside medium; a constant or `{param}` only,
+since it feeds K). No compiler, engine, transport or core GLSL change; one registry line.
+
+**Witnesses added:** `plastic-furnace` (R = 1: every pixel reads 1, center and whole frame),
+`plastic-chroma` (base (0.8, 0.5, 0.2): center A(1) = (0.632833, 0.316071, 0.127997)) under
+pt-nee, pt-mis and pt; `spectral-plastic` (gray 0.5, frame mean 0.316313).
+
+**Measured:**
+- TS twin (plastic.test.ts): the Fresnel identity to 1e-12; χ² with the delta lobe as a cell
+  passes at p = 0.001 in 9 configurations (η 1.5 and 0.8, grazing included); the triple and
+  pdf agreement to 1e-12; reciprocity; A(μ) against eval quadrature to 1e-9 and against the
+  mean sample weight within 3σ.
+- Witnesses (SwiftShader): `plastic-furnace` center (1.0029, 0.9995, 1.0002) and whole frame
+  (0.9998, 0.9999, 1.0000) for keys pt-nee, pt-mis, pt; `plastic-chroma` red/green/blue on the
+  three keys within 0.0014 of A(1); `spectral-plastic` 0.3168 vs 0.316313; `furnace-sky`
+  unchanged and passing. At 96 spp the pt-nee arm read +1.5% (as did furnace-sky's Lambert
+  sphere on the same stream); the two plastic entries use 384 spp, like `fog-sky`.
+- Digest: the 274 existing suite scenes are identical; 3 new scenes.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

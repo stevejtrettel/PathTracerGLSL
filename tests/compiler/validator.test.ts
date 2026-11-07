@@ -492,12 +492,12 @@ describe('Validator — schema discipline warnings (R2)', () => {
             s.materials['m'] = { model: 'lambert', albdeo: [1, 0, 0] };
         });
         expect(typo.getWarnings().map(w => w.message)).toContain(
-            "Material 'm': unknown field 'albdeo' is ignored by model 'lambert' (valid: model, medium, sampleAsLight, albedo, emission)");
+            "Material 'm': unknown field 'albdeo' is ignored by model 'lambert' (valid: model, medium, sampleAsLight, bump, albedo, emission)");
         const glassAlbedo = run(s => {
             s.materials['m'] = { model: 'dielectric', ior: 1.5, albedo: [0.9, 0.9, 0.9] };
         });
         expect(glassAlbedo.getWarnings().map(w => w.message)).toContain(
-            "Material 'm': unknown field 'albedo' is ignored by model 'dielectric' (valid: model, medium, sampleAsLight, transmittance, ior)");
+            "Material 'm': unknown field 'albedo' is ignored by model 'dielectric' (valid: model, medium, sampleAsLight, bump, transmittance, ior)");
     });
 
     it("warns on a key on model 'none', which reads no surface properties", () => {
@@ -580,6 +580,27 @@ describe('Validator — correctness domains', () => {
         expect(run(s => {
             s.materials.m = { model: 'lambert', albedo: { param: 'm.albedo', default: [0.5, 0.5] as never } };
         }).getErrors().some(e => /albedo must be a finite number or vec3/.test(e.message))).toBe(true);
+    });
+
+    it('a row feeding a derived field computed only on the host takes a constant or a {param}', () => {
+        const coat = (value: unknown) => (s: SceneDescription) => { s.materials.m = { model: 'plastic', coat_eta: value as never }; };
+        expect(run(coat({ kind: 'glsl', source: '1.5 + 0.1 * uv.x' })).getErrors().map(e => e.message))
+            .toEqual([`Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression`]);
+        expect(run(coat({ cauchy: [1.5, 0.004] })).getErrors().map(e => e.message))
+            .toEqual([`Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not a Cauchy value`]);
+        expect(run(coat(1.5)).hasErrors()).toBe(false);
+        expect(run(coat({ param: 'm.coat', default: 1.5, min: 1, max: 2 })).hasErrors()).toBe(false);
+    });
+
+    it('a row feeding a derived field with a per-hit form takes an expression; a named kind meets the row\'s own checks', () => {
+        const roughness = (model: 'ggx' | 'rough_dielectric', value: unknown) => (s: SceneDescription) => {
+            s.materials.m = { model, roughness: value as never };
+        };
+        for (const model of ['ggx', 'rough_dielectric'] as const) {
+            expect(run(roughness(model, { kind: 'glsl', source: '0.1 + 0.2 * uv.x' })).hasErrors()).toBe(false);
+            expect(run(roughness(model, { cauchy: [1.5, 0.004] })).getErrors().map(e => e.message))
+                .toEqual([`Material 'm': roughness: Cauchy is an index form`]);
+        }
     });
 
     it('rejects malformed transform.position values from untyped scene input', () => {
@@ -777,12 +798,20 @@ describe('Validator — instance attributes', () => {
         expect(framed.getErrors().some(e => /per-instance emission is supported only on params-tier SPHERE batches/.test(e.message))).toBe(true);
     });
 
-    it('rejects rows feeding a derived field (ggx roughness → alpha)', () => {
+    it('rejects rows feeding a derived field computed only on the host (plastic coat_eta → coat_fdr)', () => {
+        const bag = run(s => {
+            s.materials.coated = { model: 'plastic', coat_eta: 1.5 };
+            s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'coated' }, placements, attributes: { coat_eta: [1.4, 1.6] } } as never);
+        });
+        expect(bag.getErrors().map(e => e.message)).toEqual([`Object 1 (instanced): attributes.coat_eta feeds the derived field 'coat_fdr', which is computed once per material on the host`]);
+    });
+
+    it('accepts rows feeding a derived field with a per-hit form (ggx roughness → alpha)', () => {
         const bag = run(s => {
             s.materials.metal = { model: 'ggx', roughness: 0.3, f0: [0.9, 0.9, 0.9] };
             s.objects.push({ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 0.5 }, material: 'metal' }, placements, attributes: { roughness: [0.1, 0.5] } } as never);
         });
-        expect(bag.getErrors().some(e => /feeds the derived field/.test(e.message))).toBe(true);
+        expect(bag.hasErrors()).toBe(false);
     });
 
     it('checks per-instance values against the row\'s own constraint, as for the material (checker uv_scale > 0)', () => {

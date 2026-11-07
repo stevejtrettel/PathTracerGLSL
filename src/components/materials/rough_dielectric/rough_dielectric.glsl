@@ -20,14 +20,17 @@
 // lobe's (1−F) against (1−F), leaving G1(wi) [× eta² × tint]. If a future edit needs the
 // full f·|cos|/pdf quotient at the sampling site, something has drifted.
 //
-// Fields read: mp.alpha (D4 derived host-side: max(1e-3, roughness²) — the α floor is
+// Energy: both lobes of eval and of the sample weight carry microfacet_dielectric_gain
+// (materials/microfacet_energy), the constant 1 under measurement.microfacet
+// 'single-scattering'; the index-matched delta pass-through already loses nothing.
+// Fields read: mp.alpha (the derived field max(1e-3, roughness²) — the α floor is
 // the house convention; author true smooth glass as `dielectric`, since a runtime
 // delta flip would break the compile-time NEE guard), mp.transmittance (interface tint;
 // interior absorption is the medium's job, §4.4). ior is region-indexed.
 // Provides: rough_dielectric_eval/sample/pdf/emission().
-// Depends on: ior_of() (generated), microfacet_* (core), dielectric_fresnel() (core
-//             math), MaterialProperties, Hit/Frame, InteractionSample, LOBE_*,
-//             SPECTRUM_ZERO/ONE, ambient_dot.
+// Depends on: ior_of() (generated), microfacet_* (core), microfacet_dielectric_gain,
+//             dielectric_fresnel() (core math), MaterialProperties, Hit/Frame,
+//             InteractionSample, LOBE_*, SPECTRUM_ZERO/ONE, ambient_dot.
 // The TS twin in rough_dielectric.test.ts is the tested ground truth (§11.3): χ² over
 // both lobes, the weight·pdf ≈ eval·|cos| triple on both sides, η²-aware reciprocity.
 
@@ -59,15 +62,17 @@ Spectrum rough_dielectric_eval(Direction wi, Direction wo, Hit hit, MaterialProp
     float F = dielectric_fresnel(cos_om, eta);
     float DG = microfacet_D(m, a) * microfacet_G1(wol, a) * microfacet_G1(wil, a);
 
+    float g = microfacet_dielectric_gain(wol.z, a, eta);   // energy gain on wo, both lobes
+
     if (wil.z > 0.0) {   // reflection lobe — bare f (§2.2), no cosine here
-        return SPECTRUM_ONE * (DG * F / (4.0 * wil.z * wol.z));
+        return SPECTRUM_ONE * (DG * F / (4.0 * wil.z * wol.z)) * g;
     }
     // Transmission lobe (Walter Eq. 21): the change-of-variables denominator, then the
     // η² radiance compression. eta = 1/etap, so (wo·m)/etap = (wo·m)·eta.
     float denom = dot(wil, m) + dot(wol, m) * eta;
     denom *= denom;
     float ft = DG * (1.0 - F) * abs(dot(wil, m) * dot(wol, m) / (wil.z * wol.z * denom));
-    return mp.transmittance * (ft * eta * eta);
+    return mp.transmittance * (ft * eta * eta) * g;
 }
 
 InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
@@ -102,6 +107,7 @@ InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialPropert
     }
 
     vec3 m = microfacet_sample_vndf(wol, a, u);       // visible microfacet normal (Heitz 2018)
+    float g = microfacet_dielectric_gain(wol.z, a, eta);   // energy gain on wo, both lobes
     float cos_om = clamp(dot(wol, m), 1e-6, 1.0);
     float F = dielectric_fresnel(cos_om, eta);        // TIR is not a special case: it is F = 1
 
@@ -109,7 +115,7 @@ InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialPropert
     if (uc < F) {
         wil = reflect(-wol, m);
         if (wil.z <= 0.0) return s;                   // reflected below the horizon: dead sample
-        s.weight = SPECTRUM_ONE * microfacet_G1(wil, a);   // F cancels against P(reflect) = F
+        s.weight = SPECTRUM_ONE * microfacet_G1(wil, a) * g;   // F cancels against P(reflect) = F
         s.pdf    = F * microfacet_G1(wol, a) * microfacet_D(m, a) / (4.0 * wol.z);
         s.flags  = LOBE_REFLECTION;
     } else {
@@ -123,7 +129,7 @@ InteractionSample rough_dielectric_sample(Direction wo, Hit hit, MaterialPropert
         // crossing into a denser medium; camera paths transport backwards, so throughput
         // carries (n_i/n_t)². It cancels on enter+exit round trips, which is why omitting
         // it "looks fine" until a path terminates inside the medium. F-ETA: 0.554 vs 0.980.
-        s.weight = mp.transmittance * (microfacet_G1(wil, a) * eta * eta);
+        s.weight = mp.transmittance * (microfacet_G1(wil, a) * eta * eta) * g;
         s.pdf    = (1.0 - F) * microfacet_G1(wol, a) * microfacet_D(m, a) * cos_om / wol.z
                  * abs(dot(wil, m)) / denom;          // VNDF density × dwm_dwi
         s.flags  = LOBE_TRANSMISSION;                 // NO LOBE_DELTA — the first such sample

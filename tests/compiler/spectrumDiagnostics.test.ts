@@ -59,6 +59,13 @@ const cases: Record<string, Mutation> = {
     'cauchy as medium ior': set((s) => { s.materials.fog.medium.ior = { cauchy: [1.5, 0.004] }; }),
     'sellmeier as albedo': set((s) => { s.materials.m.albedo = { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } }; }),
     'sellmeier as medium ior': set((s) => { s.materials.fog.medium.ior = { sellmeier: { B: [1, 0, 0], C: [0.01, 0, 0] } }; }),
+    // Rows feeding a derived field. Roughness feeds alpha, which has a per-hit form: a named
+    // kind meets the row's own checks, and an expression compiles. coat_eta feeds coat_fdr,
+    // which is computed only on the host: it takes a constant or a {param}.
+    'cauchy as ggx roughness': set((s) => { s.materials.m = { model: 'ggx', f0: 0.9, roughness: { cauchy: [1.5, 0.004] } }; }),
+    'blackbody as rough_dielectric roughness': set((s) => { s.materials.glass = { model: 'rough_dielectric', ior: 1.5, roughness: blackbody(3000) }; }),
+    'expression as ggx roughness': set((s) => { s.materials.m = { model: 'ggx', f0: 0.9, roughness: { kind: 'glsl', source: '0.1 + 0.2 * uv.x' } }; }),
+    'expression as plastic coat_eta': set((s) => { s.materials.m = { model: 'plastic', coat_eta: { kind: 'glsl', source: '1.5 + 0.1 * uv.x' } }; }),
     // Bad numbers inside a kind.
     'blackbody kelvin below range': set((s) => { s.lights[0].emission = blackbody(500); }),
     'blackbody kelvin slider default above range': set((s) => { s.lights[0].emission = blackbody({ param: 'lamp.k', default: 50000 }); }),

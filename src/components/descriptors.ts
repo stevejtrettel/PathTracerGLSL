@@ -82,15 +82,27 @@ export type PropertySchema<TSource extends string = string> = {
     storage: 'field' | 'region-table';
 }
 
-/** A DERIVED material property (D4 — the CameraDerived rail on the schema): a pure
- *  function of this model's ROW values, computed HOST-SIDE — baked as a literal when
- *  every input is constant, a compute-closure uniform when any input is driven (the
- *  u_majorant pattern; `fn` runs for BOTH the plan-time bake and the per-frame value,
- *  so the two can never drift). Lands in MaterialProperties as a struct field the
- *  occupant reads (`mp.<name>`) — GLSL never recomputes a pure function of its own
- *  rows per evaluation (ggx's alpha = max(1e-3, roughness²) is the first occupant). */
+/** A DERIVED material property: a pure function of this model's ROW values, landing in
+ *  MaterialProperties as a struct field the occupant reads (`mp.<name>`), so the occupant
+ *  never repeats the formula (ggx's alpha = max(1e-3, roughness²)).
+ *  Where it is computed depends on the material's input values:
+ *  - every input a constant or a {param}: on the HOST by `fn`, baked as a literal when all
+ *    are constant, else a compute-closure uniform (`fn` runs for both the plan-time bake and
+ *    the per-frame value);
+ *  - some input varying over the surface (a GLSL expression or a per-instance attribute):
+ *    per hit by `glsl`, in the material lookup after the input rows are assigned. A field
+ *    without `glsl` (an expensive derivation, such as plastic's quadrature) takes only
+ *    constant or {param} inputs, which the Validator enforces (hostDerivedFieldFedBy).
+ *  `fn` and `glsl` are the same function in two languages; the materials contract test
+ *  evaluates `glsl` against `fn`. A Spectrum field has no per-hit form: nothing needs one,
+ *  and its formula would have to be written for both color models' Spectrum types. */
 export type MaterialDerivedSpec = (
-    | { glslType: 'float' }
+    | {
+          glslType: 'float';
+          /** The per-hit form: a GLSL float expression over the inputs, given each input's
+           *  struct field (`props.<name>`) keyed by row source. Its inputs are field rows. */
+          glsl?(fields: Record<string, string>): string;
+      }
     | { glslType: 'Spectrum'; role: RadiometricRole }
 ) & {
     name: string;
@@ -108,12 +120,16 @@ export interface MaterialModelDescriptor {
     glsl: string;
     /** Fields this model READS → scene-scoped struct + resolver (§3.4, R2). */
     properties: PropertySchema[];
-    /** DERIVED fields (D4) — join the struct union like rows; never authored. */
+    /** DERIVED fields: join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
-    /** This model is written against glsl/core/microfacet.glsl (D / Smith G₁ / VNDF /
-     *  the frame maps). The INCLUDE GATE for that fixed-core library — declared, never
-     *  a model-name list in the generator (fable-rough-dielectric §4). Default false. */
-    usesMicrofacet?: boolean;
+    /** Present when this model is written against glsl/core/microfacet.glsl (D / Smith G₁ /
+     *  VNDF / the frame maps): the include gate for that library, declared rather than a
+     *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
+     *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
+     *  (materials/microfacet_energy): `microfacet_conductor_gain` or
+     *  `microfacet_dielectric_gain`. Under measurement.microfacet 'single-scattering' the
+     *  compiler emits that gain as the constant 1. */
+    microfacet?: { energy: 'conductor' | 'dielectric' };
     /** The model's albedo for the albedo guide (components/aov): the surface's color
      *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
      *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`
@@ -137,8 +153,9 @@ export interface MaterialModelDescriptor {
          *  conflated fact when a reader asks only half of it). The reader is light
          *  SELECTION: the light tree's below-horizon cull is licensed by a
          *  hemisphere claim, so a sphere-support receiver that runs NEE must get a
-         *  two-sided query. A future translucent model answers 'sphere' with
-         *  transmission FALSE (no index change) — which is why one flag cannot serve. */
+         *  two-sided query. thin_dielectric answers 'sphere' with transmission FALSE
+         *  (light passes through with no index change), as a translucent model would —
+         *  which is why one flag cannot serve. modelTransmitsWithoutCrossing reads that pair. */
         support: 'hemisphere' | 'sphere';
         /** May emit — eligibility for the emission gate + light registry (§6.2);
          *  whether a given MATERIAL emits stays a per-value analysis. */

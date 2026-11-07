@@ -62,7 +62,24 @@ Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy conver
 `dielectric/` (delta, η² factor — F-ETA 0.554), `ggx/` (VNDF; see `ggx/ggx.md`),
 `mirror/` (delta conductor, Schlick — shares the `f0` row with ggx, the first real
 §3.4 union-dedupe pair; F-MIRROR = f0·L convex).
+`rough_dielectric/` (GGX microfacet glass; see `rough_dielectric/rough_dielectric.md`),
+`checker/` (a two-color Lambertian checkerboard on the shape's uv chart),
+`plastic/` (smooth clear coat over a Lambertian base, Mitsuba's interfaced Lambertian: a
+delta coat lobe and a non-delta diffuse lobe in one model, so a single sample can carry
+LOBE_DELTA; albedo in [0, 1]; `coat_eta` is relative to the outside medium; see
+`plastic/plastic.md`),
+`thin_dielectric/` (an infinitely thin glass sheet, pbrt's ThinDielectricBxDF: delta reflection
+2R/(1 + R) and straight-through transmission, both of weight 1; `sheet_eta` is relative to the
+medium around it; it passes light through without changing region, so the Validator rejects it
+in scenes with media; see `thin_dielectric/thin_dielectric.md`).
 
+
+**Microfacet models** (`ggx`, `rough_dielectric`) declare `microfacet: { energy }`: the gate
+for `glsl/core/microfacet.glsl` and the energy gain their GLSL multiplies into eval and the
+sample weight. `microfacet_energy/` is the shared part behind the gains (not an occupant):
+the energy table, its TS twin and builder, and `microfacet_energy.glsl`, linked under
+`measurement.microfacet: 'energy-compensated'`; otherwise the compiler emits each gain as 1.
+Their roughness rows lie in [0, 1], the table's range (`microfacet_energy/microfacet_energy.md`).
 
 Index-consuming models mark their region-table row with `role: 'index'`.
 `modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics

@@ -235,18 +235,10 @@ notes (`rough_dielectric.md`, "Energy") record the measured loss for glass: unde
 below roughness 0.1, ≤ 2.4% at 0.2, 8–23% at 0.5 and up to 39% at 0.7 (grazing exit). Rough
 metals lose energy the same way.
 
-**Plan.** Kulla & Conty 2017, "Revisiting Physically Based Shading at Imageworks" (SIGGRAPH
-course). Tabulate the single-scattering directional albedo E(μ, α) (32×32) and its average
-E_avg(α) once offline (a TS script; the tables ship as constants). Add the lobe
-
-  f_ms(μ_o, μ_i) = (1 − E(μ_o))(1 − E(μ_i)) / (π·(1 − E_avg)),
-
-scaled for colored conductors by F_avg²·E_avg / (1 − F_avg·(1 − E_avg)) (the sum over
-second and later bounces, each attenuated by the average Fresnel F_avg). Sample it with a
-cosine-weighted lobe mixed into the existing VNDF sampler. Witness: a white furnace for the
-BSDF (a GGX sphere with f0 = 1 under a uniform white sky and no other light), which today
-reads the directional albedo E(μ) < 1, darkest toward the silhouette, and should read 1
-everywhere. For glass, the table above says compensation matters only above roughness ~0.3.
+**Built** as `measurement.microfacet: 'energy-compensated'` with Turquin 2019's gain on ωₒ
+(the form Blender Cycles ships) rather than Kulla–Conty's added lobe: sampling and the pdf
+stay unchanged. See `src/components/materials/microfacet_energy/microfacet_energy.md` and
+the `ms-furnace` witness.
 
 ### 2.5 Metals with measured optical constants
 

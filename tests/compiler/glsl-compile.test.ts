@@ -8,7 +8,7 @@ import { isAsyncSceneEntry, type SceneSuiteEntry } from '../witnesses/types.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import type { MeshObject } from '../../src/compiler/types.js';
 import { PRIMITIVES } from '../../src/components/geometry/index.js';
-import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
+import { MATERIAL_MODELS, modelTransmitsWithoutCrossing } from '../../src/components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../src/components/volume_scattering/index.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import type { SceneDescription, RenderStrategy, ObjectDescription, LightDescription, MaterialDescription, MaterialModel } from '../../src/compiler/types.js';
@@ -149,9 +149,9 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
     });
 
     // ============================================================================
-    // Registry kitchen sink (A4): a scene SYNTHESIZED from the registries themselves —
-    // every primitive (constant AND driven placement), every material model, every
-    // phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
+    // Registry kitchen sink: a scene SYNTHESIZED from the registries themselves —
+    // every primitive (constant AND driven placement), every material model that can share
+    // a scene with media, every phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
     // means a new occupant's GLSL is otherwise invisible to glslang until some suite
     // scene uses it (the cylinder lesson); this test closes that gap the moment the
     // registry line lands. Light kinds need a sample authored form (input language is
@@ -163,7 +163,11 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
     describe('registry kitchen sink compiles (every occupant, glslang static check)', () => {
         it('synthesized all-occupant scene + pt-mis', () => {
             const materials: Record<string, MaterialDescription> = {};
-            const surfaceModels = Object.keys(MATERIAL_MODELS) as MaterialModel[];
+            // A model that transmits without crossing the interface (a thin sheet) cannot share a
+            // scene with media (the Validator rejects the pair); the per-model AOV cases below
+            // compile it in a media-free program.
+            const surfaceModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[])
+                .filter((id) => !modelTransmitsWithoutCrossing(id));
             for (const id of surfaceModels) {
                 materials[`mat_${id}`] = { model: id };
             }

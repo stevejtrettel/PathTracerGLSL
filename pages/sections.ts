@@ -34,7 +34,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Spectral foundations',
         blurb: 'four-wavelength transport, CIE sensor response, live colours, packed data and surface materials',
-        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-expressions'), e('spectral-expressions-constant', 'spectral-expressions-ref'), e('spectral-mirror'), e('spectral-eta'), e('spectral-inclusion'), e('spectral-blackbody', 'spectral-blackbody-ref'), e('spectral-blackbody-changed', 'spectral-blackbody-changed-ref'), e('spectral-blackbody-tree'), e('blackbody-lamp-batch'), e('blackbody-equiangular'), e('spectral-gaussian-plane'), e('spectral-blackbody-softbeam'), e('spectral-showcase'), e('spectral-dispersion-prism'), e('spectral-dispersion-beam'), e('spectral-dispersion-bk7'), e('spectral-dispersion-slab'), e('spectral-blackbody-direct'), e('spectral-blackbody-receiver'), e('spectral-grin'), e('spectral-grin-slab'), e('spectral-grin-vacuum'), e('spectral-grin-scatter', 'spectral-grin-scatter-ref'), e('spectral-grin-furnace-hard'), e('spectral-grin-furnace-emit'), e('spectral-grin-furnace-scatter'), e('spectral-emit'), e('spectral-emit-tracking'), e('spectral-emit-clamp'), e('spectral-emit-vacuum'), e('spectral-emit-vacuum-tracking'), e('spectral-emit-budget'), e('spectral-emit-driven'), e('spectral-emit-scatter'), e('spectral-tracking-slab'), e('spectral-tracking-clamp'), e('spectral-tracking-shadow'), e('spectral-tracking-fog'), e('spectral-slab'), e('spectral-shadow-slab'), e('spectral-scatter-furnace'), e('spectral-fog'), e('spectral-rayleigh-furnace'), e('spectral-fog-placement'), e('spectral-sky'), e('spectral-proc-sky'), e('sky-missed-cap'), e('spectral-comp-empty'), e('spectral-image-constant', 'spectral-image-constant-ref')],
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-expressions'), e('spectral-expressions-constant', 'spectral-expressions-ref'), e('spectral-mirror'), e('spectral-plastic'), e('spectral-eta'), e('spectral-inclusion'), e('spectral-blackbody', 'spectral-blackbody-ref'), e('spectral-blackbody-changed', 'spectral-blackbody-changed-ref'), e('spectral-blackbody-tree'), e('blackbody-lamp-batch'), e('blackbody-equiangular'), e('spectral-gaussian-plane'), e('spectral-blackbody-softbeam'), e('spectral-showcase'), e('spectral-dispersion-prism'), e('spectral-dispersion-beam'), e('spectral-dispersion-bk7'), e('spectral-dispersion-slab'), e('spectral-blackbody-direct'), e('spectral-blackbody-receiver'), e('spectral-grin'), e('spectral-grin-slab'), e('spectral-grin-vacuum'), e('spectral-grin-scatter', 'spectral-grin-scatter-ref'), e('spectral-grin-furnace-hard'), e('spectral-grin-furnace-emit'), e('spectral-grin-furnace-scatter'), e('spectral-emit'), e('spectral-emit-tracking'), e('spectral-emit-clamp'), e('spectral-emit-vacuum'), e('spectral-emit-vacuum-tracking'), e('spectral-emit-budget'), e('spectral-emit-driven'), e('spectral-emit-scatter'), e('spectral-tracking-slab'), e('spectral-tracking-clamp'), e('spectral-tracking-shadow'), e('spectral-tracking-fog'), e('spectral-slab'), e('spectral-shadow-slab'), e('spectral-scatter-furnace'), e('spectral-fog'), e('spectral-rayleigh-furnace'), e('spectral-fog-placement'), e('spectral-sky'), e('spectral-proc-sky'), e('sky-missed-cap'), e('spectral-comp-empty'), e('spectral-image-constant', 'spectral-image-constant-ref')],
     },
     {
         title: 'Closed manifolds',
@@ -116,7 +116,7 @@ export const gallerySections: GallerySection[] = [
             e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('instance-lights-sky'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'), e('fog-area-ignored'),
             e('orb'), e('cornell-disk'), e('shadow-aim-march'), e('shadow-aim-far'), e('shadow-aim-fog'),
             e('disk-bake', 'disk-bake-ref'),
-            e('spot'), e('veach-mis'),
+            e('spot'), e('veach-mis'), e('veach-mis-varying'),
             e('sun'), e('beam-wall'), e('beam-slab'), e('beam-fog'), e('laser'),
             e('softbeam-wall'), e('laser-soft'),
         ],
@@ -132,16 +132,16 @@ export const gallerySections: GallerySection[] = [
         entries: [
             e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
             e('regions-transformed', 'regions-transformed-ref'),
-            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('region-overlap'),
+            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('rough-furnace-expr'), e('ms-furnace'), e('ms-furnace-control'), e('region-overlap'),
             e('rough-grin', 'rough-grin-ref'),
             e('rough-sheet'),
         ],
     },
     {
         title: 'Materials & texturing',
-        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos, bump mapping, image textures',
+        blurb: 'surface models and texturing: mirror + GGX showcase, the plastic coat, thin glass panes, blackbody emission, UV charts, expression albedos, bump mapping, image textures',
         entries: [
-            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
+            e('chrome'), e('mirror'), e('plastic-furnace'), e('plastic-chroma'), e('thin-pane'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
             e('expr-const', 'expr-const-ref'),
             e('bump-tilt'), e('bump-sides'),
             e('image-texture', 'image-texture-linear', 'image-texture-spectral'),

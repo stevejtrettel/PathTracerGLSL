@@ -5,6 +5,7 @@
 // compile-time NEE guard).
 
 import type { MaterialModelDescriptor } from '../../descriptors.js';
+import { microfacetAlpha } from '../microfacet.js';
 import roughDielectricGLSL from './rough_dielectric.glsl?raw';
 
 export const roughDielectricDescriptor: MaterialModelDescriptor = {
@@ -14,17 +15,15 @@ export const roughDielectricDescriptor: MaterialModelDescriptor = {
     // region-table ior with dielectric — so this model adds NO field to
     // MaterialProperties. No f0: a dielectric's Fresnel is exact, not a Schlick fit.
     properties: [
-        { name: 'roughness', glslType: 'float', source: 'roughness', default: 0.2, storage: 'field' },
+        // [0, 1]: the energy table's range (α ≤ 1).
+        { name: 'roughness', glslType: 'float', source: 'roughness', default: 0.2, storage: 'field', constraint: { kind: 'closed-interval', min: 0, max: 1 } },
         { name: 'transmittance', glslType: 'Spectrum', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
         { name: 'ior', glslType: 'float', role: 'index', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
-    // D4 derived, SHARED with ggx by name + type (the union dedupes; the fn is the same
-    // declaration, so the two can never disagree about the floor).
-    derived: [{
-        name: 'alpha', glslType: 'float', inputs: ['roughness'],
-        fn: (v) => Math.max(1e-3, (v.roughness as number) * (v.roughness as number)),
-    }],
-    usesMicrofacet: true,
+    // alpha = max(1e-3, roughness²): the declaration ggx uses too, so the struct union
+    // holds one field and the two models agree on the floor.
+    derived: [microfacetAlpha],
+    microfacet: { energy: 'dielectric' },
     albedo: { row: 'transmittance' },   // 1 for clear glass, the tint for tinted glass
     capabilities: {
         nonDeltaLobes: true,    // glossy on BOTH lobes: NEE samples it, MIS weights against the pdf

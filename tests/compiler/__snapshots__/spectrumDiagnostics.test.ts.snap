@@ -467,6 +467,35 @@ exports[`spectrum diagnostics > blackbody as medium sigma_a 1`] = `
 }
 `;
 
+exports[`spectrum diagnostics > blackbody as rough_dielectric roughness 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': roughness: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': roughness: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'glass': roughness: blackbody is an emission form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'glass': roughness: blackbody is an emission form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
 exports[`spectrum diagnostics > blackbody as surface ior 1`] = `
 {
   "rgb": {
@@ -663,6 +692,35 @@ exports[`spectrum diagnostics > cauchy as albedo 1`] = `
     "validator": {
       "errors": [
         "Material 'm': albedo: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > cauchy as ggx roughness 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': roughness: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': roughness: Cauchy is an index form",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': roughness: Cauchy is an index form",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': roughness: Cauchy is an index form",
       ],
       "warnings": [],
     },
@@ -957,6 +1015,62 @@ exports[`spectrum diagnostics > expression and blackbody keys together 1`] = `
     "validator": {
       "errors": [
         "Material 'm': emission: the blackbody value has unknown keys 'kind', 'source' (its keys: blackbody)",
+      ],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression as ggx roughness 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression as plastic coat_eta 1`] = `
+{
+  "rgb": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
+      ],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "threw": "CompilationError: Compilation failed (1 error):
+  - Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
+    },
+    "validator": {
+      "errors": [
+        "Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
       ],
       "warnings": [],
     },

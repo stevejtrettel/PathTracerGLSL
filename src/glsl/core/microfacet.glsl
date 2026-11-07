@@ -4,15 +4,15 @@
 // registry); the DISTRIBUTION is not — D, Smith G₁ and VNDF sampling are one truth here,
 // so a program containing any one microfacet occupant links them exactly once and a
 // rough-glass-only scene needs no conductor.
-// Included when some present material model declares `usesMicrofacet` (the math_media
+// Included when some present material model declares `microfacet` (the math_media
 // pattern: conditional core, never wholesale).
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
 //           microfacet_to_local(), microfacet_from_local().
 // Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot/ambient_normalize.
 //
 // Convention (shared by every occupant): the local shading frame has n = +z, `a` is the
-// GGX roughness parameter α = roughness² clamped ≥ 1e-3 host-side (the descriptors' D4
-// derived row — the shader never recomputes it, and letting α → 0 produces fireflies,
+// GGX roughness parameter α = roughness² clamped ≥ 1e-3 (the derived field mp.alpha,
+// assigned by the material lookup; letting α → 0 produces fireflies,
 // not a mirror: author true specular as a delta model).
 // The TS twin in components/materials/ggx/ggx.test.ts is the tested ground truth for
 // D/G1/sample — line-for-line transcription, change one change both (§11.3).
