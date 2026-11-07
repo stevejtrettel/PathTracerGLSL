@@ -10,7 +10,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../src/components/materials/in
 
 /** SceneMaterial keys that are NOT properties — a row source colliding with one
  *  would make the authored record ambiguous. */
-const RESERVED_KEYS = new Set(['model', 'medium', 'sampleAsLight']);
+const RESERVED_KEYS = new Set(['model', 'medium', 'sampleAsLight', 'bump']);
 
 describe('material model descriptors (schema-vocabulary contract)', () => {
     for (const [id, d] of Object.entries(MATERIAL_MODELS)) {

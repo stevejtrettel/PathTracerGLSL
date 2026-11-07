@@ -149,7 +149,9 @@ verify harness (render → exportPNG → decode → nonzero + stamp present).
 - **Bloom/vignette**: view-layer sugar, dilutes the pass.
 - **Firefly clamping**: BIAS dressed as polish — if ever, it enters as a declared
   measurement truncation through the front door.
-- **Normal/bump mapping**: needs tangent frames from UVs — the natural SEQUEL to P1.
+- **Normal-map images**: need tangent frames from UVs — the natural SEQUEL to P1. Procedural
+  bump mapping (a height expression in `p`, no chart needed) is built: see
+  src/components/materials/README.md, "Shading-normal perturbation".
 
 ## 7. Decision forks (owner)
 

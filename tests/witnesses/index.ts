@@ -60,6 +60,11 @@ import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy,
 import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
+import {
+    bumpTiltScene, bumpTiltPtStrategy, bumpTiltNeeStrategy, bumpTiltMisStrategy, bumpTiltSpectralStrategy,
+    BUMP_TILT_VALUE, BUMP_TILT_POSE, BUMP_TILT_REGIONS,
+    bumpSidesScene, bumpSidesNeeStrategy, bumpSidesMisStrategy, BUMP_SIDES_VALUE, BUMP_SIDES_POSE, BUMP_SIDES_REGIONS,
+} from './scenes/bumpWitness.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
 import { MAX_DIST } from './scenes/shaderConstants.js';
@@ -2553,6 +2558,46 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
                 { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
             ],
+        },
+    },
+    'bump-tilt': {
+        scene: bumpTiltScene,
+        strategies: posed(BUMP_TILT_POSE.position, BUMP_TILT_POSE.target, bumpTiltPtStrategy, bumpTiltNeeStrategy, bumpTiltMisStrategy, bumpTiltSpectralStrategy),
+        exercises:
+            'Bump mapping (materials/README, shading-normal perturbation): h = p.x tilts a Lambert plane\'s '
+            + 'shading normal 45°; the frame swap in the walk, the flip (far rows) and the ng mask, under pt, '
+            + 'pt-nee, pt-mis and a spectral pt-nee',
+        expected:
+            'every plane pixel reads the lune ρ(1+cos 45°)/2 = 0.341421, flipped or not, on all four keys; '
+            + 'the sky reads 1.0. 0.4 means the mask is missing; ≈0 in the far rows means the flip is missing',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap((strategy) => [
+                { kind: 'mean' as const, value: BUMP_TILT_VALUE, tol: 0.006, strategy, region: BUMP_TILT_REGIONS.unflipped, label: `near rows (unflipped) = ρ(1+cos45°)/2 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: BUMP_TILT_VALUE, tol: 0.006, strategy, region: BUMP_TILT_REGIONS.flipped, label: `far rows (flipped) = ρ(1+cos45°)/2 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: 1.0, tol: 0.004, strategy, region: BUMP_TILT_REGIONS.sky, label: `sky = L = 1 (key ${strategy + 1})` },
+            ]),
+        },
+    },
+    'bump-sides': {
+        scene: bumpSidesScene,
+        strategies: posed(BUMP_SIDES_POSE.position, BUMP_SIDES_POSE.target, bumpSidesNeeStrategy, bumpSidesMisStrategy),
+        exercises:
+            'Bump mapping seen from both sides of a thin quad: the orientation sign σ (the relief must not invert '
+            + 'from behind) and the gradient sign, under two directional lights (pt-nee, pt-mis)',
+        expected:
+            'A front = ρ and B back = ρ (each shading normal faces its light head-on). ρ/√2 means no bump; '
+            + '0 on B means a wrong σ; 0 on A means a wrong gradient sign',
+        witness: {
+            size: [64, 64],
+            // Each sample reads 2ρ or 0 (one light of two is picked): σ of a region mean
+            // ≈ ρ/√(512·~190 px) ≈ 0.0013 at this budget.
+            spp: 512,
+            checks: [0, 1].flatMap((strategy) => [
+                { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.aFront, label: `quad A front = ρ (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.bBack, label: `quad B back = ρ (key ${strategy + 1})` },
+            ]),
         },
     },
 };

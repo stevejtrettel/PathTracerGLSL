@@ -100,6 +100,7 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             model: mat.model,
             values: resolveMaterialValues(mat.model, mat as unknown as Record<string, MaterialProperty | undefined>),
             medium: mat.medium === undefined ? null : resolveMedium(mat.medium),
+            ...(mat.bump !== undefined ? { bump: { height: mat.bump.height, step: mat.bump.step } } : {}),
         });
     }
 
@@ -467,6 +468,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // models fall out of the registry filter. Registry insertion order pins the dispatch
     // order (deterministic snapshots).
     const present = new Set(materials.map((m) => m.model));
+    const perturbed = materials.filter((m) => m.bump !== undefined).map((m) => m.id);
     const brdfModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[]).filter((m) => present.has(m));
 
     // Directional-emission gates (softbeam v0): kinds declaring the emissionCone fact
@@ -647,8 +649,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // reading only `p` still turns charts on — correctness-safe (a uv-formula is NEVER
             // missed), slightly wasteful. Precise per-formula uv-detection is the noted follow-up.
             materialsReadUv: Object.keys(scene.materials).some((name) => materialReadsUv(name, scene)),
-            // The noise library, for the material formulas to call.
-            ...(Object.keys(scene.materials).some((name) => materialHasExpression(name, scene)) ? { noise: true as const } : {}),
+            // The noise library, for the material formulas (rows and bump heights) to call.
+            ...(Object.keys(scene.materials).some((name) => materialHasExpression(name, scene)) || perturbed.length > 0 ? { noise: true as const } : {}),
+            // Bumped materials: the walk's frame swap and their masked interaction arms.
+            ...(perturbed.length > 0 ? { perturbed } : {}),
         },
         media: {
             present: features.media.hasMedia,

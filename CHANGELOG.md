@@ -4,6 +4,35 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Procedural bump mapping
+
+Photorealism integration step 5 (docs/claude-2026-11-review/photoreal/integration.md): Stage A of
+the normal-mapping plan, with its review's must-fix items. Stage B (normal-map images, which need
+a tangent on `Hit`) is deferred, to be planned with anisotropic GGX after image textures.
+
+- **Authoring**: the material meta-key `bump: { height, step }`. `height` is a float GLSL
+  expression in the world point `p` (sliders and the Perlin functions allowed); `step` is the
+  central-difference step in world units and is required (review must-fix 3: a world-length
+  default is a guess about scene scale). Validator errors: bump on model 'none', a non-expression
+  height, a missing or non-positive step, unknown keys.
+- **`src/glsl/core/shading_normal.glsl`**: the surface gradient by central differences along
+  geodesics (`ambient_geodesic`, so no uv chart and no Euclidean assumption), the perturbed frame
+  n − σ∇_S h with σ from `region_to == region_owner`, the Schüssler/Mitsuba flip, and the mask
+  (wi·ng)(wi·n'') > 0 in eval, pdf and sample.
+- **Linkage**: `program.materials.perturbed` (bumped ids, present only when non-empty). The walk
+  swaps `hit.frame` for `material_shading_frame(mat, hit, wo)` before the guides, NEE, the light
+  query and sampling; bumped ids get masked interaction arms; the Perlin library is included for
+  a bump height too.
+- **Tests**: `tests/glsl/shadingNormal.test.ts` (twin: flip guarantee, χ² of the masked sampler
+  with a rejected cell, the triple, albedo ≤ 1, BSDF/NEE/MIS agreement on the tilted plane, σ,
+  and the float32 finite-difference error law), `tests/compiler/bump.test.ts` (Validator rules,
+  linkage, glslang).
+- **Witnesses**: `bump-tilt` (the lune ρ(1+cos 45°)/2 = 0.341421 in flipped and unflipped rows,
+  with a black occluder under the plane so a missing flip reads 0; review must-fix 1) and
+  `bump-sides` (σ and the gradient sign, with light 2 chosen so the correct value is ρ, not 0;
+  review must-fix 2).
+- **Digest**: every existing scene identical; `bump-tilt` and `bump-sides` are new.
+
 ## 2026-11-07 — Perlin noise for material expressions
 
 Photorealism integration step 4 (docs/claude-2026-11-review/photoreal/integration.md): Part A

@@ -56,6 +56,10 @@ exports[`scene-data textures (byte fingerprints) > blackhole 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > bump-sides 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bump-tilt 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > cacti 1`] = `
 {
   "indices": "4096x2 52acce35509eb4a8",

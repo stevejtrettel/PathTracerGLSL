@@ -502,15 +502,32 @@ export interface MaterialDescription {
      * shapes `true` is a Validator error (V1-C2) — emissive SDFs stay path-only and still glow.
      */
     sampleAsLight?: boolean;
+    /** Bump mapping: a height field tilts the shading normal (materials/README, "Shading-normal
+     *  perturbation"). Any surface model; not 'none'. */
+    bump?: BumpDescription;
     /**
      * OPEN VOCABULARY (A6, materials-§7): the legal property keys are the model's
      * SCHEMA ROWS, not this interface — a new model's new property (`sheen: 0.7`)
      * is authored directly; the Validator warns on keys no present model declares.
      * The named fields above are the current models' properties, kept for
-     * autocomplete/docs. Meta-keys (model/medium/sampleAsLight) are reserved
+     * autocomplete/docs. Meta-keys (model/medium/sampleAsLight/bump) are reserved
      * (registry-test-enforced against row-source collisions).
      */
-    [key: string]: MaterialProperty | MaterialModel | MediumDescription | boolean | undefined;
+    [key: string]: MaterialProperty | MaterialModel | MediumDescription | BumpDescription | boolean | undefined;
+}
+
+/** The keys of a bump record. */
+export const BUMP_KEYS = ['height', 'step'] as const;
+
+/** A bump: the surface is displaced along its outward normal by h(p) for shading only (the
+ *  geometry and its silhouette are unchanged). */
+export interface BumpDescription {
+    /** h(p) in world units: a float GLSL expression in the world point `p` (and its declared
+     *  params); it may call the Perlin functions. */
+    height: GlslExpression;
+    /** The central-difference step along the surface, in world units. Required: it is a length
+     *  in the scene's units, so no default fits every scene (README: the error law). */
+    step: number;
 }
 
 // --- Lights ---
