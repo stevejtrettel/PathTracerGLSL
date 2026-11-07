@@ -29,4 +29,7 @@ round((x + wi·t − hit.p)/L) = k whenever the spawn offset |x' − x| and the 
 within the far clip stay below L/2. An image outside S has NEE density 0, so its BSDF hit keeps
 weight 1 (partition MIS). The index and the shift are adjacent functions over one numbering.
 
-`quotient_reduce(p)` is the point of D equivalent to p.
+`quotient_reduce(p)` is the point of D equivalent to p. In programs with fog the transport loop
+calls it on each medium event point (the medium arm reports it in the chart of the ray's origin,
+up to farClip away) and on the camera's position before the region lookup, so every vertex of a
+path lies in D and the NEE table's images stay within 2·diam(D) of it.

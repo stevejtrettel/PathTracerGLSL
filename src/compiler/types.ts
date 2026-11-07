@@ -625,7 +625,11 @@ export interface MeasurementDescription {
      *  1000). Required in a quotient space (`ambientSpace.quotient`), where nothing escapes and
      *  the clip is the only end of a segment that meets nothing; there it must be at least
      *  twice the fundamental domain's diameter, so that every light image NEE samples is
-     *  reachable by a BSDF ray. A finite number > 0. */
+     *  reachable by a BSDF ray. In a quotient filled with a homogeneous fog of extinction σ
+     *  the clip's error is bounded per pixel and channel by (N+1)²·e^{−σ·farClip}·Le_max
+     *  (N = maxBounces, Le_max the largest emitted radiance, the fog's glow ε/σ included;
+     *  components/quotient/README.md); without fog it has no stated bound. A finite
+     *  number > 0. */
     farClip?: number;
 }
 

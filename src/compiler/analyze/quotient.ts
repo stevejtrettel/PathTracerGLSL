@@ -7,7 +7,7 @@
 // of those conditions.
 
 import type { SceneDescription, RenderStrategy, ObjectDescription, Vec3, Transform, PrimitiveObject, MeshObject } from '../types.js';
-import { isInstancedObject, isMeshObject, isValueParam } from '../types.js';
+import { isInstancedObject, isMeshObject, isValueParam, isHeterogeneousMedium, mediumIsDeflecting } from '../types.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { QUOTIENTS } from '../../components/quotient/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults } from '../../components/lights/index.js';
@@ -82,13 +82,20 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
         bag.error('invalid-setting', `${label}: environment '${env}' — a closed manifold has no sky; light leaves only by absorption`).add();
     }
 
-    // Media are not built across cells yet: the medium state would have to follow the walk.
-    if (scene.ambientMedium !== undefined) {
-        bag.error('invalid-setting', `${label}: ambientMedium is not supported in a quotient yet`).add();
-    }
+    // Media: only a homogeneous ambient fog. Its coefficients are the same at every point, so
+    // the medium arms need no position in D, and with no medium boundary the walk carries no
+    // medium state across cells; the transport loop reduces medium event points into D. A
+    // heterogeneous fog would need its density read at reduced points along the segment, and a
+    // medium inside an object (null interfaces, GRIN, glass interiors) region state across faces.
+    const usedMaterials = new Set(scene.objects.map((o) => (isInstancedObject(o) ? o.prototype.material : o.material)));
     for (const [name, mat] of Object.entries(scene.materials)) {
-        if (mat.medium !== undefined) {
-            bag.error('invalid-setting', `${label}: material '${name}' has a medium (media, null interfaces and GRIN are not supported in a quotient yet)`).add();
+        if (mat.medium === undefined) continue;
+        if (name !== scene.ambientMedium || usedMaterials.has(name)) {
+            bag.error('invalid-setting', `${label}: material '${name}' has a medium (only a homogeneous ambientMedium is supported in a quotient; media inside objects, null interfaces and GRIN are not)`).add();
+        } else if (mediumIsDeflecting(mat.medium)) {
+            bag.error('invalid-setting', `${label}: ambientMedium '${name}' is a gradient-index (GRIN) medium — only a homogeneous fog is supported in a quotient`).add();
+        } else if (isHeterogeneousMedium(mat.medium)) {
+            bag.error('invalid-setting', `${label}: ambientMedium '${name}' is heterogeneous (an expression coefficient) — only a homogeneous fog is supported in a quotient`).add();
         }
     }
 

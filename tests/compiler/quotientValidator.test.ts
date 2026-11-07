@@ -84,15 +84,50 @@ describe('quotient Validator rules', () => {
         expect(quotientErrors((_s, st) => { st.measurement.farClip = 3.52; })).toEqual([]);
     });
 
-    it('rejects media, null interfaces, GRIN and an ambient medium', () => {
+    it('accepts a homogeneous ambient fog: absorbing, scattering, emitting, or with {param} coefficients', () => {
+        for (const medium of [
+            { sigma_a: 0.1 },
+            { sigma_a: 0.1, sigma_s: 0.3, phase_g: 0.4 },
+            { sigma_a: 0.5, emission: 0.5 },
+            { sigma_a: { param: 'fog.absorption', default: 0.1 }, sigma_s: 0.2 },
+        ]) {
+            expect(errors((s) => {
+                s.materials.fog = { model: 'none', medium };
+                s.ambientMedium = 'fog';
+            }), JSON.stringify(medium)).toEqual([]);
+        }
+        // An emitting, scattering fog takes the tracking arms (constant coefficients), which
+        // need volumeSampling 'delta-tracking' and, as everywhere, NEE rather than MIS.
+        expect(errors((s, st) => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1, sigma_s: 0.2, emission: [0.1, 0.2, 0.3] } };
+            s.ambientMedium = 'fog';
+            st.estimator.directLighting = 'nee';
+            st.estimator.volumeSampling = 'delta-tracking';
+        })).toEqual([]);
+    });
+
+    it('rejects a heterogeneous or GRIN ambient medium, objects with media, null interfaces and GRIN', () => {
         expect(quotientErrors((s) => {
-            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1, sigma_s: 0.2 } };
-            s.objects.push({ type: 'sphere', parameters: { center: [-0.2, 0.3, 0], radius: 0.1 }, material: 'fog' });
-        }).some((m) => /has a medium/.test(m))).toBe(true);
+            s.materials.fog = { model: 'none', medium: { sigma_a: { kind: 'glsl', source: '0.1 + 0.05 * p.x' }, majorant: 0.2 } };
+            s.ambientMedium = 'fog';
+        }).some((m) => /ambientMedium 'fog' is heterogeneous/.test(m))).toBe(true);
+        expect(quotientErrors((s) => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1, ior: 1.2 } };
+            s.ambientMedium = 'fog';
+        }).some((m) => /ambientMedium 'fog' is a gradient-index/.test(m))).toBe(true);
+        // A medium-filled object, whatever its medium, and an object made of the ambient fog.
+        expect(quotientErrors((s) => {
+            s.materials.ink = { model: 'none', medium: { sigma_a: 0.1, sigma_s: 0.2 } };
+            s.objects.push({ type: 'sphere', parameters: { center: [-0.2, 0.3, 0], radius: 0.1 }, material: 'ink' });
+        }).some((m) => /material 'ink' has a medium/.test(m))).toBe(true);
         expect(quotientErrors((s) => {
             s.materials.fog = { model: 'none', medium: { sigma_a: 0.1 } };
             s.ambientMedium = 'fog';
-        }).some((m) => /ambientMedium/.test(m))).toBe(true);
+            s.objects.push({ type: 'sphere', parameters: { center: [-0.2, 0.3, 0], radius: 0.1 }, material: 'fog' });
+        }).some((m) => /material 'fog' has a medium/.test(m))).toBe(true);
+        expect(quotientErrors((s) => {
+            s.materials.lens = { model: 'dielectric', ior: 1.5, medium: { sigma_a: 0, ior: { kind: 'glsl', source: '1.5 - 0.2 * dot(p, p)' } } };
+        }).some((m) => /material 'lens' has a medium/.test(m))).toBe(true);
     });
 
     it('rejects unbounded primitives', () => {

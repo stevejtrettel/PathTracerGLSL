@@ -32,7 +32,8 @@ export function flags(p: ProgramDescription) {
          *  re-derived here. */
         twoSided: p.materials.twoSidedShading,
         /** The ambient space is a quotient (components/quotient): pt-nee's emitter weight is 1 for
-         *  an image NEE never samples. */
+         *  an image NEE never samples, and the walk reduces the camera's start point and each
+         *  medium event point into the fundamental domain. */
         quotient: p.measurement.quotient !== undefined,
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
