@@ -1,0 +1,14 @@
+slab (2-D horizon), surface receiver on the floor, light at height h:
+  h = 0.05: lost fraction =  11.94%   | medium receiver partial sums R=10,100,400: 26.48, 40.67, 49.35 (diverges like 2 pi ln R)
+  h =  0.1: lost fraction =  12.63%   | medium receiver partial sums R=10,100,400: 26.35, 40.54, 49.23 (diverges like 2 pi ln R)
+  h = 0.25: lost fraction =  17.08%   | medium receiver partial sums R=10,100,400: 25.56, 39.75, 48.44 (diverges like 2 pi ln R)
+  h =  0.5: lost fraction =  28.78%   | medium receiver partial sums R=10,100,400: 23.52, 37.71, 46.40 (diverges like 2 pi ln R)
+  h =  0.9: lost fraction =  47.15%   | medium receiver partial sums R=10,100,400: 20.43, 34.61, 43.30 (diverges like 2 pi ln R)
+tubes (1-D horizons; images visible only along the receiver's tube), radius-12 image ball:
+  half-width a = 0.1: lost fraction surface receiver =  1.24%   medium receiver (on axis) =  7.84%
+  half-width a = 0.2: lost fraction surface receiver =  1.75%   medium receiver (on axis) =  7.84%
+  half-width a = 0.3: lost fraction surface receiver = 10.75%   medium receiver (on axis) = 16.22%
+  on-axis medium receiver, exact 1-D series (all images visible along the tube): lost = 8.86%
+balls r = 0.72: sampled max free path = 0.547  (inf = escaped the 13-cell window: 0)  mean = 0.128
+balls r = 0.75: sampled max free path = 0.379  (inf = escaped the 13-cell window: 0)  mean = 0.102
+balls r = 0.8: sampled max free path = 0.187  (inf = escaped the 13-cell window: 0)  mean = 0.059

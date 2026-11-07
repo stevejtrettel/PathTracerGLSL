@@ -1,0 +1,5 @@
+
+==================== diameter of M (max over pairs of d_M(x,y)) ====================
+using 22977 elements with d(o,γo) ≤ 6.006
+max d_M found 1.902847 (R_c = 1.902847); the pair: d(o,x) 0.0000, d(o,y) 1.9028
+  d_M(o, vertex) = 1.902847

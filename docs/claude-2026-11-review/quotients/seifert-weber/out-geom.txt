@@ -1,0 +1,79 @@
+
+==================== radii (closed forms vs Klein-model construction) ====================
+{
+  rIn: 0.9963844978473164,
+  rMid: 1.4391063994535864,
+  rCirc: 1.9028473444057536,
+  thurstonHalfWidth: 0.996384497847316,
+  diff: 4.440892098500626e-16
+}
+thurston comment formula, asinh(...) = NaN (radicand < 0) radicand -0.18090169943749462
+same formula with α = π/5 (half the dihedral angle): asinh = 0.9963844978473164  vs r_in 0.9963844978473164
+r_mid via Klein 1.4391063994535862  R_c via Klein 1.9028473444057519
+{
+  edgeLength: 1.9927689956946324,
+  coshRc_is_phi4_over_2: -4.440892098500626e-16,
+  cosh2rIn: 3.7360679774997902,
+  cosh2rIn_closed: 3.73606797749979
+}
+
+==================== face normals ====================
+max |<N,N>-1| = 6.661338147750939e-16  pairwise <N_i,N_j> values (count): { '-3.736067977': 6, '-2.427050983': 30, '-0.309016994': 30 }
+cos(2π/5) = 0.30901699437494745  → adjacent faces need <N_i,N_j> = −cos(2π/5) =  -0.30901699437494745
+N_0 = [ 0, 0.809016994375, 1.309016994375, 1.169629851171 ]
+
+==================== vertices ====================
+each vertex on exactly 3 faces: true  all inside D (tol 1e-12): true  d(o,v) − R_c max: 6.661338147750939e-16
+vertex solid angle 3α−π = 0.6283185307179586  ×20 = 12.566370614359172  4π = 12.566370614359172
+
+==================== pairings ====================
+face 0: SO+(3,1) defect 1.78e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 1: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 1: true
+face 1: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 0: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 0: true
+face 2: SO+(3,1) defect 1.78e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 3: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 3: true
+face 3: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 2: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 2: true
+face 4: SO+(3,1) defect 2.66e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 5: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 5: true
+face 5: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 4: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 4: true
+face 6: SO+(3,1) defect 2.66e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 7: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 7: true
+face 7: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 6: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 6: true
+face 8: SO+(3,1) defect 1.78e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 9: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 9: true
+face 9: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 8: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 8: true
+face 10: SO+(3,1) defect 1.78e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 11: true | gN_i = −N_opp err 1.78e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 11: true
+face 11: SO+(3,1) defect 3.55e-15 det 1.000000000000 g_ww 3.736068 | 5 vertices → face 10: true | gN_i = −N_opp err 1.33e-15 | face-centre err 0.00e+0 | d(o,g o) = 1.992768996 (2r_in = 1.992768996), g·o beyond face 10: true
+face 0 vertex azimuths about u (deg): [ '-126.000', '-54.000', '18.000', '90.000', '162.000' ]
+opposite face vertex azimuths (deg): [ '-162.000', '-90.000', '-18.000', '54.000', '126.000' ] → opposite pentagons are rotated by 36° relative to each other (antiprism-like), so a 108° twist maps vertices to vertices.
+vertex at azimuth 18.000° on face 0 maps to azimuth 126.000° on face 1 (twist θ = 108°)
+
+==================== edge cycles and vertex cycles ====================
+edges: 30
+edge cycles: [
+  { len: 5, angle: 360, prodErr: 3.730349362740526e-14 },
+  { len: 5, angle: 360, prodErr: 2.842170943040401e-14 },
+  { len: 5, angle: 360, prodErr: 1.4210854715202004e-14 },
+  { len: 5, angle: 360, prodErr: 3.730349362740526e-14 },
+  { len: 5, angle: 360, prodErr: 4.1744385725905886e-14 },
+  { len: 5, angle: 360, prodErr: 1.7763568394002505e-14 }
+]
+vertex classes: 1 (Euler χ = V − E + F − C =  1 − 6 + 6 − 1 = 0 )
+
+==================== number field of the generator entries (this frame) ====================
+g_0 entries (κ = √((13+7√5)/2) = 3.7850017069017636):
+  (1-1√5)/4  (-1-1√5)/4  (1+0√5)/2  κ·(0+0√5)/1
+  (1+1√5)/4  (1+1√5)/4  (5+1√5)/4  κ·(-1+0√5)/2
+  (-1+0√5)/2  (5+1√5)/4  (3+1√5)/2  κ·(-1-1√5)/4
+  κ·(0+0√5)/1  κ·(-1+0√5)/2  κ·(-1-1√5)/4  (3+2√5)/2
+  off-diagonal entry g[1][3] = -1.8925008534508823 in Q(√5) itself? no
+g_1 entries (κ = √((13+7√5)/2) = 3.7850017069017636):
+  (1-1√5)/4  (1+1√5)/4  (-1+0√5)/2  κ·(0+0√5)/1
+  (-1-1√5)/4  (1+1√5)/4  (5+1√5)/4  κ·(1+0√5)/2
+  (1+0√5)/2  (5+1√5)/4  (3+1√5)/2  κ·(1+1√5)/4
+  κ·(0+0√5)/1  κ·(1+0√5)/2  κ·(1+1√5)/4  (3+2√5)/2
+  off-diagonal entry g[1][3] = 1.8925008534508823 in Q(√5) itself? no
+all 12 generators: 3×3 block and ww entry in Q(√5), (xyz,w) entries in κ·Q(√5): true
+traces of 200 random words (length 1–6) in Q(√5): 200/200; e.g. [
+  '3572.000280=(3573+1597√5)/2',
+  '4.236068=(2+1√5)/1',
+  '4420.235162=(2211+988√5)/1',
+  '271.782113=(273+121√5)/2',
+  '6.854102=(7+3√5)/2',
+  '25.798374=(27+11√5)/2'
+]

@@ -1,0 +1,4 @@
+max cells / bound      = 0.992   (must be <= 1)
+max overshoot of bound = 0.0
+float32 vs float64 cell-sequence mismatches: 7 / 4000
+max distance of a local entry point outside D: 2.375e-04
