@@ -196,7 +196,9 @@ the object's frame (the arm moves the ray in by G⁻¹; the center row is folded
   row. Distance (for the twins only; a thin shape claims no region): √(y² + max(D_H − ρ, 0)²).
 - **cylinder** (radius R, halfHeight h, center row; canonical axis y as in E³): the capped vertical
   cylinder D_R × [−h, h] (D_R the H² disk of radius R about o).
-  - Tube: w(γ(t)) = a·cosh τ + b·sinh τ, τ = st, a = p.w, b = û.w. Setting w = cosh R and X = e^τ is
+  - Tube (*changed during the build*, §9 row 10: now |x(τ)|² = sinh²R on the flow's x, z, a quadratic
+    in e^{2τ} valid for non-tangent directions; the first form below assumed tangency): w(γ(t)) =
+    a·cosh τ + b·sinh τ, τ = st, a = p.w, b = û.w. Setting w = cosh R and X = e^τ is
     H³'s ball quadratic, with H³'s cancellation-free identities in 2D:
     disc = sinh²R − k, k = (p.x·û.z − p.z·û.x)² (Lagrange's identity holds in R^{2,1} with the
     scalar cross product), (a + b)(a − b) = 1 + k. Entry/exit τ_in = log((a−b)/q),
@@ -379,7 +381,7 @@ dim constant sky; checked on a lab render.
 | 7 | sky: constant and procedural, BSDF rays only | the key is exact; sampling it needs its Jacobian | add the sky-as-light row with a witness |
 | 8 | MAX_DIST = 10 | as H³; a floor's horizon band (rays within about h/10 of it) is clipped to sky — visible, unlike H³'s grazing bands | one constant |
 | 9 | the metric and frame through the transported basis (E1, e_y, E2) | the form cancels far from o (measured NaN) | the form |
-| 10 | ray directions projected onto the origin's tangent space in the flow and the closed-form roots | a spawned ray's direction is tangent at the hit point, not at the offset origin; measured furnace deficit 0.3% without it | project in ray_spawn instead (shared, all spaces) |
+| 10 | the cylinder's tube root solved on the flow's x and z (a quadratic in e^{2st}), valid for non-tangent directions | a spawned ray's direction is off the offset origin's tangent space by the spawn offset; H³'s ball identities then put the root inside the surface (furnace −0.3%, measured); projecting every direction was measured worse (NaN far from o) | H³'s identities with a projected direction |
 
 ## 10. Review
 

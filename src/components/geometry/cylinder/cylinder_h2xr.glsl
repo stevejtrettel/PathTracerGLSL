@@ -4,7 +4,7 @@
 // distance. Derivations: components/ambient/h2xr/h2xr.md.
 // Provides (struct GENERATED from descriptor rows): cylinder_sdf(), cylinder_intersect(),
 //           cylinder_normal().
-// Depends on: h2xr_speed(), h2xr_h2(), h2xr_tangent_at() (the H²×R occupant).
+// Depends on: h2xr_speed() (the H²×R occupant).
 
 // Exact signed distance: with a = dist_H²(p, o) − R = asinh(|p.xz|) − R and b = |y| − h,
 // length(max((a, b), 0)) + min(max(a, b), 0).
@@ -14,16 +14,20 @@ float cylinder_sdf(Point p, Cylinder c) {
 }
 
 // Nearest intersection strictly ahead of the ray (floor 0). The slab |y| ≤ h is an interval of t
-// (the height is linear). The tube: along the H² part, w(t) = a·cosh τ + b·sinh τ with τ = st,
-// a = p.w, b = û.w (û = u/s the unit H² direction); w = cosh R at X = e^τ solving
-// (a+b)X² − 2 cosh R·X + (a−b) = 0 — H³'s ball quadratic, with its cancellation-free identities in
-// R^{2,1}: disc = sinh²R − k with k = (p.x·û.z − p.z·û.x)², and (a+b)(a−b) = 1 + k. A vertical ray
-// (s = 0) stays at its H² point: inside the tube for all t or never. The hit is the first end of the
-// intersected interval, chosen by the inside test (inside → its far end).
+// (the height is linear). The tube: the flow keeps the point's x and z as
+// x(τ) = cosh τ·P + sinh τ·V with τ = st, P = p.xz, V = u.xz/s (u the H² part of the direction; w is
+// recomputed from them), so |x(τ)|² = sinh²R is, in Y = e^{2τ}, the quadratic
+// |P + V|²·Y² + 2(|P|² − |V|² − 2 sinh²R)·Y + |P − V|² = 0, whose reduced discriminant is 4·D with
+// D = sinh²R·(sinh²R − |P|² + |V|²) − (P × V)². It holds for any direction, tangent or not: a spawned
+// ray's direction is tangent at its hit point and off the offset origin's tangent space by about the
+// spawn offset, and H³'s ball identities, which assume tangency, put the root up to 4e-5 inside the
+// surface (measured on SwiftShader; the next ray then met the cylinder from inside). A vertical ray
+// (s = 0) stays at its H² point: inside the tube for all t or never. The hit is the first end of
+// the intersected interval, chosen by the inside test (inside → its far end).
 bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
     float lo = -1.0e30, hi = 1.0e30;
     Point p = ray.origin;
-    Direction v = h2xr_tangent_at(p, ray.direction);   // the flow's direction (the occupant)
+    Direction v = ray.direction;
     if (v.y == 0.0) {
         if (abs(p.y) > c.halfHeight) return false;
     } else {
@@ -33,24 +37,24 @@ bool cylinder_intersect(Ray ray, Cylinder c, out float t) {
     }
     float s = h2xr_speed(v);
     float sr = sinh(c.radius);
+    float S = sr * sr;
+    vec2 P = p.xz;
     if (s == 0.0) {
-        if (dot(p.xz, p.xz) > sr * sr) return false;
+        if (dot(P, P) > S) return false;
     } else {
-        vec4 u = h2xr_h2(v) / s;
-        float cr = p.x * u.z - p.z * u.x;
-        float k = cr * cr;
-        float disc = sr * sr - k;
-        if (disc < 0.0) return false;
-        float big = p.w + abs(u.w);
-        float small = (1.0 + k) / big;
-        float apb = u.w >= 0.0 ? big : small;   // a + b
-        float amb = u.w >= 0.0 ? small : big;   // a − b
-        float q = cosh(c.radius) + sqrt(disc);
-        lo = max(lo, log(amb / q) / s);
-        hi = min(hi, log(q / apb) / s);
+        vec2 V = v.xz / s;
+        float cr = P.x * V.y - P.y * V.x;
+        float D = S * (S - dot(P, P) + dot(V, V)) - cr * cr;   // the reduced discriminant is 4·D
+        if (D < 0.0) return false;
+        float A = dot(P + V, P + V), C = dot(P - V, P - V);
+        float Bh = dot(P, P) - dot(V, V) - 2.0 * S;            // B / 2
+        float q = -(Bh + sign(Bh) * 2.0 * sqrt(D));             // cancellation-free pair: Y = q/A, C/q
+        float y1 = q / A, y2 = C / q;
+        lo = max(lo, 0.5 * log(min(y1, y2)) / s);
+        hi = min(hi, 0.5 * log(max(y1, y2)) / s);
     }
     if (!(lo < hi)) return false;
-    bool inside = dot(p.xz, p.xz) < sr * sr && abs(p.y) < c.halfHeight;
+    bool inside = dot(P, P) < S && abs(p.y) < c.halfHeight;
     t = inside ? hi : lo;
     return t > 0.0;
 }

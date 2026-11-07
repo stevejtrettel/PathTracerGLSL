@@ -126,8 +126,9 @@ export function diskRoot(p: V4, v: V4, d: { radius: number }): number | null {
     return h[0] * h[0] + h[2] * h[2] <= Math.sinh(d.radius) ** 2 ? t : null;
 }
 
-/** The capped cylinder: the tube interval (H³'s ball quadratic in e^τ on the H² part, τ = st) met
- *  with the slab interval; root selection by the inside test. */
+/** The capped cylinder (cylinder_h2xr.glsl, transcribed): the tube condition |x(τ)|² = sinh²R on the
+ *  flow's x = (x, z) part, x(τ) = cosh τ·P + sinh τ·V (τ = st, V = u.xz/s), a quadratic in Y = e^{2τ},
+ *  met with the slab interval; root selection by the inside test. */
 export function cylinderRoot(p: V4, v: V4, c: { radius: number; halfHeight: number }): number | null {
     let lo = -Infinity, hi = Infinity;
     if (v[1] === 0) { if (Math.abs(p[1]) > c.halfHeight) return null; } else {
@@ -136,23 +137,26 @@ export function cylinderRoot(p: V4, v: V4, c: { radius: number; halfHeight: numb
     }
     const u = H(v);
     const s = Math.sqrt(Math.max(hform(u, u), 0));
-    const sr = Math.sinh(c.radius);
+    const S = Math.sinh(c.radius) ** 2;
+    const P = [p[0], p[2]];
+    const PP = P[0] * P[0] + P[1] * P[1];
     if (s === 0) {
-        if (p[0] * p[0] + p[2] * p[2] > sr * sr) return null;
+        if (PP > S) return null;
     } else {
-        const uh = lin(u, 1 / s, u, 0);
-        const cr = p[0] * uh[2] - p[2] * uh[0];
-        const k = cr * cr;
-        const disc = sr * sr - k;
-        if (disc < 0) return null;
-        const big = p[3] + Math.abs(uh[3]), small = (1 + k) / big;
-        const apb = uh[3] >= 0 ? big : small, amb = uh[3] >= 0 ? small : big;
-        const q = Math.cosh(c.radius) + Math.sqrt(disc);
-        lo = Math.max(lo, Math.log(amb / q) / s);
-        hi = Math.min(hi, Math.log(q / apb) / s);
+        const V = [v[0] / s, v[2] / s];
+        const VV = V[0] * V[0] + V[1] * V[1];
+        const cr = P[0] * V[1] - P[1] * V[0];
+        const D = S * (S - PP + VV) - cr * cr;
+        if (D < 0) return null;
+        const A = (P[0] + V[0]) ** 2 + (P[1] + V[1]) ** 2, C = (P[0] - V[0]) ** 2 + (P[1] - V[1]) ** 2;
+        const Bh = PP - VV - 2 * S;
+        const q = -(Bh + Math.sign(Bh) * 2 * Math.sqrt(D));
+        const y1 = q / A, y2 = C / q;
+        lo = Math.max(lo, 0.5 * Math.log(Math.min(y1, y2)) / s);
+        hi = Math.min(hi, 0.5 * Math.log(Math.max(y1, y2)) / s);
     }
     if (!(lo < hi)) return null;
-    const inside = p[0] * p[0] + p[2] * p[2] < sr * sr && Math.abs(p[1]) < c.halfHeight;
+    const inside = PP < S && Math.abs(p[1]) < c.halfHeight;
     const t = inside ? hi : lo;
     return t > 0 ? t : null;
 }

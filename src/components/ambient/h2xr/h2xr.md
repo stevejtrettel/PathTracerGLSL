@@ -39,12 +39,15 @@ tests/witnesses/scenes/h2xrTwins.ts, checked by tests/components/h2xr.test.ts.
   relative error grows like ε·w² (measured in emulated float32 by the review: 2e-6 at 2 from o,
   2e-4 at 4, 1e-2 at 6, order 1 at 8). The working radius for accurate shading is about 3 from o,
   as in H³; the witnesses stay within 1.5.
-- **Directions are made tangent at the ray's origin** (`h2xr_tangent_at`) in the flow, the
-  vertical-plane root and the cylinder. A spawned ray keeps the direction sampled at its hit
-  point, off the spawned origin's tangent space by about the spawn offset, and the closed forms
-  assume tangency: without the projection a cylinder root landed up to 4e-5 inside the surface,
-  the next ray met the cylinder from inside (a back face, no emission), and the furnace read
-  3.9398 against 3.9514; with it, 3.95142.
+- **A spawned ray's direction is not tangent at its origin**: it is sampled at the hit point and
+  the origin is offset from there, so it is off the origin's tangent space by about the spawn
+  offset. The flow does not care (it keeps the point's x and z and recomputes w), but a closed form
+  that assumes tangency does: H³'s ball identities in the cylinder put its root up to 4e-5 inside
+  the surface, the next ray met the cylinder from inside (a back face, no emission), and the
+  furnace read 3.9398 against 3.9514. The cylinder now solves the condition on the flow's own x and
+  z, which holds for any direction (3.95142). Projecting every direction onto the origin's tangent
+  space instead was tried and measured worse: far from o the projection coefficient carries the
+  form's cancellation and produced NaN pixels in the demo.
 - **`MAX_DIST = 10`**, as H³; **`fp_uncertainty(p) = max(ABS, REL·max(p.w, |p.y|))`**. A horizontal
   floor seen from height h is hit beyond the clip by rays within about h/10 of the horizon, so a
   thin band of sky shows there (the declared far-clip truncation); unlike H³'s grazing bands
@@ -82,8 +85,8 @@ The totally geodesic surfaces are the horizontal planes H²×{c} and the vertica
 - **plane**: normal vertical (y·n.y + offset = 0, linear root) or horizontal (H³'s plane in the H²
   factor; root t = (−P/W)·atanhc(−s·P/W), no 1/s).
 - **disk**: horizontal; t = −y/v.y, then x² + z² ≤ sinh²ρ.
-- **cylinder**: capped vertical, D_R × [−h, h]; the tube is H³'s ball quadratic in e^{st} on the H²
-  part, met with the slab interval.
+- **cylinder**: capped vertical, D_R × [−h, h]; the tube is |x(τ)|² = sinh²R on the flow's x, z
+  (x(τ) = cosh τ·P + sinh τ·V), a quadratic in e^{2τ} that needs no tangency, met with the slab.
 - **sphere** (the metric ball): no closed form; f(t) = D_H² + y² − R² is convex along geodesics
   (H²×R is CAT(0)), so Newton from where f > 0 moves monotonically to the nearest root. It stops
   at f ≤ 0 (the root within rounding) or at a step ≤ 1e-5·(1 + t). Measured on SwiftShader on 4096

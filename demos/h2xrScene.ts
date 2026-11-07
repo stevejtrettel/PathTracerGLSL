@@ -1,5 +1,5 @@
 // demos/h2xrScene.ts — a colonnade in H²×R (the hyperbolic plane times the line).
-// A floor 0.6 below the origin (a horizontal plane: a copy of H²), two rings of columns (capped
+// A floor 0.6 below the origin (a disk of radius 3.2 in a horizontal plane, a copy of H²), two rings of columns (capped
 // vertical cylinders) standing on it about the point under the origin, balls resting on the floor
 // between the inner columns, and a backdrop wall (a vertical plane: an H² geodesic times the line),
 // lit by a warm disk light overhead and a dim sky. The geometry shows in three places: the outer
@@ -13,6 +13,10 @@
 import type { SceneDescription, RenderStrategy, ObjectDescription, Vec3 } from '../src/compiler/types.js';
 
 const FLOOR = 0.6;   // the floor's depth below o
+/** The floor is a disk, not a plane: a plane is hit near its horizon at points far beyond the working
+ *  radius (about 3 from o), where float32 hyperboloid coordinates carry relative error ε·w² and a
+ *  column root computed from there can be garbage (rare NaN pixels in the plane version, measured). */
+const FLOOR_RADIUS = 3.2;
 
 /** A point at H² polar coordinates (ρ, θ) about the point under o, at height y (exp coordinates at o:
  *  a horizontal vector of length ρ reaches the H² point at distance ρ in its direction). */
@@ -25,7 +29,7 @@ const palette: Record<string, Vec3> = {
 const hues = Object.keys(palette);
 
 const objects: ObjectDescription[] = [
-    { type: 'plane', parameters: { normal: [0, 1, 0], offset: FLOOR }, material: 'floor' },
+    { type: 'disk', parameters: { center: [0, -FLOOR, 0], radius: FLOOR_RADIUS, normal: [0, 1, 0] }, material: 'floor' },
     { type: 'plane', parameters: { normal: [0, 0, 1], offset: 2.4 }, material: 'wall' },
 ];
 const column = (rho: number, theta: number, r: number, h: number) =>
