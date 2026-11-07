@@ -196,6 +196,10 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
                 bottle: { baseRadius: 0.6, baseHeight: 0.8, neckRadius: 0.2, neckHeight: 0.4 },
                 menger: { size: 0.6, iterations: 3 },
                 apollonian: { size: 0.5, morph: 1.2, iterations: 6 },
+                // Scene-local fields registered by the suite's scenes are in PRIMITIVES too.
+                // photo-plaza's rounded box needs every half-size component positive (the
+                // generic vec3 has a zero) and the radius below the smallest of them.
+                roundedBox: { halfSize: [0.4, 0.3, 0.3], radius: 0.05 },
             };
             for (const d of Object.values(PRIMITIVES)) {
                 const parameters = Object.fromEntries(d.params.map((p, i) =>

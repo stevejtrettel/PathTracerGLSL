@@ -150,8 +150,9 @@ export function tubeMesh(C: (t: number) => Vec3, r: number, nAlong: number, nAro
 
 /**
  * The "bottle" immersion of the Klein bottle (the glass-blower's shape), from the closed form
- * popularized by Robert Israel: u ∈ [0, π), v ∈ [0, 2π). It is about 2.9 units tall along +y with
- * the base near y = −1.5…; the caller scales and places it. The surface is non-orientable and
+ * popularized by Robert Israel: u ∈ [0, π), v ∈ [0, 2π). It spans y ∈ [0, 4.21], x ∈ [−1.52, 1.82]
+ * and z ∈ [−0.73, 0.73] in the formula's units; u = 0 is a ring of radius 0.4 on y = 0 (the base).
+ * The caller scales and places it. The surface is non-orientable and
  * self-intersecting, so it is only usable as a thin sheet (not `closed`).
  */
 export function kleinBottle(nu: number, nv: number): MeshArrays {

@@ -1,6 +1,6 @@
 // demos/photo/studioScene.ts — a studio product shot: a glossy plastic trefoil knot on a paper
-// sweep, lit by a key softbox up to the left and, as fill, a photo studio's light (the Poly Haven
-// studio_small_09 HDRI at 0.4).
+// sweep, lit by a key softbox close up to the left and, as a weak fill, a photo studio's light
+// (the Poly Haven studio_small_09 HDRI at 0.12), so the paper falls off into the background.
 //
 // Meters. The sweep is 3 m wide; the knot is about 0.26 m across, lying flat on the paper.
 
@@ -30,20 +30,32 @@ async function studioScene(): Promise<SceneDescription> {
             }),
         ],
         materials: {
-            // Photographic seamless paper, a light neutral gray.
-            paper: { model: 'lambert', albedo: [0.62, 0.62, 0.6] },
+            // Photographic seamless paper, a light neutral gray with a faint mottle (±3%:
+            // |perlin_fbm| ≤ 1.94 for 3 octaves at gain 0.5) and a fine tooth.
+            paper: {
+                model: 'lambert',
+                albedo: { kind: 'glsl', source: 'vec3(0.62, 0.62, 0.60) * (1.0 + 0.015 * perlin_fbm(6.0 * p, 0.5, 3))' },
+                bump: { height: { kind: 'glsl', source: '0.00002 * perlin_noise(1500.0 * p)' }, step: 0.00005 },
+            },
             // Injection-molded red plastic: a dyed diffuse base under a clear coat of index 1.5.
-            red_plastic: { model: 'plastic', albedo: [0.45, 0.025, 0.02], coat_eta: 1.5 },
+            // The coat has orange peel: relief of wavelength 0.25 mm (below a pixel, 0.45 mm at
+            // the knot) and slope about 0.01, which the pixel filter integrates into a slight
+            // softening of the reflected softbox's edges.
+            red_plastic: {
+                model: 'plastic', albedo: [0.45, 0.025, 0.02], coat_eta: 1.5,
+                bump: { height: { kind: 'glsl', source: '0.0000025 * perlin_noise(4000.0 * p)' }, step: 0.00003 },
+            },
         },
         lights: [
-            // Key: a 0.6 × 0.6 m softbox up and to the camera's left, tilted 45° toward the knot
-            // (edge1 × edge2 = (0.25, −0.25, 0): down and to the right).
-            { kind: 'quad', corner: [-0.95, 0.9, -0.15], edge1: [0.42, 0.42, 0], edge2: [0, 0, 0.6], emission: 26 },
+            // Key: a 0.6 × 0.6 m softbox 0.75 m from the knot, up and to the camera's left, tilted
+            // 45° toward it (edge1 × edge2 = (0.25, −0.25, 0): down and to the right). This close,
+            // the inverse square darkens the paper toward the back.
+            { kind: 'quad', corner: [-0.64, 0.46, -0.19], edge1: [0.42, 0.42, 0], edge2: [0, 0, 0.6], emission: 10 },
         ],
         environment: {
             type: 'image',
             url: '/trial/hdri/studio_small_09_4k.hdr',
-            intensity: 0.4,
+            intensity: 0.12,
             rotation: -1.73,
         },
     };

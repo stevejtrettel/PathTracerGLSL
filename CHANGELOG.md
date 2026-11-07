@@ -4,6 +4,54 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Photographs: fixes from a review of the six pictures
+
+- **Bugs and wrong text.** `photo-window`'s 3 cm table edge reused the top's `wood` material, so
+  its uv squashed the map about 60:1 and turned the planks 90° (striped planks, a stray seam); it
+  now has its own `wood_edge` (edge2 along x, uvScale [0.015, 0.8]). Corrected: `photo-glass`'s
+  `exercises`/`expected` (they described the earlier bright-field set), `photo-sponge`'s (the wood
+  is lambert, not coated), the table/paving quads' "normal +y" comments (edge1 × edge2 points −y;
+  harmless, quads are two-sided), `kleinBottle`'s extent (it spans y ∈ [0, 4.21], measured on a
+  2001 × 721 grid), the plaza knot's resting height (now computed from the sampled curve minimum,
+  −0.692, so it sinks the stated 3 cm; it sank 4.2), and the pavilion's size (the gasket's
+  half-extent measured with its twin is 2.306, not the descriptor's slack bound 2.595: 4.6 m
+  across, sunk 0.26 m; the picture is unchanged).
+- **Studio:** key softbox moved to 0.75 m (emission 10), HDRI fill 0.4 → 0.12: the paper now falls
+  off 1 to 1.8 stops from front to back (measured luminance 0.97 → 0.27 at the left edge,
+  0.58 → 0.29 at the right), where it fell about 0.4 stop (1.10 → 0.86). Orange
+  peel on the plastic coat (Perlin bump, wavelength 0.25 mm, slope about 0.01) softens the
+  softbox's reflected edges; faint mottle and tooth on the paper.
+- **Sponge:** bulbs 7 → 9 mm with radiance scale 60 → 2.8 (about a thirteenth of the power),
+  ±25% brightness per bulb: the bokeh discs' centers measure linear red 0.75–1.10 (was 10.1–11.7),
+  which AgX shows amber-peach rather than cream. A white
+  bounce card out of frame fills the shadow side. The orange speckle on the dark face and the
+  sparkle fringe on its silhouette are gone at 4096 spp (seen in zoomed crops).
+- **Plaza:** the plinth is a rounded box (a scene-local `defineSDF`, 12 mm radius) with a
+  stronger, larger-scale mottle; a stone curb ends the quay; the camera moved back (10.8 m) so
+  the whole plinth is in frame. Loading the scene registers `roundedBox`, so the glslang kitchen
+  sink (tests/compiler/glsl-compile.test.ts) now compiles it too, from a sample with a positive
+  half-size (the generic vec3 has a zero component).
+- **Window:** an 8 cm apron under the table top (no lit plaster below the table any more); the
+  wall moved back to 1.1 m behind the objects and the lens opened to f/4, so the plaster blurs
+  (about 8 px against 3 px); sub-pixel relief on the apples' wax spreads the window's reflection
+  into a sheen.
+- **Glass:** a dim panel with an expression emission, hung just below eye level far behind the
+  set under a black flag, reflects in the acrylic as a glow that brightens toward its horizon.
+  Rendered at 32768 spp for the frosted ball's grain: relative pixel noise at its center 0.20 →
+  0.08 (measured against a 3 × 3 local mean; the glow also brightens the ball by a quarter). Widening the strip boxes did not reduce that
+  grain (measured: relative noise 0.65 at 1024 spp, against 0.54 expected from the old render), so
+  they are unchanged.
+- **Pavilion:** a park bench (three boxes) for scale; `expected` now says the light is soft (the
+  sun gives about a sixth of the ground irradiance in this HDRI). Fewer gasket iterations did not
+  help the foam-like bumps (4 looks the same as 5; 3 is lumpier), so it stays at 5.
+- Not addressed: the paving's 3 m repeat (a texture value cannot be multiplied by an expression),
+  normal maps, lens effects (vignetting, bloom), the Menger sponge's sharp edges, and a sunnier
+  HDRI for the pavilion (not downloaded).
+- All six re-rendered on the Apple M2 (`npm run shoot`, 1280 × 853, salt 1) into renders/photo/:
+  sponge 4096 spp 274 s, plaza 4096 spp 250 s, pavilion 4096 spp 396 s, studio 4096 spp 649 s,
+  window 4096 spp 817 s, glass 32768 spp 1106 s. Each new picture was compared with the old one,
+  whole and in zoomed crops, and replaced it.
+
 ## 2026-11-07 — Photographs: six scenes composed to look like photographs
 
 - A **Photographs** gallery section (demos/photo/): `photo-studio` (a red plastic trefoil on a
@@ -16,7 +64,7 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
   `photo-pavilion` (an Apollonian gasket as a 5 m concrete pavilion in a meadow, 24 mm f/8).
 - Shared recipe (demos/photo/camera.ts): `thinLensFromPhoto` on a 36 × 24 mm sensor, blades,
   Gaussian pixel filter, energy-compensated microfacets, MIS, AgX. Mesh builders
-  (demos/photo/geometry.ts): parametric grids with analytic-difference normals, a paper sweep,
+  (demos/photo/geometry.ts): parametric grids with normals from central differences of the map, a paper sweep,
   a rotation-minimizing tube around a closed curve, the Klein bottle "bottle" immersion.
 - All six are async entries (registry-iterating tests and snapshots skip them); five read
   public/trial/. `large_grey_tiles` (Poly Haven, CC0) joins tools/trial-assets.json.
