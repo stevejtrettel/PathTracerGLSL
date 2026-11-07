@@ -123,7 +123,7 @@ export interface MaterialModelDescriptor {
     /** DERIVED fields: join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
     /** Present when this model is written against glsl/core/microfacet.glsl (D / Smith G₁ /
-     *  VNDF / the frame maps): the include gate for that library, declared rather than a
+     *  VNDF / the F-free reflection lobe / the frame maps): the include gate for that library, declared rather than a
      *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
      *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
      *  (materials/microfacet_energy): `microfacet_conductor_gain` or

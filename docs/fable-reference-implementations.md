@@ -473,7 +473,8 @@ float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {
 > `microfacet_sample_vndf` (plus the frame maps) — the FIXED stdlib every microfacet
 > model links, so a rough-dielectric-only program needs no conductor. The math below is
 > unchanged; only the home and the prefix are. `ggx.glsl` is now the conductor MODEL
-> alone.
+> alone. The F-free lobe below (everything but F) is `microfacet_reflect_{eval,pdf,sample}`
+> in the same file; `ggx.glsl` multiplies Schlick's F into it.
 
 ```glsl
 // ggx.glsl — rough conductor, Smith separable masking, Schlick Fresnel.

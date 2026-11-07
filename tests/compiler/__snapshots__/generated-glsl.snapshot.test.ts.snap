@@ -82511,15 +82511,17 @@ Ray ray_spawn(Hit hit, Direction wi) {
 // Included when some present material model declares \`microfacet\` (the math_media
 // pattern: conditional core, never wholesale).
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
-//           microfacet_to_local(), microfacet_from_local().
-// Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot.
+//           microfacet_to_local(), microfacet_from_local(), and the F-free reflection lobe
+//           microfacet_reflect_eval(), microfacet_reflect_pdf(), microfacet_reflect_sample().
+// Depends on: PI, TWO_PI (math), Frame/Point/Direction/Hit (structs), ambient_dot.
 //
 // Convention (shared by every occupant): the local shading frame has n = +z, \`a\` is the
 // GGX roughness parameter α = roughness² clamped ≥ 1e-3 (the derived field mp.alpha,
 // assigned by the material lookup; letting α → 0 produces fireflies,
 // not a mirror: author true specular as a delta model).
 // The TS twin in components/materials/ggx/ggx.test.ts is the tested ground truth for
-// D/G1/sample — line-for-line transcription, change one change both (§11.3).
+// D/G1/sample and the reflection lobe — line-for-line transcription, change one change both
+// (§11.3).
 
 // Local shading frame, n = +z. Frame vectors are orthonormal in the ambient metric, so
 // projection goes through ambient_dot (Euclidean unpacks to dot).
@@ -82555,6 +82557,64 @@ vec3 microfacet_sample_vndf(vec3 wol, float a, vec2 u) {
     t2 = (1.0 - s_) * sqrt(max(0.0, 1.0 - t1 * t1)) + s_ * t2;
     vec3 nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * vh;
     return normalize(vec3(a * nh.x, a * nh.y, max(1e-6, nh.z)));
+}
+
+// The F-free GGX reflection lobe. A reflection-only microfacet model (the conductor) is this
+// lobe times its Fresnel term F(cos_h), times an energy gain read at cos_o; the lobe carries
+// everything else: D·G₁·G₁/(4|cos θᵢ||cos θₒ|), the VNDF weight G₁(ωᵢ), the pdf and the
+// horizon test. cos_h = |ωₒ·h| and cos_o = |cos θₒ|. World directions in, world direction out.
+
+// f/F, the bare BRDF without its Fresnel term (no cos θᵢ). Returns 0 when wi and wo lie on
+// opposite sides (reflection only) and then leaves cos_h and cos_o unset: the caller returns
+// zero before reading them.
+float microfacet_reflect_eval(Direction wi, Direction wo, Hit hit, float a, out float cos_h, out float cos_o) {
+    vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
+    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
+    if (wil.z * wol.z <= 0.0) return 0.0;
+    vec3 h = normalize(wil + wol);
+    cos_h = abs(dot(wol, h));
+    cos_o = abs(wol.z);
+    return microfacet_D(h, a) * microfacet_G1(wil, a) * microfacet_G1(wol, a) / (4.0 * abs(wil.z) * abs(wol.z));
+}
+
+// Solid-angle pdf of microfacet_reflect_sample: the VNDF pdf G₁(ωₒ)·D·|ωₒ·h|/|cos θₒ| through
+// the reflection jacobian 1/(4|ωₒ·h|). Side-symmetric (G₁ reads |z|, D reads z²).
+float microfacet_reflect_pdf(Direction wi, Direction wo, Hit hit, float a) {
+    vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
+    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
+    if (wil.z * wol.z <= 0.0) return 0.0;
+    vec3 h = normalize(wil + wol);
+    return microfacet_G1(wol, a) * microfacet_D(h, a) / (4.0 * abs(wol.z));
+}
+
+// One VNDF sample of the lobe. weight = G₁(ωᵢ) is f·|cos θᵢ|/pdf without F: D, both cosines and
+// the jacobian cancel. A direction reflected below the horizon is a dead sample: wi = wo,
+// weight 0, pdf 0, with cos_h and cos_o still finite, so the caller's F·weight·gain is 0.
+struct MicrofacetReflectSample {
+    Direction wi;       // on wo's side
+    float weight;       // G₁(ωᵢ)
+    float pdf;          // solid angle, equal to microfacet_reflect_pdf(wi, wo)
+    float cos_h;        // |ωₒ·h|, the Fresnel argument
+    float cos_o;        // |cos θₒ|, the energy-gain argument
+};
+
+MicrofacetReflectSample microfacet_reflect_sample(Direction wo, Hit hit, float a, vec2 u) {
+    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
+    float side = wol.z < 0.0 ? -1.0 : 1.0;                  // canonical side, undone at exit
+    wol *= side;
+    vec3 h = microfacet_sample_vndf(wol, a, u);
+    vec3 wil = reflect(-wol, h);
+    MicrofacetReflectSample s;
+    s.cos_h = abs(dot(wol, h));
+    s.cos_o = wol.z;
+    if (wil.z <= 0.0) {
+        s.wi = wo; s.weight = 0.0; s.pdf = 0.0;
+        return s;
+    }
+    s.weight = microfacet_G1(wil, a);
+    s.pdf    = microfacet_G1(wol, a) * microfacet_D(h, a) / (4.0 * abs(wol.z));
+    s.wi     = microfacet_from_local(hit.frame, wil * side);
+    return s;
 }
 
 Spectrum microfacet_conductor_gain(float mu_o, float a, Spectrum f_avg) {
@@ -83057,9 +83117,9 @@ Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
 
 // GGX rough conductor — conforms to §3.2 (transcribed from reference-implementations §7,
 // adapted to the (uc, u) sampler split and the ambient_dot metric discipline).
-// The distribution machinery (D, Smith G₁, VNDF sampling, the frame maps) is SHARED
-// stdlib in glsl/core/microfacet.glsl (fable-rough-dielectric §4) — this file is the
-// conductor MODEL: Schlick Fresnel, the reflection lobe, and nothing else.
+// The F-free reflection lobe (D·G₁·G₁/(4|cos θᵢ||cos θₒ|), the VNDF weight G₁(ωᵢ), the pdf
+// and the horizon test) is SHARED stdlib in glsl/core/microfacet.glsl — this file is the
+// conductor MODEL: Schlick Fresnel at the lobe's half-vector cosine, and nothing else.
 // Fields read: mp.f0 (normal-incidence reflectance), mp.alpha (the derived field
 // max(1e-3, roughness²), assigned by the material lookup; this file never recomputes it).
 // Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta
@@ -83067,10 +83127,10 @@ Spectrum lambert_emission(Direction wo, Hit hit, MaterialProperties mp) {
 // Energy: eval and the sample weight carry microfacet_conductor_gain (materials/
 // microfacet_energy), the constant 1 under measurement.microfacet 'single-scattering'.
 // Provides: ggx_eval(), ggx_sample(), ggx_pdf(), ggx_emission(), ggx_fresnel_average().
-// Depends on: microfacet_* (core), microfacet_conductor_gain, MaterialProperties, Hit/Frame,
-//             InteractionSample, LOBE_REFLECTION, SPECTRUM_ZERO/ONE, ambient_dot,
-//             schlick_fresnel (core math).
-// The TS twin in ggx.test.ts is the tested ground truth for D/G1/sample/pdf/eval —
+// Depends on: microfacet_reflect_* (core), microfacet_conductor_gain, MaterialProperties,
+//             Hit, InteractionSample, LOBE_REFLECTION, SPECTRUM_ZERO/ONE, schlick_fresnel
+//             (core math).
+// The TS twin in ggx.test.ts is the tested ground truth for the lobe and this model —
 // line-for-line transcription, change one change both (§11.3 runs against the twin).
 
 // Schlick's hemispherical average 2∫₀¹ F(μ) μ dμ = f0 + (1 − f0)/21: the F_avg of the
@@ -83080,51 +83140,30 @@ Spectrum ggx_fresnel_average(Spectrum f0) {
 }
 
 Spectrum ggx_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
-    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
-    if (wil.z * wol.z <= 0.0) return SPECTRUM_ZERO;         // reflection-only model
-    float a = mp.alpha;                                     // derived field: max(1e-3, roughness²)
-    vec3 h = normalize(wil + wol);
-    Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
-    Spectrum g = microfacet_conductor_gain(abs(wol.z), a, ggx_fresnel_average(mp.f0));
-    // bare f (§2.2): D·F·G / (4 cos_i cos_o) × the energy gain on wo, NO extra cos_i here
-    return F * (microfacet_D(h, a) * microfacet_G1(wil, a) * microfacet_G1(wol, a) / (4.0 * abs(wil.z) * abs(wol.z))) * g;
+    float cos_h, cos_o;
+    float lobe = microfacet_reflect_eval(wi, wo, hit, mp.alpha, cos_h, cos_o);
+    if (lobe == 0.0) return SPECTRUM_ZERO;                  // reflection only: wi, wo on opposite sides
+    Spectrum F = schlick_fresnel(mp.f0, cos_h);
+    // bare f (§2.2): F · D·G / (4 cos_i cos_o) × the energy gain on wo, NO extra cos_i here
+    return F * lobe * microfacet_conductor_gain(cos_o, mp.alpha, ggx_fresnel_average(mp.f0));
 }
 
 InteractionSample ggx_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
     // Single lobe: uc unused (the reflection lobe is certain).
-    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
-    float side = wol.z < 0.0 ? -1.0 : 1.0;                  // canonical side (undone at exit)
-    wol *= side;
-    float a = mp.alpha;                                     // derived field
-    vec3 h = microfacet_sample_vndf(wol, a, u);             // visible microfacet normal (Heitz 2018)
-
-    vec3 wil = reflect(-wol, h);
+    MicrofacetReflectSample r = microfacet_reflect_sample(wo, hit, mp.alpha, u);
+    Spectrum F = schlick_fresnel(mp.f0, r.cos_h);
     InteractionSample s;
-    if (wil.z <= 0.0) {                                     // reflected below horizon: dead sample
-        s.wi = wo; s.weight = SPECTRUM_ZERO; s.pdf = 0.0; s.flags = LOBE_REFLECTION;
-        return s;
-    }
-    Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
-    // The VNDF elegance: weight = F · G1(wi) exactly (separable Smith) — D, cosines,
-    // and the half-vector jacobian all cancel. The energy gain on wo multiplies eval and
-    // weight alike and leaves the pdf alone.
-    s.weight = F * microfacet_G1(wil, a) * microfacet_conductor_gain(wol.z, a, ggx_fresnel_average(mp.f0));
-    // pdf for MIS: VNDF pdf = G1(wo)·D·|wo·h| / cos_o through the jacobian 1/(4|wo·h|):
-    s.pdf    = microfacet_G1(wol, a) * microfacet_D(h, a) / (4.0 * abs(wol.z));
+    // The VNDF weight is F · G₁(wi) exactly (r.weight = G₁(wi); 0 for a dead sample). The
+    // energy gain on wo multiplies eval and weight alike and leaves the pdf alone.
+    s.weight = F * r.weight * microfacet_conductor_gain(r.cos_o, mp.alpha, ggx_fresnel_average(mp.f0));
+    s.pdf    = r.pdf;
     s.flags  = LOBE_REFLECTION;
-    s.wi     = microfacet_from_local(hit.frame, wil * side);   // back to arrival side
+    s.wi     = r.wi;
     return s;
 }
 
 float ggx_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
-    vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
-    vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
-    if (wil.z * wol.z <= 0.0) return 0.0;
-    float a = mp.alpha;                                     // derived field
-    vec3 h = normalize(wil + wol);
-    // Side-symmetric by construction (G1 uses |z|, D uses z²) — no canonicalization needed.
-    return microfacet_G1(wol, a) * microfacet_D(h, a) / (4.0 * abs(wol.z));   // MUST match ggx_sample's pdf — §11.3 checks this
+    return microfacet_reflect_pdf(wi, wo, hit, mp.alpha);   // equals ggx_sample's pdf (§11.3)
 }
 
 Spectrum ggx_emission(Direction wo, Hit hit, MaterialProperties mp) {
@@ -83624,209 +83663,209 @@ void main() {
         "startLine": 380,
       },
       {
-        "endLine": 467,
+        "endLine": 527,
         "origin": "glsl/core/microfacet.glsl",
         "startLine": 413,
       },
       {
-        "endLine": 470,
+        "endLine": 530,
         "origin": "generated:microfacet-gains",
-        "startLine": 468,
+        "startLine": 528,
       },
       {
-        "endLine": 502,
+        "endLine": 562,
         "origin": "generated:interfaces",
-        "startLine": 471,
+        "startLine": 531,
       },
       {
-        "endLine": 517,
+        "endLine": 577,
         "origin": "generated:primitive-structs",
-        "startLine": 503,
+        "startLine": 563,
       },
       {
-        "endLine": 607,
+        "endLine": 667,
         "origin": "components/geometry/sphere/sphere.glsl",
-        "startLine": 518,
+        "startLine": 578,
       },
       {
-        "endLine": 639,
+        "endLine": 699,
         "origin": "components/geometry/plane/plane.glsl",
-        "startLine": 608,
+        "startLine": 668,
       },
       {
-        "endLine": 681,
+        "endLine": 741,
         "origin": "components/geometry/quad/quad.glsl",
-        "startLine": 640,
+        "startLine": 700,
       },
       {
-        "endLine": 684,
+        "endLine": 744,
         "origin": "generated:spawn-eps",
-        "startLine": 682,
+        "startLine": 742,
       },
       {
-        "endLine": 807,
+        "endLine": 867,
         "origin": "generated:primitive-dispatch",
-        "startLine": 685,
+        "startLine": 745,
       },
       {
-        "endLine": 819,
+        "endLine": 879,
         "origin": "generated:material-of",
-        "startLine": 808,
+        "startLine": 868,
       },
       {
-        "endLine": 842,
+        "endLine": 902,
         "origin": "generated:scene-region-at",
-        "startLine": 820,
+        "startLine": 880,
       },
       {
-        "endLine": 878,
+        "endLine": 938,
         "origin": "generated:scene-intersect",
-        "startLine": 843,
+        "startLine": 903,
       },
       {
-        "endLine": 927,
+        "endLine": 987,
         "origin": "generated:material-lookup",
-        "startLine": 879,
+        "startLine": 939,
       },
       {
-        "endLine": 965,
+        "endLine": 1025,
         "origin": "components/materials/lambert/lambert.glsl",
-        "startLine": 928,
+        "startLine": 988,
       },
       {
-        "endLine": 1041,
+        "endLine": 1080,
         "origin": "components/materials/ggx/ggx.glsl",
-        "startLine": 966,
+        "startLine": 1026,
       },
       {
-        "endLine": 1058,
+        "endLine": 1097,
         "origin": "generated:interaction-dispatch",
-        "startLine": 1042,
+        "startLine": 1081,
       },
       {
-        "endLine": 1062,
+        "endLine": 1101,
         "origin": "generated:nondelta-guard",
-        "startLine": 1059,
+        "startLine": 1098,
       },
       {
-        "endLine": 1066,
+        "endLine": 1105,
         "origin": "generated:emissive-table",
-        "startLine": 1063,
+        "startLine": 1102,
       },
       {
-        "endLine": 1086,
+        "endLine": 1125,
         "origin": "components/transport/shadow/opaque/opaque.glsl",
-        "startLine": 1067,
+        "startLine": 1106,
       },
       {
-        "endLine": 1092,
+        "endLine": 1131,
         "origin": "generated:light-structs",
-        "startLine": 1087,
+        "startLine": 1126,
       },
       {
-        "endLine": 1164,
+        "endLine": 1203,
         "origin": "components/lights/sphere/sphere.glsl",
-        "startLine": 1093,
+        "startLine": 1132,
       },
       {
-        "endLine": 1168,
+        "endLine": 1207,
         "origin": "generated:light-accessors",
-        "startLine": 1165,
+        "startLine": 1204,
       },
       {
-        "endLine": 1183,
+        "endLine": 1222,
         "origin": "generated:light-sampling",
-        "startLine": 1169,
+        "startLine": 1208,
       },
       {
-        "endLine": 1191,
+        "endLine": 1230,
         "origin": "generated:light-of",
-        "startLine": 1184,
+        "startLine": 1223,
       },
       {
-        "endLine": 1198,
+        "endLine": 1237,
         "origin": "generated:lighting-pdf",
-        "startLine": 1192,
+        "startLine": 1231,
       },
       {
-        "endLine": 1206,
+        "endLine": 1245,
         "origin": "components/pixel/box/box.glsl",
-        "startLine": 1199,
+        "startLine": 1238,
       },
       {
-        "endLine": 1225,
+        "endLine": 1264,
         "origin": "components/camera/pinhole/pinhole.glsl",
-        "startLine": 1207,
+        "startLine": 1246,
       },
       {
-        "endLine": 1229,
+        "endLine": 1268,
         "origin": "generated:environment",
-        "startLine": 1226,
+        "startLine": 1265,
       },
       {
-        "endLine": 1236,
+        "endLine": 1275,
         "origin": "generated:transport/light-query",
-        "startLine": 1230,
-      },
-      {
-        "endLine": 1257,
-        "origin": "generated:transport/state",
-        "startLine": 1237,
-      },
-      {
-        "endLine": 1271,
-        "origin": "components/transport/math_mis.glsl",
-        "startLine": 1258,
-      },
-      {
-        "endLine": 1288,
-        "origin": "generated:transport/combiner",
-        "startLine": 1272,
+        "startLine": 1269,
       },
       {
         "endLine": 1296,
-        "origin": "generated:transport/kernel-record",
-        "startLine": 1289,
+        "origin": "generated:transport/state",
+        "startLine": 1276,
       },
       {
-        "endLine": 1305,
-        "origin": "generated:transport/roulette",
+        "endLine": 1310,
+        "origin": "components/transport/math_mis.glsl",
         "startLine": 1297,
       },
       {
-        "endLine": 1309,
-        "origin": "generated:transport/shadow-crossings",
-        "startLine": 1306,
+        "endLine": 1327,
+        "origin": "generated:transport/combiner",
+        "startLine": 1311,
+      },
+      {
+        "endLine": 1335,
+        "origin": "generated:transport/kernel-record",
+        "startLine": 1328,
       },
       {
         "endLine": 1344,
-        "origin": "components/transport/techniques/kernel/kernel.glsl",
-        "startLine": 1310,
+        "origin": "generated:transport/roulette",
+        "startLine": 1336,
       },
       {
-        "endLine": 1373,
-        "origin": "components/transport/techniques/light/light.glsl",
+        "endLine": 1348,
+        "origin": "generated:transport/shadow-crossings",
         "startLine": 1345,
       },
       {
-        "endLine": 1395,
+        "endLine": 1383,
+        "origin": "components/transport/techniques/kernel/kernel.glsl",
+        "startLine": 1349,
+      },
+      {
+        "endLine": 1412,
+        "origin": "components/transport/techniques/light/light.glsl",
+        "startLine": 1384,
+      },
+      {
+        "endLine": 1434,
         "origin": "generated:transport/walk",
-        "startLine": 1374,
+        "startLine": 1413,
       },
       {
-        "endLine": 1396,
+        "endLine": 1435,
         "origin": "generated:accumulation-inputs",
-        "startLine": 1396,
+        "startLine": 1435,
       },
       {
-        "endLine": 1407,
+        "endLine": 1446,
         "origin": "components/accumulator/average/average.glsl",
-        "startLine": 1397,
+        "startLine": 1436,
       },
       {
-        "endLine": 1427,
+        "endLine": 1466,
         "origin": "generated:accumulation-main",
-        "startLine": 1408,
+        "startLine": 1447,
       },
     ],
   },

@@ -4,6 +4,29 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — The F-free GGX reflection lobe in microfacet.glsl (refactor)
+
+Integration step 11 of the photorealism batch (conductor review, item 2): the prerequisite for
+`rough_conductor`, so that it and `ggx` differ only in their Fresnel line instead of copying the
+lobe.
+
+**What:** `glsl/core/microfacet.glsl` gains `microfacet_reflect_eval` (f/F, with the Fresnel
+argument |ωₒ·h| and the energy-gain argument |cos θₒ| as out parameters; 0 across the surface),
+`microfacet_reflect_pdf`, and `microfacet_reflect_sample` (returning `MicrofacetReflectSample`:
+wi, the F-free weight G₁(ωᵢ), pdf, cos_h, cos_o; a dead sample has weight 0 and pdf 0).
+`ggx.glsl` now multiplies Schlick's F and the conductor energy gain into these and does nothing
+else. The TS twin in ggx.test.ts has the same split, plus tests that the lobe's sample and eval
+report the same cos_h and cos_o for the drawn direction and that ggx.glsl reaches D, G₁ and VNDF
+sampling only through the lobe. Frame cases `rough-furnace` and `mirror` added to
+`npm run frames` (separate commit).
+
+**Measured:** `npm run frames -- compare` before/after: 26 of 26 pictures bit-identical (12
+cases, including `ggx` = veach-mis under MIS, `rough-furnace`, `mirror`, `spectral`). Digest:
+the 28 scenes that link microfacet.glsl differ, and in them only the shader text and source
+maps; removing the old and new texts of microfacet.glsl and ggx.glsl leaves all 67 differing
+shaders identical. `ms-furnace` (energy-compensated ggx and rough glass, pt / pt-nee / pt-mis /
+spectral): 34 of 34 checks pass.
+
 ## 2026-11-07 — Sheen: fuzz over a Lambertian base (`sheen`)
 
 Integration step 10 of the photorealism batch (small-materials plan, sheen section), with the
