@@ -45,8 +45,8 @@ reflection at μ = 0.5, so the witness's tilted pane would read 0.
 `sheet_eta` is the sheet's index over the index of the medium around it, as in pbrt (which
 carries no surrounding index here) and Mitsuba. A pane in air takes 1.5; a pane under water
 takes 1.5/1.33. Nothing checks this: the model does not read the region table, so it cannot
-know the surrounding index. The row is a plain positive number (a constant, a `{param}` or an
-expression); a dispersive Cauchy or Sellmeier index is rejected, because nothing here reads one.
+know the surrounding index. The row is a plain positive number (a constant or a `{param}`); a
+dispersive Cauchy or Sellmeier index is rejected, because nothing here reads one.
 
 ## Boundaries of this version
 

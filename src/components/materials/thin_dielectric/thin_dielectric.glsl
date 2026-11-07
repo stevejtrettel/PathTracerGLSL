@@ -26,7 +26,7 @@ float thin_dielectric_reflectance(float cos_i, float sheet_eta) {
 }
 
 InteractionSample thin_dielectric_sample(Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u) {
-    // n faces region_from (§4.1), so cos_i > 0 by orientation; clamped at grazing.
+    // n faces region_from, so cos_i > 0 by orientation; clamped at grazing.
     Direction n = hit.frame.n;
     float cos_i = clamp(ambient_dot(wo, n, hit.p), 1e-6, 1.0);
 
@@ -39,8 +39,8 @@ InteractionSample thin_dielectric_sample(Direction wo, Hit hit, MaterialProperti
         s.flags = LOBE_TRANSMISSION | LOBE_DELTA;
     }
     // Each lobe is chosen with the probability of its own weight (R_tot or T_tot), so f·|cos|/pdf
-    // with the delta cancellation (§2.1) leaves weight 1 on both branches. No η² factor: the
-    // light ends up in the medium it started in.
+    // (the delta factor cancels between f and pdf) leaves weight 1 on both branches. No η²
+    // factor: the light ends up in the medium it started in.
     s.weight = SPECTRUM_ONE;
     s.pdf    = 0.0;
     return s;

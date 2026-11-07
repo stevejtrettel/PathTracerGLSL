@@ -136,7 +136,7 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
     });
 
     // ============================================================================
-    // Registry kitchen sink (A4): a scene SYNTHESIZED from the registries themselves —
+    // Registry kitchen sink: a scene SYNTHESIZED from the registries themselves —
     // every primitive (constant AND driven placement), every material model that can share
     // a scene with media, every phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
     // means a new occupant's GLSL is otherwise invisible to glslang until some suite
