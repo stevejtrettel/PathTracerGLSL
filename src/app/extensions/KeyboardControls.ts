@@ -14,7 +14,7 @@ import { AppEvents } from '../events.js';
  *   ← - left       → - right
  *   ' - up         / - down
  *
- * Rotation (WASD + QE)
+ * Rotation (WASD)
  *   W - pitch up   S - pitch down
  *   A - yaw left   D - yaw right
  *
@@ -69,7 +69,7 @@ export class KeyboardControls implements Extension {
 
         console.log('KeyboardControls installed:');
         console.log('  Arrows/\'/ : Move');
-        console.log('  WASD/QE   : Rotate');
+        console.log('  WASD      : Rotate');
         console.log('  Shift     : Boost');
         console.log('  Ctrl      : Slow');
         console.log('  G         : Stabilize');
@@ -233,9 +233,9 @@ export class KeyboardControls implements Extension {
     private getMovementInput(): Vec3 | null {
         const move: Vec3 = [0, 0, 0];
 
-        // Forward/backward (arrows or numpad)
-        if (this.pressed.has('ArrowUp') || this.pressed.has('Numpad8')) move[2] -= 1;
-        if (this.pressed.has('ArrowDown') || this.pressed.has('Numpad2')) move[2] += 1;
+        // Forward/backward (arrows or numpad); local z is the view direction (frame.forward)
+        if (this.pressed.has('ArrowUp') || this.pressed.has('Numpad8')) move[2] += 1;
+        if (this.pressed.has('ArrowDown') || this.pressed.has('Numpad2')) move[2] -= 1;
 
         // Left/right
         if (this.pressed.has('ArrowRight') || this.pressed.has('Numpad6')) move[0] += 1;
@@ -251,15 +251,12 @@ export class KeyboardControls implements Extension {
     private getRotationInput(): Vec3 | null {
         const rot: Vec3 = [0, 0, 0];
 
-        // Pitch (W/S)
-        if (this.pressed.has('KeyW')) rot[0] -= 1;  // Pitch up
-        if (this.pressed.has('KeyS')) rot[0] += 1;  // Pitch down
-
-        // Yaw (A/D)
-        if (this.pressed.has('KeyA')) rot[1] -= 1;  // Yaw left
-        if (this.pressed.has('KeyD')) rot[1] += 1;  // Yaw right
-
-        // Roll (Q/E)
+        // Right-handed rotations: a positive angle about frame.right tilts forward toward up
+        // (pitch up); a positive angle about frame.up turns forward toward -right (yaw left).
+        if (this.pressed.has('KeyW')) rot[0] += 1;  // Pitch up
+        if (this.pressed.has('KeyS')) rot[0] -= 1;  // Pitch down
+        if (this.pressed.has('KeyA')) rot[1] += 1;  // Yaw left
+        if (this.pressed.has('KeyD')) rot[1] -= 1;  // Yaw right
 
         return vec3IsZero(rot) ? null : vec3Normalize(rot);
     }
@@ -281,9 +278,8 @@ export class KeyboardControls implements Extension {
 
         if (pitch !== 0) this.frame.rotatePitch(pitch * angle);
         if (yaw !== 0) this.frame.rotateYaw(yaw * angle);
-        // E8: roll DELETED — the pose rail is position/target with world-up, so roll was a
-        // no-op on screen (it mutated only this extension's private frame). A real keyboard
-        // NAVIGATION system is the owner's planned follow-up (impl-plan-engine-app).
+        // No roll: the camera pose is position/target with world up, so a roll would not
+        // show on screen.
     }
 
     private updateParameters(): void {
