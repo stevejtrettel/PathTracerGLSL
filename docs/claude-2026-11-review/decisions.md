@@ -62,4 +62,4 @@ copied here until the owner accepts them.
     better (e.g. for math scenes without UVs).
 16. **No license work.** "what if we skip all the license stuff im just a hobbyist academic" —
     data and assets are used without license research. Each data file still records where it
-    came from (a source URL), as an academic citation.
+    came from (a source URL), as an academic citation. Owner: "i dont need agents wasting their brains on that", "just grab the spectra and report the sources".
