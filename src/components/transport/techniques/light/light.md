@@ -23,9 +23,11 @@ scores at the same vertex, locally. No carried state.
   heuristic against `interaction_surface_pdf` under MIS).
 
 **Medium site** (`light_sample_direct_medium`): the same flow from a scattering
-vertex with the pinned surface/medium asymmetry — phase EVAL (`hg_eval`) and **NO
-cosine** (§2.2: the cosine is a surface Jacobian), weight from
-`combiner_w_light_medium` (balances against `hg_pdf` under MIS). Replaced wholesale
+vertex with the pinned surface/medium asymmetry — phase EVAL at the event point
+(`interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt)`, the generated dispatch over the registered
+phase models) and **NO cosine** (§2.2: the cosine is a surface Jacobian), weight from
+`combiner_w_light_medium` (1 under plain NEE; the power heuristic against
+`interaction_medium_pdf` under MIS). Replaced wholesale
 by `../equiangular/` under `mediumLightSampling: 'equiangular'` — one placement per
 program.
 
