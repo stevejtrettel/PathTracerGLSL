@@ -1,0 +1,26 @@
+furnace: Le=1 rho=0.8 maxBounces=6; expected Le*sum rho^k = 3.9514240000000003; paths=800000
+  H3 R=0.5 cam@0.25 pt                         mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 4.4e-16
+  H3 R=0.5 cam@0.25 nee                        mean 3.951406  se 0.00020  expected 3.951424  z -0.09  mean|<y,y>-sgn| at last vertex 4.4e-16
+  H3 R=0.5 cam@0.25 mis                        mean 3.951410  se 0.000099  expected 3.951424  z -0.14  mean|<y,y>-sgn| at last vertex 4.4e-16
+  H3 R=2 cam@1.00 pt                           mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 8.5e-14
+  H3 R=2 cam@1.00 nee                          mean 3.951844  se 0.0029  expected 3.951424  z 0.14  mean|<y,y>-sgn| at last vertex 8.5e-14
+  H3 R=2 cam@1.00 mis                          mean 3.950733  se 0.00051  expected 3.951424  z -1.36  mean|<y,y>-sgn| at last vertex 8.5e-14
+  H3 R=4 cam@2.00 pt                           mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 3.4e-10
+  H3 R=4 cam@2.00 nee                          mean 3.951718  se 0.023  expected 3.951424  z 0.01  mean|<y,y>-sgn| at last vertex 3.4e-10
+  H3 R=4 cam@2.00 mis                          mean 3.950946  se 0.00027  expected 3.951424  z -1.74  mean|<y,y>-sgn| at last vertex 3.4e-10
+  S3 R=0.5 cam@0.25 pt                         mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 6.7e-17
+  S3 R=0.5 cam@0.25 nee                        mean 3.951621  se 0.00022  expected 3.951424  z 0.91  mean|<y,y>-sgn| at last vertex 6.7e-17
+  S3 R=0.5 cam@0.25 mis                        mean 3.951566  se 0.00011  expected 3.951424  z 1.33  mean|<y,y>-sgn| at last vertex 6.7e-17
+  S3 R=1.4 cam@0.70 pt                         mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 1.7e-16
+  S3 R=1.4 cam@0.70 nee                        mean 3.955441  se 0.0047  expected 3.951424  z 0.85  mean|<y,y>-sgn| at last vertex 1.7e-16
+  S3 R=1.4 cam@0.70 mis                        mean 3.951319  se 0.00048  expected 3.951424  z -0.22  mean|<y,y>-sgn| at last vertex 1.7e-16
+  S3 R=2.2 cam@0.00 pt                         mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 1.3e-16
+  S3 R=2.2 cam@0.00 nee                        mean 3.951885  se 0.00092  expected 3.951424  z 0.50  mean|<y,y>-sgn| at last vertex 1.3e-16
+  S3 R=2.2 cam@0.00 mis                        mean 3.951508  se 0.00037  expected 3.951424  z 0.23  mean|<y,y>-sgn| at last vertex 1.3e-16
+  S3 R=3 cam@0.00 pt                           mean 3.951424  se 6.5e-9  expected 3.951424  z -0.00  mean|<y,y>-sgn| at last vertex 1.1e-16
+  S3 R=3 cam@0.00 nee                          mean 3.951449  se 0.000017  expected 3.951424  z 1.51  mean|<y,y>-sgn| at last vertex 1.1e-16
+  S3 R=3 cam@0.00 mis                          mean 3.951432  se 0.0000084  expected 3.951424  z 0.93  mean|<y,y>-sgn| at last vertex 1.1e-16
+  off-center camera in an S3 ball with R > pi/2: fraction of camera rays that reach the wall 0.579284
+  S3 R=2.2 cam@1.10 pt                         mean 2.286640  se 0.0022  expected 2.288995  z -1.08  never reach wall 337050  mean|<y,y>-sgn| at last vertex 1.3e-16
+  S3 R=2.2 cam@1.10 nee                        mean 2.288048  se 0.0023  expected 2.288995  z -0.41  never reach wall 336490  mean|<y,y>-sgn| at last vertex 1.3e-16
+  S3 R=2.2 cam@1.10 mis                        mean 2.291293  se 0.0022  expected 2.288995  z 1.05  never reach wall 336143  mean|<y,y>-sgn| at last vertex 1.3e-16

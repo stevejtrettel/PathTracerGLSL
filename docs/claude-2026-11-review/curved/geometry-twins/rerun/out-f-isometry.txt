@@ -1,0 +1,13 @@
+H3 f64 (errors relative to coordinate size): T·o=p 0.0000, form preserved 6.61e-16, |det-1| 2.50e-7, inv·T=I 6.61e-16, T·e_i = PT(e_i) 2.11e-13
+S3 f64 (errors relative to coordinate size): T·o=p 0.0000, form preserved 1.34e-10, |det-1| 6.75e-11, inv·T=I 1.34e-10, T·e_i = PT(e_i) 6.72e-11
+S3 makeTranslation near the antipode of the origin (p4=-1.0000): max entry 1.0000, |TᵀT-I| 5.45e-8  (formula divides by 1+p4)
+
+float32 composition drift over 1000 steps (camera-like motion: small translations + rotations)
+H3 step≤0.05: final distance from origin 0.5513 | f64 form err 1.36e-14 (rel) | f32: form err 6.00e-6, position err 6.95e-7, |ref⁻¹·M - I| 3.00e-6 | f32+reduce: form err 1.10e-7, position err 7.80e-7, |ref⁻¹·M - I| 6.94e-7 | f32+polar: form err 2.71e-7, position err 8.72e-7, |ref⁻¹·M - I| 2.68e-6
+H3 step≤0.3: final distance from origin 5.9327 | f64 form err 1.82e-14 (rel) | f32: form err 1.4712, position err 0.4524, |ref⁻¹·M - I| 0.7356 | f32+reduce: form err 0.0230, position err 2.3002, |ref⁻¹·M - I| 4.1214 | f32+polar: form err 0.0327, position err 4.2831, |ref⁻¹·M - I| 35.5475
+S3 step≤0.05: final distance from origin 0.9957 | f64 form err 3.75e-15 (rel) | f32: form err 2.21e-6, position err 6.78e-7, |ref⁻¹·M - I| 1.11e-6 | f32+reduce: form err 1.82e-7, position err 3.50e-7, |ref⁻¹·M - I| 2.76e-6 | f32+polar: form err 8.54e-8, position err 8.64e-7, |ref⁻¹·M - I| 2.26e-6
+S3 step≤0.3: final distance from origin 1.5667 | f64 form err 1.15e-15 (rel) | f32: form err 1.34e-6, position err 7.47e-7, |ref⁻¹·M - I| 8.61e-7 | f32+reduce: form err 2.03e-7, position err 1.76e-6, |ref⁻¹·M - I| 1.39e-6 | f32+polar: form err 2.59e-7, position err 2.25e-6, |ref⁻¹·M - I| 1.99e-6
+S3 fromDir f32 d=0.5000: |T·o - p| 1.46e-8, |TᵀT-I| 9.98e-9
+S3 fromDir f32 d=3.0000: |T·o - p| 6.18e-9, |TᵀT-I| 6.80e-8
+S3 fromDir f32 d=3.1416: |T·o - p| 5.00e-13, |TᵀT-I| 2.54e-8
+S3 fromDir f32 d=3.1416: |T·o - p| 6.95e-24, |TᵀT-I| 1.54e-7

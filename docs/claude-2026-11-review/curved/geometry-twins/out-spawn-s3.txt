@@ -1,0 +1,5 @@
+S3 R=0 failures true/f32-SDF of 4000: eps 1.00e-7: 0/0 | eps 3.00e-7: 0/0 | eps 1.00e-6: 0/0 | eps 3.00e-6: 0/0 | eps 1.00e-5: 0/0 | eps 1.53e-5: 0/0
+S3 R=1 failures true/f32-SDF of 4000: eps 1.00e-7: 0/13 | eps 3.00e-7: 0/0 | eps 1.00e-6: 0/0 | eps 3.00e-6: 0/0 | eps 1.00e-5: 0/0 | eps 1.53e-5: 0/0
+S3 R=2 failures true/f32-SDF of 4000: eps 1.00e-7: 0/9 | eps 3.00e-7: 0/0 | eps 1.00e-6: 0/0 | eps 3.00e-6: 0/0 | eps 1.00e-5: 0/0 | eps 1.53e-5: 0/0
+S3 R=3 failures true/f32-SDF of 4000: eps 1.00e-7: 0/4 | eps 3.00e-7: 0/0 | eps 1.00e-6: 0/0 | eps 3.00e-6: 0/0 | eps 1.00e-5: 0/0 | eps 1.53e-5: 0/0
+S3 R=3.1 failures true/f32-SDF of 4000: eps 1.00e-7: 0/1 | eps 3.00e-7: 0/0 | eps 1.00e-6: 0/0 | eps 3.00e-6: 0/0 | eps 1.00e-5: 0/0 | eps 1.53e-5: 0/0

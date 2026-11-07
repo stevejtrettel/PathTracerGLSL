@@ -1,0 +1,5 @@
+E3: worst rel err fd vs formula 1.79e-10  [r=0.01: fd 1.00e-4 formula 1.00e-4; r=0.5: fd 0.2500 formula 0.2500; r=1: fd 1.0000 formula 1.0000; r=2: fd 4.0000 formula 4.0000; r=4: fd 16.0000 formula 16.0000; r=6: fd 36.0000 formula 36.0000]
+H3: worst rel err fd vs formula 2.25e-10  [r=0.01: fd 1.00e-4 formula 1.00e-4; r=0.5: fd 0.2715 formula 0.2715; r=1: fd 1.3811 formula 1.3811; r=2: fd 13.1541 formula 13.1541; r=4: fd 744.7396 formula 744.7396; r=6: fd 4.07e+4 formula 4.07e+4]
+S3: worst rel err fd vs formula 2.22e-10  [r=0.01: fd 1.00e-4 formula 1.00e-4; r=0.5: fd 0.2298 formula 0.2298; r=1: fd 0.7081 formula 0.7081; r=2: fd 0.8268 formula 0.8268; r=3: fd 0.0199 formula 0.0199; r=3.1: fd 0.0017 formula 0.0017; r=4: fd 0.5728 formula 0.5728; r=6: fd 0.0781 formula 0.0781]
+H2R: worst rel err fd vs formula 1.53e-8  [r=0.01: fd 1.00e-4 formula 1.00e-4; r=0.5: fd 0.2574 formula 0.2574; r=1: fd 1.1223 formula 1.1223; r=2: fd 6.1744 formula 6.1744; r=4: fd 68.7476 formula 68.7476; r=6: fd 555.5734 formula 555.5734]
+H3 sphere area 4π sinh²(1) = 17.3554 ; S3 at r=π: A= 1.50e-32 (focal: every geodesic from p meets at -p)

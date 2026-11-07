@@ -1,0 +1,9 @@
+--- S3: disk BELOW x D=1 rho=0.6 two-sided  (N=8000000)
+  A cosine/BSDF                                mean 1.250764  se 0.00054  expected 1.250217  z 1.01
+  B area sampling                              mean 1.250199  se 0.000056  expected 1.250217  z -0.32
+  MIS(A,B) power                               mean 1.250285  se 0.000087  expected 1.250217  z 0.78
+--- S3: ball off-axis d=2.2 R=0.4 polar=0.7  (N=8000000)
+  A cosine/BSDF                                mean 0.5573236  se 0.00042  expected 0.5574403  z -0.27
+  B area sampling                              mean 0.5574682  se 0.00019  expected 0.5574403  z 0.14
+  MIS(A,B) power                               mean 0.5574355  se 0.00017  expected 0.5574403  z -0.03
+  C cone sampling                              mean 0.5575594  se 0.00021  expected 0.5574403  z 0.58  cone misses 0

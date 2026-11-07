@@ -1,0 +1,536 @@
+app/sceneData.ts:11:import { buildBVHNodes, rootBoxOf, transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
+app/sceneData.ts:62:    const batchRoots: AABB[] = packedBatches.map((packed, i) => {
+app/sceneData.ts:77:    const resolveBox = (source: BoxSource): AABB => {
+app/sceneData.ts:80:        return transformAABB(geometry[source.geometry].rootBox, (pt) => similarityApplyPoint(source.placement, pt));
+app/utils/instancePack.ts:12:import type { AABB } from '../../components/accel/bvh/bvh.js';
+app/utils/instancePack.ts:16:    localBox: AABB,
+glsl/core/microfacet.glsl:11:// Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot.
+glsl/core/microfacet.glsl:21:// projection goes through ambient_dot (Euclidean unpacks to dot).
+glsl/core/microfacet.glsl:23:    return vec3(ambient_dot(v, f.t, p), ambient_dot(v, f.b, p), ambient_dot(v, f.n, p));
+glsl/core/microfacet.glsl:26:    return normalize(f.t * v.x + f.b * v.y + f.n * v.z);
+glsl/core/microfacet.glsl:42:    vec3 vh = normalize(vec3(a * wol.x, a * wol.y, wol.z));
+glsl/core/microfacet.glsl:44:    vec3 T1 = lensq > 0.0 ? vec3(-vh.y, vh.x, 0.0) * inversesqrt(lensq) : vec3(1.0, 0.0, 0.0);
+glsl/core/microfacet.glsl:45:    vec3 T2 = cross(vh, T1);
+glsl/core/microfacet.glsl:53:    return normalize(vec3(a * nh.x, a * nh.y, max(1e-6, nh.z)));
+glsl/core/placement.glsl:4://   q  = the INVERSE rotation quaternion (world→local)
+glsl/core/placement.glsl:14:// Directions stay unit through placement_dir, so intersector assumptions hold; normals
+glsl/core/placement.glsl:15:// return via the free forward rotation (quaternion conjugation is a sign flip).
+glsl/core/placement.glsl:18:// Rotate v by unit quaternion q: v + 2·q.xyz × (q.xyz × v + q.w·v).
+glsl/core/placement.glsl:19:vec3 placement_qrot(vec4 q, vec3 v) {
+glsl/core/placement.glsl:20:    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+glsl/core/placement.glsl:24:vec3 placement_rigid(vec4 q, vec4 ts, vec3 p) {
+glsl/core/placement.glsl:25:    return placement_qrot(q, p) + ts.xyz;
+glsl/core/placement.glsl:29:vec3 placement_dir(vec4 q, vec3 d) {
+glsl/core/placement.glsl:30:    return placement_qrot(q, d);
+glsl/core/placement.glsl:34:vec3 placement_normal(vec4 q, vec3 n) {
+glsl/core/placement.glsl:35:    return placement_qrot(vec4(-q.xyz, q.w), n);
+glsl/core/placement.glsl:39:float placement_scale(vec4 ts) {
+glsl/core/structs.glsl:91:    float distance;       // to the sampled point (MAX_DIST for the environment and directional lights)
+app/utils/packWorker.ts:16:import type { AABB } from '../../components/accel/bvh/bvh.js';
+app/utils/packWorker.ts:19:    localBox: AABB;
+components/descriptors.ts:16:import type { AABB } from './accel/bvh/bvh.js';
+components/descriptors.ts:279:    /** World AABB of the emitter for light-TREE leaves (fable-light-bvh §5). Two forms:
+components/descriptors.ts:287:    treeBounds?: ((values: Record<string, number | number[]>) => AABB) | 'data';
+components/descriptors.ts:421:    /** Local-space AABB of the primitive given its (canonical) values — the prototype box
+components/descriptors.ts:425:    bounds?(values: PrimitiveValues): AABB;
+components/materials/lambert/lambert.glsl:9:    // World-space direction·normal → metric (ambient_dot); Euclidean unpacks to dot.
+components/materials/lambert/lambert.glsl:10:    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
+components/materials/lambert/lambert.glsl:17:    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
+components/materials/lambert/lambert.glsl:23:    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+components/materials/lambert/lambert.glsl:31:    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
+components/materials/dielectric/dielectric.glsl:8://             InteractionSample, LOBE_*, SPECTRUM_ZERO/ONE, ambient_dot.
+components/materials/dielectric/dielectric.glsl:24:    float cos_i = clamp(ambient_dot(wo, n, hit.p), 1e-6, 1.0);   // > 0 by orientation; clamped at grazing
+components/materials/dielectric/dielectric.glsl:31:        s.wi     = normalize(2.0 * cos_i * n - wo);
+components/materials/dielectric/dielectric.glsl:39:        s.wi     = normalize(-eta * wo + (eta * cos_i - cos_t) * n);
+components/materials/rough_dielectric/rough_dielectric.glsl:30://             SPECTRUM_ZERO/ONE, ambient_dot.
+components/materials/rough_dielectric/rough_dielectric.glsl:41:    m = normalize(m);
+components/materials/rough_dielectric/rough_dielectric.glsl:110:        wil = reflect(-wol, m);
+components/materials/rough_dielectric/rough_dielectric.glsl:118:        wil = normalize(-eta * wol + (eta * cos_om - cos_t) * m);
+components/materials/ggx/ggx.glsl:2:// adapted to the (uc, u) sampler split and the ambient_dot metric discipline).
+components/materials/ggx/ggx.glsl:12://             LOBE_REFLECTION, SPECTRUM_ZERO/ONE, ambient_dot, schlick_fresnel (core math).
+components/materials/ggx/ggx.glsl:21:    vec3 h = normalize(wil + wol);
+components/materials/ggx/ggx.glsl:35:    vec3 wil = reflect(-wol, h);
+components/materials/ggx/ggx.glsl:57:    vec3 h = normalize(wil + wol);
+components/transport/shadow/opaque/opaque.glsl:17:    float maxDist = length(light_p - shadow_ray.origin) - SHADOW_BACKOFF;
+components/transport/integrators/pt/pt.ts:327:                `            if (bounce < ${N}) equiangular_sample_direct(s, med_mat, boundary ? hit.t : MAX_DIST);`,
+components/transport/integrators/pt/pt.ts:331:            '            MediumSample ms = medium_sample(med_mat, s.ray, boundary ? hit.t : MAX_DIST, random2());',
+components/materials/checker/checker.glsl:11://             PI, TWO_PI, SPECTRUM_ZERO, ambient_dot.
+components/materials/checker/checker.glsl:21:    if (ambient_dot(wi, hit.frame.n, hit.p) * ambient_dot(wo, hit.frame.n, hit.p) <= 0.0) return SPECTRUM_ZERO;
+components/materials/checker/checker.glsl:28:    Direction n = ambient_dot(wo, f.n, hit.p) < 0.0 ? -f.n : f.n;
+components/materials/checker/checker.glsl:34:    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+components/materials/checker/checker.glsl:42:    float c = ambient_dot(wi, hit.frame.n, hit.p) * sign(ambient_dot(wo, hit.frame.n, hit.p));
+components/materials/mirror/mirror.glsl:13://             LOBE_DELTA, SPECTRUM_ZERO/ONE, ambient_dot, schlick_fresnel (core math).
+components/materials/mirror/mirror.glsl:23:    float cos_i = clamp(ambient_dot(wo, n, hit.p), 1e-6, 1.0);
+components/materials/mirror/mirror.glsl:27:    s.wi     = normalize(2.0 * cos_i * n - wo);
+components/transport/volume/grin/grin.glsl:30:// medium_emission (generated — the zero-folding ε accessor), ambient_geodesic (core),
+components/transport/volume/grin/grin.glsl:220:        float n = length(T);
+components/transport/volume/grin/grin.glsl:232:        h = min(h, GRIN_DTOL * n / max(length(F), 1e-6));
+components/transport/volume/grin/grin.glsl:255:            float n_exit  = length(T_half);
+components/transport/volume/grin/grin.glsl:263:            ms.exit_dir = normalize(T_half);
+components/transport/volume/grin/grin.glsl:273:        float ds = length(T_half) * h;
+components/transport/volume/grin/grin.glsl:324:            ms.exit_p    = ambient_geodesic(ray.origin, ray.direction, s_star);
+components/transport/volume/grin/grin.glsl:347:        float n = length(T);
+components/transport/volume/grin/grin.glsl:350:        h = min(h, GRIN_DTOL * n / max(length(F), 1e-6));
+components/transport/volume/grin/grin.glsl:354:        float n_half = length(T_half);
+components/transport/volume/grin/grin.glsl:378:            ms.exit_dir  = normalize(T_half);
+components/transport/volume/grin/grin.glsl:395:            ms.exit_dir  = normalize(T_half);
+components/transport/techniques/equiangular/equiangular.glsl:16://             spectrum_exp, ambient_geodesic, make_ray.
+components/transport/techniques/equiangular/equiangular.glsl:37:    Point p_evt = ambient_geodesic(o, d, t);
+components/transport/techniques/equiangular/equiangular.glsl:45:    float d2 = max(dot(to_light, to_light), 1e-8);
+components/transport/techniques/equiangular/equiangular.glsl:46:    float dist = sqrt(d2);
+components/transport/techniques/equiangular/equiangular.glsl:56:        * (intensity / d2) * vis / (pdf_t * select_pdf);
+components/transport/techniques/light/light.glsl:6://             interaction_surface_eval, ray_spawn, ambient_direction_to, ambient_dot.
+components/transport/techniques/light/light.glsl:20:    Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
+components/transport/techniques/light/light.glsl:22:    shadow_ray.direction = ambient_direction_to(shadow_ray.origin, light_p);
+components/transport/techniques/light/light.glsl:26:    float cos_i = abs(ambient_dot(ls.wi, hit.frame.n, hit.p));           // transport applies the cosine (metric)
+glsl/core/math.glsl:2:// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, fp_uncertainty(), build_basis(),
+glsl/core/math.glsl:8:// MAX_DIST — the far clip: nothing beyond it is geometry, and the environment is found there
+glsl/core/math.glsl:11:#define MAX_DIST 1000.0
+glsl/core/math.glsl:38:// (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
+glsl/core/math.glsl:48:// ambient_geodesic (the metric seam), and the legal window — hit error ~2e-7…2e-6
+glsl/core/math.glsl:59:// METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that
+glsl/core/math.glsl:61:// because a sampler only needs SOME orthonormal completion, while ambient_frame's output
+glsl/core/math.glsl:63:void build_basis(vec3 n, out vec3 t, out vec3 b) {
+glsl/core/math.glsl:65:    t = normalize(cross(up, n));
+glsl/core/math.glsl:66:    b = cross(n, t);
+glsl/core/ray.glsl:5:// Provides: make_ray(), ray_spawn(). Depends on: Ray/Hit (structs), ambient_geodesic/ambient_dot.
+glsl/core/ray.glsl:30:    float side = ambient_dot(wi, hit.ng, hit.p) >= 0.0 ? 1.0 : -1.0;
+glsl/core/ray.glsl:31:    return make_ray(ambient_geodesic(hit.p, hit.ng * side, hit.eps), wi, hit.wl);
+components/camera/equirect/equirect.glsl:27:    return make_ray(u_cameraPosition, normalize(dir), wl);
+components/transport/techniques/light/light_medium.glsl:14:    Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
+components/transport/volume/analytic/analytic.glsl:31:        ms.exit_p    = ambient_geodesic(ray.origin, ray.direction, t);
+components/transport/volume/analytic/analytic.glsl:48:// a strict superset). Caller clamps len finite (MAX_DIST) — inf × 0 = NaN guard (pbrt note).
+components/camera/thinlens/thinlens.glsl:18:    vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
+components/camera/thinlens/thinlens.glsl:25:    // gives lens = 0 → origin unchanged, dir → normalize(focus_point − position) = the
+components/camera/thinlens/thinlens.glsl:29:    vec3 lens_dir = normalize(focus_point - origin);
+components/camera/basis.ts:30:function cross(a: Vec3Tuple, b: Vec3Tuple): Vec3Tuple {
+components/camera/basis.ts:38:function normalize(v: Vec3Tuple): Vec3Tuple {
+components/camera/basis.ts:39:    const len = Math.hypot(v[0], v[1], v[2]);
+components/camera/basis.ts:40:    // Match the shader's normalize(0) → NaN avoidance is unnecessary here: forward is
+components/camera/basis.ts:47: * degenerate up-reference guard: forward ∥ ±Y makes cross(forward, +Y) zero-length, so
+components/camera/basis.ts:51:    const forward = normalize(sub(target, position));
+components/camera/basis.ts:53:    const right = normalize(cross(forward, upRef));
+components/camera/basis.ts:54:    const up = cross(right, forward);
+components/camera/cylindrical/cylindrical.glsl:27:    return make_ray(u_cameraPosition, normalize(dir), wl);
+components/transport/shadow/media/media.glsl:9:// (materials), ray_spawn (core), ambient_direction_to (ambient).
+components/transport/shadow/media/media.glsl:23:// shadow ray). (length() is Euclidean; a geodesic-distance ambient helper is the curved-space
+components/transport/shadow/media/media.glsl:39:        float remaining = length(light_p - seg_ray.origin) - SHADOW_BACKOFF;
+components/transport/shadow/media/media.glsl:59:        seg_ray.direction = ambient_direction_to(seg_ray.origin, light_p);   // re-aimed at the light point
+components/camera/fisheye/fisheye.glsl:25:    float rho = length(c);
+components/camera/fisheye/fisheye.glsl:38:    return make_ray(u_cameraPosition, normalize(dir), wl);
+components/transport/volume/delta_tracking/delta_tracking.glsl:28:// advancement is spelled through ambient_geodesic() (a Euclidean no-op) so the one
+components/transport/volume/delta_tracking/delta_tracking.glsl:37:// (MediumSample), spectrum_* (core math), ambient_geodesic.
+components/transport/volume/delta_tracking/delta_tracking.glsl:75:        Point p = ambient_geodesic(ray.origin, ray.direction, t);
+components/transport/volume/delta_tracking/delta_tracking.glsl:110:            ms.exit_p   = ambient_geodesic(ray.origin, ray.direction, t);
+components/transport/volume/delta_tracking/delta_tracking.glsl:143:        Point p = ambient_geodesic(ray.origin, ray.direction, t);
+components/transport/volume/delta_tracking/delta_tracking.glsl:168:        Point p = ambient_geodesic(ray.origin, ray.direction, t);
+components/ambient/index.ts:2:// the non-Euclidean seam). An ambient occupant = one folder (the ambient_* contract
+components/ambient/index.ts:3:// GLSL: ambient_geodesic / ambient_frame / ambient_dot / ambient_parallel_transport /
+components/ambient/index.ts:4:// ambient_direction_to)
+components/ambient/index.ts:17:    /** ?raw source providing the ambient_* contract surface (trace-loop-contract). */
+components/color/spectral/lookup.glsl:43:    vec4 p = (c.x * t + c.y) * t + c.z;
+components/intersection/index.ts:14:// accel/bvh/bvh.glsl (slab test, stack depth).
+components/intersection/index.ts:96:     *  per-node ray transform → one-FMA quantized slabs; uvec2 stack entries; bounded
+components/intersection/mesh/topology.ts:13:import type { AABB } from '../../accel/bvh/bvh.js';
+components/intersection/mesh/topology.ts:21:    /** Signed volume > 0: the agreed side actually points OUT (cross(e1,e2) outward). */
+components/intersection/mesh/topology.ts:80:/** The mesh's local AABB (min/max over positions) — baked into the generated containment
+components/intersection/mesh/topology.ts:82:export function meshLocalBox(positions: Float32Array): AABB {
+components/aov/normal/normal.glsl:9:    vec3 n = ambient_dot(hit.frame.n, wo, hit.p) < 0.0 ? -hit.frame.n : hit.frame.n;
+components/intersection/instancing/instancing.ts:17:import { buildBVHNodesFlat, TLAS_LEAF_SIZE, type AABB } from '../../accel/bvh/bvh.js';
+components/intersection/instancing/instancing.ts:39: *  allocates per instance. The packed arm normalizes its quat exactly like
+components/intersection/instancing/instancing.ts:40: *  similarityFromTransform's raw-quat arm (f32-stored quats sit ~1e-7 off unit) — the
+components/intersection/instancing/instancing.ts:54:        const len = Math.hypot(o[4 * i], o[4 * i + 1], o[4 * i + 2], o[4 * i + 3]);
+components/intersection/instancing/instancing.ts:129:export function packInstanceBatch(localBox: AABB, placements: Similarity[] | PackedPlacements, attributeRows?: AttributeRowSpec[], paramsRecord?: ParamsRecordSpec, buildCwbvh = false): PackedInstanceBatch {
+components/intersection/instancing/instancing.ts:132:    // World boxes, FLAT (Aug 8 allocation-discipline rewrite — no per-instance AABB
+components/intersection/instancing/instancing.ts:134:    // quatRotate ∘ similarityApplyPoint op-for-op — output is byte-identical to the old
+components/intersection/instancing/instancing.ts:135:    // transformAABB(similarityApplyPoint) path (the bvhFlat reference-twin gate).
+components/intersection/instancing/instancing.ts:144:            // quatRotate (v' = v + 2·qv × (qv × v + w·v), the no-trig expansion) then ·s + t.
+components/intersection/instancing/instancing.ts:235: *  kind-fold). Point rows take the full g·p (the no-trig quat expansion, ×s, +t);
+components/intersection/instancing/instancing.ts:254:                // g·p = s·R·p + t (quatRotate's no-trig expansion, matching the box loop).
+components/color/spectral/lookup.ts:28:    const p = (c[0] * t + c[1]) * t + c[2];
+components/intersection/mesh/mesh.glsl:4://           (glsl/core/data_texture.glsl) + bvh_aabb_hit/BVH_STACK_DEPTH (accel/bvh/bvh.glsl),
+components/intersection/mesh/mesh.glsl:20:// equals the world t (p_world = ambient_geodesic(world_o, world_d, t)). See the derivation in
+components/intersection/mesh/mesh.glsl:24:// generic walk support (bvh_aabb_hit) come from the rail/accel files included before it.
+components/intersection/mesh/mesh.glsl:32:// mesh-slab-albedo, σ_t = 20) and breaks scale invariance (witness mesh-scale-twin).
+components/intersection/mesh/mesh.glsl:45:    gnorm = cross(e1, e2);
+components/intersection/mesh/mesh.glsl:51:    vec3 dao = cross(ao, rd);
+components/intersection/mesh/mesh.glsl:158:// ── BVH: a fixed-stack DFS around the shared leaf (v1). data_texel1d/bvh_aabb_hit/BVH_STACK_DEPTH
+components/intersection/mesh/mesh.glsl:169:    vec3 inv = 1.0 / rd;                           // hoisted — the slab test takes it
+components/intersection/mesh/mesh.glsl:177:        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, inv, tmax)) continue;   // prune by running nearest
+components/intersection/mesh/mesh.glsl:214:        if (!bvh_aabb_hit(n0.xyz, n1.xyz, p, inv, tmax)) continue;
+components/intersection/mesh/mesh.glsl:230:// Squared distance from p to an AABB (0 inside) — the branch-and-bound prune bound.
+components/intersection/mesh/mesh.glsl:240:    float d1 = dot(ab, ap), d2 = dot(ac, ap);
+components/intersection/mesh/mesh.glsl:241:    if (d1 <= 0.0 && d2 <= 0.0) { vec3 q = p - a; return dot(q, q); }
+components/intersection/mesh/mesh.glsl:245:    float vc = d1 * d4 - d3 * d2;
+components/intersection/mesh/mesh.glsl:250:    float vb = d5 * d2 - d1 * d6;
+components/intersection/mesh/mesh.glsl:251:    if (vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0) { vec3 q = ap - ac * (d2 / (d2 - d6)); return dot(q, q); }
+components/intersection/mesh/mesh.glsl:309:        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ro, inv, maxDist)) continue;
+components/intersection/mesh/mesh.ts:15:import { buildBVH, type AABB } from '../../accel/bvh/bvh.js';
+components/intersection/mesh/mesh.ts:33:    /** The BLAS root box — the mesh's local AABB (prototype box when instanced). */
+components/intersection/mesh/mesh.ts:34:    rootBox: AABB;
+components/env/sampler_cdf.glsl:78:    ls.distance = MAX_DIST;
+components/env/octahedral/octahedral.ts:28:    // Signed distance to the diagonal |u'|+|v'| = 1 (the equator fold)
+components/accel/light_tree/light_tree.glsl:72:    float cos_c = dot(q.n, d) * inversesqrt(max(d2raw, 1e-12));
+components/accel/light_tree/light_tree.glsl:75:    float lo = h * inversesqrt(max(dot(dmx, dmx), 1e-12));
+components/accel/bvh/bvh.ts:7:// `buildBVHNodesFlat` is the SAH core over ANY flat AABB list — one builder, many
+components/accel/bvh/bvh.ts:13:// ALLOCATION DISCIPLINE (the Aug 8 rewrite): the old core built per-item AABB objects,
+components/accel/bvh/bvh.ts:44:/** The Ize 2013 far-plane pad (~2 ulps): fp32 slab arithmetic can shrink the interval so
+components/accel/bvh/bvh.ts:46: *  only. ONE source for every slab test: the feature emits `#define BVH_TFAR_PAD` from
+components/accel/bvh/bvh.ts:57: *  swaps the slab test for its entry/exit form, putting `lt0`/`lt1` (the node-box ray
+components/accel/bvh/bvh.ts:61:        '    vec3 inv = 1.0 / ray.direction;   // hoisted — the slab test takes it',
+components/accel/bvh/bvh.ts:69:               `        if (!bvh_aabb_hit_range(n0.xyz, n1.xyz, ray.origin, inv, ${bound}, lt0, lt1)) continue;`]
+components/accel/bvh/bvh.ts:70:            : [`        if (!bvh_aabb_hit(n0.xyz, n1.xyz, ray.origin, inv, ${bound})) continue;`]),
+components/accel/bvh/bvh.ts:91:    /** The root node's local AABB — the prototype box when this mesh is an instance prototype. */
+components/accel/bvh/bvh.ts:92:    rootBox: AABB;
+components/accel/bvh/bvh.ts:95:interface AABB { min: [number, number, number]; max: [number, number, number]; }
+components/accel/bvh/bvh.ts:97:function emptyAABB(): AABB { return { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] }; }
+components/accel/bvh/bvh.ts:98:function growPoint(b: AABB, p: [number, number, number]): void {
+components/accel/bvh/bvh.ts:137:        cx[t] = (boxes[6 * t] + boxes[6 * t + 3]) * 0.5;
+components/accel/bvh/bvh.ts:138:        cy[t] = (boxes[6 * t + 1] + boxes[6 * t + 4]) * 0.5;
+components/accel/bvh/bvh.ts:139:        cz[t] = (boxes[6 * t + 2] + boxes[6 * t + 5]) * 0.5;
+components/accel/bvh/bvh.ts:406:        '        if (!bvh_aabb_contains(n0.xyz, n1.xyz, p)) continue;',
+components/accel/bvh/bvh.ts:426:/** Object-input adapter for callers holding AABB[] (App-side world boxes etc.). */
+components/accel/bvh/bvh.ts:427:export function buildBVHNodes(boxes: AABB[], leafSize: number = BVH_LEAF_SIZE): { nodes: Float32Array; nodeCount: number; order: Uint32Array; maxDepth: number } {
+components/accel/bvh/bvh.ts:431:        flat[6 * t] = boxes[t].min[0]; flat[6 * t + 1] = boxes[t].min[1]; flat[6 * t + 2] = boxes[t].min[2];
+components/accel/bvh/bvh.ts:432:        flat[6 * t + 3] = boxes[t].max[0]; flat[6 * t + 4] = boxes[t].max[1]; flat[6 * t + 5] = boxes[t].max[2];
+components/accel/bvh/bvh.ts:451:        triBox[6 * t] = minx; triBox[6 * t + 1] = miny; triBox[6 * t + 2] = minz;
+components/accel/bvh/bvh.ts:452:        triBox[6 * t + 3] = maxx; triBox[6 * t + 4] = maxy; triBox[6 * t + 5] = maxz;
+components/accel/bvh/bvh.ts:467: *  prototype-local AABB when a mesh is an instance prototype (transformed per placement → TLAS). */
+components/accel/bvh/bvh.ts:468:export function rootBoxOf(nodes: Float32Array, nodeCount: number): AABB {
+components/accel/bvh/bvh.ts:469:    if (nodeCount === 0) return emptyAABB();
+components/accel/bvh/bvh.ts:473:/** World AABB of a local box under a similarity (8-corner transform) — for TLAS leaf boxes. */
+components/accel/bvh/bvh.ts:474:export function transformAABB(local: AABB, apply: (p: [number, number, number]) => [number, number, number]): AABB {
+components/accel/bvh/bvh.ts:475:    const out = emptyAABB();
+components/accel/bvh/bvh.ts:486:export type { AABB };
+components/camera/pinhole/pinhole.glsl:15:    vec3 dir = normalize(forward + ndc.x * u_tanFov * right + ndc.y * u_tanFov * up);
+components/camera/pinhole/pinhole.glsl:17:    return make_ray(u_cameraPosition, dir, wl);   // unbounded ahead; the far clip (MAX_DIST) is the query's concern
+components/geometry/boundCheck.ts:14:import type { AABB } from '../accel/bvh/bvh.js';
+components/geometry/boundCheck.ts:27:        return Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]) - (v.radius as number);
+components/geometry/boundCheck.ts:32:        return Math.hypot(...d.map((x) => Math.max(x, 0))) + Math.min(Math.max(d[0], Math.max(d[1], d[2])), 0);
+components/geometry/boundCheck.ts:36:        const dx = Math.hypot(p[0] - c[0], p[2] - c[2]) - (v.radius as number);
+components/geometry/boundCheck.ts:38:        return Math.min(Math.max(dx, dy), 0) + Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
+components/geometry/boundCheck.ts:69:    box: AABB,
+components/geometry/boundCheck.ts:75:    const diag = Math.hypot(...[0, 1, 2].map((i) => box.max[i] - box.min[i]));
+components/geometry/boundCheck.ts:86:                const n = Math.hypot(...v) || 1;
+components/geometry/boundCheck.ts:107:    box: AABB,
+components/volume_scattering/rayleigh/rayleigh.glsl:25:    build_basis(-wo, t, b);                              // frame around the propagation direction
+components/volume_scattering/rayleigh/rayleigh.glsl:28:    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+components/volume_scattering/hg/hg.glsl:9:// (ambient_dot) waits for the phase interface to gain a position argument with curved spaces.
+components/volume_scattering/hg/hg.glsl:30:    build_basis(-wo, t, b);                           // frame around the propagation direction
+components/volume_scattering/hg/hg.glsl:33:    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+components/geometry/similarity.ts:15:/** Unit quaternion [x, y, z, w]. */
+components/geometry/similarity.ts:36:export function quatMultiply(a: Quat, b: Quat): Quat {
+components/geometry/similarity.ts:47:/** Conjugate = inverse for unit quaternions. */
+components/geometry/similarity.ts:48:export function quatConjugate(q: Quat): Quat {
+components/geometry/similarity.ts:52:export function quatNormalize(q: Quat): Quat {
+components/geometry/similarity.ts:53:    const len = Math.hypot(q[0], q[1], q[2], q[3]);
+components/geometry/similarity.ts:57:/** Axis-angle (radians) → unit quaternion. The axis need not be unit; a near-zero
+components/geometry/similarity.ts:59:export function quatFromAxisAngle(axis: Vec3Tuple, angle: number): Quat {
+components/geometry/similarity.ts:60:    const len = Math.hypot(axis[0], axis[1], axis[2]);
+components/geometry/similarity.ts:66:/** Rotate a vector by a unit quaternion (no translation, no scale). */
+components/geometry/similarity.ts:67:export function quatRotate(q: Quat, v: Vec3Tuple): Vec3Tuple {
+components/geometry/similarity.ts:80:/** Column-major 3×3 rotation matrix of a unit quaternion (GLSL mat3 constructor order). */
+components/geometry/similarity.ts:81:export function quatToMat3(q: Quat): number[] {
+components/geometry/similarity.ts:101:    const r = quatRotate(g.rotation, p);
+components/geometry/similarity.ts:111:    return quatRotate(g.rotation, d);
+components/geometry/similarity.ts:116:    const r = quatRotate(g.rotation, v);
+components/geometry/similarity.ts:122:    const rotatedTa = quatRotate(b.rotation, a.translation);
+components/geometry/similarity.ts:124:        rotation: quatNormalize(quatMultiply(b.rotation, a.rotation)),
+components/geometry/similarity.ts:136:    const rInv = quatConjugate(g.rotation);
+components/geometry/similarity.ts:137:    const rt = quatRotate(rInv, g.translation);
+components/geometry/similarity.ts:149:    return { rotation: quatNormalize(rotation), translation, scale };
+components/geometry/similarity.ts:155: *  the placement texture): world→local point = placement_rigid(q, ts, p) / s. */
+components/geometry/similarity.ts:157:    const q = quatConjugate(g.rotation);
+components/geometry/similarity.ts:158:    const tr = quatRotate(q, g.translation);
+components/geometry/similarity.ts:197:/** Below this norm a quaternion has no rotation to normalize to. */
+components/geometry/similarity.ts:200:/** Why `q` is not a usable rotation quaternion, or null. A non-unit quaternion is usable:
+components/geometry/similarity.ts:202:export function quaternionProblem(q: unknown): QuaternionProblem | null {
+components/geometry/similarity.ts:206:    return Math.hypot(q[0], q[1], q[2], q[3]) < QUAT_DEGENERATE_NORM ? 'degenerate' : null;
+components/geometry/similarity.ts:212:/** Authored CONSTANT `Transform` (TRS sugar: axis-angle | quaternion) → the canonical
+components/geometry/similarity.ts:214: *  axes and quaternions, so this only normalizes. Shared by the Planner (constant
+components/geometry/similarity.ts:227:        rotation = Array.isArray(aa) ? quatNormalize(aa) : quatFromAxisAngle(aa.axis, aa.angle);
+components/ambient/euclidean/euclidean.glsl:3:// Provides: ambient_geodesic(), ambient_frame(), ambient_dot(), ambient_parallel_transport(),
+components/ambient/euclidean/euclidean.glsl:4://           ambient_direction_to()
+components/ambient/euclidean/euclidean.glsl:6:Point ambient_geodesic(Point origin, Direction dir, float t) {
+components/ambient/euclidean/euclidean.glsl:11:// construction is free to differ from core math's build_basis (the declared-Euclidean
+components/ambient/euclidean/euclidean.glsl:13:Frame ambient_frame(Point p, Direction n) {
+components/ambient/euclidean/euclidean.glsl:14:    Direction nn = normalize(n);
+components/ambient/euclidean/euclidean.glsl:16:    t = normalize(t - dot(t, nn) * nn);
+components/ambient/euclidean/euclidean.glsl:17:    Direction b = cross(nn, t);
+components/ambient/euclidean/euclidean.glsl:21:float ambient_dot(Direction v1, Direction v2, Point p) {
+components/ambient/euclidean/euclidean.glsl:25:Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
+components/ambient/euclidean/euclidean.glsl:31:Direction ambient_direction_to(Point from, Point to) {
+components/ambient/euclidean/euclidean.glsl:32:    return normalize(to - from);
+components/geometry/custom.ts:8:// placement, derived AABB). Written once, used once, deleted with its scene.
+components/geometry/quad/quad.ts:11:/** cross(edge1, edge2) — the one formula behind BOTH the quad's normal and its area
+components/geometry/quad/quad.ts:21:/** Unit cross(edge1, edge2) — a quad's emitting-side normal, precomputed at compile
+components/geometry/quad/quad.ts:26:    const len = Math.hypot(cx, cy, cz);
+components/geometry/quad/quad.ts:54:        return Math.hypot(c[0], c[1], c[2]) < 1e-8
+components/geometry/quad/quad.ts:58:    // AABB of the four corners: corner, +edge1, +edge2, +edge1+edge2.
+components/geometry/index.ts:23:    quatRotate,
+components/geometry/index.ts:31:import type { AABB } from '../accel/bvh/bvh.js';
+components/geometry/index.ts:78:/** Local-space AABB of a primitive given (canonical) values — the prototype box for instancing
+components/geometry/index.ts:83: *  at the AABB door. A shape with no authored `bounds` but a CROSS-TYPE `marchBound`
+components/geometry/index.ts:84: *  gets its AABB DERIVED: the bound primitive's own box at the mapped values
+components/geometry/index.ts:100:export function primitiveBounds(type: string, values: PrimitiveValues): AABB | null {
+components/geometry/index.ts:342:        `    return normalize(${call('k.xyy')}`,
+components/geometry/index.ts:513:    const rc = quatRotate(g.rotation, c);
+components/geometry/quad/quad.glsl:4:// deviation). The `normal` FIELD is the precompiled unit cross(edge1, edge2) — the
+components/geometry/quad/quad.glsl:17:    float d1 = dot(local, q.edge1), d2 = dot(local, q.edge2);
+components/geometry/quad/quad.glsl:19:    float u = (d1 * e22 - d2 * e12) / det;
+components/geometry/quad/quad.glsl:20:    float v = (d2 * e11 - d1 * e12) / det;
+components/geometry/quad/quad.glsl:36:    float d1 = dot(local, q.edge1), d2 = dot(local, q.edge2);
+components/geometry/quad/quad.glsl:38:    float u = (d1 * e22 - d2 * e12) / det;
+components/geometry/quad/quad.glsl:39:    float v = (d2 * e11 - d1 * e12) / det;
+components/env/equirect/equirect_map.glsl:16:    vec3 n = normalize(dir);
+components/env/equirect/equirect_map.glsl:19:    float theta = atan(length(n.xz), n.y);
+components/geometry/box/box.glsl:9:    return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+components/geometry/box/box.glsl:12:// Nearest intersection strictly ahead of the ray (t > 0) — the slab method. direction is
+components/geometry/box/box.glsl:13:// unit; a zero component gives ±inf slab times that min/max resolve (the bvh_aabb_hit
+components/geometry/box/box.glsl:21:// slab-albedo J2 leak — this box IS that witness's geometry).
+components/geometry/box/box.glsl:44:// The INTERVAL form (impl-plan-sdf-as-shape T2) — entry/exit of the slab intersection,
+components/geometry/box/box.ts:3:// the slab intersector rides the same canonical axis-aligned form the SDF uses;
+components/geometry/torus/torus.glsl:16:    vec2 c = vec2(length(p.xz) - t.ringRadius, p.y);
+components/geometry/torus/torus.glsl:17:    return length(c) - t.tubeRadius;
+components/geometry/torus/torus.glsl:27:    float v = atan(p.y, length(p.xz) - t.ringRadius) / TWO_PI + 0.5;
+components/geometry/torus/torus.ts:12:    // (the AABB derives from the marchBound cylinder).
+components/env/octahedral/octahedral.glsl:30:    float signedDistance = 1.0 - (upAbs + vpAbs);   // to the equator fold |u'|+|v'| = 1
+components/env/octahedral/octahedral.glsl:45:    vec3 n = env_rotate_cs(normalize(dir), u_envRotCS);
+components/geometry/plane/plane.ts:15:    const invLen = 1 / Math.hypot(normal[0], normal[1], normal[2]);
+components/geometry/menger/menger.ts:12:    // (the AABB derives from the marchBound cube).
+components/geometry/menger/menger.glsl:20:    return min(max(d.x, max(d.y, d.z)), length(max(d, 0.0)));
+components/accel/bvh/bvh.glsl:5:// to their domain — build is shared, query is local. Provides: bvh_aabb_hit, BVH_STACK_DEPTH.
+components/accel/bvh/bvh.glsl:22:// "Robust BVH Ray Traversal" §3): fp32 slab arithmetic can shrink the interval so
+components/accel/bvh/bvh.glsl:27:// walk's quantized slab test and the TS reference walk read the same number).
+components/accel/bvh/bvh.glsl:28:bool bvh_aabb_hit(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax) {
+components/accel/bvh/bvh.glsl:39:// reserved (impl-plan-sdf-accel T1): same slab arithmetic, same pad, plus the box
+components/accel/bvh/bvh.glsl:44:bool bvh_aabb_hit_range(vec3 bmin, vec3 bmax, vec3 ro, vec3 inv, float tmax, out float t_enter, out float t_exit) {
+components/accel/bvh/bvh.glsl:55:// Point-in-box (impl-plan-sdf-as-shape T6) — the POINT-QUERY counterpart of the slab
+components/accel/bvh/bvh.glsl:59:bool bvh_aabb_contains(vec3 bmin, vec3 bmax, vec3 p) {
+components/geometry/sphere/sphere.glsl:9:    return length(p - sp.center) - sp.radius;
+components/geometry/sphere/sphere.glsl:27:// shallow hits (the measured slab-albedo J2 leak).
+components/geometry/sphere/sphere.glsl:50:    return normalize(p - sp.center);
+components/geometry/sphere/sphere.glsl:85:    vec3 d = normalize(p - sp.center);
+components/geometry/apollonian/apollonian.ts:23:    // (the AABB derives from the marchBound cube).
+components/geometry/knob/knob.glsl:49:    axis = normalize(axis);
+components/geometry/knob/knob.glsl:60:    return length(v) - r;
+components/geometry/knob/knob.glsl:64:    vec2 q = vec2(length(p.xz) - t.x, p.y);
+components/geometry/knob/knob.glsl:65:    return length(q) - t.y;
+components/geometry/knob/knob.glsl:70:    float q = length(p.xy);
+components/geometry/knob/knob.glsl:75:    vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(h, r);
+components/geometry/knob/knob.glsl:76:    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+components/geometry/knob/knob.glsl:84:float knob_smooth_union(float d1, float d2, float k) {
+components/geometry/knob/knob.glsl:85:    float h = clamp(0.5 + 0.5*(d2 - d1)/k, 0.0, 1.0);
+components/geometry/knob/knob.glsl:86:    return mix(d2, d1, h) - k*h*(1.0 - h);
+components/geometry/knob/knob.glsl:89:float knob_ssub(float d1, float d2, float k) {
+components/geometry/knob/knob.glsl:90:    float h = clamp(0.5 - 0.5*(d2 + d1)/k, 0.0, 1.0);
+components/geometry/knob/knob.glsl:91:    return mix(d2, -d1, h) + k*h*(1.0 - h);
+components/geometry/disk/disk.ts:17:    const invLen = 1 / Math.hypot(v[0], v[1], v[2]);
+components/geometry/knob/knob.ts:28:    // center row, no bounds() — the AABB derives from the marchBound cylinder.
+components/accel/cwbvh/cwbvh.ts:5:// deviations ledger: docs/fable-accel-cwbvh.md. Every equation reference below is to
+components/accel/cwbvh/cwbvh.ts:77: * Build the compressed wide BVH over a flat AABB list (6 f64 per item — the same
+components/accel/cwbvh/cwbvh.ts:312:        // Empty slots: hi < lo ⇒ the slab test can never accept (paper convention).
+components/accel/cwbvh/cwbvh.ts:440:    // axis-aligned ray gives inv = ∞ and the quantized slab then computes q·∞ with
+components/accel/cwbvh/cwbvh.ts:469:        // Per-node ray transform (Eq. 10) then one-FMA slabs per plane (Eq. 11).
+components/geometry/cylinder/cylinder.glsl:13:    vec2 d = vec2(length(q.xz) - c.radius, abs(q.y) - c.halfHeight);
+components/geometry/cylinder/cylinder.glsl:14:    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+components/geometry/cylinder/cylinder.glsl:18:// INTERVAL intersection of the axis slab and the infinite tube — caps and side fall
+components/geometry/cylinder/cylinder.glsl:30:        if (abs(q.y) > c.halfHeight) return false;   // axis-normal ray outside the slab
+components/geometry/cylinder/cylinder.glsl:61:    float dr = c.radius - length(q.xz);
+components/geometry/cylinder/cylinder.glsl:63:    return normalize(vec3(q.x, 0.0, q.z));
+components/geometry/cylinder/cylinder.glsl:66:// The INTERVAL form (impl-plan-sdf-as-shape T2) — the slab ∩ tube interval that
+components/geometry/bottle/bottle.glsl:45:    vec2 q = vec2(length(p.xz), p.y);
+components/geometry/bottle/bottle.glsl:47:    return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - rounded;
+components/geometry/bottle/bottle.glsl:61:        float dimple = length(q + vec3(0.0, b.baseHeight, 0.0)) - b.punt;
+components/lights/quad/quad.glsl:4:// ONE-SIDED: emits from the cross(edge1, edge2) side (impl-plan-area-lights pinned deviation);
+components/lights/quad/quad.glsl:17:    float d2 = dot(d, d);
+components/lights/quad/quad.glsl:20:    ls.wi       = d * inversesqrt(d2);
+components/lights/quad/quad.glsl:21:    ls.distance = sqrt(d2);
+components/lights/quad/quad.glsl:30:    ls.pdf = d2 / (l.area * cos_l);
+components/lights/quad/quad.ts:14:    return Math.hypot(...quadCross(edge1, edge2));
+components/lights/mesh/mesh.glsl:9:// ONE-SIDED: emits from the cross(b−a, c−a) side (the quad pin; similarity placement with
+components/lights/mesh/mesh.glsl:45:    float d2 = dot(d, d);
+components/lights/mesh/mesh.glsl:48:    ls.wi       = d * inversesqrt(d2);
+components/lights/mesh/mesh.glsl:49:    ls.distance = sqrt(d2);
+components/lights/mesh/mesh.glsl:54:    vec3 gn = cross(b - a, c - a);          // outward by winding (one-sided pin)
+components/lights/mesh/mesh.glsl:55:    float cos_l = dot(normalize(gn), -ls.wi);
+components/lights/mesh/mesh.glsl:61:    ls.pdf = d2 / (l.area * cos_l);
+components/lights/sphere/sphere.glsl:49:    vec3 w = to_c * inversesqrt(dc2);
+components/lights/sphere/sphere.glsl:51:    build_basis(w, t, b);
+components/lights/sphere/sphere.glsl:52:    ls.wi  = normalize(t * (sin_t * cos(phi)) + b * (sin_t * sin(phi)) + w * cos_t);
+components/geometry/disk/disk.glsl:25:// orientation-free; the ANGULAR reference comes from build_basis(normal) (fable-imagery P1
+components/geometry/disk/disk.glsl:31:    build_basis(d.normal, t, b);
+components/geometry/disk/disk.glsl:32:    float r = length(local) / d.radius;
+components/lights/directional/directional.glsl:6:// rung) and the BSDF's cosine supplies surface obliquity as always. distance = MAX_DIST,
+components/lights/directional/directional.glsl:8:// scene-scale truncation — geometry and an ambient medium beyond MAX_DIST are cut. (Until
+components/lights/directional/directional.glsl:10:// while the sky beside it was attenuated over MAX_DIST, and occluders past the clip could
+components/lights/directional/directional.glsl:22:    ls.distance = MAX_DIST;        // the far clip, as for the environment
+components/geometry/cylinder/cylinder.ts:5:// stage 4 (Aug 10 2026): the interval intersector (slab ∩ tube).
+components/lights/disk/disk.glsl:14:// Depends on: concentric_disk + build_basis (core math).
+components/lights/disk/disk.glsl:18:    build_basis(l.normal, t, b);
+components/lights/disk/disk.glsl:20:    Point q = l.center + u.x * t + u.y * b;
+components/lights/disk/disk.glsl:22:    float d2 = dot(d, d);
+components/lights/disk/disk.glsl:25:    ls.wi       = d * inversesqrt(d2);
+components/lights/disk/disk.glsl:26:    ls.distance = sqrt(d2);
+components/lights/disk/disk.glsl:35:    ls.pdf = d2 / (PI * l.radius * l.radius * cos_l);
+components/geometry/bottle/bottle.ts:31:    // bounds() — the AABB derives from the marchBound cylinder, which carries the one
+components/geometry/bottle/bottle.ts:46:    // where it matters and loose only over the neck (a cheap, mostly-empty slab).
+components/lights/spot/spot.glsl:17:    float d2 = dot(d, d);
+components/lights/spot/spot.glsl:20:    ls.wi       = d * inversesqrt(d2);
+components/lights/spot/spot.glsl:21:    ls.distance = sqrt(d2);
+components/lights/spot/spot.glsl:25:    ls.radiance = l.intensity * (falloff / d2);   // falloff + 1/d² folded (delta, §6.1)
+components/lights/softbeam/softbeam.glsl:24:// Depends on: concentric_disk + build_basis (core math).
+components/lights/softbeam/softbeam.glsl:28:    build_basis(l.direction, t, b);
+components/lights/softbeam/softbeam.glsl:30:    Point q = l.position + u.x * t + u.y * b;
+components/lights/softbeam/softbeam.glsl:32:    float d2 = dot(d, d);
+components/lights/softbeam/softbeam.glsl:35:    ls.wi       = d * inversesqrt(d2);
+components/lights/softbeam/softbeam.glsl:36:    ls.distance = sqrt(d2);
+components/lights/softbeam/softbeam.glsl:45:    ls.pdf = d2 / (PI * l.radius * l.radius * cos_l);
+components/lights/mesh/mesh.ts:59:        local += Math.hypot(cx, cy, cz) / 2;
+components/lights/mesh/mesh.ts:84:        areas[t] = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+authoring/loadInstances.ts:7:import type { AABB } from '../components/accel/bvh/bvh.js';
+authoring/loadInstances.ts:12:    /** POSITIONS-ONLY world AABB from the header (hook-invariant — see the format doc §2). */
+authoring/loadInstances.ts:13:    aabb: AABB;
+authoring/loadInstances.ts:19:    orientations?: Float32Array;     // 4N, unit quats [x,y,z,w]
+authoring/loadInstances.ts:43:    const aabbF = new Float32Array(buffer, 16, 6);
+authoring/loadInstances.ts:44:    const aabb = {
+authoring/loadInstances.ts:45:        min: [aabbF[0], aabbF[1], aabbF[2]] as [number, number, number],
+authoring/loadInstances.ts:46:        max: [aabbF[3], aabbF[4], aabbF[5]] as [number, number, number],
+authoring/loadInstances.ts:48:    if (!aabbF.every(Number.isFinite) || aabb.min.some((v, a) => v > aabb.max[a])) {
+authoring/loadInstances.ts:49:        throw new Error('inst: header AABB is non-finite or empty');
+authoring/loadInstances.ts:93:        count, aabb, provenance, positions,
+authoring/flatten.ts:26:    quatMultiply,
+authoring/flatten.ts:27:    quatNormalize,
+authoring/flatten.ts:144: *  through the parent map, size × parent scale, quaternion left-multiplied. Fresh
+authoring/flatten.ts:165:            const c = quatNormalize(quatMultiply(parent.rotation, [q[0], q[1], q[2], q[3]]));
+components/lights/point/point.glsl:13:    float d2 = dot(d, d);
+components/lights/point/point.glsl:16:    ls.wi       = d * inversesqrt(d2);
+components/lights/point/point.glsl:17:    ls.distance = sqrt(d2);
+components/lights/point/point.glsl:18:    ls.radiance = l.intensity / d2;    // falloff folded in (delta light, §6.1)
+components/lights/disk/disk.ts:58:    // orientation's slab-thinning, like the tree ignores the cone).
+authoring/instance.ts:54: *  carries an analytic slab intersector, and the old "per-context backend fact" worry
+authoring/loadOBJ.ts:43:        const cl = Math.hypot(cx, cy, cz);
+authoring/loadOBJ.ts:53:        let l = Math.hypot(n[i], n[i + 1], n[i + 2]);
+compiler/plan/types.ts:20:import type { AABB } from '../../components/accel/bvh/bvh.js';
+compiler/plan/types.ts:51:         *  which AMBIENT_SPACES occupant provides the ambient_* contract surface). */
+compiler/plan/types.ts:397:    /** The mesh's LOCAL AABB (baked literals) — the containment query's root-box early-out.
+compiler/plan/types.ts:399:    localBox?: AABB;
+compiler/plan/types.ts:583: *   q  = inverse rotation quat;  ts = (t_rigid = −Rᵀt, s)
+compiler/plan/types.ts:588:    /** vec4 uniform names: the inverse quat and (t_rigid, s). */
+compiler/plan/Planner.ts:22:    quatFromAxisAngle,
+compiler/plan/Planner.ts:23:    quatNormalize,
+compiler/plan/Planner.ts:27:    quaternionProblem,
+compiler/plan/Planner.ts:789:    // -- rotation: quaternion (const | param) or axis-angle (angle const | param) --
+compiler/plan/Planner.ts:793:        const problem = quaternionProblem(q);   // the similarity rule the Validator applies to defaults
+compiler/plan/Planner.ts:795:        if (problem === 'degenerate') { warnOnce('degenerate quaternion — using identity'); return IDENTITY_QUAT; }
+compiler/plan/Planner.ts:796:        return quatNormalize(q as Quat);
+compiler/plan/Planner.ts:806:        const c = quatNormalize(rot);
+compiler/plan/Planner.ts:821:                return quatFromAxisAngle(axis, typeof a === 'number' && Number.isFinite(a) ? a : def);
+compiler/plan/Planner.ts:824:            const c = quatFromAxisAngle(axis, angle);
+compiler/plan/Planner.ts:989:        // Max corner norm of the world AABB: per-axis worst magnitude, combined.
+compiler/plan/Planner.ts:990:        r = Math.max(r, Math.hypot(
+compiler/plan/Planner.ts:1000:        const half = Math.hypot(
+compiler/plan/Planner.ts:1005:        const center = Math.hypot(
+compiler/plan/Planner.ts:1011:        r = Math.max(r, Math.hypot(g.translation[0], g.translation[1], g.translation[2]) + g.scale * (half + center));
+compiler/generate/features/environment.ts:81:    ls.distance = MAX_DIST;                                        // the far clip — where a missed BSDF ray finds the sky
+compiler/generate/features/environment.ts:215:            { origin: ORIGIN, source: radianceFn(`dir = env_rotate_cs(normalize(dir), u_envRotCS);\n    return ${skyRadiance(glslValue(`(${env.glsl.source})`))};`) },
+compiler/sceneData.ts:16:import { transformAABB, type AABB } from '../components/accel/bvh/bvh.js';
+compiler/sceneData.ts:30:    | { box: AABB }
+compiler/sceneData.ts:46:        localBox: { geometry: number } | { box: AABB };
+compiler/sceneData.ts:145:                return { ...leaf, box: { box: transformAABB(primitiveBounds(s.type, o.parameters)!, (p) => similarityApplyPoint(residual, p)) } };
+compiler/types.ts:234:/** Unit quaternion [x, y, z, w] (normalized by the compiler within tolerance). */
+compiler/types.ts:246: * arrive as quat params). Transforms NEVER accept GlslExpression (§6.1 pin 4): a
+compiler/types.ts:251:    /** Axis-angle (radians, angle may be driven) or a quaternion (constant or driven). */
+compiler/plan/dataTenants.ts:361:        // form is the quat-carrying record the boxed-SDF design defers
+compiler/generate/features/core.ts:110:    // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
+compiler/generate/features/lighting.ts:466:            if (row.kind === 'point' && Array.isArray(v)) center = Math.max(center, Math.hypot(v[0], v[1], v[2]));
+compiler/generate/features/intersection.ts:33:    quatConjugate,
+compiler/generate/features/intersection.ts:34:    quatToMat3,
+compiler/generate/features/intersection.ts:60:    // The data rail (data_texel1d) + the accel walk support (bvh_aabb_hit/BVH_STACK_DEPTH)
+compiler/generate/features/intersection.ts:92:    // calls the SAME placement_* helpers as a driven object — but bakes constant vec4s, so it
+compiler/generate/features/intersection.ts:99:    // batch (the loop conjugates the ray with placement_rigid/dir/normal/scale).
+compiler/generate/features/intersection.ts:245:    // + accel's ray-walk support (accel/bvh/bvh.glsl: bvh_aabb_hit, BVH_STACK_DEPTH) —
+compiler/generate/features/intersection.ts:414:        // field's gradient — no placement_normal).
+compiler/generate/features/intersection.ts:416:        const used = ['placement_rigid', 'placement_scale', ...((placedAnalytic || meshDriven || hasInstanced || tabledSdfPresent) ? ['placement_dir', 'placement_normal'] : [])];
+compiler/generate/features/intersection.ts:418:            placement_rigid: 'vec3 placement_rigid(vec4 q, vec4 ts, vec3 p)',
+compiler/generate/features/intersection.ts:419:            placement_dir: 'vec3 placement_dir(vec4 q, vec3 d)',
+compiler/generate/features/intersection.ts:420:            placement_normal: 'vec3 placement_normal(vec4 q, vec3 n)',
+compiler/generate/features/intersection.ts:421:            placement_scale: 'float placement_scale(vec4 ts)',
+compiler/generate/features/intersection.ts:520:            lines.push(`    p = placement_rigid(${g.uniformQ}, ${g.uniformTS}, p);`);
+compiler/generate/features/intersection.ts:521:            lines.push(`    float s = placement_scale(${g.uniformTS});`);
+compiler/generate/features/intersection.ts:559:    const lp = `${rayRef}.origin + t * ${rayRef}.direction`;
+compiler/generate/features/intersection.ts:605:            setup: [`float s = placement_scale(${pl.uniformTS});`],
+compiler/generate/features/intersection.ts:607:            ro: `placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, ray.origin)`,
+compiler/generate/features/intersection.ts:608:            rd: `placement_dir(${pl.uniformQ}, ray.direction)`,
+compiler/generate/features/intersection.ts:610:            nWorld: (n) => `placement_normal(${pl.uniformQ}, ${n})`,
+compiler/generate/features/intersection.ts:620:    const Rt = quatToMat3(quatConjugate(g.rotation));
+compiler/generate/features/intersection.ts:621:    const R = quatToMat3(g.rotation);
+compiler/generate/features/intersection.ts:648:        return [`    p = ${formatMat3(quatToMat3(quatConjugate(g.rotation)))} * ${centered};`];
+compiler/generate/features/intersection.ts:654:    const m = quatToMat3(quatConjugate(g.rotation)).map((v) => v / g.scale);
+compiler/generate/features/intersection.ts:692: *  to them is a rotation (a folded constant mat3 R, `placement_normal`'s quat
+compiler/generate/features/intersection.ts:707:        'hit.p = ambient_geodesic(ray.origin, ray.direction, t);',
+compiler/generate/features/intersection.ts:709:        `hit.frame = ambient_frame(hit.p, ${o.nWorld});`,
+compiler/generate/features/intersection.ts:721: *  with constant numbers. `placement_scale`/`_rigid`/`_dir`/`_normal` accept const args
+compiler/generate/features/intersection.ts:734:// come from ambient_geodesic/ambient_frame so they agree with the SDF path (cross-method match).
+compiler/generate/features/intersection.ts:753:        lines.push(`        Ray lray = make_ray(placement_rigid(${q}, ${ts}, ray.origin), placement_dir(${q}, ray.direction), ray.wl);`);
+compiler/generate/features/intersection.ts:754:        lines.push(`        float s = placement_scale(${ts});`);
+compiler/generate/features/intersection.ts:763:            nWorld: `placement_normal(${q}, ${d.type}_normal(lray.origin + t * lray.direction, shape))`,
+compiler/generate/features/intersection.ts:765:            uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+compiler/generate/features/intersection.ts:867:            setup: [`float s = placement_scale(${pl.uniformTS});`],
+compiler/generate/features/intersection.ts:868:            ro: `placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, ray.origin) / s`,
+compiler/generate/features/intersection.ts:869:            rd: `placement_dir(${pl.uniformQ}, ray.direction) / s`,
+compiler/generate/features/intersection.ts:870:            nWorld: (n) => `placement_normal(${pl.uniformQ}, ${n})`,
+compiler/generate/features/intersection.ts:881:    const Rt = quatToMat3(quatConjugate(g.rotation));
+compiler/generate/features/intersection.ts:884:    const R = quatToMat3(g.rotation);
+compiler/generate/features/intersection.ts:904:        lines.push(`        hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);`);
+compiler/generate/features/intersection.ts:906:        lines.push(`        hit.frame = ambient_frame(hit.p, normalize(${pl.nWorld('nLocal')}));`);
+compiler/generate/features/intersection.ts:907:        lines.push(`        hit.ng = normalize(${pl.nWorld('gLocal')});   // the triangle's plane normal`);
+compiler/generate/features/intersection.ts:1008:        `float s = placement_scale(ts);`,
+compiler/generate/features/intersection.ts:1013:            'vec3 ro = placement_rigid(q, ts, ray.origin) / s;',
+compiler/generate/features/intersection.ts:1014:            'vec3 rd = placement_dir(q, ray.direction) / s;',
+compiler/generate/features/intersection.ts:1023:            '    hit.p = ambient_geodesic(ray.origin, ray.direction, hit.t);',
+compiler/generate/features/intersection.ts:1025:            '    hit.frame = ambient_frame(hit.p, normalize(placement_normal(q, nLocal)));',
+compiler/generate/features/intersection.ts:1026:            '    hit.ng = normalize(placement_normal(q, gLocal));   // the triangle\'s plane normal',
+compiler/generate/features/intersection.ts:1034:        'vec3 ro = placement_rigid(q, ts, ray.origin);',
+compiler/generate/features/intersection.ts:1035:        'vec3 rd = placement_dir(q, ray.direction);   // unit — <type>_intersect assumes it',
+compiler/generate/features/intersection.ts:1052:        ? `${d.type}_sdf_normal(lray.origin + t * lray.direction, shape)`
+compiler/generate/features/intersection.ts:1053:        : `${d.type}_normal(lray.origin + t * lray.direction, shape)`;
+compiler/generate/features/intersection.ts:1059:            nWorld: `placement_normal(q, ${normal})`,
+compiler/generate/features/intersection.ts:1062:            uv: uvFill(d, 'lray.origin + t * lray.direction', 'shape', chartUv),
+compiler/generate/features/intersection.ts:1145:            lines.push(`    { vec3 lp = placement_rigid(${q}, ${ts}, p); float s = placement_scale(${ts});`);
+compiler/generate/features/intersection.ts:1256:            'float s = placement_scale(ts);',
+compiler/generate/features/intersection.ts:1257:            'vec3 lp = placement_rigid(q, ts, p) / s;   // mesh data is UNSCALED (§5.2)',
+compiler/generate/features/intersection.ts:1268:            'float s = placement_scale(ts);',
+compiler/generate/features/intersection.ts:1269:            'vec3 lp = placement_rigid(q, ts, p);',
+compiler/generate/features/intersection.ts:1303:            `lp = placement_rigid(${pl.uniformQ}, ${pl.uniformTS}, lp);`,
+compiler/generate/features/intersection.ts:1304:            `ms = placement_scale(${pl.uniformTS});`,
+compiler/generate/features/intersection.ts:1314:    if (kind === 'rigid') return [`lp = ${formatMat3(quatToMat3(quatConjugate(g.rotation)))} * ${centered};`];
+compiler/generate/features/intersection.ts:1320:    const M = quatToMat3(quatConjugate(g.rotation)).map((v) => v / g.scale);
+compiler/generate/features/intersection.ts:1343:    const lp = 'lray.origin + t * lray.direction';
+compiler/generate/features/intersection.ts:1348:    lines.push('            Ray lray = make_ray(placement_rigid(rq, rts, ray.origin), placement_dir(rq, ray.direction), ray.wl);');
+compiler/generate/features/intersection.ts:1355:            nWorld: `placement_normal(rq, ${k.type}_sdf_normal(${lp}, shape))`,
+compiler/generate/features/intersection.ts:1400:        lines.push(`    return ${k.type}_sdf(placement_rigid(rq, rts, p), shape);`);
+compiler/generate/features/intersection.ts:1682:    lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+compiler/generate/features/intersection.ts:1693:    lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
+compiler/generate/features/intersection.ts:1694:    lines.push('        if (ambient_dot(ray.direction, hit.ng, hit.p) < 0.0) {');
+compiler/generate/features/intersection.ts:1701:        lines.push('                ? scene_region_at(ambient_geodesic(hit.p, hit.ng, -EPS_INTERFACE))');
+compiler/generate/features/intersection.ts:1707:    lines.push('            hit.frame = ambient_frame(hit.p, -hit.frame.n);   // §4.1: n faces region_from');
+compiler/analyze/propertyValidation.ts:31:    return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
+compiler/analyze/Validator.ts:25:import { isDrivenTransform, scaleProblem, quaternionProblem, AXIS_DEGENERATE_LENGTH } from '../../components/geometry/similarity.js';
+compiler/analyze/Validator.ts:846:            && Math.hypot(cam.position[0] - cam.target[0], cam.position[1] - cam.target[1], cam.position[2] - cam.target[2]) < 1e-8) {
+compiler/analyze/Validator.ts:1131:                        const norm = Math.hypot(p.orientations[4 * j], p.orientations[4 * j + 1], p.orientations[4 * j + 2], p.orientations[4 * j + 3]);
+compiler/analyze/Validator.ts:1135:                        bag.error('invalid-setting', `Object ${i} (instanced): packed orientations must be unit quaternions ([x,y,z,w], |q| = 1 within 1e-3)`)
+compiler/analyze/Validator.ts:1317:    // the first validator (scalar scale, axis-angle|quat rotation), but authored JS
+compiler/analyze/Validator.ts:1586:/** §7 rules 2: quaternion normalized-within-tolerance (warn + the Planner normalizes),
+compiler/analyze/Validator.ts:1587: *  error near zero; axis-angle rejects a zero axis. §6: quaternion and angle may be
+compiler/analyze/Validator.ts:1592:        const problem = quaternionProblem(q);
+compiler/analyze/Validator.ts:1599:        const norm = Math.hypot(x, y, z, w);
+compiler/analyze/Validator.ts:1611:        checkQuat(rotation, 'quaternion rotation');
+compiler/analyze/Validator.ts:1615:        // Driven quaternion (the graph runtime's port): validate the default if given.
+compiler/analyze/Validator.ts:1621:        if (!isVec3(aa.axis) || Math.hypot(...(aa.axis as Vec3)) < AXIS_DEGENERATE_LENGTH) {
+compiler/analyze/Validator.ts:1633:        `Object ${index}: rotation must be axis-angle { axis, angle }, a quaternion [x, y, z, w], or a {param} quaternion`)
+compiler/analyze/Validator.ts:1702:            const problem = quaternionProblem(rotation);
+compiler/analyze/Validator.ts:1703:            if (problem === 'not-four-finite-numbers') return 'a quaternion rotation must be 4 finite numbers [x, y, z, w]';
+compiler/analyze/Validator.ts:1704:            if (problem === 'degenerate') return 'the quaternion rotation is degenerate (norm ≈ 0)';
+compiler/analyze/Validator.ts:1707:            if (!isVec3(axis) || Math.hypot(...(axis as Vec3)) < AXIS_DEGENERATE_LENGTH) return 'the rotation axis must be a nonzero vec3 of finite numbers';
+compiler/analyze/Validator.ts:1710:            return 'rotation must be axis-angle { axis, angle } or a quaternion [x, y, z, w]';

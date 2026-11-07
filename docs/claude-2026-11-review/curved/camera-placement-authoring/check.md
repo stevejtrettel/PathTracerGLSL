@@ -1,0 +1,50 @@
+# Check of camera-placement-authoring
+
+Labels: [checked-code file:line], [checked-num script], [math], [mem].
+I re-ran all five scripts (checks.ts to checks5.ts). Every printed number in notes.md reproduces.
+I also wrote an independent re-implementation that does not import space.ts:
+check/indep.ts in this folder. It uses the generator-form transvection, its own exp/log, its own inverse
+and both up rules.
+
+## Confirmed
+
+- Holonomy roll. The independent code gives 54.36° in H³ and 11.26° in S³, against the notes' 53.92° and 11.26°. The notes sampled 72 azimuths, which is coarser than my 720 [checked-num indep.ts].
+- The maths of the pinhole and fisheye 4-directions, the normal transform J((Jn)·Ginv), the exact inverses J gᵀ J and gᵀ, the parallel-transport formula F′ = F − ⟨F,D⟩D + ⟨F,D⟩D′, and orbit in E³ reducing to target + d·u [math; checked-num checks*.ts, re-run].
+- An authored Vec3 means exp_o(v), and that equals v in E³ [math]. The H³ transvection equals thurston's makeTranslationFromDir [checked-code thurston-rebuild/src/geometries/hyp/geometry/Isometry.js:112-140; checked-num checks.ts].
+- The code citations I re-read are correct: types.ts:24, 43-46, 249-254, 735-740, 815; measurement.ts:21-23; Analyzer.ts:52; Validator.ts:56-57, 845-848; camera.ts:76, 86-103, 112; basis.ts:50-55; pinhole.glsl:11-17; fisheye.glsl:29-38; ray.glsl:7-13; Planner.ts:241-270, 764-866, 868-885; placement.glsl; intersection.ts:418-421, 601-660; OrbitControls.ts:39, 216, 220-225; KeyboardControls.ts:271-277, 284-286, 292; flatten.ts:77/90/118; App.ts:823; camera/index.ts:10-13; equirect.glsl:24-27; cylindrical.glsl:26-27; fable-transforms.md:34-42, 312-315; and the thurston Position.js and commons2.glsl lines.
+- mat4 uniforms are already supported end to end: the UniformType union includes 'mat4' [checked-code src/compiler/types.ts:783], and the engine uploads it with uniformMatrix4fv [checked-code src/engine/utils/shader-uniform-utils.ts:77-78]. So the locked compiler↔engine contract does not need to change.
+
+## Corrections
+
+1. **The precision limit is tighter than "about 4", and the notes measured the wrong error.** The notes measure a point error in world coordinates. What an intersector sees is the error of the ray in the object's local frame. In H³, with an object 1 unit ahead of the camera, a float32 Ginv and a float32 pinhole, the direction error in the local frame is 2e-7 at camera distance 0, 8.6e-6 at 2, 4.7e-4 at 4, 4.0e-3 at 5 and 2.2e-2 at 6 [checked-num indep.ts (b)]. A pixel at 1000 px across about 1 rad is about 1e-3 rad. So distance 4 is already half a pixel, and 5 is several pixels. The limit for v1 should read "about 3, at most 4". This also supports the notes' claim that local frames do not help [checked-num indep.ts].
+2. **Camera-relative coordinates do cure it.** The notes left this as thought-through-not-checked. With the camera at the origin and the same object, the error is 5e-8 / 2e-7 at every distance [checked-num indep.ts (b)]. The notes also understate the cost. Every world-space constant becomes camera-dependent, not just the placements: point and spot light positions, quad corners, and any baked literal.
+3. **The precision finding is not new.** The survey already says it: curved-literature.md:263-266 gives a "practical float32 working radius ~5 … keep the camera at the origin (move the scene by isometries)", and thurston-port.md:335-337 says the same. The notes should cite these rather than present it as a finding. The numbers agree.
+4. **The Gram–Schmidt cost of the target-centered rule is moot inside the v1 radius.** At d = 4 the target-centered frame is orthonormal to 3e-11 in float64 [checked-num checks3.ts, re-run], which is far below the float32 upload rounding of about 6e-8. Gram–Schmidt matters only at d ≥ 6, beyond the recommended limit. Target-centered then costs one extra 4×4 product over origin-centered, and nothing else. The open question should not list "needs Gram–Schmidt in H3" as a drawback.
+5. **fable-transforms §6.1 is mischaracterized.** Open question 3 says §6.1 anticipated an "8-float (inverse quat, point)" payload. It actually names SL(2,ℂ) as H³'s 8-real representation [checked-code docs/fable-transforms.md:312-315]. For S³ the natural 8-real form would be a pair of unit quaternions [math]. The mat4 recommendation still stands as the simpler choice; only the description of the alternative is wrong.
+6. **Missed site: emissive objects as lights.** The notes say a curved space has "no folding; every object gets a placement". But samplableEmitterObjects admits an analytic emitter only when its placement is constant AND it keeps no local frame [checked-code src/compiler/plan/dataTenants.ts:153-158]. The light values come from the folded, resolved parameters (the "light drift" comment, Planner.ts:246-249). Area lights are in the v1 subset, so this conflict has to be resolved: either emitter sampling learns the placement, or curved emitters are authored lights only. That needs a decision, and it touches the lights design.
+7. **Missed existing mechanism: ParamKind.** Descriptor rows already declare a kind: 'point' | 'vector' | 'direction' | 'length' | 'angle' | 'area' | 'scalar' [checked-code src/components/descriptors.ts:332]. Sphere center is 'point' [checked-code src/components/geometry/sphere/sphere.ts:11]. Point-light position is 'point' [checked-code src/components/lights/point/point.ts:17]. Quad corner is 'point' and the edges are 'vector' [checked-code src/components/lights/quad/quad.ts:23-25]. The curved lowering can be one rule keyed on this existing fact: a 'point' row goes through exp_o to a vec4 (or folds into a pre-translation); 'vector' and 'area' rows have no curved meaning and are compile errors; 'length', 'angle' and 'scalar' pass through. That answers the "point rows" item and the light-position upload with no new machinery. The notes do not mention it [math, thought-through-not-checked].
+8. **A row-major versus column-major trap.** space.ts stores matrices row-major. GLSL mat4 literals and uniformMatrix4fv(…, false, …) are column-major [checked-code shader-uniform-utils.ts:78; mem for the GLSL convention]. In S³ the transpose of g is g⁻¹, so a layout mix-up silently uploads g in place of Ginv. It does not crash. It renders a mirrored placement. The design should say which layout it uses and test it.
+9. **"Orthonormal to round-off" is overstated in H³.** In checks.ts the H³ frame, pinhole and fisheye checks give 3.0e-6, 1.8e-6 and 2.7e-6 [checked-num checks.ts, re-run], because the random poses reach composite distances of about 7. Round-off holds only near the origin. The S³ figures (1e-13) are round-off.
+10. **The default pose argument should be stated differently.** In S³, [0,0,8] is a valid camera 1.717 from o, looking at o [checked-num indep.ts (d)]. It wraps, but nothing breaks. The strong reason to require the pose is H³: distance 8 is exactly where the notes' own measurement gives an O(1) ray error (checks2.ts). Also, the pose lives in strategy.measurement.camera, not in the scene [checked-code src/compiler/analyze/Validator.ts:834-848]. So "pose required in curved scenes" is a scene × strategy cross-check.
+11. **The S³ transvection form is inconsistent.** The notes recommend the generator form, but the "working prototype" space.ts uses the 1/(1+w) point form everywhere, including orbit and camera. decompose() needs the point form anyway, because it starts from g(o). It is singular at the antipode by nature, which is fine. The prototype should use the generator form wherever it starts from v.
+12. **Minor citation and label errors.**
+   - fable-strategy-taxonomy.md:39 is a blank line; the quote is at lines 37-38.
+   - "Thurston stores the vertical in .w [checked-code survey/thurston-port.md:195-196]" cites a survey document, not code. It should be labeled from the survey (the survey cites h2e part1:272-277).
+   - "Today a curved scene with transformed groups would compose wrongly without any error" is not reachable today, because the Validator rejects non-Euclidean spaces (Validator.ts:56-57). It is a future hazard.
+   - camera.frame is a reserved path [types.ts:815], but only a stale comment refers to it; ParameterStore has no frame coercion (grep). There is nothing to do there. Mentioning it would only close the question.
+13. **A smaller missed site.** KeyboardControls saves and restores a Euclidean Frame and position, and puts frame in its CAMERA_MOVED event [checked-code KeyboardControls.ts:128-142, 298-303]. A curved branch needs its own state shape.
+
+## Over-engineering check
+
+- The design is mostly minimal: no new scene field, an unchanged App parameter contract, one mat4 per placement, and one alias seam (ambient_normalize). The alias is needed because the space-free formula (F + aR + bU)·inversesqrt(1+a²+b²) would change E³ rounding, and the owner requires bit-identity [math].
+- The `spaces` field answers the owner's "who implements what" request directly. One decision is left open: does an absent field mean ['euclidean'], which is true of every existing occupant, or must every descriptor declare it? The second means editing every descriptor. That is the owner's call under the "no guesses" rule.
+- Camera-relative coordinates are correctly deferred, but see corrections 1 and 2 for their real cost and benefit.
+
+## Verdict
+
+The notes are mostly correct. Every number reproduces, and the key ones (the roll angles, the precision trend) were confirmed independently. The code citations are accurate, with a few minor exceptions. The main problems:
+
+- The v1 precision radius is too generous, because the notes measured the wrong error (corrections 1–3).
+- The Gram–Schmidt drawback of target-centered is mis-weighted (correction 4).
+- Two real interactions were missed: emitter objects need folded parameters (correction 6), and the existing ParamKind gives a ready-made, simpler rule for point rows and light positions (correction 7).
+- There is a silent layout trap (correction 8).

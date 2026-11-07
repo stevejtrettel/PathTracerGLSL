@@ -1,0 +1,6 @@
+x=1.00e-6 rel err of (e^x-e^-x)/2 in f32: 0.0165; x itself as sinh: 2.52e-9
+x=1.00e-5 rel err of (e^x-e^-x)/2 in f32: 0.0014; x itself as sinh: 2.53e-8
+x=1.00e-4 rel err of (e^x-e^-x)/2 in f32: 1.66e-4; x itself as sinh: 2.69e-8
+x=0.0010 rel err of (e^x-e^-x)/2 in f32: 1.68e-5; x itself as sinh: 1.19e-7
+x=0.0100 rel err of (e^x-e^-x)/2 in f32: 2.61e-7; x itself as sinh: 1.67e-5
+x=0.1000 rel err of (e^x-e^-x)/2 in f32: 1.78e-7; x itself as sinh: 0.0017

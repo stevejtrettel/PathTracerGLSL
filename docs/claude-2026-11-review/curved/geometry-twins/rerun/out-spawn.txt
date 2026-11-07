@@ -1,0 +1,33 @@
+
+H3 spawn variant: flow. Smallest eps (from 1.00e-7,1.00e-6,1.00e-5,3.00e-5,1.00e-4,3.00e-4,0.0010,0.0030,0.0100,0.0300,0.1000,0.3000) with 0/2000 failures, per judge
+R=0: true 1.00e-6 | world-f32 SDF 1.00e-6 | local-f32 SDF 1.00e-6   (failures at eps=1e-4: 0/0/0)
+R=1: true 1.00e-5 | world-f32 SDF 1.00e-6 | local-f32 SDF 1.00e-6   (failures at eps=1e-4: 0/0/0)
+R=2: true 3.00e-5 | world-f32 SDF 1.00e-5 | local-f32 SDF 1.00e-5   (failures at eps=1e-4: 0/0/0)
+R=3: true 1.00e-4 | world-f32 SDF 1.00e-4 | local-f32 SDF 3.00e-5   (failures at eps=1e-4: 0/0/0)
+R=4: true 0.0010 | world-f32 SDF 0.0010 | local-f32 SDF 3.00e-4   (failures at eps=1e-4: 220/48/30)
+R=5: true 0.0100 | world-f32 SDF 0.0100 | local-f32 SDF 0.0030   (failures at eps=1e-4: 639/668/497)
+R=6: true 0.1000 | world-f32 SDF 0.1000 | local-f32 SDF 0.0300   (failures at eps=1e-4: 867/928/951)
+
+H3 spawn variant: flow+GLSLsinh. Smallest eps (from 1.00e-7,1.00e-6,1.00e-5,3.00e-5,1.00e-4,3.00e-4,0.0010,0.0030,0.0100,0.0300,0.1000,0.3000) with 0/2000 failures, per judge
+R=0: true 1.00e-6 | world-f32 SDF 1.00e-6 | local-f32 SDF 1.00e-6   (failures at eps=1e-4: 0/0/0)
+R=1: true 1.00e-5 | world-f32 SDF 1.00e-6 | local-f32 SDF 1.00e-6   (failures at eps=1e-4: 0/0/0)
+R=2: true 3.00e-5 | world-f32 SDF 1.00e-5 | local-f32 SDF 1.00e-5   (failures at eps=1e-4: 0/0/0)
+R=3: true 1.00e-4 | world-f32 SDF 1.00e-4 | local-f32 SDF 3.00e-5   (failures at eps=1e-4: 0/0/0)
+R=4: true 0.0010 | world-f32 SDF 3.00e-4 | local-f32 SDF 3.00e-4   (failures at eps=1e-4: 225/40/31)
+R=5: true 0.0100 | world-f32 SDF 0.0100 | local-f32 SDF 0.0030   (failures at eps=1e-4: 685/693/579)
+R=6: true 0.1000 | world-f32 SDF 0.0300 | local-f32 SDF 0.0300   (failures at eps=1e-4: 883/944/965)
+
+H3 spawn variant: flow+reduce. Smallest eps (from 1.00e-7,1.00e-6,1.00e-5,3.00e-5,1.00e-4,3.00e-4,0.0010,0.0030,0.0100,0.0300,0.1000,0.3000) with 0/2000 failures, per judge
+R=0: true 1.00e-6 | world-f32 SDF 1.00e-6 | local-f32 SDF 1.00e-6   (failures at eps=1e-4: 0/0/0)
+R=1: true 1.00e-5 | world-f32 SDF 1.00e-5 | local-f32 SDF 1.00e-5   (failures at eps=1e-4: 0/0/0)
+R=2: true 3.00e-5 | world-f32 SDF 3.00e-5 | local-f32 SDF 3.00e-5   (failures at eps=1e-4: 0/0/0)
+R=3: true 3.00e-4 | world-f32 SDF 1.00e-4 | local-f32 SDF 3.00e-4   (failures at eps=1e-4: 2/0/1)
+R=4: true 0.0030 | world-f32 SDF 0.0030 | local-f32 SDF 0.0030   (failures at eps=1e-4: 209/158/233)
+R=5: true 0.0100 | world-f32 SDF 0.0100 | local-f32 SDF 0.0100   (failures at eps=1e-4: 614/744/693)
+R=6: true 0.1000 | world-f32 SDF 0.1000 | local-f32 SDF 0.1000   (failures at eps=1e-4: 851/965/924)
+
+E3 baseline with fp_uncertainty: failures /2000
+E3 R=0: failures 0, eps up to 3.05e-5
+E3 R=10: failures 0, eps up to 3.29e-4
+E3 R=100: failures 0, eps up to 0.0031
+E3 R=400: failures 0, eps up to 0.0122

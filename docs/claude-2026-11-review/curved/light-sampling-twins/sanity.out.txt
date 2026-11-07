@@ -1,0 +1,12 @@
+H3: flow/log identities, worst abs error 2.73e-12
+H3: disk D=1 rho=0.7: tan(beta)=T(rho)/S(D) boundary misclassified 0/400
+H3: disk D=3 rho=2: tan(beta)=T(rho)/S(D) boundary misclassified 0/400
+H3: ball d=1 R=0.5 alpha=0.459399: forward cone misclassified 0/400
+H3: ball d=4 R=2.5 alpha=0.223559: forward cone misclassified 0/400
+H3: ball d=0.3 R=0.29 alpha=1.308211: forward cone misclassified 0/400
+S3: flow/log identities, worst abs error 3.31e-13
+S3: disk D=1 rho=0.6: tan(beta)=T(rho)/S(D) boundary misclassified 0/400
+S3: disk D=2.5 rho=0.4: tan(beta)=T(rho)/S(D) boundary misclassified 0/400
+S3: ball d=1 R=0.5 alpha=0.606198: forward cone misclassified 0/400, backward cone misclassified 0/400
+S3: ball d=2.5 R=0.4 alpha=0.708489: forward cone misclassified 0/400, backward cone misclassified 0/400
+S3: ball d=1.5 R=1.4 alpha=1.415234: forward cone misclassified 0/400, backward cone misclassified 0/400

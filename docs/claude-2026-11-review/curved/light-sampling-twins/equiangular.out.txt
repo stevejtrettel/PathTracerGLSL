@@ -1,0 +1,46 @@
+sigma_t=0.6 sigma_s=0.4 I=3 HG g=0.5; N=1000000
+--- H3 light dist 1 polar 1.2 T=3.0000: foot t0=0.2833 h=0.9472 theta range [-0.2468, 0.7356]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 1.4e-14; max rel |pdf - dtheta/dt/range| = 3.2e-9
+  brute force (Simpson 2e5 / 4e5) = 0.01511278497 / 0.01511278497
+  equiangular MC                               mean 0.01511397  se 0.000011  expected 0.01511278  z 0.11  per-sample std 0.0107
+  uniform-t MC                                 mean 0.01510974  se 0.000026  expected 0.01511278  z -0.12  per-sample std 0.0256
+--- H3 light dist 0.3 polar 1.5 T=6.0000: foot t0=0.0206 h=0.2993 theta range [-0.0677, 1.2759]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 1.9e-11; max rel |pdf - dtheta/dt/range| = 2.1e-8
+  brute force (Simpson 2e5 / 4e5) = 0.09557403237 / 0.09557403237
+  equiangular MC                               mean 0.09556906  se 0.000049  expected 0.09557403  z -0.10  per-sample std 0.0494
+  uniform-t MC                                 mean 0.09589004  se 0.00037  expected 0.09557403  z 0.85  per-sample std 0.370
+--- H3 light dist 3 polar 0.3 T=2.0000: foot t0=1.8381 h=1.8059 theta range [-0.3107, 0.0542]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 2.5e-15; max rel |pdf - dtheta/dt/range| = 1.5e-9
+  brute force (Simpson 2e5 / 4e5) = 0.002335223186 / 0.002335223186
+  equiangular MC                               mean 0.002332727  se 0.0000020  expected 0.002335223  z -1.25  per-sample std 0.00200
+  uniform-t MC                                 mean 0.002335330  se 6.4e-7  expected 0.002335223  z 0.17  per-sample std 0.000639
+--- H3 light dist 0.05 polar 1 T=4.0000: foot t0=0.0270 h=0.0421 theta range [-0.5702, 1.5287]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 1.7e-12; max rel |pdf - dtheta/dt/range| = 2.2e-7
+  brute force (Simpson 2e5 / 4e5) = 1.991212020 / 1.991212020
+  equiangular MC                               mean 1.991682  se 0.0013  expected 1.991212  z 0.37  per-sample std 1.27
+  uniform-t MC                                 mean 1.991578  se 0.014  expected 1.991212  z 0.03  per-sample std 14.3
+--- S3 light dist 1 polar 1.2 T=3.0000: foot t0=0.5138 h=0.9015 theta range [-0.6237, 2.3662]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 8.9e-16; max rel |pdf - dtheta/dt/range| = 4.5e-10
+  brute force (Simpson 2e5 / 4e5) = 0.05515509031 / 0.05515509031
+  equiangular MC                               mean 0.05515838  se 0.000045  expected 0.05515509  z 0.07  per-sample std 0.0449
+  uniform-t MC                                 mean 0.05513628  se 0.000054  expected 0.05515509  z -0.35  per-sample std 0.0544
+--- S3 light dist 0.3 polar 1.5 T=6.0000: foot t0=0.0219 h=0.2992 theta range [-0.0741, 5.4648]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 3.6e-15; max rel |pdf - dtheta/dt/range| = 1.7e-9
+  brute force (Simpson 2e5 / 4e5) = 0.2159582333 / 0.2159582333
+  equiangular MC                               mean 0.2158802  se 0.00019  expected 0.2159582  z -0.41  per-sample std 0.192
+  uniform-t MC                                 mean 0.2163738  se 0.00041  expected 0.2159582  z 1.01  per-sample std 0.410
+--- S3 light dist 2.5 polar 0.8 T=5.5000: foot t0=2.6617 h=0.4437 theta range [-2.2605, 2.5117]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 8.9e-16; max rel |pdf - dtheta/dt/range| = 4.4e-10
+  brute force (Simpson 2e5 / 4e5) = 0.2372345955 / 0.2372345955
+  equiangular MC                               mean 0.2374533  se 0.00027  expected 0.2372346  z 0.81  per-sample std 0.271
+  uniform-t MC                                 mean 0.2371868  se 0.00022  expected 0.2372346  z -0.22  per-sample std 0.216
+--- S3 light dist 0.05 polar 1 T=6.2822: foot t0=0.0270 h=0.0421 theta range [-0.5714, 5.6952]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 2.0e-14; max rel |pdf - dtheta/dt/range| = 8.8e-9
+  brute force (Simpson 2e5 / 4e5) = 2.860521466 / 2.860521466
+  equiangular MC                               mean 2.861630  se 0.0033  expected 2.860521  z 0.33  per-sample std 3.33
+  uniform-t MC                                 mean 2.867724  se 0.018  expected 2.860521  z 0.39  per-sample std 18.5
+--- S3 light dist 1.5 polar 2.6 T=1.0000: foot t0=-1.4882 h=0.5401 theta range [1.5283, 2.1623]
+  integral of pdf over [0,T] (Simpson 2e5) = 1.000000000; max |t(theta(t)) - t| = 6.7e-16; max rel |pdf - dtheta/dt/range| = 4.9e-10
+  brute force (Simpson 2e5 / 4e5) = 0.02360988447 / 0.02360988447
+  equiangular MC                               mean 0.02361396  se 0.0000048  expected 0.02360988  z 0.85  per-sample std 0.00480
+  uniform-t MC                                 mean 0.02360945  se 7.8e-7  expected 0.02360988  z -0.56  per-sample std 0.000781

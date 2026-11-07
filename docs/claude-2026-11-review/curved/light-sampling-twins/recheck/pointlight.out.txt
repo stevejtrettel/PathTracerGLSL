@@ -1,0 +1,33 @@
+(1) point light vs small ball (deterministic cone quadrature, 1500x1500 cells per cone)
+  H3 d=2 polar=0.6 R=0.3: ball 1.82789505e-2  point 1.82789505e-2  ratio 1.00000000
+  H3 d=2 polar=0.6 R=0.03: ball 1.77456361e-4  point 1.77456361e-4  ratio 1.00000000
+  H3 d=2 polar=0.6 R=0.003: ball 1.77403666e-6  point 1.77403666e-6  ratio 1.00000000
+  H3 d=2 polar=1.5 R=0.3: ball 1.57099685e-3  point 1.56663760e-3  ratio 1.00278255
+  H3 d=2 polar=1.5 R=0.03: ball 1.52092872e-5  point 1.52092872e-5  ratio 1.00000000
+  H3 d=2 polar=1.5 R=0.003: ball 1.52047708e-7  point 1.52047708e-7  ratio 1.00000000
+  S3 d=1.2 polar=0.6 R=0.3: ball 2.60667311e-1  point 2.60667311e-1  ratio 1.00000000
+  S3 d=1.2 polar=0.6 R=0.03: ball 2.68549548e-3  point 2.68549548e-3  ratio 1.00000000
+  S3 d=1.2 polar=0.6 R=0.003: ball 2.68629321e-5  point 2.68629321e-5  ratio 1.00000000
+  S3 d=1.2 polar=1.5 R=0.3: ball 4.68583572e-2  point 2.23410644e-2  ratio 2.09740934
+  S3 d=1.2 polar=1.5 R=0.03: ball 2.30166288e-4  point 2.30166288e-4  ratio 1.00000000
+  S3 d=1.2 polar=1.5 R=0.003: ball 2.30234660e-6  point 2.30234660e-6  ratio 1.00000000
+  S3 d=1.2 polar=2 R=0.3: ball 1.31432444e-1  point 1.31432444e-1  ratio 1.00000000
+  S3 d=1.2 polar=2 R=0.03: ball 1.35406788e-3  point 1.35406788e-3  ratio 1.00000000
+  S3 d=1.2 polar=2 R=0.003: ball 1.35447011e-5  point 1.35447011e-5  ratio 1.00000000
+  S3 d=1.2 polar=2.8 R=0.3: ball 2.97583867e-1  point 2.97583867e-1  ratio 1.00000000
+  S3 d=1.2 polar=2.8 R=0.03: ball 3.06582412e-3  point 3.06582412e-3  ratio 1.00000000
+  S3 d=1.2 polar=2.8 R=0.003: ball 3.06673483e-5  point 3.06673483e-5  ratio 1.00000000
+
+(2) S3 antipodal caustic: two-sided disk on the axis at distance pi-h (its plane passes at distance h from x and from -x), rho = 0.3
+  h=0.2 (disk center at distance 2.942 from x), N=1000000
+    A cosine                                   mean 2.222771  se 0.0014  expected 2.224172  z -0.98  per-sample std 1.43
+    B area                                     mean 2.224858  se 0.0016  expected 2.224172  z 0.43  per-sample std 1.58
+    MIS                                        mean 2.224545  se 0.00099  expected 2.224172  z 0.38  per-sample std 0.993
+  h=0.05 (disk center at distance 3.092 from x), N=1000000
+    A cosine                                   mean 3.061777  se 0.00049  expected 3.061669  z 0.22  per-sample std 0.494
+    B area                                     mean 3.065858  se 0.010  expected 3.061669  z 0.40  per-sample std 10.4
+    MIS                                        mean 3.062511  se 0.0011  expected 3.061669  z 0.76  per-sample std 1.11
+  h=0.01 (disk center at distance 3.132 from x), N=1000000
+    A cosine                                   mean 3.138291  se 0.00010  expected 3.138313  z -0.22  per-sample std 0.102
+    B area                                     mean 3.288739  se 0.057  expected 3.138313  z 2.66  per-sample std 56.5
+    MIS                                        mean 3.137415  se 0.00058  expected 3.138313  z -1.54  per-sample std 0.583

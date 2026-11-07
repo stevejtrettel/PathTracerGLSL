@@ -1,0 +1,90 @@
+--- H3: disk on axis D=1 rho=0.7 one-sided  (N=4000000)
+  A cosine/BSDF                                mean 0.6572015  se 0.00064  expected 0.6570813  z 0.19
+  B area sampling                              mean 0.6570053  se 0.00011  expected 0.6570813  z -0.69
+  MIS(A,B) power                               mean 0.6570378  se 0.00010  expected 0.6570813  z -0.42
+--- H3: disk on axis D=4 rho=3 one-sided  (N=4000000)
+  A cosine/BSDF                                mean 0.004213661  se 0.000057  expected 0.004171213  z 0.74
+  B area sampling                              mean 0.004162145  se 0.0000053  expected 0.004171213  z -1.72
+  MIS(A,B) power                               mean 0.004162160  se 0.0000053  expected 0.004171213  z -1.72
+--- H3: disk tilted off-axis D=1.5 rho=1.2 polar=1.0 tilt=0.8  (N=4000000)
+  A cosine/BSDF                                mean 0.2995084  se 0.00046
+  B area sampling                              mean 0.2996381  se 0.00017
+  MIS(A,B) power                               mean 0.2996359  se 0.00016
+  pairwise z: A-B -0.26  A-MIS -0.26  B-MIS 0.01
+--- H3: disk crossing horizon D=0.8 rho=1.5 polar=1.3 tilt=0.4 2-sided  (N=4000000)
+  A cosine/BSDF                                mean 0.5871354  se 0.00061
+  B area sampling                              mean 0.5864339  se 0.00050
+  MIS(A,B) power                               mean 0.5867136  se 0.00036
+  pairwise z: A-B 0.89  A-MIS 0.59  B-MIS -0.45
+--- H3: ball on axis d=1.2 R=0.6  (N=4000000)
+  A cosine/BSDF                                mean 0.5592137  se 0.00060  expected 0.5588719  z 0.57
+  B area sampling                              mean 0.5597790  se 0.00090  expected 0.5588719  z 1.01
+  MIS(A,B) power                               mean 0.5593349  se 0.00050  expected 0.5588719  z 0.93
+  C cone sampling                              mean 0.5588801  se 0.0000079  expected 0.5588719  z 1.05  cone misses 0
+--- H3: ball on axis d=3 R=2  (N=4000000)
+  A cosine/BSDF                                mean 0.4112792  se 0.00053  expected 0.4117753  z -0.94
+  B area sampling                              mean 0.4133588  se 0.0025  expected 0.4117753  z 0.64
+  MIS(A,B) power                               mean 0.4113200  se 0.00052  expected 0.4117753  z -0.87
+  C cone sampling                              mean 0.4117754  se 0.0000042  expected 0.4117753  z 0.02  cone misses 0
+--- H3: ball off-axis d=2 R=0.5 polar=0.9  (N=4000000)
+  A cosine/BSDF                                mean 0.04031370  se 0.00018  expected 0.04031257  z 0.01
+  B area sampling                              mean 0.04031402  se 0.000047  expected 0.04031257  z 0.03
+  MIS(A,B) power                               mean 0.04031398  se 0.000047  expected 0.04031257  z 0.03
+  C cone sampling                              mean 0.04031264  se 0.0000018  expected 0.04031257  z 0.04  cone misses 0
+--- H3: ball crossing horizon d=1 R=0.7 polar=1.4  (N=4000000)
+  A cosine/BSDF                                mean 0.3345686  se 0.00048
+  B area sampling                              mean 0.3340197  se 0.0010
+  MIS(A,B) power                               mean 0.3345503  se 0.00044
+  C cone sampling                              mean 0.3344560  se 0.00017  cone misses 0
+  pairwise z: A-B 0.48  A-MIS 0.03  B-MIS -0.47  A-C 0.22  B-C -0.42
+--- S3: disk on axis D=1 rho=0.6 one-sided  (N=4000000)
+  A cosine/BSDF                                mean 1.250352  se 0.00077  expected 1.250217  z 0.17
+  B area sampling                              mean 1.250082  se 0.000079  expected 1.250217  z -1.71
+  MIS(A,B) power                               mean 1.250135  se 0.00012  expected 1.250217  z -0.67
+--- S3: disk on axis D=2 rho=0.5 (beyond pi/2) one-sided  (N=4000000)
+  A cosine/BSDF                                mean 0.8332085  se 0.00069  expected 0.8332209  z -0.02
+  B area sampling                              mean 0.8331878  se 0.000027  expected 0.8332209  z -1.23
+  MIS(A,B) power                               mean 0.8332031  se 0.000051  expected 0.8332209  z -0.35
+--- S3: disk BELOW x D=1 rho=0.6 one-sided facing x  (N=4000000)
+  A cosine/BSDF                                mean 0.000000  se 0.0  expected 0.000000  z NaN
+  B area sampling                              mean 0.000000  se 0.0  expected 0.000000  z NaN
+  MIS(A,B) power                               mean 0.000000  se 0.0  expected 0.000000  z NaN
+--- S3: disk BELOW x D=1 rho=0.6 one-sided facing away  (N=4000000)
+  A cosine/BSDF                                mean 1.249948  se 0.00077  expected 1.250217  z -0.35
+  B area sampling                              mean 1.250253  se 0.000079  expected 1.250217  z 0.45
+  MIS(A,B) power                               mean 1.250198  se 0.00012  expected 1.250217  z -0.15
+--- S3: disk BELOW x D=1 rho=0.6 two-sided  (N=4000000)
+  A cosine/BSDF                                mean 1.248329  se 0.00077  expected 1.250217  z -2.46
+  B area sampling                              mean 1.250418  se 0.000079  expected 1.250217  z 2.54
+  MIS(A,B) power                               mean 1.250087  se 0.00012  expected 1.250217  z -1.05
+--- S3: disk tilted off-axis D=1.2 rho=0.7 polar=1.2 tilt=0.8 2-sided  (N=4000000)
+  A cosine/BSDF                                mean 0.5001910  se 0.00057
+  B area sampling                              mean 0.5003476  se 0.00018
+  MIS(A,B) power                               mean 0.5003291  se 0.00016
+  pairwise z: A-B -0.26  A-MIS -0.23  B-MIS 0.08
+--- S3: disk crossing horizon D=1.4 rho=1.0 polar=1.5 tilt=0.3 2-sided  (N=4000000)
+  A cosine/BSDF                                mean 1.096161  se 0.00075
+  B area sampling                              mean 1.095842  se 0.00032
+  MIS(A,B) power                               mean 1.095851  se 0.00028
+  pairwise z: A-B 0.39  A-MIS 0.39  B-MIS -0.02
+--- S3: ball on axis d=1 R=0.5  (N=4000000)
+  A cosine/BSDF                                mean 1.019726  se 0.00074  expected 1.019797  z -0.10
+  B area sampling                              mean 1.018190  se 0.0011  expected 1.019797  z -1.40
+  MIS(A,B) power                               mean 1.019527  se 0.00062  expected 1.019797  z -0.44
+  C cone sampling                              mean 1.019541  se 0.00051  expected 1.019797  z -0.50  cone misses 0
+--- S3: ball BELOW x d=1 R=0.5  (N=4000000)
+  A cosine/BSDF                                mean 1.020000  se 0.00074  expected 1.019797  z 0.28
+  B area sampling                              mean 1.019857  se 0.00048  expected 1.019797  z 0.13
+  MIS(A,B) power                               mean 1.019951  se 0.00039  expected 1.019797  z 0.40
+  C cone sampling                              mean 1.020735  se 0.00051  expected 1.019797  z 1.83  cone misses 0
+--- S3: ball off-axis d=2.2 R=0.4 polar=0.7  (N=4000000)
+  A cosine/BSDF                                mean 0.5588249  se 0.00060  expected 0.5574403  z 2.31
+  B area sampling                              mean 0.5571133  se 0.00027  expected 0.5574403  z -1.19
+  MIS(A,B) power                               mean 0.5572923  se 0.00025  expected 0.5574403  z -0.60
+  C cone sampling                              mean 0.5576368  se 0.00029  expected 0.5574403  z 0.67  cone misses 0
+--- S3: ball crossing horizon d=1.3 R=0.6 polar=1.45  (N=4000000)
+  A cosine/BSDF                                mean 0.3167283  se 0.00047
+  B area sampling                              mean 0.3161765  se 0.00028
+  MIS(A,B) power                               mean 0.3161828  se 0.00023
+  C cone sampling                              mean 0.3162464  se 0.00021  cone misses 0
+  pairwise z: A-B 1.00  A-MIS 1.03  B-MIS -0.02  A-C 0.93  B-C -0.20

@@ -1,0 +1,34 @@
+f64 E3   sep=0.001 #geodesics=1 |u|-1:4.44e-16 <u,p>:0.0000 d(flow,q):2.17e-19 rel len err:2.67e-14 angle(arrival,-reverse):0.0000 PT |.|-1:6.66e-16 PT angle:0.0000
+f64 E3   sep=0.5   #geodesics=1 |u|-1:4.44e-16 <u,p>:0.0000 d(flow,q):5.55e-17 rel len err:2.22e-16 angle(arrival,-reverse):0.0000 PT |.|-1:4.44e-16 PT angle:0.0000
+f64 E3   sep=2     #geodesics=1 |u|-1:4.44e-16 <u,p>:0.0000 d(flow,q):4.44e-16 rel len err:2.22e-16 angle(arrival,-reverse):0.0000 PT |.|-1:4.44e-16 PT angle:0.0000
+f64 E3   sep=5     #geodesics=1 |u|-1:4.44e-16 <u,p>:0.0000 d(flow,q):9.93e-16 rel len err:3.55e-16 angle(arrival,-reverse):0.0000 PT |.|-1:4.44e-16 PT angle:0.0000
+f64 H3   sep=0.001 #geodesics=1 |u|-1:4.44e-16 <u,p>:1.11e-16 d(flow,q):7.88e-17 rel len err:1.07e-13 angle(arrival,-reverse):2.48e-16 PT |.|-1:5.55e-16 PT angle:4.44e-16 PT(p,q) vs PT(u,L):3.33e-16 naive-u err:5.92e-13
+f64 H3   sep=0.5   #geodesics=1 |u|-1:6.66e-16 <u,p>:1.67e-16 d(flow,q):4.02e-16 rel len err:6.66e-16 angle(arrival,-reverse):3.21e-16 PT |.|-1:8.88e-16 PT angle:6.66e-16 PT(p,q) vs PT(u,L):4.44e-16 naive-u err:1.51e-15
+f64 H3   sep=2     #geodesics=1 |u|-1:6.66e-16 <u,p>:3.89e-16 d(flow,q):3.12e-15 rel len err:4.22e-15 angle(arrival,-reverse):7.37e-15 PT |.|-1:1.78e-14 PT angle:1.13e-14 PT(p,q) vs PT(u,L):4.44e-15 naive-u err:5.83e-16
+f64 H3   sep=5     #geodesics=1 |u|-1:6.66e-16 <u,p>:5.24e-16 d(flow,q):2.84e-13 rel len err:9.09e-13 angle(arrival,-reverse):3.39e-12 PT |.|-1:5.46e-12 PT angle:5.69e-12 PT(p,q) vs PT(u,L):1.80e-12 naive-u err:7.77e-16
+f64 S3   sep=0.001 #geodesics=2 |u|-1:4.44e-16 <u,p>:1.11e-16 d(flow,q):6.55e-16 rel len err:6.85e-14 angle(arrival,-reverse):2.55e-16 PT |.|-1:5.55e-16 PT angle:3.33e-16 PT(p,q) vs PT(u,L):3.89e-16 naive-u err:4.86e-13
+f64 S3   sep=0.5   #geodesics=2 |u|-1:5.55e-16 <u,p>:1.67e-16 d(flow,q):5.34e-16 rel len err:4.44e-16 angle(arrival,-reverse):2.95e-16 PT |.|-1:8.88e-16 PT angle:4.44e-16 PT(p,q) vs PT(u,L):4.44e-16 naive-u err:9.85e-16
+f64 S3   sep=2     #geodesics=2 |u|-1:4.44e-16 <u,p>:8.47e-16 d(flow,q):7.54e-16 rel len err:2.22e-16 angle(arrival,-reverse):3.17e-16 PT |.|-1:2.66e-15 PT angle:1.89e-15 PT(p,q) vs PT(u,L):7.77e-16 naive-u err:5.00e-16
+f64 S3   sep=3.1   #geodesics=2 |u|-1:4.44e-16 <u,p>:2.55e-14 d(flow,q):8.90e-16 rel len err:0.0000 angle(arrival,-reverse):5.12e-15 PT |.|-1:3.55e-15 PT angle:2.66e-15 PT(p,q) vs PT(u,L):5.51e-13 naive-u err:1.29e-14
+f64 H2R  sep=0.001 #geodesics=1 |u|-1:6.66e-16 <u,p>:1.11e-16 d(flow,q):6.21e-17 rel len err:1.08e-13 angle(arrival,-reverse):2.78e-16 PT |.|-1:8.88e-16 PT angle:4.44e-16
+f64 H2R  sep=0.5   #geodesics=1 |u|-1:6.66e-16 <u,p>:1.67e-16 d(flow,q):3.61e-16 rel len err:9.99e-16 angle(arrival,-reverse):3.56e-16 PT |.|-1:8.88e-16 PT angle:7.77e-16
+f64 H2R  sep=2     #geodesics=1 |u|-1:6.66e-16 <u,p>:4.34e-16 d(flow,q):2.51e-15 rel len err:6.11e-15 angle(arrival,-reverse):4.03e-15 PT |.|-1:3.03e-14 PT angle:2.33e-14
+f64 H2R  sep=5     #geodesics=1 |u|-1:6.66e-16 <u,p>:5.55e-16 d(flow,q):2.64e-13 rel len err:5.92e-13 angle(arrival,-reverse):1.67e-12 PT |.|-1:4.16e-12 PT angle:4.69e-12
+f32 E3   sep=0.001 #geodesics=1 |u|-1:2.38e-7 <u,p>:0.0000 d(flow,q):1.16e-10 rel len err:1.49e-5 angle(arrival,-reverse):0.0000 PT |.|-1:2.38e-7 PT angle:0.0000
+f32 E3   sep=0.5   #geodesics=1 |u|-1:2.38e-7 <u,p>:0.0000 d(flow,q):6.01e-8 rel len err:1.19e-7 angle(arrival,-reverse):0.0000 PT |.|-1:3.58e-7 PT angle:0.0000
+f32 E3   sep=2     #geodesics=1 |u|-1:2.38e-7 <u,p>:0.0000 d(flow,q):1.69e-7 rel len err:1.19e-7 angle(arrival,-reverse):0.0000 PT |.|-1:2.38e-7 PT angle:0.0000
+f32 E3   sep=5     #geodesics=1 |u|-1:2.38e-7 <u,p>:0.0000 d(flow,q):5.46e-7 rel len err:1.91e-7 angle(arrival,-reverse):0.0000 PT |.|-1:3.58e-7 PT angle:0.0000
+f32 H3   sep=0.001 #geodesics=1 |u|-1:2.98e-7 <u,p>:5.96e-8 d(flow,q):6.05e-8 rel len err:5.79e-5 angle(arrival,-reverse):1.12e-7 PT |.|-1:3.58e-7 PT angle:1.79e-7 PT(p,q) vs PT(u,L):1.49e-7 naive-u err:3.67e-4
+f32 H3   sep=0.5   #geodesics=1 |u|-1:3.58e-7 <u,p>:1.19e-7 d(flow,q):1.24e-7 rel len err:4.17e-7 angle(arrival,-reverse):1.30e-7 PT |.|-1:3.58e-7 PT angle:2.38e-7 PT(p,q) vs PT(u,L):2.38e-7 naive-u err:7.45e-7
+f32 H3   sep=2     #geodesics=1 |u|-1:3.58e-7 <u,p>:2.46e-7 d(flow,q):1.39e-6 rel len err:2.09e-6 angle(arrival,-reverse):7.49e-7 PT |.|-1:9.54e-6 PT angle:8.64e-6 PT(p,q) vs PT(u,L):2.15e-6 naive-u err:4.17e-7
+f32 H3   sep=5     #geodesics=1 |u|-1:2.98e-7 <u,p>:3.58e-7 d(flow,q):1.45e-4 rel len err:4.38e-4 angle(arrival,-reverse):1.35e-5 PT |.|-1:0.0029 PT angle:0.0033 PT(p,q) vs PT(u,L):0.0014 naive-u err:4.24e-7
+f32 S3   sep=0.001 #geodesics=2 |u|-1:2.38e-7 <u,p>:5.96e-8 d(flow,q):2.98e-7 rel len err:2.17e-5 angle(arrival,-reverse):1.31e-7 PT |.|-1:3.58e-7 PT angle:2.38e-7 PT(p,q) vs PT(u,L):1.49e-7 naive-u err:2.49e-4
+f32 S3   sep=0.5   #geodesics=2 |u|-1:2.98e-7 <u,p>:8.94e-8 d(flow,q):3.65e-7 rel len err:1.79e-7 angle(arrival,-reverse):1.26e-7 PT |.|-1:3.58e-7 PT angle:1.79e-7 PT(p,q) vs PT(u,L):2.38e-7 naive-u err:5.46e-7
+f32 S3   sep=2     #geodesics=2 |u|-1:2.38e-7 <u,p>:4.92e-7 d(flow,q):6.72e-7 rel len err:1.19e-7 angle(arrival,-reverse):1.14e-7 PT |.|-1:1.43e-6 PT angle:8.94e-7 PT(p,q) vs PT(u,L):4.77e-7 naive-u err:2.20e-7
+f32 S3   sep=3.1   #geodesics=2 |u|-1:2.38e-7 <u,p>:1.22e-5 d(flow,q):4.98e-7 rel len err:6.49e-8 angle(arrival,-reverse):3.13e-6 PT |.|-1:1.91e-6 PT angle:1.43e-6 PT(p,q) vs PT(u,L):4.46e-4 naive-u err:6.44e-6
+f32 H2R  sep=0.001 #geodesics=1 |u|-1:3.58e-7 <u,p>:4.77e-8 d(flow,q):3.07e-8 rel len err:7.32e-5 angle(arrival,-reverse):1.30e-7 PT |.|-1:2.98e-7 PT angle:2.38e-7
+f32 H2R  sep=0.5   #geodesics=1 |u|-1:3.58e-7 <u,p>:7.52e-8 d(flow,q):1.37e-7 rel len err:3.58e-7 angle(arrival,-reverse):1.42e-7 PT |.|-1:4.77e-7 PT angle:4.17e-7
+f32 H2R  sep=2     #geodesics=1 |u|-1:2.98e-7 <u,p>:2.13e-7 d(flow,q):1.72e-6 rel len err:3.58e-6 angle(arrival,-reverse):9.20e-7 PT |.|-1:4.89e-6 PT angle:4.35e-6
+f32 H2R  sep=5     #geodesics=1 |u|-1:3.58e-7 <u,p>:2.72e-7 d(flow,q):1.61e-4 rel len err:9.22e-4 angle(arrival,-reverse):3.61e-4 PT |.|-1:0.0032 PT angle:0.0024
+H3: step-projection transport vs closed form, max coord diff 2.01e-5 (O(1/n) = 5.00e-5)
+S3: step-projection transport vs closed form, max coord diff 1.73e-5 (O(1/n) = 5.00e-5)

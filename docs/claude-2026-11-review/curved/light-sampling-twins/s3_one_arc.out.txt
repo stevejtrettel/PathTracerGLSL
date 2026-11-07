@@ -1,0 +1,15 @@
+--- S3 disk on axis D=1 rho=0.6 (N=2000000)
+  A cosine                                     mean 1.251309  se 0.0011  expected 1.250217  z 1.00
+  B both arcs summed                           mean 1.250179  se 0.00011  expected 1.250217  z -0.34
+  B one random arc (x2)                        mean 1.251565  se 0.00090  expected 1.250217  z 1.50
+  MIS(A, one-arc B), pdf halved                mean 1.251257  se 0.00069  expected 1.250217  z 1.51
+--- S3 disk crossing horizon D=1.4 rho=1.0 polar=1.5 tilt=0.3 (N=2000000)
+  A cosine                                     mean 1.093976  se 0.0011
+  B both arcs summed                           mean 1.096347  se 0.00046
+  B one random arc (x2)                        mean 1.095536  se 0.0010
+  MIS(A, one-arc B), pdf halved                mean 1.094833  se 0.00072
+--- S3 ball crossing horizon d=1.3 R=0.6 polar=1.45 (N=2000000)
+  A cosine                                     mean 0.3168013  se 0.00067
+  B both arcs summed                           mean 0.3162861  se 0.00040
+  B one random arc (x2)                        mean 0.3159218  se 0.00061
+  MIS(A, one-arc B), pdf halved                mean 0.3165075  se 0.00044
