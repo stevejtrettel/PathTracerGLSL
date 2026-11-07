@@ -2569,7 +2569,8 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             + 'pt-nee, pt-mis and a spectral pt-nee',
         expected:
             'every plane pixel reads the lune ρ(1+cos 45°)/2 = 0.341421, flipped or not, on all four keys; '
-            + 'the sky reads 1.0. 0.4 means the mask is missing; ≈0 in the far rows means the flip is missing',
+            + 'the sky reads 1.0. 0.458579 (ρ·L_b·(1−cos 45°)/2 more, from the emitter below the surface) means '
+            + 'the mask is missing; 0.682843 (the lune × L_b, L_b = 2) in the far rows means the flip is missing',
         witness: {
             size: [64, 64],
             spp: 256,

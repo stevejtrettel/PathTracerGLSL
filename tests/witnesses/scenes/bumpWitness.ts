@@ -11,11 +11,17 @@
 //                    ρ·L·(1 + cos 45°)/2 = 0.4·(1 + 1/√2)/2 = 0.341421
 //                for EVERY view direction. The camera sits at +x looking toward −x, so the near
 //                rows (view steeper than 45°) see n' unflipped and the far rows (shallower) see
-//                it flipped (wo·n' ≤ 0, mirrored across the true normal). A black plane just below
-//                catches every direction below the surface: without it a missing flip would read
-//                the same value (the antipodal lune reaches the same sky). With it:
-//                  0.4      — the mask is missing (the unmasked tilted lobe sees the whole sky);
-//                  ≈ 0      — in the far rows only: the flip is missing.
+//                it flipped (wo·n' ≤ 0, mirrored across the true normal). An emitting plane just
+//                below (radiance L_b = 2, not sampled as a light, so every estimator finds it on
+//                BSDF rays) is what every direction below the surface reaches; the correct BSDF
+//                never reaches it. Each missing step reads a different value:
+//                  ρ(1+cos45°)/2 + ρ·L_b·(1−cos45°)/2 = 0.458579 — the mask is missing (or tests
+//                      the perturbed normal instead of ng): the lobe's below-surface directions
+//                      reach the emitter;
+//                  ρ(1+cos45°)/2·L_b = 0.682843 — in the far rows only: the flip is missing (the
+//                      lobe around −n' keeps only its below-surface directions).
+//                A black plane would hide the mask (0 in place of L_b gives the lune again), and
+//                no plane would hide the flip (the antipodal lune reaches the same sky).
 //                The Lambert integral is symmetric under mirroring n', so a gradient SIGN error
 //                passes here; bump-sides catches it.
 //   bump-sides — two thin quads with normal +y and the same bump. The camera (between them) sees
@@ -38,6 +44,9 @@
 import type { SceneDescription, RenderStrategy, MaterialDescription } from '../../../src/compiler/types.js';
 
 const RHO = 0.4;
+/** The radiance of bump-tilt's emitter below the surface (L_b): any value but 1 and 0 keeps the
+ *  three outcomes in the header apart. */
+const BELOW_RADIANCE = 2;
 
 /** The tilt shared by both fixtures: h = p.x, a 45° slope. The step only has to be small next
  *  to the scene (|p| ≤ ~10 here): for a linear field there is no truncation error. */
@@ -53,11 +62,11 @@ export const bumpTiltScene: SceneDescription = {
     ambientSpace: { type: 'euclidean' },
     objects: [
         { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0 }, material: 'tilted' },
-        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.01 }, material: 'black' },
+        { type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.01 }, material: 'below' },
     ],
     materials: {
         tilted: bumped(),
-        black: { model: 'lambert', albedo: 0 },
+        below: { model: 'lambert', albedo: 0, emission: BELOW_RADIANCE, sampleAsLight: false },
     },
     lights: [],
     environment: { type: 'constant', color: 1, intensity: 1.0, sampleAsLight: true },

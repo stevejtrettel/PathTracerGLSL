@@ -7,7 +7,8 @@
 //      weight·pdf = f·|cos| and sample.pdf = pdf, for Lambert and GGX;
 //   3. directional albedo ≤ 1 under perturbation (Lambert ρ = 1, GGX f0 = 1);
 //   4. estimator equality: BSDF, uniform-sphere NEE and power-MIS estimates of a tilted Lambert
-//      plane under a unit sky (nothing below the surface) all give ρ(1 + cos θ)/2, flipped or not;
+//      plane under a unit sky, with radiance 2 below the surface, all give ρ(1 + cos θ)/2,
+//      flipped or not; without the mask or the flip they read the values bump-tilt names;
 //   5. the σ rule: the same surface seen from the other side has the opposite shading normal;
 //   6. the finite-difference error law the README states, in float32.
 import { describe, it, expect } from 'vitest';
@@ -201,39 +202,73 @@ describe('shading-normal perturbation (twin of shading_normal.glsl)', () => {
         expect(maxG).toBeLessThanOrEqual(1 + 1e-12);
     });
 
-    it('4. BSDF, NEE and MIS estimates of the tilted plane agree with ρ(1 + cos θ)/2', () => {
-        const rho = 0.4, slope = 1;
-        const exact = rho * (1 + 1 / Math.sqrt(1 + slope * slope)) / 2;
+    describe('4. BSDF, NEE and MIS estimates of the tilted plane', () => {
+        // A unit sky above the surface and radiance L_BELOW below it, the way the bump-tilt
+        // witness lays it out. The masked BSDF never reaches below the surface, so all three
+        // estimators read the lune ρ(1 + cos θ)/2 whatever L_BELOW is. Without the mask the
+        // lobe's directions below ng add ρ·L_BELOW·(1 − cos θ)/2; without the flip, a view
+        // below n' gets the antipodal lune, all of it below the surface: ρ·L_BELOW·(1 + cos θ)/2.
+        const rho = 0.4, slope = 1, L_BELOW = 2;
+        const cosT = 1 / Math.sqrt(1 + slope * slope);
+        const lune = rho * (1 + cosT) / 2;
         const grad: V3 = [slope, 0, 0];
         // Unflipped and flipped views (wo·(ng − grad) > 0 and ≤ 0).
         const views: V3[] = [norm([0, 0, 1]), norm([0.95, 0, 0.3]), norm([-0.9, 0.2, 0.4]), norm([0.6, -0.6, 0.2])];
-        expect(views.map((wo) => dot(wo, sub(NG, grad)) <= 0)).toEqual([false, true, false, true]);
-        const rnd = lcg(11);
-        const sky = (wi: V3) => wi[2] > 0 ? 1 : 0;   // a unit sky above; below the surface is occluded
+        const flippedView = (wo: V3) => dot(wo, sub(NG, grad)) <= 0;
+        const radiance = (wi: V3) => wi[2] > 0 ? 1 : L_BELOW;
         const pl = 1 / (4 * Math.PI);                  // uniform-sphere sky sampling
-        for (const wo of views) {
-            const f = shadingFramePerturbed(BASE.n, 1, grad, wo);
+
+        /** The three estimates at view wo; `mask: false` / `flip: false` remove one step. */
+        function estimates(wo: V3, seed: number, opts = { mask: true, flip: true }) {
+            const f = opts.flip ? shadingFramePerturbed(BASE.n, 1, grad, wo) : ambientFrame(sub(BASE.n, grad));
+            const keep = (wi: V3) => !opts.mask || sideConsistent(wi, f);
+            const rnd = lcg(seed);
             const N = 200_000;
             let bsdf = 0, nee = 0, mis = 0;
             for (let i = 0; i < N; i++) {
-                const s = masked(lambertSample(wo, f, rho, [rnd(), rnd()]), f);
+                const s0 = lambertSample(wo, f, rho, [rnd(), rnd()]);
+                const s = keep(s0.wi) ? s0 : { ...s0, weight: 0, pdf: 0 };
                 if (s.weight > 0) {
-                    bsdf += s.weight * sky(s.wi);
-                    mis += s.weight * sky(s.wi) * (s.pdf * s.pdf / (s.pdf * s.pdf + pl * pl));
+                    bsdf += s.weight * radiance(s.wi);
+                    // NEE samples the sky only (the region below is not a light): MIS weighs
+                    // the BSDF hit by the power heuristic above the surface, by 1 below it.
+                    mis += s.weight * radiance(s.wi) * (s.wi[2] > 0 ? s.pdf * s.pdf / (s.pdf * s.pdf + pl * pl) : 1);
                 }
                 const wi = uniformSphere(rnd);
-                const fe = sideConsistent(wi, f) ? lambertEval(wi, wo, f, rho) : 0;
-                if (fe > 0) {
-                    const contrib = fe * Math.abs(dot(wi, f.n)) * sky(wi) / pl;
+                const fe = keep(wi) ? lambertEval(wi, wo, f, rho) : 0;
+                if (fe > 0 && wi[2] > 0) {
+                    const contrib = fe * Math.abs(dot(wi, f.n)) / pl;
                     const pb = lambertPdf(wi, wo, f);
                     nee += contrib;
                     mis += contrib * (pl * pl / (pl * pl + pb * pb));
                 }
+                // NEE's below-surface share arrives on BSDF rays (the region is path-found).
+                if (s.weight > 0 && s.wi[2] <= 0) nee += s.weight * radiance(s.wi);
             }
-            expect(Math.abs(bsdf / N - exact)).toBeLessThan(0.003);
-            expect(Math.abs(nee / N - exact)).toBeLessThan(0.006);
-            expect(Math.abs(mis / N - exact)).toBeLessThan(0.003);
+            return { bsdf: bsdf / N, nee: nee / N, mis: mis / N };
         }
+
+        it('agree with the lune ρ(1 + cos θ)/2, flipped or not', () => {
+            expect(views.map(flippedView)).toEqual([false, true, false, true]);
+            views.forEach((wo, k) => {
+                const e = estimates(wo, 11 + k);
+                expect(Math.abs(e.bsdf - lune)).toBeLessThan(0.003);
+                expect(Math.abs(e.nee - lune)).toBeLessThan(0.006);
+                expect(Math.abs(e.mis - lune)).toBeLessThan(0.003);
+            });
+        });
+
+        it('read the stated failure values without the mask and without the flip', () => {
+            const noMask = lune + rho * L_BELOW * (1 - cosT) / 2;
+            const noFlip = lune * L_BELOW;
+            views.forEach((wo, k) => {
+                const m = estimates(wo, 21 + k, { mask: false, flip: true });
+                for (const v of [m.bsdf, m.nee, m.mis]) expect(Math.abs(v - noMask)).toBeLessThan(0.008);
+                if (!flippedView(wo)) return;
+                const n = estimates(wo, 31 + k, { mask: true, flip: false });
+                for (const v of [n.bsdf, n.nee, n.mis]) expect(Math.abs(v - noFlip)).toBeLessThan(0.008);
+            });
+        });
     });
 
     it('5. σ: the surface seen from the other side has the opposite shading normal', () => {

@@ -24,11 +24,14 @@ a tangent on `Hit`) is deferred, to be planned with anisotropic GGX after image 
   query and sampling; bumped ids get masked interaction arms; the Perlin library is included for
   a bump height too.
 - **Tests**: `tests/glsl/shadingNormal.test.ts` (twin: flip guarantee, χ² of the masked sampler
-  with a rejected cell, the triple, albedo ≤ 1, BSDF/NEE/MIS agreement on the tilted plane, σ,
+  with a rejected cell, the triple, albedo ≤ 1, BSDF/NEE/MIS agreement on the tilted plane with
+  radiance below the surface, and the values a missing mask or flip reads there, σ,
   and the float32 finite-difference error law), `tests/compiler/bump.test.ts` (Validator rules,
   linkage, glslang).
 - **Witnesses**: `bump-tilt` (the lune ρ(1+cos 45°)/2 = 0.341421 in flipped and unflipped rows,
-  with a black occluder under the plane so a missing flip reads 0; review must-fix 1) and
+  with a non-samplable emitter of radiance 2 under the plane, so a missing mask reads 0.458579 and
+  a missing flip 0.682843 in the far rows; review must-fix 1, and the review of the build: a black
+  occluder there hid a missing mask) and
   `bump-sides` (σ and the gradient sign, with light 2 chosen so the correct value is ρ, not 0;
   review must-fix 2).
 - **Digest**: every existing scene identical; `bump-tilt` and `bump-sides` are new.
