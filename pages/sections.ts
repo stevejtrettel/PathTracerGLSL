@@ -39,7 +39,7 @@ export const gallerySections: GallerySection[] = [
     {
         title: 'Closed manifolds',
         blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face',
-        entries: [e('torus-crystal', 'torus-crystal-ref'), e('torus-lights')],
+        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights')],
     },
     {
         title: 'Instance clouds',

@@ -968,6 +968,8 @@ exports[`scene-data textures (byte fingerprints) > torus-lights 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > torus-room 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > transform-bake 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > transform-bake-ref 1`] = `null`;
