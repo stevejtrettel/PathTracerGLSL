@@ -773,6 +773,10 @@ const FRAME_CASES = [
     // sample and pdf all reach the picture.
     { id: 'ggx', scene: 'veach-mis', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'rough-glass', scene: 'rough-mis', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // Rough dielectric spheres in a furnace (microfacet core without ggx) and the delta mirror
+    // (the conductor's Schlick f0 without microfacet core).
+    { id: 'rough-furnace', scene: 'rough-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'mirror', scene: 'mirror', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     // 150×100 in 64px tiles = 3×2 tiles with partial edges (tile sizes round up to 64, app/tiling.ts).
     { id: 'tiled', scene: 'cornell-area', strategy: 0, size: [150, 100], spp: 8, tileSize: 64 },
 ];
