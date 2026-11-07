@@ -11,27 +11,35 @@ domain's diameter, its defines) and one static GLSL file, included whole after t
 occupant. The file is pure group math with no calls into the program:
 
 ```glsl
-int   quotient_image_index(...);                 // the NEE-table index of a cell, or −1
-Point quotient_image_shift(int j);               // image j's map (E³: a translation)
-int   quotient_image(Point x, Direction wi, Hit h);  // the table index of the image a ray from x
-                                                 // along wi hit, or −1 when it is not in the table
-Point quotient_reduce(Point p);                  // the point of D equivalent to p
+int        quotient_image_index(...);                     // the NEE-table index of the image a
+                                                          // walk reached (its arguments are the
+                                                          // walk's state), or −1
+LightQuery quotient_image_query(LightQuery q, int j);     // q seen from image j: the lights in D
+                                                          // seen from it are image j of the
+                                                          // lights seen from q
+Direction  quotient_image_direction(int j, Direction v);  // a direction at the moved query's
+                                                          // point, carried back to q.p
+Point      quotient_reduce(Point p);                      // the point of D equivalent to p
+                                                          // (programs with fog)
 ```
 
-`quotient_image_index` and `quotient_image_shift` are two adjacent functions over one numbering:
-NEE samples image j and MIS recovers j from a hit, and the two must name the same images.
+`quotient_image_index` and the two maps are adjacent functions over one numbering: NEE samples
+image j through the maps, and the walk names the image a BSDF ray hit through the index
+(`hit.image`), so the two must name the same images.
 
 ## What the compiler generates in a quotient program
 
 - **The walk** (intersection.ts): today's dispatcher becomes `scene_intersect_cell(Ray, float
   t_far, out Hit)` (and `scene_intersect_any_cell` where the any-hit query exists), and
   `scene_intersect`/`scene_intersect_any` walk the cells, querying the one scene copy in D.
-  `hit.t` is the arc length from `ray.origin`, summed over the cells crossed; `hit.p` and the
-  rest of the Hit are in D's chart.
+  `hit.t` is the arc length from `ray.origin`, summed over the cells crossed; `hit.p`,
+  `hit.arrival` and the rest of the Hit are in D's chart (the cell query's), and the walk sets
+  `hit.image` to the image it reached.
 - **Image-aware NEE/MIS** (lighting.ts): `lighting_sample` picks an image j of S uniformly with a
-  fresh `random()` and runs the existing sampler (`lighting_sample_cover`) at the moved query;
-  `lighting_pdf` returns 0 for a hit image outside S, so that BSDF hit keeps weight 1. pt-nee's
-  emitter weight is 1 for a hit outside S too (combiner.ts).
+  fresh `random()`, runs the existing sampler (`lighting_sample_cover`) at the moved query and
+  carries the sampled direction back; `lighting_pdf` reads `hit.image`, returns 0 for an image
+  outside S, so that BSDF hit keeps weight 1, and otherwise runs the existing pdf at the moved
+  stored query. pt-nee's emitter weight is 1 for a hit outside S too (combiner.ts).
 - `MAX_DIST` is the measurement's `farClip`, required in quotients.
 - **Reduced medium vertices** (pt.ts, programs with media): a medium arm reports its event point
   in the chart of the ray's origin, possibly many cells away, and the walk moves it to the

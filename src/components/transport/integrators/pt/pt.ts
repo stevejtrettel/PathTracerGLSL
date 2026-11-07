@@ -431,7 +431,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     }
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
-        '        Direction wo = -ambient_flow(s.ray, hit.t).direction;   // back along the arrival direction',
+        '        Direction wo = -hit.arrival;   // back along the arrival direction',
     );
     if (aovs.length > 0) {
         // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null

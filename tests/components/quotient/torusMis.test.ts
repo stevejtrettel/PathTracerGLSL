@@ -2,9 +2,9 @@
 // docs/claude-2026-11-review/quotients/twin/torus.ts at its fixed-ray point Q1.
 //
 // The GPU program samples NEE images from the 27-entry table S with the occupant's numbering
-// (quotient_image_shift ↔ torusImageOffset) and identifies the image a BSDF ray hit by rounding
-// (quotient_image ↔ the `imageOf` below, the same formula); an image outside S has NEE density 0,
-// so its BSDF hit keeps weight 1. This twin runs that scheme on a small scene and checks that
+// (quotient_image_shift ↔ torusImageOffset) and names the image a BSDF ray hit by the cell index
+// its walk reached (hit.image = quotient_image_index(k) ↔ the trace's `k` below); an image
+// outside S has NEE density 0, so its BSDF hit keeps weight 1. This twin runs that scheme on a small scene and checks that
 // the three estimators agree and that two wrong schemes are caught:
 //   - pt, pt-nee and pt-mis agree within 3σ (independent fixed-seed streams, 200,000 paths each);
 //   - W1 (pt-nee also drops BSDF hits on images outside S) is wrong by more than 10σ;
@@ -70,7 +70,7 @@ const Q1DIR: Vec3 = nrm(sub(addS(BALL.c, [0.15, 0.1, -0.05], 1), X0));
 const TMIN = 1e-6;
 
 /** kind 0 = miss, 1 = ball, 2 = light; t is summed over cells, p in D's chart, k the cell index
- *  accumulated by the teleports (exact), for checking the rounding below against it. */
+ *  accumulated by the teleports (exact): the walk's hit.image names it. */
 type Hit = { kind: 0 | 1 | 2; t: number; p: Vec3; n: Vec3; k: Vec3 };
 const NONE: Hit = { kind: 0, t: Infinity, p: [0, 0, 0], n: [0, 0, 0], k: [0, 0, 0] };
 
@@ -114,9 +114,6 @@ function trace(o: Vec3, d: Vec3): Hit {
     }
 }
 
-/** quotient_image's formula: the cell of the image a ray from x along wi hit, by rounding. */
-const imageOf = (x: Vec3, wi: Vec3, h: Hit): Vec3 => [0, 1, 2].map((i) => Math.round((x[i] + wi[i] * h.t - h.p[i]) / L)) as Vec3;
-
 // ---- image selection -------------------------------------------------------------------------
 const lightCenter = (k: Vec3): Vec3 => addS(LIGHT.c, k, L);
 const nearestK = (x: Vec3): Vec3 => [0, 1, 2].map((i) => Math.round((x[i] - LIGHT.c[i]) / L)) as Vec3;
@@ -139,7 +136,6 @@ function aroundAxis(n: Vec3, ct: number, phi: number): Vec3 {
 const pcone = (d: number) => 1 / (2 * Math.PI * (1 - Math.sqrt(1 - Math.min(1, (LIGHT.r / d) ** 2))));
 
 type Mode = 'pt' | 'nee' | 'mis' | 'w1';
-const identification = { checked: 0, wrong: 0 };
 
 function radiance(mode: Mode, psel: (x: Vec3, k: Vec3) => number, rng: Rng): number {
     let Lr = 0, beta = 1;
@@ -173,9 +169,7 @@ function radiance(mode: Mode, psel: (x: Vec3, k: Vec3) => number, rng: Rng): num
         if (h2.kind === 2) {
             let w = 1;
             if (mode !== 'pt') {
-                const k = imageOf(x, wo, h2);
-                identification.checked++;
-                if (k.some((v, i) => v !== h2.k[i])) identification.wrong++;
+                const k = h2.k;
                 const ps = psel(x, k);
                 const pn = ps > 0 ? ps * pcone(len(sub(lightCenter(k), x))) : 0, pb = ct / Math.PI;
                 if (mode === 'nee') w = pn > 0 ? 0 : 1;
@@ -204,14 +198,11 @@ describe('torus partition MIS (float64 twin, fixed seeds)', () => {
         const w1 = run('w1', pselU27, 9104);
         const w2 = run('mis', pselW2, 9105);
         const z = { neePt: zScore(nee, pt), misPt: zScore(mis, pt), neeMis: zScore(nee, mis), w1: zScore(w1, pt), w2: zScore(w2, pt) };
-        console.log(JSON.stringify({ pt: pt.mean, nee: nee.mean, mis: mis.mean, w1: w1.mean, w2: w2.mean, z, identification }));
+        console.log(JSON.stringify({ pt: pt.mean, nee: nee.mean, mis: mis.mean, w1: w1.mean, w2: w2.mean, z }));
         expect(Math.abs(z.neePt)).toBeLessThan(3);
         expect(Math.abs(z.misPt)).toBeLessThan(3);
         expect(Math.abs(z.neeMis)).toBeLessThan(3);
         expect(z.w1).toBeLessThan(-10);
         expect(z.w2).toBeLessThan(-10);
-        // The rounding names the cell the teleports counted, on every BSDF light hit.
-        expect(identification.wrong).toBe(0);
-        expect(identification.checked).toBeGreaterThan(1000);
     }, 300_000);
 });

@@ -1762,6 +1762,9 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
         lines.push('    hit.wl = ray.wl;');
         lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
     }
+    lines.push(cell
+        ? '    hit.image = 0;   // the image in this query\'s own chart; the walk names the image it reached'
+        : '    hit.image = 0;   // no quotient: the scene has one image');
     lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');
     if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
@@ -1772,8 +1775,9 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
     lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
     lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
+    lines.push('        hit.arrival = ambient_flow(ray, hit.t).direction;   // the velocity at hit.p, in its chart');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ambient_flow(ray, hit.t).direction, hit.ng, hit.p) < 0.0) {   // the arrival direction, at hit.p');
+    lines.push('        if (ambient_dot(hit.arrival, hit.ng, hit.p) < 0.0) {');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
@@ -1840,6 +1844,7 @@ function generateQuotientWalks(kind: string, anyQuery: boolean): string {
         ] : [
             '        if (scene_intersect_cell(local, min(t_exit, MAX_DIST) - t_enter, hit)) {',
             '            hit.t += t_enter;                                        // arc length from ray.origin',
+            '            hit.image = quotient_image_index(k);                     // cell k, in the coordinates of ray.origin',
             '            return true;',
             '        }',
             '        if (t_exit >= MAX_DIST) return false;                        // the far clip',

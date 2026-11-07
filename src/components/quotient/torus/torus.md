@@ -22,11 +22,11 @@ step at each end — and `TORUS_MAX_CELLS = 5 + ⌈farClip·√(Σ 1/L_i²)⌉`.
 
 A lamp in D is seen from x along one geodesic per lattice translate. NEE samples the table
 S = {L∘c : c ∈ {−1, 0, 1}³} uniformly: image j's lamp seen from x is the lamp in D seen from
-x − L∘c_j, so the unchanged light sampler runs at the moved query point (`quotient_image_shift`).
-A BSDF ray that hits a lamp has hit the image in cell k, and `quotient_image` recovers k from
-data the hit already carries: the walk reported hit.p = x' + wi·t − L∘k for its origin x', so
-round((x + wi·t − hit.p)/L) = k whenever the spawn offset |x' − x| and the rounding of points
-within the far clip stay below L/2. An image outside S has NEE density 0, so its BSDF hit keeps
+x − L∘c_j, so the unchanged light sampler runs at the moved query (`quotient_image_query`, over
+`quotient_image_shift`); a translation leaves the sampled direction unchanged
+(`quotient_image_direction` is the identity). A BSDF ray that hits a lamp has hit the image in
+the cell k where the walk found it, k in the coordinates of the ray's origin, and the walk reports
+`hit.image = quotient_image_index(k)`. An image outside S has NEE density 0, so its BSDF hit keeps
 weight 1 (partition MIS). The index and the shift are adjacent functions over one numbering.
 
 `quotient_reduce(p)` is the point of D equivalent to p. In programs with fog the transport loop

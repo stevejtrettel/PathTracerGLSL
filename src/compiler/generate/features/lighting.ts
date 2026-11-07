@@ -981,10 +981,9 @@ function generateQuotientLightSampling(imageCount: number): string {
         '// Image-aware NEE (quotient): one image of the table, uniformly, then the cover\'s sampler.',
         'LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl) {',
         `    int j = min(int(random() * ${n}), ${imageCount - 1});`,
-        '    LightQuery qj = q;',
-        '    qj.p = q.p - quotient_image_shift(j);                   // image j of every light, seen from q.p',
-        '    LightSample ls = lighting_sample_cover(qj, xi, wl);',
-        `    ls.pdf /= ${n};                                          // wi and distance are translation-invariant`,
+        '    LightSample ls = lighting_sample_cover(quotient_image_query(q, j), xi, wl);   // image j of every light',
+        '    ls.wi = quotient_image_direction(j, ls.wi);              // back at q.p; the distance is invariant',
+        `    ls.pdf /= ${n};`,
         '    return ls;',
         '}',
     ].join('\n');
@@ -995,11 +994,9 @@ function generateQuotientLightingPdf(imageCount: number): string {
     return [
         '// Image-aware MIS pdf (quotient): NEE\'s density for the image the BSDF ray hit; 0 outside the table.',
         'float lighting_pdf(LightQuery q, Direction wo, int light_id, Hit light_hit) {',
-        '    int j = quotient_image(q.p, -wo, light_hit);            // -wo: the departure direction at q.p (E³)',
+        '    int j = light_hit.image;',
         '    if (j < 0) return 0.0;                                  // NEE never samples it: BSDF weight 1',
-        '    LightQuery qj = q;',
-        '    qj.p = q.p - quotient_image_shift(j);',
-        `    return lighting_pdf_cover(qj, wo, light_id, light_hit) / ${n};`,
+        `    return lighting_pdf_cover(quotient_image_query(q, j), wo, light_id, light_hit) / ${n};`,
         '}',
     ].join('\n');
 }

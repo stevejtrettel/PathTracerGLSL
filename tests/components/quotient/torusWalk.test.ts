@@ -1,9 +1,8 @@
-// Float32 twin of the generated torus walk (intersection.ts, generateTorusWalks) over
+// Float32 twin of the generated torus walk (intersection.ts, generateQuotientWalks) over
 // torus_face_times (components/quotient/torus/torus.glsl): every arithmetic step rounds to float32
 // with Math.fround, in the order the GLSL writes it. Port of the review twin
 // docs/claude-2026-11-review/quotients/torus-code/dda_bound_twin.py, plus exact ±0.0 direction
-// components and the image identification of quotient_image (derived in
-// docs/claude-2026-11-review/quotients-plan.md, Q1.1).
+// components.
 //
 // What it checks, for random rays (origins in D, far outside D, exactly on a face; directions
 // generic and near-axis), random periods 0.3–3 and far clips 1–200:
@@ -11,9 +10,9 @@
 //     relies on;
 //   - t_enter never decreases, and every cell's local entry point lies in D up to 1e-3;
 //   - the cell sequence equals a float64 walk's, except where two faces are met within float32
-//     rounding of t (an edge passage, crossed in the other order); exactly, for ±0.0 components;
-//   - quotient_image's rounding returns the walk's cell index k at random hit distances in every
-//     visited cell, from a start point offset by a spawn offset.
+//     rounding of t (an edge passage, crossed in the other order); exactly, for ±0.0 components.
+// The walk reports the image it reached as quotient_image_index(k) of the cell index k it holds,
+// so no image needs to be recovered from the hit.
 // GLSL builtins and FMA contraction are not modeled.
 
 import { describe, it, expect } from 'vitest';
@@ -73,9 +72,9 @@ describe('torus walk (float32 twin)', () => {
         expect(torusImageIndex([0, 0, 0])).toBe(13);
     });
 
-    it('stays within its loop bound, keeps entries monotone and in D, matches float64, and identifies images', () => {
+    it('stays within its loop bound, keeps entries monotone and in D, and matches float64', () => {
         const u = rng(7);
-        let worstRatio = 0, maxOut = 0, backward = 0, mismatches = 0, nonTieMismatches = 0, zeroMismatches = 0, zeroRays = 0, imageSamples = 0, imageWrong = 0;
+        let worstRatio = 0, maxOut = 0, backward = 0, mismatches = 0, nonTieMismatches = 0, zeroMismatches = 0, zeroRays = 0;
         const TRIALS = 4000;
         for (let trial = 0; trial < TRIALS; trial++) {
             const L: Vec3 = [f(0.3 + 2.7 * u()), f(0.3 + 2.7 * u()), f(0.3 + 2.7 * u())];
@@ -103,42 +102,30 @@ describe('torus walk (float32 twin)', () => {
             worstRatio = Math.max(worstRatio, c32.length / bound);
             const same = c32.length === c64.length && c32.every((c, i) => c.k.every((v, a) => v === c64[i].k[a]));
             if (!same) {
-                // The only allowed difference: two faces met within float32 rounding of t (an
-                // edge passage), crossed in the other order — both orders are walks of the ray.
+                // The only allowed difference: two faces met within float32 rounding of their face
+                // times (an edge passage), crossed in the other order — both orders are walks of
+                // the ray. A face time (k_a + s_a/2)·L_a − o_a over d_a is rounded at the size of
+                // its terms, so its error grows with the origin's distance from D and shrinks
+                // with |d_a|: 2⁻²²·(|o_a| + (|k_a| + 1)·L_a)/|d_a| on each of the two axes.
                 mismatches++;
                 const i = c32.findIndex((c, j) => j >= c64.length || c.k.some((v, a) => v !== c64[j].k[a]));
-                const t = c64[i - 1].tExit;
-                if (!(i > 0 && i < c64.length && Math.abs(c64[i].tExit - t) <= 1e-6 * (1 + t))) nonTieMismatches++;
+                const t = i > 0 ? c64[i - 1].tExit : 0;
+                const stepAxis = (cells: Cell[]) => [0, 1, 2].find((a) => cells[i].k[a] !== cells[i - 1].k[a])!;
+                const faceTimeError = (a: number) => 2 ** -22 * (Math.abs(o[a]) + (Math.abs(c64[i - 1].k[a]) + 1) * L[a]) / Math.abs(d[a]);
+                const tie = i > 0 && i < c64.length && i < c32.length
+                    && Math.abs(c64[i].tExit - t) <= 1e-6 * (1 + t) + faceTimeError(stepAxis(c32)) + faceTimeError(stepAxis(c64));
+                if (!tie) nonTieMismatches++;
             }
             if (zero) { zeroRays++; if (!same) zeroMismatches++; }
             for (let i = 1; i < c32.length; i++) if (c32[i].tEnter < c32[i - 1].tEnter) backward++;
             for (const c of c32) maxOut = Math.max(maxOut, ...c.local.map((v, a) => Math.abs(v) - 0.5 * L[a]));
-
-            // quotient_image: a hit at arc length t in cell k is reported, as the walk forms it,
-            // at hit.t = t_local + t_enter and hit.p = local + d·t_local; the start point x is the
-            // previous vertex, a spawn offset (1e-3) behind the ray's origin.
-            const off: Vec3 = [gauss(u), gauss(u), gauss(u)];
-            const on = Math.hypot(...off);
-            const x = o.map((v, a) => f(v - 1e-3 * off[a] / on)) as Vec3;
-            for (const c of c32) {
-                const t1 = Math.min(c.tExit, f(far));
-                if (!(t1 > c.tEnter)) continue;
-                const tLocal = f(f(c.tEnter + u() * (t1 - c.tEnter)) - c.tEnter);
-                const hitT = f(tLocal + c.tEnter);
-                const hitP = c.local.map((v, a) => f(v + f(d[a] * tLocal)));
-                const k = [0, 1, 2].map((a) => Math.round(f(f(f(x[a] + f(d[a] * hitT)) - hitP[a]) / L[a])));
-                imageSamples++;
-                if (k.some((v, a) => v !== c.k[a])) imageWrong++;
-            }
         }
         // Measured: printed so a change in margin is visible in the test log.
-        console.log(JSON.stringify({ worstRatio, maxOut, backward, mismatches, nonTieMismatches, zeroRays, zeroMismatches, imageSamples, imageWrong }));
+        console.log(JSON.stringify({ worstRatio, maxOut, backward, mismatches, nonTieMismatches, zeroRays, zeroMismatches }));
         expect(worstRatio).toBeLessThanOrEqual(1);
         expect(backward).toBe(0);
         expect(maxOut).toBeLessThanOrEqual(1e-3);
         expect(zeroMismatches).toBe(0);
         expect(nonTieMismatches).toBe(0);
-        expect(imageWrong).toBe(0);
-        expect(imageSamples).toBeGreaterThan(100000);
     }, 120_000);
 });
