@@ -56,13 +56,14 @@ export function materialReadsUv(name: string, scene: SceneDescription): boolean 
 }
 
 /** A PATTERNED + rotated analytic shape keeps its own LOCAL frame (fable-imagery P1b): its
- *  material reads Hit.uv and it carries a rotation, so it is NOT folded (the chart needs the
- *  frame the fold would dissolve). Like a driven object it therefore cannot be TABLED (records
- *  assume folded params) and stays in the unrolled wrapper arm. THE ONE predicate both the
- *  table adapter (exclude) and the Planner (retain the similarity) read — so the two decisions
- *  cannot drift. */
+ *  material reads Hit.uv and it carries a constant rotation, so it is NOT folded (the chart needs
+ *  the frame the fold would dissolve). Like a driven object it therefore cannot be TABLED
+ *  (records assume folded params) and stays in the unrolled wrapper arm. THE ONE predicate both
+ *  the table adapter (exclude) and the Planner (retain the similarity) read — so the two
+ *  decisions cannot drift. A driven object is never folded (its arm conjugates the ray into its
+ *  rigid frame, so its chart follows it), and the predicate answers false for it. */
 export function keepsLocalFrame(obj: PrimitiveObject, scene: SceneDescription): boolean {
-    if (PRIMITIVES[obj.type]?.uvChart !== true) return false;
+    if (PRIMITIVES[obj.type]?.uvChart !== true || isDrivenTransform(obj.transform)) return false;
     return materialReadsUv(obj.material, scene) && !isIdentityRotation(similarityFromTransform(obj.transform).rotation);
 }
 

@@ -4,6 +4,19 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Fix: a uv-reading material on a driven SDF object crashed the compiler
+
+`keepsLocalFrame` (compiler/plan/dataTenants.ts) lowered the object's transform as a constant
+similarity, and the SDF branch of `planScene` asks it for every object, driven or not. A
+`checker` (or any expression material) on a driven, rotated SDF shape with a uv chart threw
+"driven transform reached the constant lowering". The predicate now answers false for a driven
+transform: a driven object is never folded, and its arm already follows its rigid frame (the
+analytic branch and the table adapter test `isDrivenTransform` first and were unaffected).
+Found when the registry kitchen-sink compile (glsl-compile.test.ts) assigned `checker` to a
+driven SDF object after a new material model shifted its material rotation. Tests: the
+predicate for a driven sphere, and a checker on a driven SDF sphere compiles. No suite scene
+used the combination, so no compiled output changes.
+
 ## 2026-11-07 — Thin glass sheets (`thin_dielectric`)
 
 Integration step 8 of the photorealism batch (small-materials plan, thin dielectric section),

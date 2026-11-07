@@ -6,6 +6,8 @@ import {
 import { isDrivenPlacement, type PlannedPlacement } from '../../src/compiler/plan/types.js';
 import { resolveColorProperty, resolveScalarProperty } from '../../src/compiler/plan/values.js';
 import { keepsLocalFrame } from '../../src/compiler/plan/dataTenants.js';
+import { Compiler } from '../../src/compiler/Compiler.js';
+import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import type { SceneDescription, PrimitiveObject } from '../../src/compiler/types.js';
 import { foldPlacementIntoParameters } from '../../src/components/geometry/index.js';
 import { classifySimilarity, similarityApplyPoint, type Similarity } from '../../src/components/geometry/similarity.js';
@@ -178,6 +180,20 @@ describe('keepsLocalFrame (fable-imagery P1b — patterned+rotated shapes are no
     });
     it('formula (lambert + expression albedo) + rotated sphere → keeps its frame (P2)', () => {
         expect(keepsLocalFrame(sphere(rot), exprScene())).toBe(true);
+    });
+    // A driven placement is never folded, on either backend; the SDF planner asks this predicate
+    // for every object, so it must answer for driven ones too.
+    const driven = { position: { param: 'p', default: [0, 0, 0] as Vec3 }, rotation: { axis: [0, 1, 0] as Vec3, angle: { param: 'a', default: 0.3 } } };
+    it('checker + DRIVEN rotated sphere → false (not folded in the first place)', () => {
+        expect(keepsLocalFrame(sphere(driven), scene('checker'))).toBe(false);
+    });
+    it('checker on a driven SDF sphere compiles', () => {
+        const s: SceneDescription = {
+            ...minimalScene,
+            objects: [{ type: 'sphere', parameters: { center: [0, 0, 0], radius: 1 }, material: 'sphere', backend: 'sdf', transform: driven }],
+            materials: { sphere: { model: 'checker' } },
+        };
+        expect(() => new Compiler().compile(s, minimalStrategy)).not.toThrow();
     });
 });
 
