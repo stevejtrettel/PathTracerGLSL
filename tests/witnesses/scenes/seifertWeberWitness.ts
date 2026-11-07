@@ -11,7 +11,8 @@
 // through `crossings` face crossings, or nothing within R. So the window's mean is exactly that
 // sphere's emission (or 0), whatever the samples. tests/witnesses/seifertWeberWindows.test.ts
 // re-derives every window from the scene as authored and shows that a twist of 1/10 turn in place
-// of 3/10 changes every window seen across a face.
+// of 3/10 changes the windows seen across one or two faces and one of the three seen across three
+// (the other two cross faces 1, 8 and 10, along which the wrong twists compose to the identity).
 //
 // ESTIMATOR EQUALITY (`seifert-weber-lights`): three lambert balls and a disk light near face 0 of
 // D (so whether a light image is in NEE's 13-image table changes across the picture), maxBounces

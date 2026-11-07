@@ -2663,13 +2663,14 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor in fog (path-found light images) tripwire' },
             ],
         },
-    },    'seifert-weber-windows': {
+    },
+    'seifert-weber-windows': {
         scene: seifertWeberWindows,
         strategies: [seifertWeberWindowsStrategy],
         exercises:
             'the Seifert–Weber walk (components/quotient/seifert-weber): three emissive spheres of different colors at '
             + 'generic positions in the dodecahedral domain D, pt with maxBounces 0 and farClip 6; every pixel reads the '
-            + 'emission of the first sphere image within 6, seen through 0 to 6 face crossings, or 0',
+            + 'emission of the first sphere image within 6, seen through up to 8 face crossings, or 0',
         expected:
             'each window certified by the float64 twin (brute force over the sphere images in the cover, '
             + 'tests/witnesses/seifertWeberWindows.test.ts) reads its sphere\'s emission exactly, or 0; a wrong pairing '

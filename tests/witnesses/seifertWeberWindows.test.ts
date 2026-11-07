@@ -5,8 +5,9 @@
 // registry is loaded in the browser and has no business running the twin. This file reads the
 // geometry back from the scene and strategy as authored, certifies every window with the float64
 // twin (tests/helpers/seifertWeberTwin.ts: brute force over the sphere images in the cover), and
-// shows that the same twin with a twist of 1/10 turn in place of 3/10 changes the value of every
-// window seen across a face.
+// shows that the same twin with a twist of 1/10 turn in place of 3/10 changes the value of the
+// windows seen across one or two faces and of one of the three seen across three (the other two
+// cross faces 1, 8 and 10, along which the wrong twists compose to the identity).
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -115,7 +116,7 @@ describe('seifert-weber-windows windows', () => {
         }
     });
 
-    it('a twist of 1/10 turn in place of 3/10 changes every window seen across one or two faces', () => {
+    it('a twist of 1/10 turn in place of 3/10 changes the 1- and 2-crossing windows and one of the three 3-crossing windows', () => {
         // The wrong group's cells do not tile H³, so its picture is the walk's, not a sum over a
         // cover: each ray walked through D with the wrong pairings. The two twists differ by a
         // 1/5 turn about the face's axis, a symmetry of D, so the wrong walk is the right one
