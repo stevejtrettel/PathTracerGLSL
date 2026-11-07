@@ -82,3 +82,6 @@ copied here until the owner accepts them.
 ## Provisional choices (model's choices, unconfirmed by the owner)
 
 (Each entry: what was chosen, why, and how to undo it.)
+24. **Quotient spaces: research and plan tonight if time allows**, "work out realistic lighting
+    in quotient spaces and a good real plan", then try it in a Euclidean 3-torus and a
+    hyperbolic space like Seifert–Weber.
