@@ -85,3 +85,15 @@ copied here until the owner accepts them.
 24. **Quotient spaces: research and plan tonight if time allows**, "work out realistic lighting
     in quotient spaces and a good real plan", then try it in a Euclidean 3-torus and a
     hyperbolic space like Seifert–Weber.
+
+P1. **Photorealism plan questions Q1–Q8** (photoreal/integration.md), taken at the integrator's
+    recommendations so building can proceed overnight: Q1 roughness→alpha may be computed per
+    hit in GLSL (reverses D4; host form kept for expensive derivations); Q2 energy compensation
+    as `measurement.microfacet`, default 'single-scattering' (existing images unchanged),
+    roughness constrained to [0,1]; Q3 new 'optical' spectrum role and 'measured' kind for
+    metals; Q4 image textures on spheres are an error until the sphere chart is decided;
+    Q5 untruncated Gaussian pixel filter as `measurement.pixel`, always stamped; Q6 'ior' is
+    the absolute region-table index only, relative indices are coat_eta / sheet_eta, the
+    conductor keeps eta and k; Q7 zero-thickness thin_dielectric accepted; Q8 the 2D-array
+    texture is an engine API addition. Undo: each lands in its own commit on the photoreal
+    branch.
