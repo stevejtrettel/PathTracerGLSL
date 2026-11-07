@@ -27,6 +27,7 @@ import { s3Suite } from './scenes/s3Witness.js';
 import { curvedShapesSuite } from './scenes/curvedShapesWitness.js';
 import { curvedSdfSuite } from './scenes/curvedSdfWitness.js';
 import { h2xrSuite } from './scenes/h2xrWitness.js';
+import { curvedMaterialSuite } from './scenes/curvedMaterialWitness.js';
 import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
@@ -210,6 +211,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...curvedShapesSuite,
     ...curvedSdfSuite,
     ...h2xrSuite,
+    ...curvedMaterialSuite,
     'thinlens-zero': {
         scene: camCornell,
         strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy),

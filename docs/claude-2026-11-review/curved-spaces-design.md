@@ -122,7 +122,7 @@ the table: witnesses establish them.
 | `MAX_DIST` | `1000.0` | far clip |
 | `fp_uncertainty(Point p)` | today's body (constants stay in math.glsl) | spawn offsets |
 
-`ambient_parallel_transport` stays as it is (no caller; in-progress seam).
+`ambient_parallel_transport` carries a spawned ray's direction to its moved origin (`ray_spawn`; the identity in E³). Without it a specular chain in a curved space accumulates a non-tangent error of about eps·cos per bounce, and after two internal reflections in a glass ball the next spawn lands on the wrong side ([curved/next-materials-plan.md](curved/next-materials-plan.md) §6).
 
 ### 2.2 Step 1 — Euclidean respelling, bit-identical, no new mechanism
 

@@ -114,8 +114,8 @@ describe('S³ Validator rules', () => {
         expect(errorsOf(marched, furnace)).toContain("primitive 'menger' has no spherical implementation");
         const torus = { ...s3Furnace, objects: [{ type: 'torus', parameters: { ringRadius: 0.4, tubeRadius: 0.1 }, material: 'furnace' }] } as SceneDescription;
         expect(errorsOf(torus, furnace)).toContain("primitive 'torus' has no spherical implementation");
-        const sphereLight = { ...s3LongArc, lights: [{ kind: 'sphere', position: [0, 1, 0], radius: 0.2, emission: 1 }] } as SceneDescription;
-        expect(errorsOf(sphereLight, posedNee)).toContain("light kind 'sphere' has no spherical implementation");
+        const spot = { ...s3LongArc, lights: [{ kind: 'spot', position: [0, 1, 0], direction: [0, -1, 0], angle: 0.5, emission: 1 }] } as SceneDescription;
+        expect(errorsOf(spot, posedNee)).toContain("light kind 'spot' has no spherical implementation");
     });
 
     it('rejects a ball, disk or disk-light radius of π or more, and accepts one just below π', () => {

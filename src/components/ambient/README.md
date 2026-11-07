@@ -25,7 +25,7 @@ Ray   ambient_flow(Ray r, float t);                        // the ray moved by t
 float ambient_dot(Direction a, Direction b, Point p);      // the metric at p
 Direction ambient_normalize(Direction v, Point p);         // v at unit length in the metric at p
 Frame ambient_frame(Point p, Direction n);                 // orthonormal shading frame around n
-Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);   // v carried along the geodesic from → to (ray_spawn's direction)
 float ambient_distance(Point a, Point b);                  // geodesic distance
 Direction ambient_direction_to(Point from, Point to);      // unit start direction of the geodesic from → to
 Direction ambient_aim(Point from, Direction along, Point to, out float remaining);
@@ -173,7 +173,9 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 
 Occupants: `euclidean/`, `hyperbolic/` (H³), `spherical/` (S³) and `h2xr/` (H²×R). In H³ and S³:
 sphere, plane, disk, box, cylinder and quad shapes; marched balls and scene-local marched fields
-(and, in H³, Klein-chart Euclidean fields); point, disk and quad lights; lambert; pinhole and
+(and, in H³, Klein-chart Euclidean fields); point, disk, quad and sphere lights; lambert, mirror, dielectric, ggx and rough_dielectric (one
+file each, written against the seam: the microfacet models work in the local frame of
+`ambient_frame`; checker is not, it reads `hit.uv` and no curved shape has a uv chart); pinhole and
 fisheye; hg in homogeneous object media; in H³ also sky lookup by BSDF rays. In H²×R: the metric ball (an iterated
 root: convex Newton), horizontal and vertical planes (the only totally geodesic surfaces there),
 horizontal disks and the capped vertical cylinder; point lights and horizontal disk lights with the
@@ -237,6 +239,16 @@ non-identity transform is an error there).
   and fisheye). The occupant's math, the CPU geometry and the GLSL decode of the placement are
   pinned by tests/components/h2xr.test.ts against independent computations (an ODE integration,
   finite differences of exp, Monte Carlo ray hits, sphere tracing).
+- Both spaces (tests/witnesses/scenes/curvedMaterialWitness.ts, against the twins of
+  curvedMaterialTwins.ts): `h3-specular`/`s3-specular` (a mirror ball and a glass ball in a box of six
+  walls of different colors, the expected value of every camera ray an exact sum over the delta
+  choices; `e3-specular` is the same scene in E³, the control), `h3-ggx`/`s3-ggx` (a ggx receiver under a disk light in its mirror direction, in S³ through
+  the long arc, pt = pt-nee = pt-mis = the quadrature), `h3-rough-glass`/`s3-rough-glass` (roughness 0.6,
+  pt = pt-nee = pt-mis; in S³ with a sphere light under the ½ rule), `h3-sphere-light`/`s3-sphere-light` (a lambert
+  receiver under a sphere light; in S³ below it, lit only by the backward cone),
+  `h3-sphere-light-blocker` (an opaque ball holding the light: 0), `s3-sphere-light-blocker` (an opaque
+  ball on every backward-cone geodesic: 0) and
+  `s3-sphere-light-antipodal` (−x inside the ball for every window point: albedo·Le exactly).
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

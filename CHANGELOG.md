@@ -485,6 +485,53 @@ Verification (SwiftShader, targeted witnesses, final commit 1a4d96c; 23 of 23 ex
   unrelated Euclidean/spectral/H³ files that pass when rerun alone, and the h2xr demo's
   program-description snapshot, updated in f7321f0.
 - Demo: lab renders (SwiftShader, 640×480, pt-mis) checked by eye and for NaN (0 of 307200).
+## 2026-11-07 — Curved spaces: the other materials and the sphere light (H³ and S³)
+
+[Plan](docs/claude-2026-11-review/curved/next-materials-plan.md) (reviewed once; provisional
+choices P1–P4 in its §4).
+
+- **mirror, dielectric, ggx, rough_dielectric run in H³ and S³.** Their GLSL already went through
+  the seam; each file is now listed under `hyperbolic` and `spherical`. Read in the generated GLSL of
+  one H³ and one S³ program holding all four: every raw `dot`/`normalize`/`reflect` acts on local
+  frame coordinates. checker stays Euclidean only (no curved uv chart).
+- **The sphere light in H³ and S³** (`lights/sphere/sphere_hyperbolic.glsl`, `_spherical.glsl`):
+  the visible cone, sin α = sinh R/sinh d (H³) or sin R/sin d (S³), its distance from the sphere
+  body's root, now one function `sphere_root` both call. In S³ the ball is seen in the forward cone
+  and its negation (geodesics through −p), and in every direction when −p lies in it (the forward
+  cone clamped to the hemisphere); one forward-cone sample and the S³ arc rule pick ω or −ω.
+- **`ray_spawn` carries the direction to the spawned origin** (`ambient_parallel_transport`, the
+  identity in E³: frames compare 30 of 30 pictures identical). Keeping wi, tangent at hit.p and not at
+  the moved origin, left an error of about eps·cos that a specular chain passes on; after two internal
+  reflections in a glass ball the curved sphere root put the hit beyond eps and the next spawn landed
+  outside (paths with two internal reflections never arrived in H³: 0.9982 at maxBounces 4, twin
+  0.9999; E³ arrived). Found by bounce-budget renders and an fp64 emulation of the curved path.
+- **Twelve witnesses** (tests/witnesses/scenes/curvedMaterialWitness.ts, twins in
+  curvedMaterialTwins.ts, checked by curvedMaterialTwins.test.ts), measured on SwiftShader:
+  - `h3-specular`/`s3-specular` (mirror and glass balls in a box of six colored walls, exact per-ray
+    twin): H³ mirror (0.7760, 0.2206, 0.0344) vs (0.7760, 0.2205, 0.0345), glass (0.3021, 0.9528,
+    0.9722) vs (0.3013, 0.9534, 0.9724); S³ mirror (0.7472, 0.2413, 0.0377) vs (0.7471, 0.2414,
+    0.0377), glass (0.3070, 0.9463, 0.9865) vs (0.3067, 0.9465, 0.9871); `e3-specular`, the E³
+    control, glass (0.3050, 0.9502, 0.9790) vs (0.3044, 0.9502, 0.9798).
+  - `h3-ggx`/`s3-ggx` (ggx receiver, light in its mirror direction; S³ through the long arc): H³
+    pt-nee/pt-mis/pt 0.2934/0.2934/0.2928 vs 0.2936; S³ 0.6374/0.6379/0.6366 vs 0.6378.
+  - `h3-rough-glass`/`s3-rough-glass` (roughness 0.6, 1024 spp; S³ with a sphere light under the ½
+    rule): nee ≡ mis Δmean 0.18%/0.23%, χ²ᵣ 0.51/0.96. At roughness 0.3 the check failed in E³ too
+    (firefly-dominated).
+  - `h3-sphere-light` 0.1136/0.1136/0.1140 vs 0.1136; `s3-sphere-light` (backward cone only)
+    0.2127/0.2127/0.2141 vs 0.2127; `h3-sphere-light-blocker` and `s3-sphere-light-blocker` (an opaque
+    ball crossed just before the light, and on the backward cone) 0 under all three;
+    `s3-sphere-light-antipodal` 0.5000 (albedo·Le) under all three.
+  - The existing H³/S³ witnesses pass after the change. Each new witness fails under one deliberate
+    mutation: wo taken as the departure direction (specular glass, both spaces), swapped η (E³
+    control), Euclidean `dot` in microfacet_to_local (h3-ggx), no 1/cos_o in ggx_eval (s3-ggx), η²
+    dropped in rough_dielectric_eval (rough glass, Δmean 16%/45%), a Euclidean-style cone (H³ sphere,
+    0.159), no flip (S³ sphere, 0), the near root along −ω (S³ blocker, 0.213), the H³ light distance
+    halved (H³ blocker, 0.114; h3-sphere-light does not see it), no clamp (antipodal, NaN). Dropping (1 − F) in rough_dielectric_pdf alone moved nee against mis by only 0.2%/1.1%.
+- Euclidean output unchanged: digest 280 of 297 scenes identical (the rest are the curved programs
+  with spheres, by the `sphere_root` refactor, and the new scenes), frames compare identical after the
+  ray_spawn change.
+- Emissive spheres are still not light-sampled in curved spaces (design choice 5): a curved emitter's
+  center lives in its isometry, which may be {param}-driven.
 
 ## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
 

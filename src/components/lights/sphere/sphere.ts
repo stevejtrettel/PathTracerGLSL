@@ -3,17 +3,24 @@
 
 import type { LightKindDescriptor } from '../../descriptors.js';
 import { radiantScalar } from '../power.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import lightSphereGLSL from './sphere.glsl?raw';
+import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
+import sphereSphericalGLSL from './sphere_spherical.glsl?raw';
 
 export const sphereLightDescriptor: LightKindDescriptor = {
     kind: 'sphere',
-    glsl: { euclidean: { origin: 'components/lights/sphere/sphere.glsl', source: lightSphereGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/lights/sphere/sphere.glsl', source: lightSphereGLSL },
+        hyperbolic: { origin: 'components/lights/sphere/sphere_hyperbolic.glsl', source: sphereHyperbolicGLSL },
+        spherical: { origin: 'components/lights/sphere/sphere_spherical.glsl', source: sphereSphericalGLSL },
+    },
     delta: false,
     // Authored input (besides kind/emission): authored `position` maps to the registry
     // row `center` in toValues — the proof the authored language needs its own schema.
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },
-        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' } },
+        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },
     ],
     params: [
         { name: 'center', shape: 'vec3', kind: 'point' },

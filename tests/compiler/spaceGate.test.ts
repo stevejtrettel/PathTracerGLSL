@@ -99,7 +99,7 @@ describe('the space gate (descriptor occupants)', () => {
             "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
             "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
             "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
-            "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean)",
+            "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
             "Object 1: primitive 'torus' has no testspace implementation (implemented in: euclidean)",
             "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
             'marched objects: not implemented in testspace space (implemented in: euclidean, hyperbolic, spherical)',
@@ -115,7 +115,7 @@ describe('the space gate (descriptor occupants)', () => {
             x.environment = { type: 'procedural', glsl: { kind: 'glsl', source: 'vec3(0.1)' } };
         });
         const reasons = spaceErrors(s, strategy({ directLighting: 'nee' }));
-        expect(reasons).toContain("Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean)");
+        expect(reasons).toContain("Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)");
         expect(reasons).toContain("estimator.envSampler: environment chart 'equirect' has no testspace implementation (implemented in: euclidean)");
     });
 });
@@ -204,7 +204,7 @@ describe('emissive objects (design §2.3: not light-sampled in curved spaces)', 
         x.objects.push(sphere(2, 'lamp'));
     });
     const sampled = [
-        "Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean)",
+        "Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
         'emissive objects sampled as lights: not implemented in testspace space (implemented in: euclidean)',
     ];
 

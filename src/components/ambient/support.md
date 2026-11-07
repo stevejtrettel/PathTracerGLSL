@@ -25,7 +25,7 @@ not keyed by space.
 | geometry | apollonian | yes | — | — | — |
 | lights | point | yes | yes | yes | yes |
 | lights | quad | yes | yes | yes | — |
-| lights | sphere | yes | — | — | — |
+| lights | sphere | yes | yes | yes | — |
 | lights | disk | yes | yes | yes | yes |
 | lights | spot | yes | — | — | — |
 | lights | mesh | yes | — | — | — |
@@ -33,10 +33,10 @@ not keyed by space.
 | lights | beam | yes | — | — | — |
 | lights | softbeam | yes | — | — | — |
 | materials | lambert | yes | yes | yes | yes |
-| materials | dielectric | yes | — | — | — |
-| materials | rough_dielectric | yes | — | — | — |
-| materials | ggx | yes | — | — | — |
-| materials | mirror | yes | — | — | — |
+| materials | dielectric | yes | yes | yes | — |
+| materials | rough_dielectric | yes | yes | yes | — |
+| materials | ggx | yes | yes | yes | — |
+| materials | mirror | yes | yes | yes | — |
 | materials | checker | yes | — | — | — |
 | materials | plastic | yes | — | — | — |
 | materials | thin_dielectric | yes | — | — | — |

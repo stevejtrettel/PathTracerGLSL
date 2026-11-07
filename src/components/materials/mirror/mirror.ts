@@ -3,9 +3,12 @@
 import type { MaterialModelDescriptor } from '../../descriptors.js';
 import mirrorGLSL from './mirror.glsl?raw';
 
+const body = { origin: 'components/materials/mirror/mirror.glsl', source: mirrorGLSL };
+
 export const mirrorDescriptor: MaterialModelDescriptor = {
     id: 'mirror',
-    glsl: { euclidean: { origin: 'components/materials/mirror/mirror.glsl', source: mirrorGLSL } },
+    // One file, checked in every space: it is written against the ambient seam alone.
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Fields read (matches mirror.glsl's header): f0 — the SAME row ggx declares
     // (name+type), so the generated MaterialProperties shares ONE f0 field between
     // them (§3.4 unionFields dedupe — this occupant is its first real exercise).

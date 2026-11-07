@@ -5,9 +5,12 @@ import type { MaterialModelDescriptor } from '../../descriptors.js';
 import { microfacetAlpha } from '../microfacet.js';
 import ggxGLSL from './ggx.glsl?raw';
 
+const body = { origin: 'components/materials/ggx/ggx.glsl', source: ggxGLSL };
+
 export const ggxDescriptor: MaterialModelDescriptor = {
     id: 'ggx',
-    glsl: { euclidean: { origin: 'components/materials/ggx/ggx.glsl', source: ggxGLSL } },
+    // One file, checked in every space: it is written against the ambient seam alone.
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Fields read (matches ggx.glsl's header): f0, roughness. NO albedo — a conductor's
     // color IS its Fresnel f0; declaring both would invite double-tinting.
     properties: [

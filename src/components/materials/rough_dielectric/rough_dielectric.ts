@@ -8,9 +8,12 @@ import type { MaterialModelDescriptor } from '../../descriptors.js';
 import { microfacetAlpha } from '../microfacet.js';
 import roughDielectricGLSL from './rough_dielectric.glsl?raw';
 
+const body = { origin: 'components/materials/rough_dielectric/rough_dielectric.glsl', source: roughDielectricGLSL };
+
 export const roughDielectricDescriptor: MaterialModelDescriptor = {
     id: 'rough_dielectric',
-    glsl: { euclidean: { origin: 'components/materials/rough_dielectric/rough_dielectric.glsl', source: roughDielectricGLSL } },
+    // One file, checked in every space: it is written against the ambient seam alone.
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Every row is SHARED (§3.4 union dedupe): roughness with ggx, transmittance + the
     // region-table ior with dielectric — so this model adds NO field to
     // MaterialProperties. No f0: a dielectric's Fresnel is exact, not a Schlick fit.
