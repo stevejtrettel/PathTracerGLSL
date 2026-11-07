@@ -605,6 +605,12 @@ export interface MeasurementDescription {
     color?: 'rgb' | 'spectral';
     /** Measurement response; defaults to the colour model's compatible sensor. */
     sensor?: string;
+    /** The pixel filter: the kernel h_j over the film against which each pixel integrates
+     *  radiance (a components/pixel registry key). 'box' (the default) is the indicator of
+     *  the pixel square; 'gaussian' is an untruncated normal with σ = 0.5 px. Not a
+     *  truncation: each kernel is its own exact measurement, and changing it changes the
+     *  converged image. */
+    pixel?: string;
     /** First-hit pictures kept beside the main picture (components/aov registry keys, at most
      *  one each), RGB only. Each is a guide for a denoiser: a sample is the AOV's value at the
      *  first non-null surface the path reaches before any scattering event, times the path's

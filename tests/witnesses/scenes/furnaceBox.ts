@@ -76,3 +76,11 @@ export const furnaceVarianceStrategy: RenderStrategy = {
         accumulation: { type: 'average', variance: true },
     },
 };
+
+// The gaussian pixel filter (key 3). A flat field reads the same under every kernel, so this
+// arm must also read exactly 0.4; it cannot detect a wrong kernel (filter-edge does).
+export const furnaceGaussianStrategy: RenderStrategy = {
+    ...furnaceStrategy,
+    id: 'furnace-gaussian',
+    measurement: { ...furnaceStrategy.measurement, pixel: 'gaussian' },
+};

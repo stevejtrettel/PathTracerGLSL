@@ -4,6 +4,7 @@ import { spectralLimitations } from './spectral.js';
 import { rgbPreviewWarnings } from './rgbPreview.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
+import { PIXEL_MODELS } from '../../components/pixel/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
@@ -877,6 +878,7 @@ export function validate(
         ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
         ['color', strategy.measurement.color, ['rgb', 'spectral']],
         ['response', strategy.measurement.response, ['radiance']],
+        ['pixel', strategy.measurement.pixel, Object.keys(PIXEL_MODELS)],
     ];
     for (const [field, value, legal] of measurementEnums) {
         if (value !== undefined && !legal.includes(value as string)) {

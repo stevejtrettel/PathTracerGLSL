@@ -6,9 +6,7 @@ point of the pixel contributes equally. So `pixel_sample` places the sub-pixel s
 square centered on the integer pixel. `xi` comes from the sampler stream, so QMC
 stratifies the footprint.
 
-This is exactly the antialiasing jitter that used to live inside every camera; hoisting it
-here makes the camera a pure film-point → ray map and makes the reconstruction kernel a
-swappable axis. Wider kernels are the future occupants: `tent` (linear), `gaussian`,
-`mitchell` — each importance-samples its own `h(u)` (warping `xi`), and each changes what
-the pixel integrates (the footprint-weighted radiance), which is why the family is a
-**measurement** axis, sibling to `camera/`.
+The camera stays a pure film-point → ray map; the kernel is the swappable `measurement.pixel`
+axis. A wider kernel (`gaussian/`) importance-samples its own `h(u)` by warping `xi` and changes
+what the pixel integrates, which is why the family is a **measurement** axis, sibling to
+`camera/`.

@@ -156,6 +156,9 @@ verify harness (render → exportPNG → decode → nonzero + stamp present).
    axis-aligned: patterned+rotated analytic shapes take the wrapper arm (emitted like a movable
    shape with constant numbers), so the chart tracks rotation exactly — sphere AND disk. The
    axis-aligned "limit" the fork weighed collapsed once the wrapper reuse was found; see P1b.
-3. **Gaussian truncation at 2σ, σ = 0.5px** (my pick — pbrt-ish defaults; both become
-   registry knobs only if wanted). Still open — governs P3.
+3. **Gaussian truncation — RESOLVED (owner's provisional answer P1/Q5,
+   docs/claude-2026-11-review/decisions.md):** σ = 0.5 px, untruncated (Box–Muller, weight 1;
+   the only cutoff is the 24-bit sample stream's, at 2.884 px), selected by
+   `measurement.pixel: 'gaussian'` and always stamped. Built without `tent`; see
+   src/components/pixel/gaussian/gaussian.md.
 4. Anything promoted from §6.

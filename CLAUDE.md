@@ -216,8 +216,10 @@ How a program is assembled:
 - Media: homogeneous (closed form, per-channel MIS), heterogeneous (delta tracking;
   expression coefficients under a declared majorant), volume emission, HG and Rayleigh phase
   functions, null interfaces, variable-index (GRIN) media.
-- Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
-  filter; accumulators average (with an optional variance statistic) / oneshot; seven tonemaps.
+- Cameras: pinhole, thin lens (`thinLensFromPhoto` sets it from a photographic lens),
+  orthographic, equirect, fisheye, cylindrical. Pixel filters box (default) and untruncated
+  Gaussian (`measurement.pixel`); accumulators average (with an optional variance statistic) /
+  oneshot; seven tonemaps.
 - Pictures: radiance plus an optional variance statistic and first-hit albedo/normal guides
   (`measurement.aovs`, RGB only; a guide is its surface value × the path weight on arrival,
   so it converges to value × camera-ray transmittance), switched on screen live (`m`) and

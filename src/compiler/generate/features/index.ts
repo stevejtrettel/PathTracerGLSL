@@ -38,7 +38,7 @@ export function collectFeatures(plan: RenderPlan, bag: DiagnosticBag): MergedCon
         contributeIntersection(plan),
         contributeMaterials(plan),
         contributeLighting(plan),
-        contributePixel(plan),
+        contributePixel(plan, bag),
         contributeCamera(plan, bag),
         contributeEnvironment(plan, bag),
         contributeAov(plan),

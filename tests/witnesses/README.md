@@ -60,7 +60,8 @@ sweep: `tiny-sphere`, `tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `inst
 shadow rays aimed at the light point) had targeted runs only, and these witnesses were added with
 them: `mesh-light-smooth`, `mesh-slab-albedo`, `mesh-scale-twin`, `null-budget-view`,
 `null-budget`, `grin-long`, `shadow-aim-march`, `shadow-aim-far`, `shadow-aim-fog`,
-`emit-sat-budget`.
+`emit-sat-budget`. Also added after it, with targeted runs only: `filter-edge` and the
+gaussian arm of `furnace` (the pixel filter).
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not

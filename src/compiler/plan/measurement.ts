@@ -5,6 +5,7 @@
 // left them at their defaults.
 
 import { COLOR_MODELS } from '../../components/color/index.js';
+import { DEFAULT_PIXEL_MODEL } from '../../components/pixel/index.js';
 import type { SceneDescription, RenderStrategy } from '../types.js';
 import type { ProgramDescription } from './types.js';
 
@@ -28,6 +29,7 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         shadows: m.shadows ?? 'opaque-dielectrics',
         color: m.color ?? 'rgb',
         sensor: m.sensor ?? COLOR_MODELS[m.color ?? 'rgb'].defaultSensor,
+        pixel: m.pixel ?? DEFAULT_PIXEL_MODEL,
         ...(COLOR_MODELS[m.color ?? 'rgb'].version ? { colorModelVersion: COLOR_MODELS[m.color ?? 'rgb'].version } : {}),
         // Omitted when there are none, so stamps and programs without AOVs are unchanged.
         ...(m.aovs !== undefined && m.aovs.length > 0 ? { aovs: [...m.aovs] } : {}),

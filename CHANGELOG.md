@@ -4,6 +4,39 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Gaussian pixel filter and a photographic-lens helper
+
+Integration step 2 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+plan and review in photoreal/camera-film/). Owner's provisional answer P1/Q5: untruncated
+Gaussian as `measurement.pixel`, always stamped.
+
+**What changed:**
+- `measurement.pixel: 'box' | 'gaussian'` (a components/pixel registry key; default `'box'`).
+  The Validator rejects other values; the pixel feature links the chosen occupant's file. The
+  resolved value is always recorded in `ProgramDescription.measurement`, so every export stamp
+  now states `pixel`.
+- New occupant `pixel/gaussian`: σ = 0.5 px, untruncated, drawn exactly by Box–Muller (pbrt-v4
+  `SampleTwoNormal`), weight 1. The only cutoff is the 24-bit sample stream's, at 2.884 px.
+  `tent` was not built (cut in the integration).
+- `thinLensFromPhoto` (src/authoring/photoLens.ts): focal length, f-number, focus distance (scene
+  units), sensor height and meters per unit, all required, to `{ type: 'thinlens', fov,
+  aperture, focusDistance }` with `aperture = f/2N` and `fov = 2 atan(h/2v)`, v = Ff/(F − f).
+- New witness `filter-edge` (box, gaussian, gaussian spectral, tiled gaussian); `furnace` gains
+  a gaussian smoke arm.
+
+**Measured:**
+- Digest: 273 of 275 scenes identical. `furnace` differs only by its new gaussian renderer
+  (whose main shader differs from the box one only in the pixel block); `filter-edge` is new.
+- Program-description snapshot: 505 programs gain exactly one line, `"pixel": "box"`.
+- Twin χ² (4·10⁶ Box–Muller offsets, 32×32 cells plus outside, against Φ products) passes; the
+  same test with σ = 0.45 fails. Lens helper: object-space blur equals the real lens's at every
+  tested depth to 1e-10 relative; 50 mm f/1.8 at 2 m on 24 mm gives fov 0.459728, aperture
+  0.013889 m.
+- Witnesses (targeted): `filter-edge` column 79 / 80 read 0 / 1 (box), 0.1572 / 0.8422
+  (gaussian; exact 0.1587 / 0.8413) and 0.1573 / 0.8413–0.8433 (spectral), tiled HDR and PNG
+  bit-identical; `furnace` 0.4000 on all three arms; `spectral-furnace` and `cornell-area`
+  (including its tiled check) pass.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

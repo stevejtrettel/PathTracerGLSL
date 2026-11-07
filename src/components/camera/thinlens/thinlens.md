@@ -31,3 +31,10 @@ accumulation reset — they change what the render converges to.
 Randomness note (the camera A/B split, see `../README.md`): thin-lens consumes exactly the
 Category-A dimensions — the `film` footprint (pixel/) + `xiLens`. Motion blur (shutter time) and spectral
 sensor response (wavelength) are Category-B seed fields, not `generateRay` arguments.
+
+**From a photographic lens.** `thinLensFromPhoto` (src/authoring/photoLens.ts) converts a focal
+length f, an f-number N, a focus distance F and a sensor height h into these fields:
+`aperture = f/2N` (the entrance-pupil radius), `fov = 2 atan(h/2v)` with the image distance
+`v = F f/(F − f)`, and `focusDistance = F`. With that aperture, a point at depth z blurs over the
+angle `(f/2N)|1/z − 1/F|`, exactly as through the real thin lens, so the depth of field matches
+the photograph's.
