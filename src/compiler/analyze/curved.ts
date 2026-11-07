@@ -42,8 +42,8 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
     { feature: 'instanced objects', spaces: ['euclidean'], present: (scene) => scene.objects.some(isInstancedObject) },
     { feature: 'object scale other than 1', spaces: ['euclidean'], present: scaled },
     {
-        // The generated march steps along straight lines (resolved: a backend pin counts).
-        feature: 'marched objects', spaces: ['euclidean'],
+        // The generated march steps along the space's geodesics (resolved: a backend pin counts).
+        feature: 'marched objects', spaces: ['euclidean', 'hyperbolic', 'spherical'],
         present: (scene) => marchedObjectCount(scene) > 0,
     },
     {

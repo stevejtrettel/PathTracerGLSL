@@ -276,11 +276,21 @@ exports[`scene-data textures (byte fingerprints) > h3-disk-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > h3-klein-ball 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > h3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-point-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-quad-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-ball-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-blend 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-furnace 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-shapes 1`] = `null`;
 
@@ -314,6 +324,8 @@ exports[`scene-data textures (byte fingerprints) > hundred-spheres 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > hyperbolic 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > hyperbolic-sculpture 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > image-texture 1`] = `null`;
 
@@ -737,6 +749,14 @@ exports[`scene-data textures (byte fingerprints) > s3-point-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > s3-quad-light 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > s3-sdf-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-ball-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-blend 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-furnace 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > s3-shapes 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
@@ -1016,6 +1036,8 @@ exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > spherical 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spherical-sculpture 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spot 1`] = `null`;
 

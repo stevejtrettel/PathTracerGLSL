@@ -102,7 +102,7 @@ describe('the space gate (descriptor occupants)', () => {
             "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean)",
             "Object 1: primitive 'torus' has no testspace implementation (implemented in: euclidean)",
             "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
-            'marched objects: not implemented in testspace space (implemented in: euclidean)',
+            'marched objects: not implemented in testspace space (implemented in: euclidean, hyperbolic, spherical)',
             "measurement.aovs: AOV 'normal' has no testspace implementation (implemented in: euclidean)",
             "measurement.camera: camera 'thinlens' has no testspace implementation (implemented in: euclidean)",
         ].sort());
@@ -136,7 +136,7 @@ describe('a marched shape\'s bound chain', () => {
             });
             expect(spaceErrors(s, strategy())).toEqual([
                 "Object 0: the primitive bounding its march, 'box' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
-                'marched objects: not implemented in testspace space (implemented in: euclidean)',
+                'marched objects: not implemented in testspace space (implemented in: euclidean, hyperbolic, spherical)',
             ]);
         } finally {
             cylinder.marchBound = bound;

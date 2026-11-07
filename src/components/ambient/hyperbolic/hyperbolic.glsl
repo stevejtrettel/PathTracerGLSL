@@ -6,7 +6,9 @@
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
 //           isometry_direction(); for the H³ bodies, hyperbolic_form(), hyperbolic_on_model(),
-//           hyperbolic_plane_root(), hyperbolic_halfspace() and hyperbolic_interval_hit().
+//           hyperbolic_plane_root(), hyperbolic_halfspace(), hyperbolic_interval_hit(),
+//           hyperbolic_plane_vector() and hyperbolic_plane_distance(); for marched fields, sdf_plane()
+//           and sdf_tube() (the rest of the vocabulary is components/ambient/sdf.glsl).
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 
 // The far clip MAX_DIST (an arc length; nothing beyond it is geometry) is emitted just before
@@ -154,6 +156,36 @@ bool hyperbolic_interval_hit(float lo, float hi, out float t) {
     if (lo > 1.0) { t = 0.5 * log(lo); return true; }
     if (hi > 1.0 && hi < HYPERBOLIC_X_INF) { t = 0.5 * log(hi); return true; }
     return false;
+}
+
+// The unit spacelike 4-vector N of the totally geodesic plane perpendicular to n (a unit tangent
+// vector at o) at signed distance −offset from o, as in E³'s dot(p, n) + offset = 0:
+// N = (cosh(offset)·n.xyz, −sinh(offset)), so that ⟨exp_o(λ·n), N⟩ = sinh(λ + offset).
+Direction hyperbolic_plane_vector(Direction n, float offset) {
+    return Direction(cosh(offset) * n.xyz, -sinh(offset));
+}
+
+// Exact signed distance from p to the plane {x : ⟨x, N⟩ = 0}: asinh⟨p, N⟩, positive on the side N
+// points to; asinh of |s| with the sign restored (GLSL's asinh loses precision for large negative
+// arguments).
+float hyperbolic_plane_distance(Point p, Direction N) {
+    float s = hyperbolic_form(p, N);
+    return sign(s) * asinh(abs(s));
+}
+
+// Marched fields: the signed distance to the plane perpendicular to n (a unit tangent vector at o)
+// at signed distance −offset from o — the plane rows' meaning.
+float sdf_plane(Point p, Direction n, float offset) {
+    return hyperbolic_plane_distance(p, hyperbolic_plane_vector(n, offset));
+}
+
+// Marched fields: the distance from p to the geodesic through the point a with unit tangent u ∈ T_a,
+// minus r (a tube of radius r about it). p⊥ = p + ⟨p,a⟩·a − ⟨p,u⟩·u is the part of p off the plane
+// span(a, u) of R^{3,1}, and ⟨p⊥, p⊥⟩ = sinh² of the distance: precise near the axis, where the
+// equivalent acosh√(⟨p,a⟩² − ⟨p,u⟩²) is not.
+float sdf_tube(Point p, Point a, Direction u, float r) {
+    vec4 w = p + hyperbolic_form(p, a) * a - hyperbolic_form(p, u) * u;
+    return asinh(sqrt(max(hyperbolic_form(w, w), 0.0))) - r;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

@@ -68,7 +68,7 @@ not keyed by space.
 | limitation | mesh objects | yes | — | — |
 | limitation | instanced objects | yes | — | — |
 | limitation | object scale other than 1 | yes | — | — |
-| limitation | marched objects | yes | — | — |
+| limitation | marched objects | yes | yes | yes |
 | limitation | materials that read uv or hold GLSL expressions | yes | — | — |
 | limitation | bump mapping | yes | — | — |
 | limitation | media on the null-collision (tracking) arms | yes | — | — |

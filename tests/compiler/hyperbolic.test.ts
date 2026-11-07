@@ -116,11 +116,13 @@ describe('H³ Validator rules', () => {
         expect(errorsOf(h3Furnace, h3FurnaceStrategy)).toContain('needs an authored camera position and target');
     });
 
-    it('rejects a scale other than 1, a marched object and a uv-reading material', () => {
+    it('rejects a scale other than 1, a marched shape with no H³ body and a uv-reading material; accepts a marched ball', () => {
         const scaled = { ...h3Furnace, objects: [{ ...h3Furnace.objects[0], transform: { scale: 2 } }] } as SceneDescription;
         expect(errorsOf(scaled, furnace)).toContain('object scale other than 1: not implemented in hyperbolic space');
         const marched = { ...h3Furnace, objects: [{ type: 'sphere', parameters: { radius: 0.3 }, material: 'furnace', backend: 'sdf' }] } as SceneDescription;
-        expect(errorsOf(marched, furnace)).toContain('marched objects: not implemented in hyperbolic space');
+        expect(errorsOf(marched, furnace)).toBe('');
+        const torus = { ...h3Furnace, objects: [{ type: 'torus', parameters: { ringRadius: 0.5, tubeRadius: 0.1 }, material: 'furnace' }] } as SceneDescription;
+        expect(errorsOf(torus, furnace)).toContain("primitive 'torus' has no hyperbolic implementation");
         const patterned = { ...h3Furnace, materials: { furnace: { model: 'lambert', albedo: { kind: 'glsl', source: 'vec3(fract(uv.x))' } } } } as unknown as SceneDescription;
         expect(errorsOf(patterned, furnace)).toContain('materials that read uv or hold GLSL expressions: not implemented in hyperbolic space');
     });

@@ -589,6 +589,10 @@ export interface PrimitiveDescriptor {
      *  their twins test-side (tests/components/fieldTwins.ts) — this slot exists
      *  because a scene-local definition has no test file to keep one in. */
     fieldTwin?(p: number[], values: PrimitiveValues): number;
+    /** Scene-local fields only (defineSDF's `kleinChart`): the hyperbolic body is the Euclidean
+     *  field evaluated at the Klein chart k(p) = p.xyz/p.w of the object's frame. Such a field
+     *  marches unbounded in H³ (its declared bound is a fact about chart coordinates). */
+    kleinChart?: boolean;
     /** Similarity-closure fold OVERRIDE (fable-transforms §5.1). ABSENT = derived
      *  from kinds (point → g·p, vector → sR·v, direction → R·d, length → s·ℓ).
      *  Declare only when a parameter's rule couples several pieces (plane: the new

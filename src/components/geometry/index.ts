@@ -121,12 +121,19 @@ export function primitiveBallBound(type: string, values: PrimitiveValues): numbe
  *  bound (an analytic object of a possibly different primitive), that bound's own bound, and
  *  so on, until a bound is 'self' or 'unbounded'. Empty when the march needs no other
  *  primitive. The intersection generator links these and the Validator gates them. */
-export function marchBoundTypes(type: string): string[] {
+export function marchBoundTypes(type: string, space = 'euclidean'): string[] {
     const chain: string[] = [];
-    for (let mb = PRIMITIVES[type]?.marchBound; typeof mb === 'object' && !chain.includes(mb.type); mb = PRIMITIVES[mb.type]?.marchBound) {
+    const d = PRIMITIVES[type];
+    for (let mb = d === undefined ? undefined : marchBoundIn(d, space); typeof mb === 'object' && !chain.includes(mb.type); mb = PRIMITIVES[mb.type]?.marchBound) {
         chain.push(mb.type);
     }
     return chain;
+}
+
+/** The march bound a marched shape uses in `space`: its declared bound, except that a Klein-chart
+ *  field marches unbounded in H³ (its bound is stated in chart coordinates). */
+export function marchBoundIn(d: PrimitiveDescriptor, space: string): PrimitiveDescriptor['marchBound'] {
+    return d.kleinChart === true && space === 'hyperbolic' ? 'unbounded' : d.marchBound;
 }
 
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
@@ -272,9 +279,13 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
  * `refine` fact gets no polish and no cost — a true distance field's accepted
  * residual is already ≤ march_epsilon.
  */
-export function emitSdfIntersect(d: PrimitiveDescriptor): string {
+export function emitSdfIntersect(d: PrimitiveDescriptor, curved = false): string {
     const steps = d.stepBudget !== undefined ? String(d.stepBudget) : 'MAX_MARCH_STEPS';
-    const f = (at: string) => `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
+    // The field point at arc length t: re-flowed from the seed each step (ambient_geodesic) in a
+    // curved space; Euclidean programs keep the line's own spelling, the same point.
+    const f = (at: string) => curved
+        ? `${d.type}_sdf(ambient_geodesic(ray.origin, ray.direction, ${at}), s)`
+        : `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
     // With `refine`: acceptance must be CONFIRMED BY A SIGN CROSSING (the glass-lab
     // ring finding, Aug 11 round 3 — exact normals + refinement both exonerated the
     // artifact): a near-tangent ray can dip inside the acceptance shell and MISS,
@@ -386,6 +397,27 @@ export function emitSdfNormal(d: PrimitiveDescriptor): string {
         `                   + ${call('k.yyx')}`,
         `                   + ${call('k.yxy')}`,
         `                   + ${call('k.xxx')});`,
+        `}`,
+    ].join('\n');
+}
+
+/** The generated gradient normal in a curved space: `at` is the ray at the hit (the point and its
+ *  arrival direction, a unit tangent there), and ambient_frame of that direction is an orthonormal
+ *  basis (t, b, n) of the tangent space. The four taps are at arc length NORMAL_EPSILON along the
+ *  tetrahedral unit combinations k_j of the basis, and the normal is Σ f_j k_j normalized — a tangent
+ *  vector by construction, independent of the basis up to O(NORMAL_EPSILON), in the shape's frame;
+ *  the caller maps it to world. */
+export function emitCurvedSdfNormal(d: PrimitiveDescriptor): string {
+    const tap = (c: string) => `${c} * ${d.type}_sdf(ambient_geodesic(f.p, ${c}, NORMAL_EPSILON), s)`;
+    return [
+        `Direction ${d.type}_sdf_normal(Ray at, ${structName(d)} s) {`,
+        `    Frame f = ambient_frame(at.origin, at.direction);`,
+        `    const float k = 0.5773;`,
+        `    Direction d0 = k * ( f.t - f.b - f.n);`,
+        `    Direction d1 = k * (-f.t - f.b + f.n);`,
+        `    Direction d2 = k * (-f.t + f.b - f.n);`,
+        `    Direction d3 = k * ( f.t + f.b + f.n);`,
+        `    return ambient_normalize(${tap('d0')} + ${tap('d1')} + ${tap('d2')} + ${tap('d3')}, f.p);`,
         `}`,
     ].join('\n');
 }

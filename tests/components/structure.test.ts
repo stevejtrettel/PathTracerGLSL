@@ -42,6 +42,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'microfacetTwin.ts',                   // materials shared part (TS twin of glsl/core/microfacet.glsl's lobe + the §11.3 harness the models' tests run)
     'support.md',                          // ambient: the generated space-support table (spaceSupport.test.ts)
     'isometry.ts',                         // ambient shared part (curved-space CPU isometry algebra)
+    'sdf.glsl',                            // ambient shared part (the curved spaces' SDF vocabulary)
 ]);
 
 describe('components structure', () => {

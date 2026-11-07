@@ -202,6 +202,9 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
                 roundedBox: { halfSize: [0.4, 0.3, 0.3], radius: 0.05 },
             };
             for (const d of Object.values(PRIMITIVES)) {
+                // The scene is Euclidean: a primitive with no Euclidean body (a curved-only
+                // scene-local field) is compiled by the curved suite scenes that use it.
+                if (d.glsl.euclidean === undefined) continue;
                 const parameters = Object.fromEntries(d.params.map((p, i) =>
                     [p.name, sampleParameters[d.type]?.[p.name] ?? p.default ?? rowValue(p.shape, i)]));
                 const coupled = d.validateValues?.(

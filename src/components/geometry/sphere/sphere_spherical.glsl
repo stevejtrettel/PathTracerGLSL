@@ -3,7 +3,8 @@
 // struct holds only the radius (the center row is folded into the placement). Arc length t is the
 // same in every frame, so the generated arm compares it with world hits unchanged. Derivations and
 // float32 measurements: components/ambient/spherical/spherical.md.
-// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_intersect(), sphere_normal().
+// Provides (struct GENERATED from descriptor rows): sphere_sdf(), sphere_intersect(), sphere_normal(),
+//           sphere_interval().
 // Depends on: TWO_PI (math), spherical_cos_sin() (the S³ occupant).
 
 // Exact distance to the sphere: dist(o, p) = atan(|p.xyz|, p.w) (the atan form keeps precision
@@ -37,4 +38,30 @@ bool sphere_intersect(Ray ray, Sphere sp, out float t) {
 Direction sphere_normal(Point p, Sphere sp) {
     float r = length(p.xyz);
     return Direction(p.w * p.xyz / r, -r);
+}
+
+// The ray's interval inside the ball — what a marched shape bounded by this ball searches. From
+// outside: [entry, entry + 2α] with entry = (φ − α) mod 2π (the roots of sphere_intersect); the
+// geodesic returns to its origin, outside the ball, at 2π, so it meets the ball once in the period.
+// From inside: [0, MAX_DIST], the whole period. The geodesic leaves the ball and comes back around
+// before returning to its origin, and a shape smaller than its bound can be met on that second
+// visit — a ray spawned off the shape's own surface is in exactly this case.
+bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
+    // Inside first: a ball of radius above π/2 contains whole great circles, whose discriminant
+    // below is negative although every point of them is inside.
+    if (atan(length(ray.origin.xyz), ray.origin.w) < sp.radius) {
+        t0 = 0.0;
+        t1 = MAX_DIST;
+        return true;
+    }
+    vec3 c = cross(ray.origin.xyz, ray.direction.xyz);
+    float k = dot(c, c);
+    vec2 csr = spherical_cos_sin(sp.radius);
+    float disc = csr.y * csr.y - k;
+    if (disc < 0.0) return false;
+    float phi = atan(ray.direction.w, ray.origin.w);
+    float alpha = atan(sqrt(disc), csr.x);
+    t0 = mod(phi - alpha, TWO_PI);
+    t1 = t0 + 2.0 * alpha;
+    return true;
 }

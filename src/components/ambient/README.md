@@ -66,6 +66,32 @@ curvature +1, the unit sphere in R⁴) stores points and tangent vectors as 4-ve
   inverse of an isometry. Registered as the descriptor's `curved` field; its presence is the one
   fact "this space is curved" (`curvedGeometryOf`).
 
+**Marched fields.** A marched object (`backend: 'sdf'`, or a `defineSDF` field with a body for the
+space) is sphere-traced along the space's geodesics in its own frame: the generated
+`<type>_sdf_intersect` evaluates its field at `ambient_geodesic(ray.origin, ray.direction, t)`
+(re-flowed from the seed each step), and the generated `<type>_sdf_normal(Ray at, S s)` takes four
+taps at arc length NORMAL_EPSILON along tetrahedral combinations of `ambient_frame(p, arrival)` —
+a tangent vector, mapped to world by `isometry_direction`. A field is a function of a point of the
+model (a vec4) and must be a true geodesic distance or a 1-Lipschitz lower bound of one (then
+|f(p)| ≤ the distance to its zero set, all sphere tracing needs). The vocabulary for writing one:
+
+```glsl
+Point sdf_point(vec3 v);                                    // exp_o(v), an authored point (sdf.glsl)
+float sdf_ball(Point p, Point c, float r);                  // ambient_distance(p, c) − r (sdf.glsl)
+float sdf_plane(Point p, Direction n, float offset);       // the plane rows' plane (each occupant)
+float sdf_tube(Point p, Point a, Direction u, float r);    // distance to the geodesic (a, u) − r (each occupant)
+float sdf_smooth_union(float a, float b, float k);          // and _intersection, _subtraction (sdf.glsl)
+```
+
+`sdf.glsl` (this folder) is written over the seam and serves both curved spaces; it is included
+when a curved program marches. min and max are union and intersection. The smooth union lies at
+most k/4 below min(a, b), so a march bound must contain {min(pieces) ≤ k/4}. A field's march bound
+is a sphere at the object's origin (the Validator rejects any other center) or `'unbounded'`; in S³
+a ray starting inside the bound searches the whole period (it leaves and comes back around).
+Euclidean `defineSDF` fields can also serve H³ through the Klein chart (`kleinChart: true`; the
+chart never stretches distance, so the bound holds with no factor). The fp64 twins of all of this
+are tests/witnesses/scenes/curvedSdfTwins.ts (checked by tests/components/curvedSdf.test.ts).
+
 S³ adds two facts no other space has. Two geodesics join any two points, of lengths d and 2π − d,
 leaving and arriving in opposite directions: `ambient_aim` keeps a shadow ray on the arc it
 travels, and the S³ light bodies choose an arc per sample (`spherical_light_arc`; the lights
@@ -137,11 +163,12 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 ## Status & the honest caveat
 
 Occupants: `euclidean/`, `hyperbolic/` (H³) and `spherical/` (S³). In both curved spaces: sphere,
-plane, disk, box, cylinder and quad shapes; point, disk and quad lights; lambert; pinhole and fisheye; hg in homogeneous
+plane, disk, box, cylinder and quad shapes; marched balls and scene-local marched fields (and, in
+H³, Klein-chart Euclidean fields); point, disk and quad lights; lambert; pinhole and fisheye; hg in homogeneous
 object media; in H³ also sky lookup by BSDF rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
-their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
-similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
+their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the registry marched shapes
+(torus, bottle, knob, menger, apollonian: no curved body), the similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
 `flattenGroups` (it composes groups as Euclidean similarities, so in a curved space a group with a
 non-identity transform is an error there).
 
@@ -178,6 +205,12 @@ non-identity transform is an error there).
   tests/components/curvedShapes.test.ts. box_sdf and cylinder_sdf, read only for containment
   (scene_region_at), are checked there as transcriptions; no witness fills a curved box or cylinder
   with a medium.
+- Marched fields (tests/witnesses/scenes/curvedSdfWitness.ts): `h3-sdf-ball` / `s3-sdf-ball` (a marched
+  ball off o under a point light against the closed form, and against the closed-form ball scene;
+  in S³ the window is lit through both arcs), `h3-klein-ball` (the same ball as a Klein-chart
+  Euclidean sphere), `h3-sdf-furnace` / `s3-sdf-furnace` (Σ_{k≤6} 0.8^k inside a marched cavity — a
+  no-leak test), `h3-sdf-blend` / `s3-sdf-blend` (a placed smooth-union sculpture against its fp64
+  twin, tests/witnesses/curvedSdfTwins.test.ts).
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

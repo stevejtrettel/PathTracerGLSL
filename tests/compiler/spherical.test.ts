@@ -12,6 +12,7 @@ import { ORIGIN, mat4Apply, placementIsometry, tangentAtOrigin } from '../../src
 import { formatMat4, formatVec4 } from '../../src/components/glsl-format.js';
 import { IDENTITY_QUAT } from '../../src/components/geometry/similarity.js';
 import { withPose } from '../../src/authoring/strategy.js';
+import { defineSDF } from '../../src/components/geometry/custom.js';
 import type { RenderStrategy, SceneDescription } from '../../src/compiler/types.js';
 
 const compiler = new Compiler();
@@ -102,15 +103,15 @@ describe('S³ Validator rules', () => {
             .toContain('an environment: not implemented in spherical space');
     });
 
-    it('rejects an ambient medium, a marched object and an occupant with no S³ body, naming each', () => {
+    it('rejects an ambient medium, a marched shape and an occupant with no S³ body, naming each', () => {
         const fogged: SceneDescription = {
             ...s3Furnace, ambientMedium: 'fog',
             materials: { ...s3Furnace.materials, fog: { model: 'none', medium: { sigma_a: [0.1, 0.1, 0.1], sigma_s: [0, 0, 0] } } },
         };
         expect(errorsOf(fogged, furnace))
             .toContain('an ambient medium: not implemented in spherical space');
-        const marched = { ...s3Furnace, objects: [{ type: 'sphere', parameters: { radius: 0.3 }, material: 'furnace', backend: 'sdf' }] } as SceneDescription;
-        expect(errorsOf(marched, furnace)).toContain('marched objects: not implemented in spherical space');
+        const marched = { ...s3Furnace, objects: [{ type: 'menger', parameters: { size: 0.3 }, material: 'furnace' }] } as SceneDescription;
+        expect(errorsOf(marched, furnace)).toContain("primitive 'menger' has no spherical implementation");
         const torus = { ...s3Furnace, objects: [{ type: 'torus', parameters: { ringRadius: 0.4, tubeRadius: 0.1 }, material: 'furnace' }] } as SceneDescription;
         expect(errorsOf(torus, furnace)).toContain("primitive 'torus' has no spherical implementation");
         const sphereLight = { ...s3LongArc, lights: [{ kind: 'sphere', position: [0, 1, 0], radius: 0.2, emission: 1 }] } as SceneDescription;
@@ -128,5 +129,38 @@ describe('S³ Validator rules', () => {
         expect(errorsOf(ball(3.1), posedNee)).toBe('');
         expect(errorsOf(disk(3.1), posedNee)).toBe('');
         expect(errorsOf(light(3.1), posedNee)).toBe('');
+    });
+});
+
+describe('S³ marched fields', () => {
+    // A field bounded by a sphere off its origin, or by one of radius π or more: both errors.
+    const offCenter = defineSDF({
+        name: 's3OffCenterTest',
+        params: [{ name: 'radius', kind: 'length', shape: 'number', required: false, default: 0.2 }],
+        glsl: { spherical: 'float s3OffCenterTest_sdf(Point p, S3OffCenterTest s) { return sdf_ball(p, sdf_point(vec3(0.1, 0.0, 0.0)), s.radius); }' },
+        marchBound: { type: 'sphere', values: (v) => ({ center: [0.1, 0, 0], radius: (v.radius as number) + 0.01 }) },
+    });
+    const huge = defineSDF({
+        name: 's3HugeBoundTest',
+        params: [{ name: 'radius', kind: 'length', shape: 'number', required: false, default: 0.2 }],
+        glsl: { spherical: 'float s3HugeBoundTest_sdf(Point p, S3HugeBoundTest s) { return sdf_ball(p, Point(0.0, 0.0, 0.0, 1.0), s.radius); }' },
+        marchBound: { type: 'sphere', values: () => ({ radius: 3.5 }) },
+    });
+    const withField = (type: string) => ({ ...s3Furnace, objects: [{ type, parameters: {}, material: 'furnace' }] } as SceneDescription);
+    const furnace = withPose(s3FurnaceStrategy, [0, 0, 0.5], [0, 0, 0]);
+
+    it('rejects a march bound off the object\'s origin and one of radius π or more', () => {
+        expect(errorsOf(withField(offCenter), furnace)).toContain("a march bound must sit at the object's origin");
+        expect(errorsOf(withField(huge), furnace)).toContain("the 'sphere' bounding its march: parameter 'radius'");
+    });
+
+    it('rejects a field with no body for the space', () => {
+        const euclideanOnly = defineSDF({
+            name: 's3EuclideanOnlyTest',
+            params: [{ name: 'radius', kind: 'length', shape: 'number', required: false, default: 0.2 }],
+            glsl: 'float s3EuclideanOnlyTest_sdf(vec3 p, S3EuclideanOnlyTest s) { return length(p) - s.radius; }',
+            marchBound: 'unbounded',
+        });
+        expect(errorsOf(withField(euclideanOnly), furnace)).toContain(`primitive '${euclideanOnly}' has no spherical implementation`);
     });
 });

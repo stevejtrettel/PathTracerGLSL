@@ -5,16 +5,16 @@
 // signed distance is asin(p·N), positive on the side `normal` points to; the solid is the
 // hemisphere on the other side. Derivations: components/ambient/spherical/spherical.md.
 // Provides (struct GENERATED from descriptor rows): plane_sdf(), plane_intersect(), plane_normal().
-// Depends on: spherical_cos_sin(), spherical_asin(), spherical_plane_root() (the S³ occupant).
+// Depends on: spherical_plane_vector(), spherical_plane_distance(), spherical_plane_root() (the S³
+//             occupant).
 
 Direction plane_N(Plane pl) {
-    vec2 cs = spherical_cos_sin(pl.offset);
-    return Direction(cs.x * pl.normal.xyz, cs.y);
+    return spherical_plane_vector(pl.normal, pl.offset);
 }
 
 // Exact signed distance to the great sphere.
 float plane_sdf(Point p, Plane pl) {
-    return spherical_asin(clamp(dot(p, plane_N(pl)), -1.0, 1.0));
+    return spherical_plane_distance(p, plane_N(pl));
 }
 
 // The first crossing of the great sphere (spherical_plane_root in the occupant).

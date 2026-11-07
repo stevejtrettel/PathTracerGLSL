@@ -229,11 +229,11 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
         const matId = materialIdMap.get(obj.material)!;   // validated by Validator
 
         if (geom !== undefined) {
-            // Curved: the closed form in the object's own frame (a marched object is rejected in
-            // curved spaces — SPACE_LIMITATIONS), placed by its isometry.
+            // Curved: the closed form or the bounded march in the object's own frame, placed by its
+            // isometry.
             const index = objectIndex++;
             const { parameters, isometry } = curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index);
-            objects.push({ index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name, parameters, isometry });
+            objects.push({ index, materialId: matId, type: obj.type, intersect: backend === 'sdf' ? 'march' : 'closed-form', name: obj.name, parameters, isometry });
             continue;
         }
 
