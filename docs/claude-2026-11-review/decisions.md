@@ -33,3 +33,19 @@ copied here until the owner accepts them.
 8. **Priority order for the review's plans:** (b) curved-space architecture first, then (a) App,
    extension and parameter simplification, then (c) photorealism gaps (textures, normal mapping,
    layered materials, …). Owner: "yes b then a then c is a good move".
+
+## 2026-11-06 (after the survey)
+
+9. **Curved spaces: build H³ and S³ first, with a subset of features.** The owner said yes to
+   all five proposals: (1) points stored as 4-vectors (hyperboloid model for H³, unit sphere in
+   R⁴ for S³), each object intersected in its own local frame; Klein/gnomonic charts only inside
+   mesh acceleration structures; (2) a feature subset first (SDF and analytic shapes, area and
+   point lights, pinhole/fisheye cameras, homogeneous media), with unsupported features as
+   explicit compile errors, never guesses; (3) sky per space: E³ unchanged, H³ a picture on the
+   sphere at infinity looked up by the ray's endpoint, S³ no sky and an exact far limit of 2π;
+   directional lights only in E³ for now. The owner added: "eventually we need a clean way to
+   keep track of who implements what" (which components support which spaces).
+10. **Black holes: left out of building for now.** Record the research and its leads; build
+    nothing.
+11. **Quotients: think about them if time and reasoning permit**, after the curved-space plan.
+    (H²×R stays a goal from decision 3; this decision names H³ and S³ as the first spaces.)
