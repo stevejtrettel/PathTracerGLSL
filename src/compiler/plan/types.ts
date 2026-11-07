@@ -254,6 +254,10 @@ export interface MaterialsDesc {
      *  replaces the hit's frame through material_shading_frame and these ids get masked
      *  interaction arms. PRESENT only when non-empty, so programs without one are unchanged. */
     perturbed?: number[];
+    /** The image lookup (glsl/shared/image_texture.glsl) and the material image array are
+     *  declared: some material row reads an image texture. PRESENT only when true, so programs
+     *  without one are unchanged. */
+    images?: true;
 }
 
 export type LightingDesc =

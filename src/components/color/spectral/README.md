@@ -206,6 +206,13 @@ A material expression may call the solid-noise functions `perlin_noise(vec3)`,
 (src/glsl/core/perlin.glsl, pbrt-v4's noise). The program includes them when some material
 row is an expression. Their header states the bounds that keep a formula inside its domain.
 
+An image texture (`{ texture: name, uvScale? }` in a reflectance row, the image declared in
+`scene.textures` with its `colorspace`) becomes such an expression before Analyze:
+`image_texture(layer, uv, srgb).rgb` (src/glsl/shared/image_texture.glsl). It filters the decoded
+texels in RGB and the resolver lifts the filtered value, as pbrt-v4 does; Mitsuba's lift of each
+texel before the blend is a different field. Its values lie in [0, 1] by construction, so the
+reflectance domain holds without an author contract.
+
 Expression emission remains path-found under the existing light eligibility rules;
 it is not inserted into the finite-light sampling roster or light tree. PT, NEE and
 MIS all retain that hit-side contribution. Constant reference emitters must also set

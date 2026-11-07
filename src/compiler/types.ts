@@ -27,6 +27,9 @@ export interface SceneDescription {
     lights: LightDescription[];
     /** What a ray sees when it hits nothing. Defaults to `none` (black). */
     environment?: EnvironmentDescription;
+    /** Images a material's color rows may read, by name (a row's value `{ texture: name }`). Only
+     *  the images some material reads are loaded. */
+    textures?: Record<string, ImageTextureDescription>;
     /**
      * Material name of the AMBIENT medium (§2.4) — what region −1 is filled with; absent =
      * vacuum. A foggy world is just `ambientMedium: 'fog'`. material_of(-1) resolves to it.
@@ -304,9 +307,25 @@ export interface SellmeierIndex { sellmeier: { B: Vec3; C: Vec3 }; }
 export type SpectralIndex = CauchyIndex | SellmeierIndex;
 export type IndexProperty = ScalarProperty | SpectralIndex;
 
+/** An 8-bit image file (PNG or JPEG) and how its codes encode the values: 'srgb' (the sRGB
+ *  transfer curve, for colors) or 'linear' (codes/255, for data). Required: neither the file
+ *  extension nor an embedded profile says which. All of a scene's read images share one size. */
+export interface ImageTextureDescription {
+    url: string;
+    colorspace: 'srgb' | 'linear';
+}
+
+/** A color row read from a declared image at the hit's uv: bilinear between texels decoded to
+ *  linear, repeating, with uv scaled by `uvScale` first (a number scales both axes; default 1).
+ *  uv (0, 0) is the image's bottom-left corner. Reflectance rows only; not on spheres. */
+export interface TextureValue {
+    texture: string;
+    uvScale?: number | [number, number];
+}
+
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
-export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue | TextureValue;
 
 /** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
 export type NamedSpectrumValue = BlackbodyValue | GaussianValue;

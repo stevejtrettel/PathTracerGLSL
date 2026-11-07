@@ -18,7 +18,7 @@ const fixture = (): SceneDescription => ({ ...structuredClone(minimalScene), mat
     sphere: { model: 'dielectric', ior: { cauchy: [1.5, 0.01] } }, ground: { model: 'lambert', albedo: 0.5 },
 } });
 function program(scene: SceneDescription, strategy = spectral) {
-    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag()).plans[0].program;
+    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag(), []).plans[0].program;
 }
 describe('Cauchy authoring and dispersion planning', () => {
     it('uses micrometre coefficients and the fixed RGB d-line reference', () => {

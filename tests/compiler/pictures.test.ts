@@ -216,7 +216,7 @@ describe('the WebGL2 draw-buffer floor', () => {
     it('rejects more than 4 pictures at compile time', () => {
         // No strategy can request five pictures yet, so the planned list is extended by hand.
         const features = analyze(minimalScene);
-        const { plans } = planRenderers(features, minimalScene, [minimalStrategy], new DiagnosticBag('compiler'));
+        const { plans } = planRenderers(features, minimalScene, [minimalStrategy], new DiagnosticBag('compiler'), []);
         const plan = plans[0];
         const extra = ['a', 'b', 'c', 'd'].map((name, i) => ({ name, output: `frag_${name}`, previous: null, attachment: i + 1, role: 'statistic' as const, update: 'unused', display: `u_${name}`, view: 'tonemap' as const, formats: [] }));
         const bag = new DiagnosticBag('compiler');

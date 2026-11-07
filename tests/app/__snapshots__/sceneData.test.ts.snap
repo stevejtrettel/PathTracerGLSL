@@ -287,6 +287,12 @@ exports[`scene-data textures (byte fingerprints) > hundred-spheres 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > image-texture 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-linear 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-spectral 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > instance-fog 1`] = `
 {
   "nodes": "4096x1 fd78820a418c0092",

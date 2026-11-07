@@ -4,6 +4,45 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Image textures for color rows
+
+Photorealism integration step 9 (docs/claude-2026-11-review/photoreal/image-textures/plan.md, with
+its review's must-fix items). Color rows only: `channel` float rows (roughness maps) wait for
+derived rows computed per hit (integration step 6), which this branch does not have.
+
+- **Authoring**: `scene.textures[name] = { url, colorspace: 'srgb' | 'linear' }` (colorspace
+  required) and the row value `{ texture: name, uvScale? }` in reflectance rows (albedo, f0,
+  transmittance, checker colors).
+- **One value form downstream** (review must-fix 4): `compiler/analyze/imageTextures.ts` checks
+  every texture value and declaration before Analyze, assigns layers in first-use order, and
+  lowers each value to the RGB expression `image_texture(layer, uv, srgb).rgb`. Validate, Plan and
+  the spectrum kinds see an ordinary expression (lifted after the filter in spectral programs; the
+  uv charts turn on). Errors: undeclared names, unknown keys, a bad `uvScale`, emission / index /
+  float rows, keys that are not rows of the model, bad declarations, and a textured material used
+  by a sphere (decision P1 Q4; review must-fix 1).
+- **`src/glsl/shared/image_texture.glsl`**: pbrt-v4's field at zero footprint (t = 1 − v, texel
+  centers at half-integers, decode before the bilinear blend, repeat wrap) with four `texelFetch`es
+  on `u_material_textures` (`highp sampler2DArray`), no mipmaps. Linkage:
+  `program.materials.images` (present only when true) and `SceneDataPlan.images` (present only
+  when non-empty).
+- **Engine** (decision P1 Q8, an engine API addition): the texture registry keeps each texture's
+  bind target, the executor binds with it, and `registerImageArray` builds an RGBA8 2D array
+  (`texStorage3D`, one level). **App** (`app/images.ts`): fetch, reject a PNG whose bit depth is not
+  8, decode with no color-space conversion or premultiplication, require one size; uploaded with
+  the scene data (so also on recompile and context restore).
+- **Sampler budget**: `samplerRoster` counts `sampler2DArray` with `sampler2D`/`usampler2D`.
+- **Tests**: `tests/glsl/imageTexture.test.ts` (twin: texel centers, seams, period mean, exact
+  quadrant means, decode-after-blend fails; the witness PNG encoder), `tests/compiler/imageTextures.test.ts`
+  (checks, lowering, layer order, exact linkage, lift after the filter, glslang, the budget),
+  `tests/app/images.test.ts`, `tests/engine/externTextures.test.ts` (bind targets).
+- **Witnesses**: `image-texture` (an sRGB RGB 4×4 image on an orthographic quad under a unit sky,
+  pt / pt-nee / pt-mis, four quadrants per channel), `image-texture-linear`,
+  `image-texture-spectral` (gray image). The image's columns differ as much as its rows and its
+  channels are arranged differently (review must-fix 2). GPU mutations each fail every quadrant
+  check at the twin's predicted values: no v flip, no half-texel offset, a u mirror, decode after
+  the blend.
+- **Digest**: every existing scene identical; the three witnesses are new.
+
 ## 2026-11-07 — Procedural bump mapping
 
 Photorealism integration step 5 (docs/claude-2026-11-review/photoreal/integration.md): Stage A of

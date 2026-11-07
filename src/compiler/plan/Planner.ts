@@ -6,6 +6,7 @@ import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/i
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads, SpectralIndex } from '../types.js';
 import { isValueParam, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import type { ImageLayer } from '../analyze/imageTextures.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
@@ -67,11 +68,13 @@ function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvir
  * strategy's decisions against it (planProgram). The data layout holds the union of the optional
  * structures those decisions read, and the scene is placed in it once (placeScene). Each
  * renderer's RenderPlan is that placed scene with its own decisions and pipeline, so every
- * renderer on the scene sees the same scene facts at the same addresses.
+ * renderer on the scene sees the same scene facts at the same addresses. `images` are the layers
+ * the scene's lowered texture values read (analyze/imageTextures.ts); with any, every program
+ * declares the image lookup.
  */
-export function planRenderers(features: SceneFeatures, scene: SceneDescription, strategies: RenderStrategy[], bag: DiagnosticBag): { reads: DataReads; placed: PlacedScene; plans: RenderPlan[] } {
+export function planRenderers(features: SceneFeatures, scene: SceneDescription, strategies: RenderStrategy[], bag: DiagnosticBag, images: ImageLayer[]): { reads: DataReads; placed: PlacedScene; plans: RenderPlan[] } {
     const scenePlan = planScene(scene, bag);
-    const programs = strategies.map((strategy) => planProgram(features, scene, strategy, scenePlan));
+    const programs = strategies.map((strategy) => planProgram(features, scene, strategy, scenePlan, images.length > 0));
     const reads = unionDataReads(programs.map(dataReadsOf));
     const placed = placeScene(scene, scenePlan, reads);
     return { reads, placed, plans: programs.map((program) => ({ ...placed, program, pipeline: planPipeline(program) })) };
@@ -459,7 +462,7 @@ export function placeScene(scene: SceneDescription, scenePlan: ScenePlan, reads:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan, readsImages: boolean): ProgramDescription {
     const { lights, materials, objects, meshes, instanceBatches } = scenePlan;
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
@@ -653,6 +656,8 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             ...(Object.keys(scene.materials).some((name) => materialHasExpression(name, scene)) || perturbed.length > 0 ? { noise: true as const } : {}),
             // Bumped materials: the walk's frame swap and their masked interaction arms.
             ...(perturbed.length > 0 ? { perturbed } : {}),
+            // The image lookup and the image array, for the lowered texture values to call.
+            ...(readsImages ? { images: true as const } : {}),
         },
         media: {
             present: features.media.hasMedia,

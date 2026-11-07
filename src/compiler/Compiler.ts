@@ -8,6 +8,7 @@ import { generate } from './generate/Generator.js';
 import { sceneDataPlanOf } from './sceneData.js';
 import { DiagnosticBag } from '../errors/core/DiagnosticBag.js';
 import { validateCompiledRenderer } from '../errors/compiler/validation.js';
+import { lowerImageTextures } from './analyze/imageTextures.js';
 
 export class Compiler implements ICompiler {
     /** One strategy on its own: its data layout holds exactly what it reads. */
@@ -21,12 +22,17 @@ export class Compiler implements ICompiler {
      * nothing none of them reads. In order: validate every strategy (any error stops the
      * compile before work is done), plan the scene once and each strategy's decisions against
      * it, lay out the union of what they read (planRenderers), then generate every program
-     * against that layout.
+     * against that layout. Image-texture values are checked and lowered to expressions first,
+     * so every stage after that sees one value form (analyze/imageTextures.ts).
      */
-    compileScene(scene: SceneDescription, strategies: RenderStrategy[]): CompiledScene {
-        const features = analyze(scene);
+    compileScene(authored: SceneDescription, strategies: RenderStrategy[]): CompiledScene {
         const warnings = new Set<string>();
         const keepWarnings = (bag: DiagnosticBag) => { for (const d of bag.getWarnings()) warnings.add(d.message); };
+
+        const textureBag = new DiagnosticBag('compiler');
+        const { scene, images } = lowerImageTextures(authored, textureBag);
+        textureBag.throwIfErrors();
+        const features = analyze(scene);
 
         if (strategies.length === 0) {
             const bag = new DiagnosticBag('compiler');
@@ -53,7 +59,7 @@ export class Compiler implements ICompiler {
 
         // The Planner emits diagnostics like every stage.
         const planBag = new DiagnosticBag('compiler');
-        const { reads, placed, plans } = planRenderers(features, scene, strategies, planBag);
+        const { reads, placed, plans } = planRenderers(features, scene, strategies, planBag, images);
         planBag.throwIfErrors();
         keepWarnings(planBag);
 
@@ -68,6 +74,6 @@ export class Compiler implements ICompiler {
             return renderer;
         });
 
-        return { renderers, dataReads: reads, sceneData: sceneDataPlanOf(scene, placed), warnings: [...warnings] };
+        return { renderers, dataReads: reads, sceneData: sceneDataPlanOf(scene, placed, images), warnings: [...warnings] };
     }
 }

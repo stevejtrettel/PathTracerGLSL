@@ -5,7 +5,7 @@ A spectrum is a function of wavelength. Its **kind** is the way it was produced
 
 | Kind | Authored as | Roles |
 |---|---|---|
-| `rgb` | a number (gray, or one index at every wavelength), an RGB triple, a `{param}`, a GLSL expression or a per-instance attribute | reflectance, coefficient, emission, index |
+| `rgb` | a number (gray, or one index at every wavelength), an RGB triple, a `{param}`, a GLSL expression (an image texture arrives as one: compiler/analyze/imageTextures.ts lowers it before Analyze) or a per-instance attribute | reflectance, coefficient, emission, index |
 | [`blackbody`](blackbody/README.md) | `{ blackbody: { kelvin, scale } }` | emission |
 | [`cauchy`](cauchy/README.md) | `{ cauchy: [A, B, C?] }` | index |
 | [`sellmeier`](sellmeier/README.md) | `{ sellmeier: { B, C } }` | index |

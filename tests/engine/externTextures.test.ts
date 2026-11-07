@@ -13,7 +13,7 @@ function recordingGl() {
     const calls: Array<[string, ...unknown[]]> = [];
     const impl: Record<string, unknown> = {
         activeTexture: (unit: number) => calls.push(['activeTexture', unit]),
-        bindTexture: (_t: number, tex: unknown) => calls.push(['bindTexture', tex]),
+        bindTexture: (target: number, tex: unknown) => calls.push(['bindTexture', tex, target]),
         uniform1i: (loc: unknown, unit: number) => calls.push(['uniform1i', loc, unit]),
         getUniformLocation: (_p: unknown, name: string) => {
             calls.push(['getUniformLocation', name]);
@@ -22,6 +22,7 @@ function recordingGl() {
         deleteTexture: (tex: unknown) => calls.push(['deleteTexture', tex]),
         TEXTURE0: 33984,
         TEXTURE_2D: 3553,
+        TEXTURE_2D_ARRAY: 35866,
     };
     const gl = new Proxy(impl, {
         get(target, prop: string) {
@@ -64,6 +65,20 @@ describe('extern: texture resolution (T1)', () => {
         expect(samplers).toEqual([0, 1]);
     });
 
+    it('binds each extern to the target it was registered with (2D, or a 2D array)', () => {
+        const { gl, calls } = recordingGl();
+        const registry = new TextureRegistry(gl);
+        const envTex = { id: 'env' }, images = { id: 'images' };
+        registry.register('env_map', envTex as WebGLTexture);
+        registry.register('material_textures', images as WebGLTexture, gl.TEXTURE_2D_ARRAY);
+        const ex = new RenderExecutor(gl, fakeResourceManager({}), registry);
+
+        bind(ex, { u_envMap: 'extern:env_map', u_material_textures: 'extern:material_textures' });
+
+        const bound = calls.filter(c => c[0] === 'bindTexture').map(c => [c[1], c[2]]);
+        expect(bound).toEqual([[envTex, gl.TEXTURE_2D], [images, gl.TEXTURE_2D_ARRAY]]);
+    });
+
     it('throws a hard, NAMED error for a missing extern (never a silent unit-0 sample)', () => {
         const { gl } = recordingGl();
         const registry = new TextureRegistry(gl);
@@ -96,7 +111,7 @@ describe('TextureRegistry (demoted to a dumb store)', () => {
         registry.register('env_map', a as WebGLTexture);
         registry.register('env_map', b as WebGLTexture);   // replace
         expect(calls.filter(c => c[0] === 'deleteTexture').map(c => c[1])).toEqual([a]);
-        expect(registry.get('env_map')).toBe(b);
+        expect(registry.get('env_map')?.texture).toBe(b);
         expect(registry.has('env_map')).toBe(true);
         expect(registry.names()).toEqual(['env_map']);
     });

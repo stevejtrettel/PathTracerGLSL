@@ -19,7 +19,7 @@ function planned(scene: SceneDescription, strategies: RenderStrategy[], i = 0) {
     const bag = new DiagnosticBag('test');
     for (const strategy of strategies) validate(features, scene, strategy, bag);
     bag.throwIfErrors();
-    return planRenderers(features, scene, strategies, bag).plans[i];
+    return planRenderers(features, scene, strategies, bag, []).plans[i];
 }
 
 describe('optional structures are laid out only when a renderer reads them', () => {

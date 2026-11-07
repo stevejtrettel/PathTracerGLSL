@@ -65,6 +65,12 @@ import {
     BUMP_TILT_VALUE, BUMP_TILT_POSE, BUMP_TILT_REGIONS,
     bumpSidesScene, bumpSidesNeeStrategy, bumpSidesMisStrategy, BUMP_SIDES_VALUE, BUMP_SIDES_POSE, BUMP_SIDES_REGIONS,
 } from './scenes/bumpWitness.js';
+import {
+    imageTextureScene, imageTextureLinearScene, imageTextureSpectralScene,
+    imageTexturePtStrategy, imageTextureNeeStrategy, imageTextureMisStrategy, imageTextureSpectralStrategy,
+    QUADRANTS, quadrantRadiance, grayQuadrantRadiance,
+} from './scenes/imageTextureWitness.js';
+import type { Quadrant } from '../glsl/imageTextureTwin.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
 import { MAX_DIST } from './scenes/shaderConstants.js';
@@ -2599,6 +2605,53 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.aFront, label: `quad A front = ρ (key ${strategy + 1})` },
                 { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.bBack, label: `quad B back = ρ (key ${strategy + 1})` },
             ]),
+        },
+    },
+    'image-texture': {
+        scene: imageTextureScene,
+        strategies: [imageTexturePtStrategy, imageTextureNeeStrategy, imageTextureMisStrategy],
+        exercises:
+            'Image textures (src/glsl/shared/image_texture.glsl): an sRGB RGB image as a Lambert albedo on an '
+            + 'orthographic quad under a unit sky — the uv flip, the half-texel offset, decode-before-blend, the '
+            + 'repeat wrap and the channel order, under pt, pt-nee and pt-mis',
+        expected:
+            'each quadrant reads the exact mean of the albedo field over it, per channel (quadrantMean); a swapped '
+            + 'top/bottom or left/right, a missing half-texel offset or a decode after the blend each move some '
+            + 'quadrant by ≥ 0.05 (the fixture header lists them)',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            // pt reads ρ at every sample; NEE samples the sky uniformly (σ ≈ 1.3ρ a sample, about 0.002
+            // over a quadrant at this budget).
+            checks: [0, 1, 2].flatMap((strategy) => (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: quadrantRadiance(q, true), tol: 0.008, strategy, region: QUADRANTS[q], label: `${q} = albedo mean (key ${strategy + 1})` }
+            ))),
+        },
+    },
+    'image-texture-linear': {
+        scene: imageTextureLinearScene,
+        strategies: [imageTexturePtStrategy],
+        exercises: 'Image textures read as linear data (colorspace \'linear\'): the decode is skipped',
+        expected: 'each quadrant reads the mean of the codes/255 field over it; the sRGB-decoded values of image-texture mean the flag was ignored',
+        witness: {
+            size: [64, 64],
+            spp: 64,
+            checks: (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: quadrantRadiance(q, false), tol: 0.004, region: QUADRANTS[q], label: `${q} = linear albedo mean` }
+            )),
+        },
+    },
+    'image-texture-spectral': {
+        scene: imageTextureSpectralScene,
+        strategies: [imageTextureSpectralStrategy],
+        exercises: 'Image textures in a spectral program: the filtered RGB is lifted as a reflectance (a gray image, which lifts exactly)',
+        expected: 'each quadrant reads the G table\'s sRGB-decoded mean in all three channels',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            checks: (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: grayQuadrantRadiance(q), tol: 0.008, region: QUADRANTS[q], label: `${q} = gray albedo mean (spectral)` }
+            )),
         },
     },
 };

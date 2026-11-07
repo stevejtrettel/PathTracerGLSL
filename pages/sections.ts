@@ -134,11 +134,12 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Materials & texturing',
-        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos, bump mapping',
+        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos, bump mapping, image textures',
         entries: [
             e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
             e('expr-const', 'expr-const-ref'),
             e('bump-tilt'), e('bump-sides'),
+            e('image-texture', 'image-texture-linear', 'image-texture-spectral'),
         ],
     },
     {

@@ -69,6 +69,24 @@ accept scalar indices, [Cauchy](../color/spectra/cauchy/README.md), or
 collapses once before index-dependent scattering/NEE. Radiometric rows still declare
 reflectance/emission roles separately; an index is not an RGB lift.
 
+## Image textures
+
+A reflectance row (albedo, f0, transmittance, checker's colors) may read an image:
+`{ texture: name, uvScale? }`, with `scene.textures[name] = { url, colorspace: 'srgb' | 'linear' }`.
+The field is pbrt-v4's at zero footprint (src/glsl/shared/image_texture.glsl, twin
+tests/glsl/imageTextureTwin.ts): t = 1 − v (uv (0, 0) is the image's bottom-left corner), texel
+centers at half-integers, each texel decoded to linear before the bilinear blend, repeat wrap. No
+mipmaps: the pixel filter integrates the field, so the converged pixel is exact (a prefiltered
+texture would change the converged image wherever the BSDF is nonlinear in the value). The value
+is read once per hit by `scene_material_properties`, so eval, sample and pdf see one `props`.
+
+The images a scene's materials read are its layers of one RGBA8 2D-array texture (one sampler
+unit), in first-use order; they must share one size, and a declared image nobody reads is not
+loaded. Errors, not yet built: textures in emission, index or float rows (roughness waits for
+derived rows computed per hit), in media, lights or the sky, and on spheres (the sphere chart is
+pbrt's rotated 180°, and which one to keep is not decided). Shapes without a uv chart (plane, box,
+the SDF shapes) and meshes without uvs read the planar placeholder `(x, z)·0.1`; other meshes read their interpolated vertex uvs.
+
 ## Shading-normal perturbation (bump)
 
 Any surface model takes the meta-key `bump: { height, step }`. `height` is a float GLSL
