@@ -321,4 +321,5 @@ GPU mutation runs (one mutation, one scene each, reverted): the curved normal wi
 curved step budget cut to 4 — s3-sdf-furnace 1.0000 vs 3.9514, FAIL; the Klein chart without the
 division by p.w — h3-klein-ball 0.2597 vs 0.2027, FAIL; the sculpture's second blend width doubled in
 the GLSL — s3-sdf-blend 0.2342 vs 0.2353, PASSED at tolerance 0.002. The sculpture tolerance is now
-0.0008 (four times the largest measured deviation, 2e-4), and that mutation is re-run below.
+0.0008 (four times the largest measured deviation, 2e-4). Re-run: unmutated h3-sdf-blend 0.1861 and
+s3-sdf-blend 0.2353 pass; with the doubled blend width both FAIL (0.1890 vs 0.1859, 0.2342 vs 0.2353).

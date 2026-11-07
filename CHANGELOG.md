@@ -4,6 +4,54 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Marched fields in H³ and S³
+
+[Plan](docs/claude-2026-11-review/curved/sdf-plan.md) (reviewed once; the review's S³ blocker is fixed).
+
+- **The march along geodesics.** In a curved space the generated `<type>_sdf_intersect` evaluates
+  its field at `ambient_geodesic(ray.origin, ray.direction, t)` (re-flowed from the seed each step);
+  the generated normal `<type>_sdf_normal(Ray at, S s)` takes four taps at arc length
+  NORMAL_EPSILON along tetrahedral combinations of `ambient_frame` of the arrival direction and is
+  mapped to world by `isometry_direction`. The Planner plans a curved `sdf`-backend object as
+  marched; its arm moves the ray by G⁻¹, marches the bound's interval, spawns at MARCH_CLEARANCE;
+  containment reads the field at G⁻¹p. Euclidean output is unchanged (digest: all 274 Euclidean
+  scenes identical; the 13 existing curved scenes differ by the new helpers).
+- **The vocabulary** for curved fields: `sdf_point`, `sdf_ball` and the smooth union /
+  intersection / subtraction in components/ambient/sdf.glsl (over the seam, one source for both
+  spaces), `sdf_plane` and `sdf_tube` in each occupant (H³: asinh of ⟨p⊥,p⊥⟩^½, precise near the
+  axis; S³: an atan form). The plane bodies call the occupants' new `<space>_plane_vector` /
+  `<space>_plane_distance`.
+- **`sphere_interval`** in both curved sphere bodies (the bound of a marched ball and of any field
+  bounded by a sphere). In S³ an origin inside the ball searches the whole period: a geodesic leaves
+  and comes back around, and a shape smaller than its bound can be met on the second visit.
+- **`defineSDF`** takes bodies keyed by space (`glsl: { hyperbolic, spherical }`, over a point of the
+  model); the twin gates stay Euclidean. `kleinChart: true` serves a Euclidean field to H³ in the
+  Klein chart (the chart never stretches distance, so no scale factor; it marches unbounded). The
+  Validator requires a curved march bound centered at the object's origin and valid in the space.
+  The 'marched objects' limitation lists both curved spaces; registry fractals, torus, box and
+  cylinder still have no curved body.
+- **Twins**: tests/components/curvedSdf.test.ts (fp64 march against closed-form and brute-force
+  roots, normals, the 1-Lipschitz property, the Klein bound), each check seen failing under one
+  mutation.
+- **Witnesses** (tests/witnesses/scenes/curvedSdfWitness.ts), all passing at first run, measured:
+  h3-sdf-ball 0.2028 vs closed form 0.2027 (twin with the closed-form ball: Δmean 0.03%, rmse
+  0.09%); s3-sdf-ball 0.1435 vs 0.1435 (Δmean 0.02%, rmse 0.07%; the window is lit through both
+  arcs); h3-klein-ball 0.2027 vs 0.2027; h3-sdf-furnace and s3-sdf-furnace 3.9514 = Σ_{k≤6} 0.8^k;
+  h3-sdf-blend 0.1861 vs twin 0.1859; s3-sdf-blend 0.2353 vs 0.2353 (tolerance 0.002 for the balls,
+  0.0008 for the sculptures). h3-furnace, s3-furnace and s3-long-arc-blocker still pass after the plane
+  and sphere bodies changed. Each witness fails under one mutation: the curved normal without
+  isometry_direction (h3-sdf-ball 0.1494), a curved step budget of 4 (s3-sdf-furnace 1.0000), the Klein
+  chart without the division by p.w (h3-klein-ball 0.2597), the sculpture's blend width doubled in
+  the GLSL (0.1890 and 0.2342 — this one passed at the first tolerance of 0.002, which is why the
+  sculptures' is 0.0008).
+- **Final review fix:** S³ `sphere_interval` tests "inside" before the discriminant — a bound of
+  radius above π/2 contains whole great circles, whose discriminant is negative (no witness or demo
+  had such a bound).
+- The Euclidean kitchen-sink compile test skips primitives with no Euclidean body (the curved-only
+  scene-local fields, compiled by the curved scenes that use them).
+- **Demos** `hyperbolic-sculpture` and `spherical-sculpture`: a jack and a pierced ball, one GLSL
+  body each for both spaces.
+
 ## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
 
 Review of the S³ step (curved-space design §2.4).
