@@ -266,6 +266,10 @@ exports[`scene-data textures (byte fingerprints) > h3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-point-light 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > h3-quad-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-shapes 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > h3-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-sky-ball 1`] = `null`;
@@ -698,6 +702,10 @@ exports[`scene-data textures (byte fingerprints) > s3-long-arc-blocker 1`] = `nu
 exports[`scene-data textures (byte fingerprints) > s3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > s3-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-quad-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-shapes 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
 {

@@ -72,6 +72,21 @@ are computed by the fp64 twin `scenes/s3Twins.ts` (space-free parts in `scenes/c
 independent Monte Carlo estimate, the blocker's position on every long arc and the lights' absence
 from every camera ray's geodesic. Not yet in a full sweep.
 
+## Curved-space witnesses (box, cylinder, quad, quad light)
+
+`scenes/curvedShapesWitness.ts`: `h3-shapes` and `s3-shapes` (a rotated lambert box, a tilted
+cylinder and a quad under a point light, pt-nee; readout windows inside single lit faces — a box
+face, the tube, a cap, the quad, and in S³ a box face lit only through the long arc — against
+(ρ/π)·Σ_arcs I·max(0, cos θ)·visibility/S(d)² at the first hit, within 0.5%), `h3-quad-light` and
+`s3-quad-light` (the H³/S³ direct-lighting receiver under a quad light, in S³ facing away so only
+the long arc lights it; pt-nee, pt-mis and pt against the window mean of the quadrature over the
+quad). The expected values are computed by the fp64 twin `scenes/curvedShapeTwins.ts`;
+`curvedShapesTwins.test.ts` recomputes them, checks each window lies inside its one lit face, and
+checks the quad quadrature against an independent cosine-sampled estimate; the twin's intersectors
+and normals are checked against marched membership by tests/components/curvedShapes.test.ts. A
+shapes window does not see a normal's sign (the hit fill turns the normal toward the arriving ray).
+Not yet in a full sweep.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

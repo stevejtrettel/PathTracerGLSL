@@ -8,6 +8,14 @@
 //
 // Every shape is in its own frame, canonical at o = (0,0,0,1). T(x) = tanh x (H³), tan x (S³).
 
+import { hyperbolicGeometry } from '../../../src/components/ambient/hyperbolic/hyperbolic.js';
+import { sphericalGeometry } from '../../../src/components/ambient/spherical/spherical.js';
+import { mat4Apply, placementIsometry, type Mat4 } from '../../../src/components/ambient/isometry.js';
+import { quatFromAxisAngle, IDENTITY_QUAT } from '../../../src/components/geometry/similarity.js';
+import { curvedCameraRay, gaussLegendre, regionMean } from './curvedTwins.js';
+import type { WitnessRegion } from '../types.js';
+import { SHAPES_SIZE, type ShapesFixture } from './curvedShapesWitness.js';
+
 export type Space = 'H3' | 'S3';
 export type V4 = [number, number, number, number];
 
@@ -215,7 +223,7 @@ export function cylinderInside(S: Space, x: V4, r: number, h: number): boolean {
 // half-widths a = |edge1|/2, b = |edge2|/2; emitting side +ê1×ê2.
 // ---------------------------------------------------------------------------
 
-type V3 = [number, number, number];
+export type V3 = [number, number, number];
 const cross3 = (u: V3, w: V3): V3 => [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
 const norm3 = (u: V3) => Math.hypot(u[0], u[1], u[2]);
 const unit3 = (u: V3): V3 => { const n = norm3(u); return [u[0] / n, u[1] / n, u[2] / n]; };
@@ -301,4 +309,179 @@ export function quadLightAreaPdf(S: Space, c: V4, E1: V4, E2: V4, y: V4): number
 export function quadArea(S: Space, a: number, b: number): number {
     if (S === 'H3') return 2 * Math.PI - 4 * Math.acos(Math.sinh(a) * Math.sinh(b));
     return 4 * Math.acos(-Math.sin(a) * Math.sin(b)) - 2 * Math.PI;
+}
+
+// ---------------------------------------------------------------------------
+// Scenes (the witnesses' expected values): shapes placed by isometries g (world = g·local), the
+// first hit of a world ray, a lambert surface's radiance under a point light over every geodesic
+// from the hit to the light with its visibility, and a quad light's irradiance by quadrature.
+// ---------------------------------------------------------------------------
+
+export const geometryOf = (S: Space) => (S === 'H3' ? hyperbolicGeometry : sphericalGeometry);
+
+/** A shape in its own frame (the twin intersectors above) and its placement. */
+export type LocalShape =
+    | { kind: 'box'; halfSize: number[] }
+    | { kind: 'cylinder'; radius: number; halfHeight: number }
+    | { kind: 'quad'; edge1: V3; edge2: V3 };
+export interface PlacedShape { shape: LocalShape; g: Mat4; ginv: Mat4 }
+
+/** The placement of an authored transform {position, rotation} applied to a shape first moved from o
+ *  by `pre` (its center: the quad's corner + (edge1 + edge2)/2), as the compiler places it. */
+export function place(S: Space, shape: LocalShape, position: V3, rotation?: { axis: V3; angle: number }, pre: V3 = [0, 0, 0]): PlacedShape {
+    const geom = geometryOf(S);
+    const g = placementIsometry(geom, position, rotation === undefined ? IDENTITY_QUAT : quatFromAxisAngle(rotation.axis, rotation.angle), pre);
+    return { shape, g, ginv: geom.inverse(g) };
+}
+
+function localHit(S: Space, s: LocalShape, p: V4, v: V4): number | null {
+    if (s.kind === 'box') return boxIntersect(S, p, v, s.halfSize);
+    if (s.kind === 'cylinder') return cylinderIntersect(S, p, v, s.radius, s.halfHeight);
+    return quadIntersect(S, p, v, s.edge1, s.edge2);
+}
+function localNormal(S: Space, s: LocalShape, x: V4): V4 {
+    if (s.kind === 'box') return boxNormal(S, x, s.halfSize);
+    if (s.kind === 'cylinder') return cylinderNormal(S, x, s.radius, s.halfHeight);
+    return quadNormal4(s.edge1, s.edge2);
+}
+
+/** The first hit of the world ray (p, v) on (0, tmax): the shape's index, the point and the world
+ *  normal (g applied to the local one). */
+export function sceneHit(S: Space, shapes: PlacedShape[], p: V4, v: V4, tmax = S === 'H3' ? 10 : 2 * Math.PI): { index: number; t: number; x: V4; n: V4 } | null {
+    let best: { index: number; t: number; x: V4; n: V4 } | null = null;
+    shapes.forEach((sh, index) => {
+        const lp = mat4Apply(sh.ginv, p) as V4, lv = mat4Apply(sh.ginv, v) as V4;
+        const t = localHit(S, sh.shape, lp, lv);
+        if (t === null || t >= tmax || (best !== null && t >= best.t)) return;
+        const lx = flow(S, lp, lv, t).pos;
+        best = { index, t, x: mat4Apply(sh.g, lx) as V4, n: mat4Apply(sh.g, localNormal(S, sh.shape, lx)) as V4 };
+    });
+    return best;
+}
+
+/** Geodesic distance (the short arc in S³). */
+export function distance(S: Space, a: V4, b: V4): number {
+    const c = lin(a, 1, b, -1);
+    if (S === 'H3') return 2 * Math.asinh(0.5 * Math.sqrt(Math.max(form(S, c, c), 0)));
+    const d = lin(a, 1, b, 1);
+    return 2 * Math.atan2(Math.sqrt(form(S, c, c)), Math.sqrt(form(S, d, d)));
+}
+
+/** The geodesics from x to q: one in H³; the short arc (along u, length d) and the long arc (along
+ *  −u, length 2π − d) in S³. */
+function arcs(S: Space, x: V4, q: V4): Array<{ dir: V4; length: number }> {
+    const u = tangentUnit(S, x, lin(q, 1, x, -1)), d = distance(S, x, q);
+    return S === 'H3' ? [{ dir: u, length: d }] : [{ dir: u, length: d }, { dir: scale(u, -1), length: 2 * Math.PI - d }];
+}
+
+/** The radiance a camera ray (p, v) reads off a lambert scene (albedo ρ) lit by a point light of
+ *  intensity I at q, maxBounces 1: (ρ/π)·Σ_arcs I·max(0, cos θ)·vis / S(d)², with cos θ against the
+ *  normal turned toward the camera (an opaque surface is lit on the side it is seen from) and the
+ *  visibility of each arc tested against every shape. 0 when the ray misses. */
+export function pointLitRadiance(S: Space, shapes: PlacedShape[], p: V4, v: V4, q: V4, I: number, albedo: number): { L: number; index: number } {
+    const hit = sceneHit(S, shapes, p, v);
+    if (hit === null) return { L: 0, index: -1 };
+    const arrival = flow(S, p, v, hit.t).vel;
+    const n = form(S, hit.n, arrival) < 0 ? hit.n : scale(hit.n, -1);
+    const A = (S === 'H3' ? Math.sinh(distance(S, hit.x, q)) : Math.sin(distance(S, hit.x, q))) ** 2;
+    let E = 0;
+    for (const arc of arcs(S, hit.x, q)) {
+        const c = form(S, n, arc.dir);
+        if (c <= 0) continue;
+        // the shadow geodesic, started a hair off the surface on the lit side
+        const o = flow(S, hit.x, n, 1e-9).pos;
+        const dir = tangentUnit(S, o, arc.dir);
+        const blocker = sceneHit(S, shapes, o, dir, arc.length - 1e-9);
+        if (blocker === null) E += I * c / A;
+    }
+    return { L: (albedo / Math.PI) * E, index: hit.index };
+}
+
+/** A quad light in world coordinates: center c, edges E1, E2 (tangent at c), normal N, radiance Le. */
+export interface QuadEmitter { c: V4; E1: V4; E2: V4; N: V4; Le: number }
+
+/** The quad light an authored {corner, edge1, edge2} makes: placed by the transvection to its center
+ *  corner + (edge1 + edge2)/2, the edges carried there. */
+export function quadEmitter(S: Space, corner: V3, edge1: V3, edge2: V3, Le: number): QuadEmitter {
+    const center: V3 = [corner[0] + 0.5 * (edge1[0] + edge2[0]), corner[1] + 0.5 * (edge1[1] + edge2[1]), corner[2] + 0.5 * (edge1[2] + edge2[2])];
+    const g = placementIsometry(geometryOf(S), [0, 0, 0], IDENTITY_QUAT, center);
+    const c = mat4Apply(g, [0, 0, 0, 1]) as V4;
+    const E1 = mat4Apply(g, [...edge1, 0]) as V4, E2 = mat4Apply(g, [...edge2, 0]) as V4;
+    return { c, E1, E2, N: quadLightNormal(S, c, E1, E2), Le };
+}
+
+/** Irradiance at x (unit normal nx) from a quad emitter: ∫ Le·Σ_arcs max(cos_x, 0)·max(cos_y, 0)/S(d)² dA
+ *  over the rectangle, Gauss–Legendre in its chart coordinates with dA = w³·dk₁dk₂ (cos_y against
+ *  the arc's reversed arrival direction: back = direction_to(y, x) for the short arc, −back for the
+ *  long one). Nothing occludes in the quad-light witnesses. `density` replaces the area element's
+ *  w³ (the mutation-size prediction of the witness test integrates with w² in its place). */
+export function quadIrradiance(S: Space, x: V4, nx: V4, e: QuadEmitter, n = 24, density: (w: number) => number = (w) => w * w * w): number {
+    const [nodes, weights] = gaussLegendre(n);
+    const A = (S === 'H3' ? Math.tanh : Math.tan)(0.5 * Math.sqrt(form(S, e.E1, e.E1)));
+    const B = (S === 'H3' ? Math.tanh : Math.tan)(0.5 * Math.sqrt(form(S, e.E2, e.E2)));
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            const y = quadLightPoint(S, e.c, e.E1, e.E2, 0.5 * (nodes[i] + 1), 0.5 * (nodes[j] + 1));
+            const w = S === 'H3' ? -form(S, y, e.c) : form(S, y, e.c);
+            const dA = A * B * weights[i] * weights[j] * density(w);
+            const d = distance(S, x, y);
+            const Ad = (S === 'H3' ? Math.sinh(d) : Math.sin(d)) ** 2;
+            const u = tangentUnit(S, x, lin(y, 1, x, -1)), back = tangentUnit(S, y, lin(x, 1, y, -1));
+            const cases = S === 'H3' ? [[form(S, nx, u), form(S, e.N, back)]] : [[form(S, nx, u), form(S, e.N, back)], [-form(S, nx, u), -form(S, e.N, back)]];
+            for (const [cx, cy] of cases) if (cx > 0 && cy > 0) sum += e.Le * cx * cy / Ad * dA;
+        }
+    }
+    return sum;
+}
+
+// ---------------------------------------------------------------------------
+// The shapes witnesses (curvedShapesWitness.ts): the fixture's shapes placed as the compiler places
+// them, and each readout window's mean and the faces it covers.
+// ---------------------------------------------------------------------------
+
+export function shapesOf(S: Space, f: ShapesFixture): PlacedShape[] {
+    const c = f.quad.corner, e1 = f.quad.edge1, e2 = f.quad.edge2;
+    const center: V3 = [c[0] + 0.5 * (e1[0] + e2[0]), c[1] + 0.5 * (e1[1] + e2[1]), c[2] + 0.5 * (e1[2] + e2[2])];
+    return [
+        place(S, { kind: 'box', halfSize: f.box.halfSize }, f.box.position, f.box.rotation),
+        place(S, { kind: 'cylinder', radius: f.cylinder.radius, halfHeight: f.cylinder.halfHeight }, f.cylinder.position, f.cylinder.rotation),
+        place(S, { kind: 'quad', edge1: e1, edge2: e2 }, [0, 0, 0], undefined, center),
+    ];
+}
+
+const shapesRay = (S: Space, f: ShapesFixture) => (fx: number, fy: number) =>
+    curvedCameraRay(geometryOf(S), f.pose, f.fov, SHAPES_SIZE, fx, fy) as { p: V4; v: V4 };
+
+/** The window's mean radiance through the fixture's pinhole camera (regionMean, sub×sub points
+ *  per pixel). */
+export function shapesWindowMean(S: Space, f: ShapesFixture, region: WitnessRegion, sub = 2): number {
+    const shapes = shapesOf(S, f), q = geometryOf(S).exp(f.light.position) as V4;
+    return regionMean(shapesRay(S, f), SHAPES_SIZE, region, (p, v) => {
+        const L = pointLitRadiance(S, shapes, p, v, q, f.light.intensity, f.albedo).L;
+        return [L, L, L];
+    }, sub)[0];
+}
+
+/** The faces the window's points see ('box ±x/y/z' by the local normal, 'cylinder tube' or
+ *  'cylinder cap', 'quad', 'miss'), and how many of them are unlit, at sub×sub points per pixel. */
+export function shapesWindowFaces(S: Space, f: ShapesFixture, region: WitnessRegion, sub = 4): { faces: Set<string>; unlit: number } {
+    const shapes = shapesOf(S, f), q = geometryOf(S).exp(f.light.position) as V4;
+    const faces = new Set<string>();
+    let unlit = 0;
+    regionMean(shapesRay(S, f), SHAPES_SIZE, region, (p, v) => {
+        const hit = sceneHit(S, shapes, p, v);
+        if (hit === null) { faces.add('miss'); return [0, 0, 0]; }
+        const sh = shapes[hit.index];
+        const ln = mat4Apply(sh.ginv, hit.n) as V4;
+        if (sh.shape.kind === 'box') {
+            const a = [0, 1, 2].map((i) => Math.abs(ln[i]));
+            const i = a.indexOf(Math.max(...a));
+            faces.add(`box ${ln[i] > 0 ? '+' : '-'}${'xyz'[i]}`);
+        } else if (sh.shape.kind === 'cylinder') faces.add(Math.abs(ln[1]) > 0.9 ? 'cylinder cap' : 'cylinder tube');
+        else faces.add('quad');
+        if (pointLitRadiance(S, shapes, p, v, q, f.light.intensity, f.albedo).L === 0) unlit++;
+        return [0, 0, 0];
+    }, sub);
+    return { faces, unlit };
 }

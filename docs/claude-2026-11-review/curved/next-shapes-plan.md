@@ -197,7 +197,9 @@ case (the body works; the Validator rejects it).
   (rays from x, TS quad intersector, π·Le·P(hit)). Catches the sampler, the pdf (pt-nee, and pt-mis
   through the MIS weights), the hit side (pt), the one-sided normal and the arc rule.
 - Each new witness is shown to fail with one deliberate mutation (reverted): shapes — the tube normal
-  without its C/s factors (a wrong direction); quad light — w³ → w² in the pdf, with half-widths
+  with the sign of its y-part flipped (a wrong direction; dropping the C/s factors, as first planned,
+  is NOT one: every vector in the plane of the radial direction and the axis foot point projects in
+  ambient_frame onto the same tangent line, so that mutation renders identically — measured); quad light — w³ → w² in the pdf, with half-widths
   ≥ 0.5 so that the predicted change of the NEE mean (computed by the twin) is ≥ 5× the tolerance.
 - Existing output unchanged: `npm run digest` before and after; `--compare` shows no existing scene
   changed, Euclidean or curved (the `world` move must leave the h3/s3 shaders identical; frames only
