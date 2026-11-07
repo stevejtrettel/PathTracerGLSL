@@ -277,3 +277,28 @@ curved scenes' lighting, checked on a lab render.
 4. defineSDF record bodies; Klein door.
 5. Witness fixtures + twin values; targeted witness run; mutations.
 6. Demos; docs; CHANGELOG; full vitest; digest compare; review.
+
+## 5. Review record
+
+One fresh reviewer read the plan against the code and checked its math numerically (tube distances
+against brute force in fp64 and emulated f32, the Klein bound over 10⁵ pairs, the sphere_interval
+roots, the smooth-union Lipschitz ratio and the k/4 growth). Applied:
+
+- **Blocker, S³:** an origin inside the bound searched only [0, exit] and missed the shape met again
+  after going around (1798 of 2000 outward rays off a small ball inside a larger bound). Now
+  [0, 2π]; twin test 4 includes such origins and fails when the interval is cut at the exit.
+- The furnace is a no-leak test only; its mutation is a step budget of 4, not `t1·0.5` (t1 is
+  MAX_DIST in an unbounded cavity).
+- The twin criterion "t within 2e-3 below the root" fails on correct marches near the stall band;
+  dropped. Graze exemptions are judged by penetration depth, not by min |f| (which is 0 at every
+  real crossing — the first version of the test could not fail under the interval mutation).
+- The k/4 rule is about the set {min(pieces) ≤ k/4}, not a neighborhood, when pieces are lower
+  bounds; the sculpture's bound is derived from it (`sculptureBound`).
+- The MARCH_CLEARANCE statement now includes the acceptance residual (margin 1.24× at ρ = 3).
+- S³ plane vectors use spherical_cos_sin; the Klein door rejects authored normals and its contract
+  requires a lower bound in the whole unit ball.
+
+Deviation from §1.2(c) during the build: the light intensities and the H³ sculpture camera were
+set so window means are 0.14–0.20 (the first choices gave 0.03 and an H³ window that missed the
+sculpture's edge in 10 points), and the S³ ball's light moved to the side so the window holds both
+arcs (641 short-arc and 4159 long-arc points of 4800).

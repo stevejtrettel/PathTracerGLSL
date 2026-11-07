@@ -51,6 +51,7 @@ import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from '.
 import { embersScene, embersStrategy, embersMisStrategy, embersPtStrategy } from './embersScene.js';
 import { hyperbolicScene, hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy } from './hyperbolicScene.js';
 import { sphericalScene, sphericalMisStrategy, sphericalNeeStrategy, sphericalPtStrategy } from './sphericalScene.js';
+import { hyperbolicSculptureScene, sphericalSculptureScene, sculptureMisStrategy, sculptureNeeStrategy, sculptureWideMisStrategy, sculptureWideNeeStrategy } from './curvedSculptureScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -88,6 +89,23 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             + 'the ring holds few balls (a circle of radius ρ has length 2π·sin ρ); the far ball is magnified near the '
             + 'antipode. No sky: light reaches every point along both arcs. Keys 1/2/3 = pt-mis / pt-nee / pt (same image).',
         expected: 'the ring of balls with soft contact shadows on the floor, the floor rising behind them and closing overhead as a ceiling, a large dim teal shape above (the far ball, magnified near the antipode)',
+    },
+    'hyperbolic-sculpture': {
+        scene: hyperbolicSculptureScene,
+        strategies: posed([0.1, 0.05, 1.05], [-0.3, -0.45, -0.3], sculptureMisStrategy, sculptureNeeStrategy),
+        exercises:
+            'DEMO — marched fields in H³: two scene-local sculptures written against the curved SDF vocabulary '
+            + '(geodesic balls, tubes about geodesics, smooth unions and a smooth subtraction), sphere-traced along '
+            + 'geodesics, on a floor under a disk light and a sky. Keys 1/2 = pt-mis / pt-nee (same image).',
+        expected: 'a terracotta jack (six round tips on three arms, rounded joints) floating just above the floor left of center with its shadow below, a bone-white ball pierced by three tunnels resting on the floor to the right, a small blue ball between them; the floor curves away like a dome with blue sky beyond its edge',
+    },
+    'spherical-sculpture': {
+        scene: sphericalSculptureScene,
+        strategies: posed([0.1, 0.12, 1.0], [-0.3, -0.42, -0.3], sculptureWideMisStrategy, sculptureWideNeeStrategy),
+        exercises:
+            'DEMO — marched fields in S³: the same two sculptures (one GLSL body serves both spaces), on a floor that is a '
+            + 'great sphere, under a warm and a cool disk light that reach every point along both arcs. Keys 1/2 = pt-mis / pt-nee.',
+        expected: 'the terracotta jack and the pierced bone-white ball on a pale floor, seen through a wide (1.5 rad) lens; the ball nearest the edge of the frame is stretched; warm light from above, cool light from the right',
     },
     embers: {
         scene: embersScene,
