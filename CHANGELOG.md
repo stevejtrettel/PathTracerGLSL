@@ -28,6 +28,9 @@ the camera functional W_j); C is view (a fixed linear map of each converged pixe
   it integrates, which the matrix reads (one integration).
 - New witness `bokeh-edge` (disk, hexagon, triangle at 0.4 rad); `thinlens-zero` gains a
   six-blade arm.
+- The `hearth` demo gains a third renderer, `pt-nee-wb` (key 3: key 1 with `whiteBalance: 2900`,
+  the lamp's default temperature), and the glslang test compiles every tonemap's display shader
+  with white balance, so CI parses the `DISPLAY_VIEW` path.
 
 **Measured:**
 - Twin χ² of the polygon warp against exact cell areas (n = 3, 5, 6, 6, 9, assorted rotations,
@@ -42,6 +45,8 @@ the camera functional W_j); C is view (a fixed linear map of each converged pixe
 - Witnesses (targeted): `bokeh-edge` columns 79–80 read 0.1967 (disk; exact 0.1957), 0.1674
   (hexagon; exact 0.1670) and 0.0996 (triangle; exact 0.0994), tol 0.006; `thinlens-zero` both
   arms Δmean 0.00%, rmse 0.00%.
+- Screenshot (SwiftShader, `hearth`, ~40 s each): key 1 reads orange (wall sRGB mean 46/36/23,
+  floor 173/137/92); key 3 reads as under white light (wall 39/37/36, floor 144/144/145).
 
 ## 2026-11-07 — Review fixes for the Gaussian pixel filter
 

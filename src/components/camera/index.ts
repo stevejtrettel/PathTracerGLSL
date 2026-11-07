@@ -85,10 +85,12 @@ export interface CameraModelDescriptor {
     controls?(cam: CameraDesc): CameraControl[];
     /** Model-unique derived shader values (precomputed uniforms). Omit when none. */
     derived?(cam: CameraDesc): CameraDerived[];
-    /** Model-unique compile-time #defines — for selecting a PROJECTION VARIANT (fisheye
-     *  aliases FISHEYE_THETA to the radial-map function its `projection` picks). This is
-     *  the STRUCTURAL axis: the projection type is part of the integral, so it recompiles —
-     *  distinct from the NUMERIC camera controls (fov/aperture/…), which are always uniforms. */
+    /** Model-unique compile-time #defines — for selecting a projection or pupil shape
+     *  (fisheye aliases FISHEYE_THETA to the radial-map function its `projection` picks; the
+     *  thin lens sets LENS_BLADES and LENS_BLADE_ROTATION for a bladed pupil). This is the
+     *  STRUCTURAL axis: the projection and the pupil shape are part of the integral, so they
+     *  recompile — distinct from the NUMERIC camera controls (fov/aperture/…), which are
+     *  always uniforms. */
     defines?(cam: CameraDesc): Record<string, string>;
 }
 

@@ -132,6 +132,19 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
                     if (shaderId.endsWith('-display')) check(prog.fragment, 'frag', `${shaderId} [display ${type}]`);
                 }
             });
+            // White balance turns the display scale into the matrix DISPLAY_VIEW; the raw
+            // probe path 'none' applies no display glue, so it has no matrix to parse.
+            if (type === 'none') continue;
+            it(`tonemap ${type} + whiteBalance`, () => {
+                const strategy = { ...base.strategies[0], id: `tonemap-${type}-wb`, view: { tonemap: { type, whiteBalance: 3200 } } } as typeof base.strategies[0];
+                const renderer = compiler.compile(base.scene, strategy);
+                const display = [...renderer.shaders].filter(([id]) => id.endsWith('-display'));
+                if (display.length === 0) throw new Error(`tonemap ${type}: no display shader`);
+                for (const [shaderId, prog] of display) {
+                    if (!prog.fragment.includes('const mat3 DISPLAY_VIEW')) throw new Error(`${shaderId}: whiteBalance emitted no DISPLAY_VIEW`);
+                    check(prog.fragment, 'frag', `${shaderId} [display ${type} + whiteBalance]`);
+                }
+            });
         }
     });
 

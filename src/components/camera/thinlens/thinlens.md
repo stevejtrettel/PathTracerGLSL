@@ -27,6 +27,9 @@ is the correctness witness (a thin-lens render at aperture 0 must match pinhole)
 `concentric_disk` is the shared core-math helper (`glsl/core/math.glsl`), also used by the
 disk and soft-beam lights.
 
+`aperture` and `focusDistance` are live sliders that trigger accumulation reset — they change
+what the render converges to.
+
 **Bladed pupil.** With `blades: n` (an integer ≥ 3) the pupil is the regular n-gon of
 circumradius `u_aperture`, the shape a stopped-down iris of n straight blades makes, so
 out-of-focus highlights become n-gons. Its vertices lie at `bladeRotation + 2πk/n` radians,
@@ -45,8 +48,7 @@ than the nominal f-number from `thinLensFromPhoto`.
 
 Checks: the twin χ² of the warp against exact cell areas (tests/components/aperturePolygon.test.ts),
 the `bokeh-edge` witness (the fraction of the disk, a hexagon and a rotated triangle beyond a
-defocused edge, exact values), and the `thinlens-zero` six-blade arm (aperture 0 ≡ pinhole). `aperture` and `focusDistance` are live sliders that trigger
-accumulation reset — they change what the render converges to.
+defocused edge, exact values), and the `thinlens-zero` six-blade arm (aperture 0 ≡ pinhole).
 
 Randomness note (the camera A/B split, see `../README.md`): thin-lens consumes exactly the
 Category-A dimensions — the `film` footprint (pixel/) + `xiLens`. Motion blur (shutter time) and spectral
