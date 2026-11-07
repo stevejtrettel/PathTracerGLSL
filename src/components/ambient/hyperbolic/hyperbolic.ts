@@ -4,13 +4,17 @@
 
 import type { Vec3Tuple } from '../../geometry/similarity.js';
 import type { CurvedGeometry, Mat4, Vec4 } from '../isometry.js';
-import { mat4Multiply, mat4Transpose } from '../isometry.js';
+import { linearIsometries, mat4Multiply, mat4Transpose } from '../isometry.js';
 
 /** J = diag(1,1,1,−1), the form's matrix. */
 const J: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1];
 
+/** The Minkowski form of R^{3,1}. */
+const form = (a: Vec4, b: Vec4): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] - a[3] * b[3];
+
 export const hyperbolicGeometry: CurvedGeometry = {
-    form: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] - a[3] * b[3],
+    form,
+    ...linearIsometries(form),
 
     // exp_o(v) = (sinh|v|·v̂, cosh|v|).
     exp(v: Vec3Tuple): Vec4 {

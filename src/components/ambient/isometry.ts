@@ -26,6 +26,33 @@ export interface CurvedGeometry {
     transvection(v: Vec3Tuple): Mat4;
     /** The inverse of an isometry, exact (no numerical inversion). */
     inverse(g: Mat4): Mat4;
+    /** The isometry a∘b (apply b, then a). */
+    compose(a: Mat4, b: Mat4): Mat4;
+    /** g applied to a point. */
+    apply(g: Mat4, p: Vec4): Vec4;
+    /** g's differential applied to a tangent vector (at any point). */
+    applyTangent(g: Mat4, v: Vec4): Vec4;
+    /** The isometry fixing o whose differential at o is the rotation q of the tangent space there
+     *  (throws when q is not an isometry's differential in this space). */
+    rotation(q: Quat): Mat4;
+    /** The orthogonal projection (under the metric) of a vector onto the tangent space at p. */
+    tangent(p: Vec4, v: Vec4): Vec4;
+}
+
+/** The isometry algebra of a space whose isometries are linear maps of R⁴ preserving `form` (H³,
+ *  S³): the matrix product, the matrix applied to points and tangent vectors alike, the rotation
+ *  diag(R, 1), and the tangent space at p as p's orthogonal complement. */
+export function linearIsometries(form: (a: Vec4, b: Vec4) => number): Pick<CurvedGeometry, 'compose' | 'apply' | 'applyTangent' | 'rotation' | 'tangent'> {
+    return {
+        compose: mat4Multiply,
+        apply: mat4Apply,
+        applyTangent: mat4Apply,
+        rotation: rotationAtOrigin,
+        tangent(p: Vec4, v: Vec4): Vec4 {
+            const k = form(v, p) / form(p, p);
+            return [v[0] - k * p[0], v[1] - k * p[1], v[2] - k * p[2], v[3] - k * p[3]];
+        },
+    };
 }
 
 export const ORIGIN: Vec4 = [0, 0, 0, 1];
@@ -72,5 +99,5 @@ export function rotationAtOrigin(q: Quat): Mat4 {
  * similarity T·R·S with S = 1 and the center folded in.
  */
 export function placementIsometry(geom: CurvedGeometry, position: Vec3Tuple, rotation: Quat, pre: Vec3Tuple): Mat4 {
-    return mat4Multiply(mat4Multiply(geom.transvection(position), rotationAtOrigin(rotation)), geom.transvection(pre));
+    return geom.compose(geom.compose(geom.transvection(position), geom.rotation(rotation)), geom.transvection(pre));
 }

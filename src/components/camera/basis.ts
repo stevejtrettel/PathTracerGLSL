@@ -13,7 +13,7 @@
 // shared frame with per-projection concerns.
 
 import type { Vec3Tuple } from '../geometry/similarity.js';
-import { mat4Apply, mat4Multiply, tangentAtOrigin, type CurvedGeometry, type Vec4 } from '../ambient/isometry.js';
+import { tangentAtOrigin, type CurvedGeometry, type Vec4 } from '../ambient/isometry.js';
 
 export interface CameraBasis {
     /** Unit view direction (position → target). */
@@ -77,19 +77,18 @@ export interface CurvedCameraBasis {
  */
 export function curvedCameraBasis(geom: CurvedGeometry, position: Vec3Tuple, target: Vec3Tuple): CurvedCameraBasis {
     const T = geom.transvection(target);
-    const v = geom.log(mat4Apply(geom.inverse(T), geom.exp(position)));
+    const v = geom.log(geom.apply(geom.inverse(T), geom.exp(position)));
     const b = cameraBasis(v, [0, 0, 0]);
-    const G = mat4Multiply(T, geom.transvection(v));
+    const G = geom.compose(T, geom.transvection(v));
     const P = geom.exp(position);
-    const pp = geom.form(P, P);
     const scale = (a: Vec4, k: number): Vec4 => [a[0] * k, a[1] * k, a[2] * k, a[3] * k];
     const minus = (a: Vec4, c: Vec4, k: number): Vec4 => [a[0] - k * c[0], a[1] - k * c[1], a[2] - k * c[2], a[3] - k * c[3]];
     const unit = (a: Vec4): Vec4 => scale(a, 1 / Math.sqrt(geom.form(a, a)));
-    const tangent = (a: Vec4): Vec4 => minus(a, P, geom.form(a, P) / pp);   // onto T_P
-    const forward = unit(tangent(mat4Apply(G, tangentAtOrigin(b.forward))));
-    let right = tangent(mat4Apply(G, tangentAtOrigin(b.right)));
+    const tangent = (a: Vec4): Vec4 => geom.tangent(P, a);   // onto T_P
+    const forward = unit(tangent(geom.applyTangent(G, tangentAtOrigin(b.forward))));
+    let right = tangent(geom.applyTangent(G, tangentAtOrigin(b.right)));
     right = unit(minus(right, forward, geom.form(right, forward)));
-    let up = tangent(mat4Apply(G, tangentAtOrigin(b.up)));
+    let up = tangent(geom.applyTangent(G, tangentAtOrigin(b.up)));
     up = minus(up, forward, geom.form(up, forward));
     up = unit(minus(up, right, geom.form(up, right)));
     return { position: P, forward, right, up };

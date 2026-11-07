@@ -5,7 +5,7 @@
 // Provides: MAX_DIST, fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
-//           isometry_direction(); for the H³ bodies, hyperbolic_form() and hyperbolic_plane_root().
+//           isometry_point(), isometry_tangent(), isometry_direction(); for the H³ bodies, hyperbolic_form() and hyperbolic_plane_root().
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 
 // MAX_DIST — the far clip, an arc length: nothing beyond it is geometry. float32 cosh overflows
@@ -124,6 +124,15 @@ bool hyperbolic_plane_root(Ray ray, vec4 N, out float t) {
     if (P * W >= 0.0 || abs(W) <= abs(P)) return false;
     t = 0.5 * log((W - P) / (W + P));
     return true;
+}
+
+// An object's placement, an isometry of H³, is a linear map of R⁴ held as a mat4 m; these apply it
+// to a point and to a tangent vector (the same product).
+Point isometry_point(mat4 m, Point p) {
+    return m * p;
+}
+Direction isometry_tangent(mat4 m, Direction v) {
+    return m * v;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

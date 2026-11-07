@@ -826,7 +826,8 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
 }
 
 /** One closed-form object's arm in a curved space: the ray moved into the object's frame by its
- *  G⁻¹ (arc length t is the same in both frames, so it is compared with world hits unchanged),
+ *  G⁻¹ through the occupant's isometry_point/isometry_tangent (the occupant decodes its placement
+ *  mat4; arc length t is the same in both frames, so it is compared with world hits unchanged),
  *  the hit point taken along the WORLD ray, the normal computed in the object's frame and mapped
  *  back by isometry_direction. No material reads uv in a curved space (SPACE_LIMITATIONS), so the
  *  uv is the unread placeholder. */
@@ -835,7 +836,7 @@ function curvedObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, 
     const d = primitive(obj.type);
     const inv = isometryRef(obj, ids);
     const constName = hoistedShapeName(obj, ids);
-    const lines = ['    {', `        Ray lray = make_ray(${inv} * ray.origin, ${inv} * ray.direction, ray.wl);`];
+    const lines = ['    {', `        Ray lray = make_ray(isometry_point(${inv}, ray.origin), isometry_tangent(${inv}, ray.direction), ray.wl);`];
     if (bound !== null) {
         lines.push(`        if (${d.type}_intersect(lray, ${constName ?? objectCtor(obj)}, t) && t < ${bound}) return true;`, '    }');
         return lines;
@@ -1201,7 +1202,7 @@ function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: Planne
             // Curved: the shape's own distance at the point moved into its frame — an isometry
             // preserves distance, so d is the world signed distance. Thin shapes claim nothing.
             const d = primitive(obj.type);
-            lines.push(`    d = ${d.thin ? '1.0e20' : `${obj.type}_sdf(${isometryRef(obj, ids)} * p, ${hoistedShapeName(obj, ids) ?? objectCtor(obj)})`};`);
+            lines.push(`    d = ${d.thin ? '1.0e20' : `${obj.type}_sdf(isometry_point(${isometryRef(obj, ids)}, p), ${hoistedShapeName(obj, ids) ?? objectCtor(obj)})`};`);
         } else if (obj.placement !== undefined && !primitive(obj.type).thin) {
             // Placed (§6.1) — driven OR a patterned-shape's retained constant placement (P1b):
             // classify in the rigid frame with s-scaled params — d stays an exact WORLD signed
