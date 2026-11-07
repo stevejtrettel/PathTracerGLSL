@@ -1015,7 +1015,8 @@ export function validate(
         // Unknown keys warn (the typo class, as for lights, cameras and primitives): a
         // material's keys are the meta-keys plus its own model's row sources ('none' has no
         // rows), constant or {param}-driven alike. Emission and the region-table rows are
-        // skipped here: the rules above already say why they are ignored on this model.
+        // skipped here and left to their own rules above (for model 'none' the emission rule
+        // reports only a constant emission).
         // An unregistered model was rejected above.
         if (mat.model === 'none' || MATERIAL_MODELS[mat.model] !== undefined) {
             const known = new Set<string>([...MATERIAL_META_KEYS, ...(MATERIAL_MODELS[mat.model]?.properties.map((f) => f.source as string) ?? [])]);

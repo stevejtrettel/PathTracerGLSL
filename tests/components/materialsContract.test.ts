@@ -6,11 +6,11 @@
 // name policy reads, paired with the capability).
 
 import { describe, it, expect } from 'vitest';
-import { MATERIAL_MODELS, EMISSION_KEY } from '../../src/components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS } from '../../src/components/materials/index.js';
 
 /** SceneMaterial keys that are NOT properties — a row source colliding with one
  *  would make the authored record ambiguous. */
-const RESERVED_KEYS = new Set(['model', 'medium', 'sampleAsLight']);
+const RESERVED_KEYS = new Set<string>(MATERIAL_META_KEYS);
 
 describe('material model descriptors (schema-vocabulary contract)', () => {
     for (const [id, d] of Object.entries(MATERIAL_MODELS)) {
