@@ -60,6 +60,10 @@ Furnace closure (F-BOX = 0.4 exactly, for lambert), §11.2 cross-strategy conver
 `dielectric/` (delta, η² factor — F-ETA 0.554), `ggx/` (VNDF; see `ggx/ggx.md`),
 `mirror/` (delta conductor, Schlick — shares the `f0` row with ggx, the first real
 §3.4 union-dedupe pair; F-MIRROR = f0·L convex).
+`plastic/` (smooth clear coat over a Lambertian base, Mitsuba's interfaced Lambertian: a
+delta coat lobe and a non-delta diffuse lobe in one model, so a single sample can carry
+LOBE_DELTA; albedo in [0, 1]; `coat_eta` is relative to the outside medium; see
+`plastic/plastic.md`).
 
 
 Index-consuming models mark their region-table row with `role: 'index'`.

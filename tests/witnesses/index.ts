@@ -103,6 +103,7 @@ import {
     roughGrin, roughGrinRef, roughGrinStrategy,
 } from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
+import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from './scenes/plasticWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
     diskBake, diskBakeRef, diskBakeStrategy,
@@ -1427,6 +1428,50 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                     label: `W2 sky = L = 1.0 (key ${strategy + 1})`,
                 },
             ]),
+        },
+    },
+    'plastic-furnace': {
+        scene: plasticFurnaceScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic (smooth 1.5 coat over a white Lambertian base) in the open furnace: the coat\'s delta lobe and the diffuse lobe in one model, K, the 1/η² compression, the lobe selection, and NEE/MIS seeing only the diffuse lobe',
+        expected:
+            'with R = 1 the directional albedo is 1 at every angle, so every pixel, sphere or sky, reads 1.0 on all three keys',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].flatMap(strategy => [
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.008, strategy,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: `plastic A = 1 at the sphere center (key ${strategy + 1})`,
+                },
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.005, strategy,
+                    label: `plastic A = 1 over the whole frame, grazing rim included (key ${strategy + 1})`,
+                },
+            ]),
+        },
+    },
+    'plastic-chroma': {
+        scene: plasticChromaScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic with a colored base (0.8, 0.5, 0.2) under a 1.5 coat in the open furnace: the per-channel bounce series R/(1 − R·K)',
+        expected:
+            'sphere center = A(1) = (0.632833, 0.316071, 0.127997) on all three keys (Mitsuba\'s default linear form would read 0.232 in blue)',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].map(strategy => ({
+                kind: 'mean' as const, value: PLASTIC_CHROMA_CENTER, tol: 0.008, strategy,
+                region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                label: `plastic A(1) per channel (key ${strategy + 1})`,
+            })),
         },
     },
     'sky-lamp': {

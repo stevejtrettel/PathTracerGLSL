@@ -4,6 +4,35 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — `plastic`: a smooth clear coat over a Lambertian base
+
+Integration step 3 of the photorealism batch
+(docs/claude-2026-11-review/photoreal/coated/plan.md, with its review's must-fix items).
+
+**What:** a new material occupant, `src/components/materials/plastic/` (Mitsuba 3 `plastic`,
+`nonlinear = true`): a delta coat lobe F(μ_o) and the base seen through the coat,
+R/(1 − R·K)·(1 − F_i)(1 − F_o)/(π η²). The coat's internal diffuse reflectance K is a
+host-derived field (`coat_fdr`) computed by exact quadrature, not Mitsuba's fit. Settings:
+`albedo` (confined to [0, 1] in both color models, because R/(1 − R·K) has a pole at R = 1/K)
+and `coat_eta` (the coat's index relative to the outside medium; a constant or `{param}` only,
+since it feeds K). No compiler, engine, transport or core GLSL change; one registry line.
+
+**Witnesses added:** `plastic-furnace` (R = 1: every pixel reads 1, center and whole frame),
+`plastic-chroma` (base (0.8, 0.5, 0.2): center A(1) = (0.632833, 0.316071, 0.127997)) under
+pt-nee, pt-mis and pt; `spectral-plastic` (gray 0.5, frame mean 0.316313).
+
+**Measured:**
+- TS twin (plastic.test.ts): the Fresnel identity to 1e-12; χ² with the delta lobe as a cell
+  passes at p = 0.001 in 9 configurations (η 1.5 and 0.8, grazing included); the triple and
+  pdf agreement to 1e-12; reciprocity; A(μ) against eval quadrature to 1e-9 and against the
+  mean sample weight within 3σ.
+- Witnesses (SwiftShader): `plastic-furnace` center (1.0029, 0.9995, 1.0002) and whole frame
+  (0.9998, 0.9999, 1.0000) for keys pt-nee, pt-mis, pt; `plastic-chroma` red/green/blue on the
+  three keys within 0.0014 of A(1); `spectral-plastic` 0.3168 vs 0.316313; `furnace-sky`
+  unchanged and passing. At 96 spp the pt-nee arm read +1.5% (as did furnace-sky's Lambert
+  sphere on the same stream); the two plastic entries use 384 spp, like `fog-sky`.
+- Digest: the 274 existing suite scenes are identical; 3 new scenes.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

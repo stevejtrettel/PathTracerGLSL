@@ -637,6 +637,10 @@ exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-128 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > plastic-chroma 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > plastic-furnace 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > porcelain 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
@@ -892,6 +896,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-packed-ref 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > spectral-plane 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-plastic 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-proc-sky 1`] = `null`;
 

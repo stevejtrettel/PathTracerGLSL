@@ -12,6 +12,7 @@ import { ggxDescriptor } from './ggx/ggx.js';
 import { roughDielectricDescriptor } from './rough_dielectric/rough_dielectric.js';
 import { mirrorDescriptor } from './mirror/mirror.js';
 import { checkerDescriptor } from './checker/checker.js';
+import { plasticDescriptor } from './plastic/plastic.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
@@ -20,6 +21,7 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     ggx: ggxDescriptor,
     mirror: mirrorDescriptor,
     checker: checkerDescriptor,
+    plastic: plasticDescriptor,
 };
 
 /** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —
