@@ -1,0 +1,29 @@
+// Plane in H³ — a totally geodesic plane: {x : ⟨x, N⟩ = 0} for a unit spacelike 4-vector N. In
+// the object's frame the plane is perpendicular to `normal` (a tangent vector at o) at signed
+// distance −offset from o, as in E³'s dot(p, normal) + offset = 0: N = (cosh(offset)·normal.xyz,
+// −sinh(offset)). Then ⟨exp_o(λ·normal), N⟩ = sinh(λ + offset), so the signed distance is
+// asinh(⟨p, N⟩), positive on the side `normal` points to. Derivations:
+// components/ambient/hyperbolic/hyperbolic.md.
+// Provides (struct GENERATED from descriptor rows): plane_sdf(), plane_intersect(), plane_normal().
+// Depends on: hyperbolic_form(), hyperbolic_plane_root() (the H³ occupant).
+
+Direction plane_N(Plane pl) {
+    return Direction(cosh(pl.offset) * pl.normal.xyz, -sinh(pl.offset));
+}
+
+// Exact signed distance; asinh of |x| with the sign restored (GLSL's asinh loses precision for
+// large negative arguments).
+float plane_sdf(Point p, Plane pl) {
+    float s = hyperbolic_form(p, plane_N(pl));
+    return sign(s) * asinh(abs(s));
+}
+
+// The geodesic's root on ⟨x, N⟩ = 0 (hyperbolic_plane_root in the occupant).
+bool plane_intersect(Ray ray, Plane pl, out float t) {
+    return hyperbolic_plane_root(ray, plane_N(pl), t);
+}
+
+// Outward unit normal: N projected onto T_p, which is N itself on the plane.
+Direction plane_normal(Point p, Plane pl) {
+    return plane_N(pl);
+}

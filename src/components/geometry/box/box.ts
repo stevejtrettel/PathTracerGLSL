@@ -14,7 +14,7 @@ export const boxDescriptor: PrimitiveDescriptor = {
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
         { name: 'halfSize', kind: 'length', shape: 'vec3', required: true, constraint: { kind: 'positive' } },
     ],
-    glsl: boxGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/box/box.glsl', source: boxGLSL } },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
     // exactly, so a marched arm is confined to precisely this shape's interval.

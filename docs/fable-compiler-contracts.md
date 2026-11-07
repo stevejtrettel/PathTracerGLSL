@@ -301,9 +301,9 @@ struct MediumProperties {   // generated per scene, like MaterialProperties
 };
 MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl);   // heterogeneous media vary with p
 
-Spectrum          <phase>_eval  (Direction wi, Direction wo, MediumProperties mp);  // integrates to 1 over sphere
-InteractionSample <phase>_sample(Direction wo, MediumProperties mp, vec2 xi);        // flags include LOBE_MEDIUM
-float             <phase>_pdf   (Direction wi, Direction wo, MediumProperties mp);
+Spectrum          <phase>_eval  (Direction wi, Direction wo, Point p, MediumProperties mp);  // integrates to 1 over sphere
+InteractionSample <phase>_sample(Direction wo, Point p, MediumProperties mp, vec2 xi);        // flags include LOBE_MEDIUM
+float             <phase>_pdf   (Direction wi, Direction wo, Point p, MediumProperties mp);   // p: the event point (the metric is taken there)
 ```
 
 A material is *volumetric* iff its declared medium block has nonzero `sigma_s` or `sigma_a` (classification inferred from properties, per the archive's settled principle). Whether a region is a medium is compile-time knowledge — the Planner uses it to decide which per-region functions to generate (§4.5) and whether transport needs a volume integrator at all.

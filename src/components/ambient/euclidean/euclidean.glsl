@@ -2,7 +2,7 @@
 // product everywhere. The contract each occupant meets is components/ambient/README.md.
 // Provides: fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
-//           ambient_direction_to(), ambient_aim(), ambient_sky_key()
+//           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key()
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 // The far clip MAX_DIST is emitted just before this block (the descriptor's farClip, or the
 // measurement's).
@@ -48,6 +48,11 @@ Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p) {
     return v;
 }
 
+// The geodesic distance between two points: the length of the segment.
+float ambient_distance(Point a, Point b) {
+    return length(b - a);
+}
+
 // The unit direction at `from` of the geodesic to `to` (the normalized log map).
 Direction ambient_direction_to(Point from, Point to) {
     return normalize(to - from);
@@ -58,7 +63,7 @@ Direction ambient_direction_to(Point from, Point to) {
 // `remaining` the arc length left to `to`. One segment joins two points of R³, so `along`
 // selects nothing here; in S³ two arcs do, and it picks one.
 Direction ambient_aim(Point from, Direction along, Point to, out float remaining) {
-    remaining = length(to - from);
+    remaining = ambient_distance(from, to);
     return normalize(to - from);
 }
 

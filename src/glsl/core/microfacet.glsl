@@ -8,7 +8,8 @@
 // pattern: conditional core, never wholesale).
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
 //           microfacet_to_local(), microfacet_from_local().
-// Depends on: PI, TWO_PI (math), Frame/Point/Direction (structs), ambient_dot/ambient_normalize.
+// Depends on: PI, TWO_PI (math), Frame (structs), Point/Direction (the ambient occupant's types.glsl),
+//             ambient_dot/ambient_normalize.
 //
 // Convention (shared by every occupant): the local shading frame has n = +z, `a` is the
 // GGX roughness parameter α = roughness² clamped ≥ 1e-3 host-side (the descriptors' D4

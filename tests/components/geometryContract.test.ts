@@ -14,6 +14,7 @@
 // zero-thickness, and silent-thin is impossible.
 
 import { describe, it, expect } from 'vitest';
+import { inEveryBody } from '../helpers/spaceBodies.js';
 import { PRIMITIVES, structName, emitSdfIntersect, emitSdfNormal } from '../../src/components/geometry/index.js';
 
 describe('geometry primitive descriptors (struct + symbol contract)', () => {
@@ -48,7 +49,7 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
             });
 
             it(`glsl does NOT declare struct ${sn} (generated from the rows — A1)`, () => {
-                expect(new RegExp(`struct\\s+${sn}\\s*\\{`).test(d.glsl)).toBe(false);
+                expect(inEveryBody(d.glsl, new RegExp(`struct\\s+${sn}\\s*\\{`))).toBe(false);
             });
 
             it('derivedFields declarations match derivedCtorFields output (count + shapes)', () => {
@@ -63,8 +64,9 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                 });
             });
 
-            it(`defines ${key}_sdf(vec3, ${sn}) iff provides.sdf`, () => {
-                expect(new RegExp(`float\\s+${key}_sdf\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
+            // The point is vec3 in a Euclidean body and Point in a curved one (its own frame).
+            it(`defines ${key}_sdf(vec3|Point, ${sn}) iff provides.sdf`, () => {
+                expect(inEveryBody(d.glsl, new RegExp(`float\\s+${key}_sdf\\s*\\(\\s*(?:vec3|Point)\\s+\\w+\\s*,\\s*${sn}\\b`)))
                     .toBe(d.provides.sdf);
             });
 
@@ -83,11 +85,11 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
             // field (fable-sdf-contract §4) — an occupant hand-writing either would
             // shadow the one emitter and silently fork the epsilon/stall rules.
             it(`does NOT hand-write ${key}_sdf_intersect / ${key}_sdf_normal (generated — fable-sdf-contract §4)`, () => {
-                expect(new RegExp(`bool\\s+${key}_sdf_intersect\\b`).test(d.glsl),
+                expect(inEveryBody(d.glsl, new RegExp(`bool\\s+${key}_sdf_intersect\\b`)),
                     `${key}: the marching intersect is generated — delete the hand copy`).toBe(false);
-                expect(new RegExp(`vec3\\s+${key}_sdf_normal\\b`).test(d.glsl),
+                expect(inEveryBody(d.glsl, new RegExp(`vec3\\s+${key}_sdf_normal\\b`)),
                     `${key}: the gradient normal is generated — delete the hand copy`).toBe(false);
-                expect(new RegExp(`float\\s+${key}_sdf_refine\\b`).test(d.glsl),
+                expect(inEveryBody(d.glsl, new RegExp(`float\\s+${key}_sdf_refine\\b`)),
                     `${key}: hit refinement is generated (declare the \`refine\` fact instead)`).toBe(false);
             });
 
@@ -108,22 +110,25 @@ describe('geometry primitive descriptors (struct + symbol contract)', () => {
                 expect(bd, `${key}: marchBound names unregistered primitive '${boundType}'`).toBeDefined();
                 expect(bd.provides.analytic, `${key}: bound '${boundType}' must be analytic`).toBe(true);
                 const bsn = structName(bd);
-                expect(new RegExp(`bool\\s+${boundType}_interval\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${bsn}\\b[^)]*out\\s+float\\s+\\w+\\s*,\\s*out\\s+float`).test(bd.glsl),
+                // Marching is Euclidean (a marched object is a limitation row in curved spaces).
+                expect(inEveryBody({ euclidean: bd.glsl.euclidean }, new RegExp(`bool\\s+${boundType}_interval\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${bsn}\\b[^)]*out\\s+float\\s+\\w+\\s*,\\s*out\\s+float`)),
                     `${boundType}: used as a march bound, so it owes ${boundType}_interval(Ray, ${bsn}, out float t0, out float t1)`).toBe(true);
             });
 
             it(`defines ${key}_intersect(Ray, ${sn}, out float t) iff provides.analytic`, () => {
-                expect(new RegExp(`bool\\s+${key}_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`).test(d.glsl))
+                expect(inEveryBody(d.glsl, new RegExp(`bool\\s+${key}_intersect\\s*\\(\\s*Ray\\s+\\w+\\s*,\\s*${sn}\\b[^)]*out\\s+float`)))
                     .toBe(d.provides.analytic);
             });
 
-            it(`defines ${key}_normal(vec3, ${sn}) iff provides.analytic`, () => {
-                expect(new RegExp(`vec3\\s+${key}_normal\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
+            it(`defines ${key}_normal(vec3|Point, ${sn}) iff provides.analytic`, () => {
+                expect(inEveryBody(d.glsl, new RegExp(`(?:vec3|Direction)\\s+${key}_normal\\s*\\(\\s*(?:vec3|Point)\\s+\\w+\\s*,\\s*${sn}\\b`)))
                     .toBe(d.provides.analytic);
             });
 
-            it(`defines ${key}_uv(vec3, ${sn}) iff uvChart (fable-imagery P1)`, () => {
-                expect(new RegExp(`vec2\\s+${key}_uv\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`).test(d.glsl))
+            // uv charts are Euclidean (a uv-reading material is a limitation row in curved
+            // spaces), so only the Euclidean body owes the chart.
+            it(`defines ${key}_uv(vec3, ${sn}) in its Euclidean body iff uvChart (fable-imagery P1)`, () => {
+                expect(inEveryBody({ euclidean: d.glsl.euclidean }, new RegExp(`vec2\\s+${key}_uv\\s*\\(\\s*vec3\\s+\\w+\\s*,\\s*${sn}\\b`)))
                     .toBe(d.uvChart === true);
             });
 

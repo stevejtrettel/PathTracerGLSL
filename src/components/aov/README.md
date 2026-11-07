@@ -35,7 +35,8 @@ view clamps for display.
   `vec3 <name>_aov(int mat, Hit hit, Direction wo, MaterialProperties props, Spectrum weight)`.
   It draws no random numbers and changes nothing.
 - `<name>/<name>.ts` declares the picture (export name, fragment output, previous and display
-  samplers, view mapping, file formats) and the seams the function calls (`requires`).
+  samplers, view mapping, file formats), the seams the function calls (`requires`), and the
+  file under each ambient space it is implemented in (`glsl`; ambient/README.md).
 - One line in `index.ts`.
 
 The walk captures every listed AOV at one site and returns them through `out` parameters of

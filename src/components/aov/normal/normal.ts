@@ -5,7 +5,7 @@ import glsl from './normal.glsl?raw';
  *  'signed' view (0.5·n + 0.5). */
 export const normal: AovDescriptor = {
     name: 'normal',
-    glsl,
+    glsl: { euclidean: { origin: 'components/aov/normal/normal.glsl', source: glsl } },
     requires: [],
     picture: { name: 'normal', output: 'fragNormal', previous: 'u_previousNormal', display: 'u_normal', view: 'signed', formats: ['png'] },
 };

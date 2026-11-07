@@ -2,6 +2,7 @@
 // named for that family).
 
 import { describe, it, expect } from 'vitest';
+import { inEveryBody } from '../helpers/spaceBodies.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import { PRIMITIVES } from '../../src/components/geometry/index.js';
 
@@ -10,7 +11,7 @@ describe('light kind GLSL contract (struct-alignment batch — the _light_ infix
         const sn = kind[0].toUpperCase() + kind.slice(1) + 'Light';
         describe(kind, () => {
             it(`glsl does NOT declare struct ${sn} (generated from the rows — A1)`, () => {
-                expect(new RegExp(`struct\\s+${sn}\\s*\\{`).test(d.glsl)).toBe(false);
+                expect(inEveryBody(d.glsl, new RegExp(`struct\\s+${sn}\\s*\\{`))).toBe(false);
             });
 
             it('rows without a role declare a kind (drives the generated typedef + future Value<T> rules)', () => {
@@ -30,11 +31,11 @@ describe('light kind GLSL contract (struct-alignment batch — the _light_ infix
             });
 
             it(`provides LightSample ${kind}_light_sample(${sn}, Point, vec2)`, () => {
-                expect(new RegExp(`LightSample\\s+${kind}_light_sample\\s*\\(\\s*${sn}\\b`).test(d.glsl)).toBe(true);
+                expect(inEveryBody(d.glsl, new RegExp(`LightSample\\s+${kind}_light_sample\\s*\\(\\s*${sn}\\b`))).toBe(true);
             });
 
             it(`provides float ${kind}_light_pdf(${sn}, ...) iff hittable (the adjacent §6.1 mirror)`, () => {
-                expect(new RegExp(`float\\s+${kind}_light_pdf\\s*\\(\\s*${sn}\\b`).test(d.glsl)).toBe(!d.delta);
+                expect(inEveryBody(d.glsl, new RegExp(`float\\s+${kind}_light_pdf\\s*\\(\\s*${sn}\\b`))).toBe(!d.delta);
             });
         });
     }

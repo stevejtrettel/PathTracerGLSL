@@ -5,7 +5,7 @@ import dielectricGLSL from './dielectric.glsl?raw';
 
 export const dielectricDescriptor: MaterialModelDescriptor = {
     id: 'dielectric',
-    glsl: dielectricGLSL,
+    glsl: { euclidean: { origin: 'components/materials/dielectric/dielectric.glsl', source: dielectricGLSL } },
     // Fields read (matches dielectric.glsl's header): transmittance at the shading point;
     // ior is region-indexed (read for the FAR side of the boundary via ior_of — the
     // reason the region-table storage kind exists).

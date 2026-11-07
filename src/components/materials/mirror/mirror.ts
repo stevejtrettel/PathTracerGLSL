@@ -5,7 +5,7 @@ import mirrorGLSL from './mirror.glsl?raw';
 
 export const mirrorDescriptor: MaterialModelDescriptor = {
     id: 'mirror',
-    glsl: mirrorGLSL,
+    glsl: { euclidean: { origin: 'components/materials/mirror/mirror.glsl', source: mirrorGLSL } },
     // Fields read (matches mirror.glsl's header): f0 — the SAME row ggx declares
     // (name+type), so the generated MaterialProperties shares ONE f0 field between
     // them (§3.4 unionFields dedupe — this occupant is its first real exercise).

@@ -114,9 +114,10 @@ How a program is assembled:
   shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB color.
   `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
   each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
-  is an absolute far clip: `measurement.farClip` when authored (required in a quotient, where
-  it is a real truncation, bounded per pixel only with fog), else the ambient space's default (1000 in Euclidean space,
-  `farClipOf` in components/ambient). The environment and the directional light are found
+  is the far clip: `measurement.farClip` when authored (required in a quotient, where it is a
+  real truncation, bounded per pixel only with fog), else the ambient space's default
+  (`farClipOf` in components/ambient: 1000 in Euclidean space, an absolute length; arc length
+  10 in H³; 2π in S³, where it is exact). The environment and the directional light are found
   there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
   seed; `scene_intersect` fills a `Hit`; dot products go through `ambient_dot` (the
@@ -239,6 +240,12 @@ How a program is assembled:
   constants/live controls and packed emitters in both modes. Surface dispersion uses
   one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
+- Curved spaces (components/ambient/hyperbolic, spherical; docs/claude-2026-11-review/
+  curved-spaces-design.md): H³ (hyperboloid model) and S³ (unit sphere in R⁴), with sphere,
+  plane and disk shapes, point and disk lights (two arcs per light in S³), lambert, pinhole and
+  fisheye cameras, HG media and, in H³, skies looked up at ideal endpoints; objects are placed by
+  isometries. What each occupant supports in each space is gated (`curvedLimitations`, the
+  space gate in compiler/analyze/curved.ts).
 - Closed manifolds (components/quotient/): the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), in vacuum
   or filled with a homogeneous ambient fog (`ambientSpace.quotient`, required
   `measurement.farClip`): a generated cell walk, NEE over a 27-image table with partition MIS,
@@ -251,8 +258,8 @@ How a program is assembled:
   not checked numerically).
 - Tooling: the witness runner, shader dumps, CI.
 
-**Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); heterogeneous fog, GRIN and media inside objects in a quotient, and other
+**Not built / deferred:** other curved spaces (Nil, black-hole metrics) and the other
+occupants in H³ and S³ (the gate lists them); quotients of H³ and S³; heterogeneous fog, GRIN and media inside objects in a quotient, and other
 quotients (Seifert–Weber, Q2); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material

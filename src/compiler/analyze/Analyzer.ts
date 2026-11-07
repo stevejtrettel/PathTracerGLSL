@@ -7,6 +7,12 @@ import type { SceneFeatures } from './types.js';
 import { samplableEmitterObjects } from '../plan/dataTenants.js';
 
 
+/** Scattering is computed in this program: some medium may scatter and the measurement does
+ *  not ignore scattering. The program then links the phase model of every medium. */
+export function scatteringComputed(features: SceneFeatures, scattering: 'full' | 'ignored'): boolean {
+    return features.media.hasScatteringMedia && scattering === 'full';
+}
+
 export function analyze(scene: SceneDescription): SceneFeatures {
     // --- Media (§3.5/§3.6, fable-volumetric-component.md) ---
     // (No geometry backend counts, per-model flags, or heterogeneous flag here — C4:
@@ -35,18 +41,8 @@ export function analyze(scene: SceneDescription): SceneFeatures {
     // and the light roster).
     const totalLightCount = scene.lights.length + samplableEmitterObjects(scene).length;
 
-    // --- Environment as a light (T3/T4, D6): tabulated kinds default TRUE, constant opt-in, none never.
-    const env = scene.environment;
-    let envSamplable = false;
-    if (env?.type === 'image' || env?.type === 'procedural') {
-        envSamplable = env.sampleAsLight !== false;
-    } else if (env?.type === 'constant') {
-        // color is now a SCENE_VALUE (SpectrumValue): a driven {param} color counts as
-        // maybe-nonzero (the maybe-emitting rule); a constant is checked directly.
-        const c = env.color;
-        const colorMaybeNonzero = emissionMayBeNonzero(c);
-        envSamplable = env.sampleAsLight === true && (env.intensity ?? 1) > 0 && colorMaybeNonzero;
-    }
+    // --- Environment as a light.
+    const envSamplable = environmentSampledAsLight(scene.environment);
 
     return {
         ambientSpace: scene.ambientSpace.type,
@@ -66,4 +62,13 @@ export function analyze(scene: SceneDescription): SceneFeatures {
             samplable: envSamplable,
         },
     };
+}
+
+/** Whether the sky is sampled as a light: tabulated kinds (image, procedural) unless
+ *  sampleAsLight is false; a constant sky only when sampleAsLight is true and it may be nonzero
+ *  (a driven {param} color counts as maybe-nonzero); none never. */
+export function environmentSampledAsLight(env: SceneDescription['environment']): boolean {
+    if (env?.type === 'image' || env?.type === 'procedural') return env.sampleAsLight !== false;
+    if (env?.type === 'constant') return env.sampleAsLight === true && (env.intensity ?? 1) > 0 && emissionMayBeNonzero(env.color);
+    return false;
 }

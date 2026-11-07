@@ -9,7 +9,7 @@ import roughDielectricGLSL from './rough_dielectric.glsl?raw';
 
 export const roughDielectricDescriptor: MaterialModelDescriptor = {
     id: 'rough_dielectric',
-    glsl: roughDielectricGLSL,
+    glsl: { euclidean: { origin: 'components/materials/rough_dielectric/rough_dielectric.glsl', source: roughDielectricGLSL } },
     // Every row is SHARED (§3.4 union dedupe): roughness with ggx, transmittance + the
     // region-table ior with dielectric — so this model adds NO field to
     // MaterialProperties. No f0: a dielectric's Fresnel is exact, not a Schlick fit.

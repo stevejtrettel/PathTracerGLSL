@@ -22,6 +22,7 @@ import { emptyContribution, type FeatureContribution } from './types.js';
 import { mintValueUniform, type ParamValue } from '../values.js';
 import { ENV_CHARTS, EQUIRECT_MAP } from '../../../components/env/index.js';
 import envSamplerCdfGLSL from '../../../components/env/sampler_cdf.glsl?raw';
+import { bodyFor } from '../../../components/descriptors.js';
 
 const ORIGIN = 'generated:environment';
 
@@ -52,11 +53,11 @@ export function envVariantSuffix(chart: string, compensation: boolean): string {
     return (chart === 'octahedral' ? '_oct' : '') + (compensation ? '_comp' : '');
 }
 
-/** A chart's program blocks, from the chart registry (D3; origin derived from the key): the
- *  files its GLSL calls into (`needs`), then the chart itself. */
-function chartBlocks(chart: string) {
+/** A chart's program blocks, from the chart registry: the files its GLSL calls into
+ *  (`needs`), then the chart's body for the program's space. */
+function chartBlocks(chart: string, space: string) {
     const d = ENV_CHARTS[chart];
-    return [...d.needs, { origin: `components/env/${d.id}/${d.id}.glsl`, source: d.glsl }];
+    return [...d.needs, bodyFor(d.glsl, space, `environment chart '${d.id}'`)];
 }
 
 /** Per-chart table dimensions live on separate parameter paths (they differ: W×H vs N×N). */
@@ -167,7 +168,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
             const { chart, compensation } = plan.program.estimator.envSampler;
             const suffix = envVariantSuffix(chart, compensation);
             // Chart files before the radiance/sampler, after the map (which they may need).
-            blocks.splice(1, 0, ...chartBlocks(chart).filter((b) => b.origin !== EQUIRECT_MAP.origin));
+            blocks.splice(1, 0, ...chartBlocks(chart, plan.program.measurement.ambient).filter((b) => b.origin !== EQUIRECT_MAP.origin));
             if (chart === 'octahedral') {
                 blocks.splice(1, 0, ROTATE_BLOCK);    // rotate before its caller (the octahedral chart)
                 uniforms.push(rotCsUniform(rotation));   // its matrix rotation ships u_envRotCS
@@ -220,7 +221,7 @@ export function contributeEnvironment(plan: RenderPlan, _bag: DiagnosticBag): Fe
         const textures: FeatureContribution['textures'] = [];
         if (samplable) {
             const suffix = envVariantSuffix(chart, compensation);
-            blocks.splice(1, 0, ...chartBlocks(chart));   // chart (and the files it needs) before radiance/sampler
+            blocks.splice(1, 0, ...chartBlocks(chart, plan.program.measurement.ambient));   // chart (and the files it needs) before radiance/sampler
             blocks.push({ origin: 'components/env/sampler_cdf.glsl', source: `const bool ENV_COMPENSATED = ${compensation};\n` + envSamplerCdfGLSL });
             textures.push(
                 { name: 'u_envCdfCond', source: `extern:env_cdf_cond${suffix}` },

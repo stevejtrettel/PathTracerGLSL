@@ -80,8 +80,9 @@ DESIGN, owner-approved):** a pinned core struct `{ Point p; Direction n; }`
 (`glsl/core/structs.glsl`); `n = 0` means "no orientation information". Static
 technique files NEVER construct it — they pass everything they have through the
 GENERATED constructors `light_query_surface(int mat, Hit hit)` /
-`light_query_medium(Point p)` (transport-emitted policy; `mat` is in the signature
-ahead of need). The seams are `lighting_sample(LightQuery q, vec2 xi)` and
+`light_query_medium(Point p)` (transport-emitted policy; at a surface `n` is
+`hit.frame.n`, which already faces the side the ray arrived from, and the S³ light
+bodies' arc rule reads it as it is — components/lights/README.md). The seams are `lighting_sample(LightQuery q, vec2 xi)` and
 `lighting_pdf(LightQuery q, …)` — total across ALL programs (the argument is unused
 under power/uniform; unused args cost nothing). **Stored-query replay**: `PathState`
 carries `prev_query` (replacing `prev_p`, mis-gated), written by the single-emitter

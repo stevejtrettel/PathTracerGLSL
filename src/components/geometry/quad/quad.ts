@@ -34,7 +34,7 @@ export const quadDescriptor: PrimitiveDescriptor = {
         { name: 'edge1', kind: 'vector', shape: 'vec3', required: true },
         { name: 'edge2', kind: 'vector', shape: 'vec3', required: true },
     ],
-    glsl: quadGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/quad/quad.glsl', source: quadGLSL } },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the edge vector rows
     uvChart: true,            // natural [0,1]² along the edges — quad_uv (fable-imagery P1)

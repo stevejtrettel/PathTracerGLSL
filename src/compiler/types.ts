@@ -402,6 +402,13 @@ export function mediumRoutesToTracking(
     return isHeterogeneousMedium(med) || (isEmissiveMedium(med) && scatters);
 }
 
+/** Some material's medium routes to the null-collision arms under this measurement's
+ *  scattering setting. */
+export function sceneRoutesToTracking(scene: SceneDescription, scattering: 'full' | 'ignored'): boolean {
+    return Object.values(scene.materials).some((m) =>
+        m.medium !== undefined && mediumRoutesToTracking(m.medium, mediumScatters(m.medium, scattering)));
+}
+
 /**
  * The medium settles absorption by WEIGHTING the path throughput rather than by a collision
  * LOTTERY — the analytic channel-MIS arm and the GRIN arc-length arm, as against the tracking

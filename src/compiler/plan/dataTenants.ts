@@ -7,7 +7,7 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission, RenderStrategy } from '../types.js';
+import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission, RenderStrategy, MaterialModel } from '../types.js';
 import type { ProgramDescription } from './types.js';
 import { resolveColorProperty } from './values.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
@@ -19,7 +19,7 @@ import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
 import { cwbvhNodeTexelBound } from '../../components/accel/cwbvh/cwbvh.js';
-import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF } from '../../components/intersection/index.js';
+import { ANALYTIC_RECORD_TEXELS, LEAF_ANALYTIC, LEAF_MESH, LEAF_BATCH, LEAF_SDF, MARCHED_TABLE_THRESHOLD, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import type { DataTenants } from '../../components/data/ledger.js';
 
 /** Which optional data structures a program reads — read off its decisions, which are the
@@ -129,6 +129,19 @@ export function batchPlacementRecordOf(b: InstancedObject, scene: SceneDescripti
     return materialReadsUv(b.prototype.material, scene) ? 'frame' : 'params';
 }
 
+/** The scene's MARCHED objects: non-instanced primitive objects whose backend resolves to
+ *  the SDF march. */
+export function marchedObjectCount(scene: SceneDescription): number {
+    return scene.objects.filter((o) => isPrimitiveObject(o) && resolveBackend(o.type, o.backend) === 'sdf').length;
+}
+
+/** The object dispatch a program runs: the strategy's choice when it makes one, else 'table'
+ *  from MARCHED_TABLE_THRESHOLD marched objects on, else DEFAULT_OBJECT_DISPATCH. */
+export function objectDispatchOf(scene: SceneDescription, strategy: RenderStrategy): string {
+    return strategy.estimator.objectDispatch
+        ?? (marchedObjectCount(scene) >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
+}
+
 /** The ONE samplable-mesh-emitter predicate (fable-mesh-lights): shared by the ledger's
  *  light regions, the Planner's light route, and the App's light-table packing. */
 export function meshIsSamplableEmitter(scene: SceneDescription, mesh: MeshObject): boolean {
@@ -195,6 +208,13 @@ export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[
     return out;
 }
 
+/** The emissive objects a renderer samples as lights: the census (samplableEmitterObjects)
+ *  when next-event estimation is on; none under pure path tracing, which finds every emitter
+ *  by BSDF hits and links no light kind for it. */
+export function sampledEmitterObjects(scene: SceneDescription, strategy: RenderStrategy): EmitterObject[] {
+    return strategy.estimator.directLighting !== 'none' ? samplableEmitterObjects(scene) : [];
+}
+
 /** One light-roster entry: the kind, and where it came from — an authored light (index into
  *  scene.lights) or an emissive object (index into scene.objects, which is also its region
  *  id). */
@@ -212,6 +232,12 @@ export interface LightRosterEntry {
 export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number[]> | BlackbodyValue {
     return resolveColorProperty(e, [0, 0, 0]) as number[] | ValueParam<number[]> | BlackbodyValue;
 }
+
+/** The material model behind an authored hittable light (a kind with a region). The Planner
+ *  desugars such a light to an object of the kind's primitive carrying a synthesized
+ *  material of this model (albedo 0, the light's emission); the Validator gates the model
+ *  together with the light kind and that primitive. */
+export const LIGHT_BACKING_MODEL: MaterialModel = 'lambert';
 
 /** THE light registry, in light-id order (= selection-CDF order): authored lights (scene
  *  order), then emissive analytic objects, then emissive meshes (samplableEmitterObjects'

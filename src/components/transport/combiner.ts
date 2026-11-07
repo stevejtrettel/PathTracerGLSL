@@ -25,7 +25,7 @@ export function combinerFns(f: Flags): ShaderBlock {
     const lines: string[] = [combinerHeader(f)];
 
     // T1's emitter-hit weight (kernel.glsl calls it whenever emission can exist).
-    lines.push('float combiner_w_emitter(PathState s, Hit hit) {');
+    lines.push('float combiner_w_emitter(PathState s, Hit hit, Direction wo) {');
     if (f.nee && f.emitters) {
         lines.push(
             '    // §6.2: a SAMPLABLE emitter found by a non-delta bounce competes with last',
@@ -37,7 +37,8 @@ export function combinerFns(f: Flags): ShaderBlock {
         if (f.mis) {
             // The STORED query (fable-light-bvh §3.2 v1.5): the pmf replays exactly the
             // context the previous vertex's sampler used — byte-identical by construction.
-            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, s.ray.direction, lid, hit));');
+            // wo is the arrival direction reversed at the emitter hit (the kernel's wo).
+            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, wo, lid, hit));');
         } else if (f.quotient) {
             // An image outside NEE's table has NEE density 0, so its BSDF hit keeps weight 1
             // (partition MIS); quotient_image names the image this ray hit.
@@ -88,14 +89,14 @@ export function combinerFns(f: Flags): ShaderBlock {
         lines.push('}');
 
         if (f.scattering && !f.equiangular) {
-            lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, MediumProperties m_evt) {');
+            lines.push('float combiner_w_light_medium(LightSample ls, Direction wo_med, Point p_evt, MediumProperties m_evt) {');
             if (f.mis) {
                 lines.push(
                     '    // Balances against the phase density — no cosine anywhere (§2.2).',
                     '    if ((ls.flags & LIGHT_DELTA) != 0u) return 1.0;',
                     // The DISPATCH is the seam (matches light.ts's requires) — calling a
                     // per-model pdf here broke any non-hg medium under mis (unlinkable).
-                    '    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, m_evt));',
+                    '    return power_heuristic(ls.pdf, interaction_medium_pdf(ls.wi, wo_med, p_evt, m_evt));',
                 );
             } else {
                 lines.push('    return 1.0;   // plain NEE at the medium site');

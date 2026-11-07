@@ -29,7 +29,7 @@ export const knobDescriptor: PrimitiveDescriptor = {
     params: [
         { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],
-    glsl: knobGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/knob/knob.glsl', source: knobGLSL } },
     provides: { sdf: true, analytic: false },
     // A solid of revolution (bar the pie-slice cut in the base), so a cylinder is the
     // natural bound: it is 3.4× tighter than the sphere the corpus's own scenes use

@@ -36,6 +36,8 @@ const ALLOWED_ROOT_FILES = new Set([
     'values.ts',                           // colour shared questions about authored spectrum values
     'spectrumKind.ts',                     // color/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
+    'support.md',                          // ambient: the generated space-support table (spaceSupport.test.ts)
+    'isometry.ts',                         // ambient shared part (curved-space CPU isometry algebra)
 ]);
 
 describe('components structure', () => {

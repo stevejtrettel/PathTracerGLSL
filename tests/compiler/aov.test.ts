@@ -3,6 +3,7 @@ import { Compiler } from '../../src/compiler/Compiler.js';
 import { resolveMeasurement } from '../../src/compiler/plan/measurement.js';
 import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
 import { AOVS } from '../../src/components/aov/index.js';
+import { inEveryBody } from '../helpers/spaceBodies.js';
 import type { RenderStrategy } from '../../src/compiler/types.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 
@@ -49,7 +50,7 @@ describe('the albedo facts', () => {
             if ('row' in fact) {
                 expect(model.properties.find((r) => r.name === fact.row)?.glslType).toBe('Spectrum');
             } else {
-                expect(model.glsl).toMatch(new RegExp(`Spectrum ${fact.fn}\\(Hit \\w+, MaterialProperties \\w+\\)`));
+                expect(inEveryBody(model.glsl, new RegExp(`Spectrum ${fact.fn}\\(Hit \\w+, MaterialProperties \\w+\\)`))).toBe(true);
             }
         });
     }
@@ -64,7 +65,9 @@ describe('the albedo facts', () => {
 describe('the AOV registry and the measurement', () => {
     it('every AOV file defines its function with the one shared signature', () => {
         for (const a of Object.values(AOVS)) {
-            expect(a.glsl).toContain(`vec3 ${a.name}_aov(int mat, Hit hit, Direction wo, MaterialProperties props, Spectrum weight) {`);
+            for (const body of Object.values(a.glsl)) {
+                expect(body!.source).toContain(`vec3 ${a.name}_aov(int mat, Hit hit, Direction wo, MaterialProperties props, Spectrum weight) {`);
+            }
         }
     });
 

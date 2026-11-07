@@ -15,6 +15,38 @@ import type { MaterialModel, ValueParam, BlackbodyValue } from '../compiler/type
 import type { Similarity } from './geometry/similarity.js';
 import type { AABB } from './accel/bvh/bvh.js';
 
+/** A GLSL file and the path it is reported under (its program block's origin). */
+export interface GlslFile {
+    origin: string;
+    source: string;
+}
+
+/** An occupant's GLSL in each ambient space it implements, keyed by AMBIENT_SPACES key. An
+ *  occupant supports a space exactly when it has a body for it: compiling in a space is no
+ *  evidence of being correct there (a point light falls off as 1/r² in E³ and 1/sinh² r in
+ *  H³). There is no wildcard key. A body that is correct in several spaces is listed under
+ *  each space it has been checked in, with one origin. */
+export type SpaceBodies = { readonly [space: string]: GlslFile | undefined };
+
+/** The ambient spaces an occupant implements when its code is emitted from TypeScript rather
+ *  than kept in a GLSL file (the estimator registries: light selection, mesh traversal,
+ *  instance traversal, object dispatch). The same rule as SpaceBodies: a space is listed only
+ *  once the occupant has been checked in it. */
+export type SpaceList = readonly string[];
+
+/** The spaces an occupant implements, in the order its bodies are listed. */
+export function spacesOf(glsl: SpaceBodies): string[] {
+    return Object.keys(glsl).filter((space) => glsl[space] !== undefined);
+}
+
+/** The occupant's body for `space`. Throws when there is none: the Validator's space gate
+ *  rejects such a program before generation. */
+export function bodyFor(glsl: SpaceBodies, space: string, occupant: string): GlslFile {
+    const body = glsl[space];
+    if (body === undefined) throw new Error(`${occupant} has no ${space} body (the Validator's space gate should have rejected it)`);
+    return body;
+}
+
 /** THE one constraint vocabulary (descriptor-unification D1): a rule a machine can READ —
  *  one checker, one error voice, one contract test, UI-consumable ranges. Shared by every
  *  family's rows (primitives, material/phase properties, lights' authored params).
@@ -32,6 +64,12 @@ export type RowConstraint =
     | { kind: 'min-length'; value: number }
     | { kind: 'interval'; min: number; max: number }
     | { kind: 'closed-interval'; min: number; max: number };
+
+/** Further domains a row's value must lie in when the program runs in a particular space, keyed by
+ *  AMBIENT_SPACES key: what the occupant's body for that space requires beyond the row's own
+ *  `constraint` (in S³ a ball's or a disk's radius is a geodesic distance below π, the diameter of
+ *  the space). A key names a space the occupant has a body for (contract test). */
+export type SpaceConstraints = { readonly [space: string]: RowConstraint };
 
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
@@ -103,9 +141,9 @@ export type MaterialDerivedSpec = (
 /** A surface material model: one GLSL file + these facts (contracts §3.2/§3.3). */
 export interface MaterialModelDescriptor {
     id: MaterialModel;
-    /** ?raw source providing <id>_eval / <id>_sample / <id>_pdf / <id>_emission
-     *  in the (uc, u) sampler form. */
-    glsl: string;
+    /** Per space: <id>_eval / <id>_sample / <id>_pdf / <id>_emission in the (uc, u)
+     *  sampler form. */
+    glsl: SpaceBodies;
     /** Fields this model READS → scene-scoped struct + resolver (§3.4, R2). */
     properties: PropertySchema[];
     /** DERIVED fields (D4) — join the struct union like rows; never authored. */
@@ -168,6 +206,8 @@ export interface AuthoredParamSpec {
     kind?: ParamKind;
     /** Separable domain rule, machine-readable (D1). */
     constraint?: RowConstraint;
+    /** The further domain the kind's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** One row of a light kind's parameter schema (struct-alignment batch): struct field
@@ -212,8 +252,8 @@ export interface LightKindDescriptor {
     /** Registry key — validated against the registry (A2/A3: adding a kind touches
      *  no union). */
     kind: string;
-    /** ?raw source per the struct contract above. */
-    glsl: string;
+    /** Per space: the functions of the struct contract above. */
+    glsl: SpaceBodies;
     /** Delta kinds: not hittable, LIGHT_DELTA, no region, no <kind>_light_pdf. */
     delta: boolean;
     /** ISOTROPIC delta-query fact (equiangular placement): which rows carry the
@@ -300,8 +340,8 @@ export interface LightPowerContext {
  *  schema machinery, second struct family. */
 export interface VolumeScatteringModelDescriptor {
     id: string;
-    /** ?raw source providing <id>_eval / <id>_sample / <id>_pdf (LOBE_MEDIUM). */
-    glsl: string;
+    /** Per space: <id>_eval / <id>_sample / <id>_pdf (LOBE_MEDIUM). */
+    glsl: SpaceBodies;
     properties: PropertySchema[];
 }
 
@@ -352,6 +392,8 @@ export interface PrimitiveParamSpec {
     /** Mathematical domain required by the implementation (the shared RowConstraint
      *  vocabulary — D1; Validator-interpreted, shape-agnostic). */
     constraint?: RowConstraint;
+    /** The further domain the shape's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** Call-site context for emitted per-primitive expressions: the query/hit point
@@ -373,6 +415,8 @@ export interface PrimitiveEmitCtx {
  *  `vec3 <type>_normal(vec3 p, <Type>)` iff `provides.analytic`. Call sites
  *  construct the struct from compile-time literals (constant placement) or
  *  s-scaled expressions (driven rigid frame); all emission is DERIVED from the row.
+ *  A curved-space body (components/ambient/README.md, "Curved spaces") is the shape at the
+ *  origin of its own frame: Point/Direction in place of vec3, the struct without its point row.
  *
  *  Descriptor functions receive RESOLVED values (row defaults already applied) and
  *  return NUMBERS — the framework does all GLSL formatting; descriptors never build
@@ -382,12 +426,12 @@ export interface PrimitiveDescriptor {
     /** ONE schema row for both backends (order = struct field order = constructor
      *  order — see PrimitiveParamSpec). */
     params: PrimitiveParamSpec[];
-    /** ?raw source with this primitive's math. SELF-CONTAINED: an occupant's helpers
+    /** Per space, this primitive's math. SELF-CONTAINED: an occupant's helpers
      *  are its own, prefixed and file-private (bottle's combinators, knob's vendored
      *  operators, menger's cell box). Files are included WHOLESALE, so a helper defined
      *  in two of them is a link error — shared vocabulary would need a shared file, and
      *  there is deliberately none until scene-level composition is designed. */
-    glsl: string;
+    glsl: SpaceBodies;
     /** Declared occupant surface — declare-and-verify, both directions (the contract
      *  test checks symbols exist iff declared). sdf also serves analytic containment
      *  (scene_region_at) — the sdf slot's three clauses bind approximate SDFs too. */
@@ -403,8 +447,9 @@ export interface PrimitiveDescriptor {
      *  (classifyPlacement) and the instance params-tier record. Independent of
      *  `provides` — closure is about parameter storage, never intersection method. */
     similarityClosed: boolean;
-    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant provides
-     *  `vec2 <type>_uv(vec3 p, <Type>)`, and hit-fill sites call it instead of the planar
+    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant's Euclidean body
+     *  provides `vec2 <type>_uv(vec3 p, <Type>)` (curved spaces have no charts yet — a uv-reading
+     *  material is a limitation row there), and hit-fill sites call it instead of the planar
      *  placeholder WHEN some scene material reads uv (the scene-level program.materials.
      *  materialsReadUv gate — no chart trig when nothing consumes it). Contract-test-checked
      *  (symbol exists iff declared). Absent/false = planar-placeholder uv only. */

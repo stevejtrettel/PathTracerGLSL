@@ -6,6 +6,7 @@
 // name policy reads, paired with the capability).
 
 import { describe, it, expect } from 'vitest';
+import { inEveryBody } from '../helpers/spaceBodies.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../src/components/materials/index.js';
 
 /** SceneMaterial keys that are NOT properties — a row source colliding with one
@@ -59,10 +60,10 @@ describe('material model GLSL symbols (<id>_eval/_sample/_pdf/_emission)', () =>
     for (const [id, d] of Object.entries(MATERIAL_MODELS)) {
         if (d === undefined) continue;
         it(`${id} defines all four interaction ops`, () => {
-            expect(new RegExp(`Spectrum\\s+${id}_eval\\s*\\(`).test(d.glsl), `${id}_eval`).toBe(true);
-            expect(new RegExp(`InteractionSample\\s+${id}_sample\\s*\\(`).test(d.glsl), `${id}_sample`).toBe(true);
-            expect(new RegExp(`float\\s+${id}_pdf\\s*\\(`).test(d.glsl), `${id}_pdf`).toBe(true);
-            expect(new RegExp(`Spectrum\\s+${id}_emission\\s*\\(`).test(d.glsl), `${id}_emission`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`Spectrum\\s+${id}_eval\\s*\\(`)), `${id}_eval`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`InteractionSample\\s+${id}_sample\\s*\\(`)), `${id}_sample`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`float\\s+${id}_pdf\\s*\\(`)), `${id}_pdf`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`Spectrum\\s+${id}_emission\\s*\\(`)), `${id}_emission`).toBe(true);
         });
     }
 });

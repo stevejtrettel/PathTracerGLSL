@@ -19,12 +19,12 @@ import type { MaterialModelDescriptor } from '../../src/components/descriptors.j
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 import { glslangCheck } from '../helpers/glslangCheck.js';
 
-const twosidedGLSL = ggxDescriptor.glsl.replace(/ggx_/g, 'twosided_');
+const twosidedGLSL = ggxDescriptor.glsl.euclidean!.source.replace(/ggx_/g, 'twosided_');
 
 const twosidedDescriptor: MaterialModelDescriptor = {
     ...ggxDescriptor,
     id: 'twosided',
-    glsl: twosidedGLSL,
+    glsl: { euclidean: { origin: 'components/materials/twosided/twosided.glsl', source: twosidedGLSL } },
     capabilities: { ...ggxDescriptor.capabilities, support: 'sphere', nonDeltaLobes: true },
 };
 

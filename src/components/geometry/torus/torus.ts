@@ -14,7 +14,7 @@ export const torusDescriptor: PrimitiveDescriptor = {
         { name: 'ringRadius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
         { name: 'tubeRadius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],
-    glsl: torusGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/torus/torus.glsl', source: torusGLSL } },
     provides: { sdf: true, analytic: false },
     // The bound: a cylinder of radius R+r and half-height r, which is the TIGHT one —
     // the torus touches it on the rim and on both flat faces (the "bound is reached"

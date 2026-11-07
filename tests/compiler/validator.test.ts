@@ -41,8 +41,8 @@ describe('Validator', () => {
         expect(bag.isEmpty()).toBe(true);
     });
 
-    it('rejects non-euclidean ambient space', () => {
-        const bag = run(s => { s.ambientSpace = { type: 'hyperbolic' }; });
+    it('rejects an unregistered ambient space', () => {
+        const bag = run(s => { s.ambientSpace = { type: 'nil' } as unknown as typeof s.ambientSpace; });
         expect(codes(bag)).toContain('invalid-setting');
         expect(bag.getErrors().some(e => /ambient space/i.test(e.message))).toBe(true);
     });
@@ -252,7 +252,7 @@ describe('Validator', () => {
 
     it('accumulates multiple independent errors in one pass', () => {
         const bag = run(s => {
-            s.ambientSpace = { type: 'spherical' };
+            s.ambientSpace = { type: 'nil' } as unknown as typeof s.ambientSpace;
             s.objects.push({ kind: 'mesh', positions: new Float32Array(0), indices: new Uint32Array(0), material: 'm' });
         });
         expect(bag.count('error')).toBeGreaterThanOrEqual(2);
