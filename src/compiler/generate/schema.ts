@@ -49,9 +49,9 @@ export function defaultExpr(f: PropertySchema<string>, site: SpectrumSite): stri
 
 /**
  * Union of 'field'-storage schemas across the models present, deduped by name in
- * first-appearance order. Same name + same glslType share one field (deliberate —
- * GGX and rough-dielectric will share `roughness`); same name + different type is a
- * bug the Validator catches — this throw is the unreachable backstop.
+ * first-appearance order. Same name + same glslType share one field (GGX and
+ * rough-dielectric share `roughness`). A row name has one glslType across each whole
+ * registry (tests/components/materialsContract.test.ts), so the throw is a backstop.
  */
 export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][]): PropertySchema<S>[] {
     const byName = new Map<string, PropertySchema<S>>();
@@ -62,7 +62,7 @@ export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][])
             if (prior === undefined) {
                 byName.set(s.name, s);
             } else if (prior.glslType !== s.glslType) {
-                throw new Error(`schema: field '${s.name}' declared as ${prior.glslType} and ${s.glslType} (Validator should have rejected)`);
+                throw new Error(`schema: field '${s.name}' declared as ${prior.glslType} and ${s.glslType} (a row name has one glslType per registry)`);
             }
         }
     }

@@ -6,7 +6,9 @@
 // name policy reads, paired with the capability).
 
 import { describe, it, expect } from 'vitest';
-import { MATERIAL_MODELS, EMISSION_KEY } from '../../src/components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, modelStructFields } from '../../src/components/materials/index.js';
+import { VOLUME_SCATTERING_MODELS } from '../../src/components/volume_scattering/index.js';
+import type { PropertySchema } from '../../src/components/descriptors.js';
 
 /** SceneMaterial keys that are NOT properties — a row source colliding with one
  *  would make the authored record ambiguous. */
@@ -46,6 +48,43 @@ describe('material model descriptors (schema-vocabulary contract)', () => {
             });
         });
     }
+});
+
+/** Every row name declared with more than one glslType across `models`, as messages. */
+function glslTypeConflicts(models: [string, PropertySchema[]][]): string[] {
+    const declared = new Map<string, Map<string, string[]>>();
+    for (const [id, rows] of models) {
+        for (const row of rows) {
+            const types = declared.get(row.name) ?? new Map<string, string[]>();
+            types.set(row.glslType, [...(types.get(row.glslType) ?? []), id]);
+            declared.set(row.name, types);
+        }
+    }
+    return [...declared].filter(([, types]) => types.size > 1)
+        .map(([name, types]) => `${name}: ${[...types].map(([t, ids]) => `${t} in ${ids.join(', ')}`).join('; ')}`);
+}
+
+// A scene may combine any models, and the generated properties struct holds one field per row
+// name (unionFields), so a row name has one glslType across the whole registry. Derived fields
+// join the struct like rows.
+describe('one glslType per row name across the registry', () => {
+    it('material models (rows and derived fields)', () => {
+        const models = Object.values(MATERIAL_MODELS).filter((d) => d !== undefined)
+            .map((d): [string, PropertySchema[]] => [d.id, modelStructFields(d)]);
+        expect(glslTypeConflicts(models)).toEqual([]);
+    });
+
+    it('phase models', () => {
+        const models = Object.entries(VOLUME_SCATTERING_MODELS)
+            .map(([id, d]): [string, PropertySchema[]] => [id, d?.properties ?? []]);
+        expect(glslTypeConflicts(models)).toEqual([]);
+    });
+
+    it('a name declared as Spectrum in one model and float in another is reported', () => {
+        const row = (glslType: 'float' | 'Spectrum'): PropertySchema => ({ name: 'eta', glslType, source: 'eta', default: 1, storage: 'field' });
+        expect(glslTypeConflicts([['metal', [row('Spectrum')]], ['pane', [row('float')]], ['glass', [row('float')]]]))
+            .toEqual(['eta: Spectrum in metal; float in pane, glass']);
+    });
 });
 
 // ============================================================================

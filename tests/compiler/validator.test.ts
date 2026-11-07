@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { validate } from '../../src/compiler/analyze/Validator.js';
 import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
+import { Compiler } from '../../src/compiler/Compiler.js';
 import type { SceneDescription, RenderStrategy, PrimitiveObject, GlslExpression } from '../../src/compiler/types.js';
 
 function baseScene(): SceneDescription {
@@ -508,6 +509,25 @@ describe('Validator — correctness domains', () => {
         expect(run(s => {
             s.materials.m = { model: 'lambert', albedo: { param: 'm.albedo', default: [0.5, 0.5] as never } };
         }).getErrors().some(e => /albedo must be a finite number or vec3/.test(e.message))).toBe(true);
+    });
+
+    it('a row feeding a host-derived field takes a constant or a {param}, never an expression or a named kind', () => {
+        const roughness = (model: 'ggx' | 'rough_dielectric', value: unknown) => (s: SceneDescription) => {
+            s.materials.m = { model, roughness: value as never };
+        };
+        const expression = { kind: 'glsl', source: '0.1 + 0.2 * uv.x' };
+        for (const model of ['ggx', 'rough_dielectric'] as const) {
+            const errors = run(roughness(model, expression)).getErrors().map(e => e.message);
+            expect(errors).toEqual([`Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not an expression`]);
+            expect(run(roughness(model, { cauchy: [1.5, 0.004] })).getErrors().map(e => e.message))
+                .toEqual([`Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a Cauchy value`]);
+            expect(run(roughness(model, 0.3)).hasErrors()).toBe(false);
+            expect(run(roughness(model, { param: 'm.roughness', default: 0.3, min: 0, max: 1 })).hasErrors()).toBe(false);
+        }
+        // The full compile reports the diagnostic instead of failing to format alpha (NaN).
+        const scene = baseScene();
+        roughness('ggx', expression)(scene);
+        expect(() => new Compiler().compileScene(scene, [baseStrategy()])).toThrow(/feeds the derived field 'alpha'/);
     });
 
     it('rejects malformed transform.position values from untyped scene input', () => {

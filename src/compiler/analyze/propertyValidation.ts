@@ -9,6 +9,9 @@
 //     the setting's domain, the row's own constraint or else its role's;
 //   - kind: a named kind sits in a setting of one of its roles, its declared numbers pass the
 //     same checks, and its own rules hold.
+// A material row that feeds a derived field takes only a constant or a slider: the derived
+// value is computed on the host from the row's numbers (MaterialDerivedSpec.fn), and a formula
+// or a named kind has no numbers there.
 // A formula's numbers are not known before the render; its domain is the author's contract.
 
 import { GLSL_EXPRESSION_KEYS, isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
@@ -52,8 +55,17 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
     const report = (problems: string[]) => { for (const message of problems) bag.error('invalid-setting', message).add(); };
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.model !== 'none') {
-            for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-                report(valueProblems((mat as unknown as Record<string, unknown>)[field.source], rowSetting(field), `Material '${name}': ${field.source}`));
+            const model = MATERIAL_MODELS[mat.model];
+            for (const field of model?.properties ?? []) {
+                const value = (mat as unknown as Record<string, unknown>)[field.source];
+                const label = `Material '${name}': ${field.source}`;
+                const derived = model?.derived?.find((d) => d.inputs.includes(field.source));
+                const kind = namedKindOf(value);
+                if (derived !== undefined && (kind !== undefined || isGlslExpression(value))) {
+                    report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);
+                    continue;
+                }
+                report(valueProblems(value, rowSetting(field), label));
             }
         }
 
