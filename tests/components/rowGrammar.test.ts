@@ -12,7 +12,8 @@ import { TONEMAP_MODELS } from '../../src/components/tonemap/index.js';
 import { PIXEL_MODELS } from '../../src/components/pixel/index.js';
 import { SAMPLERS } from '../../src/components/sampler/index.js';
 import { SENSORS } from '../../src/components/sensor/index.js';
-import type { RowConstraint, ParamKind } from '../../src/components/descriptors.js';
+import type { RowConstraint, ParamKind, SpaceConstraints, SpaceBodies } from '../../src/components/descriptors.js';
+import { spacesOf } from '../../src/components/descriptors.js';
 
 /** Kinds-imply-shapes — ONE table (the geometry rule, applied everywhere a kind appears):
  *  point/vector/direction are vec3; angle/area/scalar are scalars; length is either (halfSize). */
@@ -30,6 +31,14 @@ function checkConstraintSane(label: string, c: RowConstraint | undefined): void 
     if (c.kind === 'min-length') expect(c.value, `${label} min-length value`).toBeGreaterThan(0);
 }
 
+/** A row's per-space domains name spaces the occupant has a body for, and each is sane. */
+function checkSpaceConstraints(label: string, c: SpaceConstraints | undefined, glsl: SpaceBodies): void {
+    for (const [space, constraint] of Object.entries(c ?? {})) {
+        expect(spacesOf(glsl), `${label}: constraintIn names '${space}'`).toContain(space);
+        checkConstraintSane(`${label} in ${space}`, constraint);
+    }
+}
+
 describe('row grammar (D1) — one vocabulary across families', () => {
     describe('light authored rows', () => {
         for (const [kind, d] of Object.entries(LIGHT_KINDS)) {
@@ -40,6 +49,7 @@ describe('row grammar (D1) — one vocabulary across families', () => {
                     }
                     checkKindShape(`${kind}.${p.name}`, p.kind, p.shape);
                     checkConstraintSane(`${kind}.${p.name}`, p.constraint);
+                    checkSpaceConstraints(`${kind}.${p.name}`, p.constraintIn, d.glsl);
                 }
             });
             it(`${kind}: struct rows + derived fields obey kinds-imply-shapes`, () => {
@@ -56,6 +66,7 @@ describe('row grammar (D1) — one vocabulary across families', () => {
                 for (const p of d.params) {
                     if (p.required) expect(p.default, `${type}.${p.name}`).toBeUndefined();
                     checkConstraintSane(`${type}.${p.name}`, p.constraint);
+                    checkSpaceConstraints(`${type}.${p.name}`, p.constraintIn, d.glsl);
                 }
             });
         }

@@ -81,7 +81,7 @@ export function contributeTransport(program: ProgramDescription): FeatureContrib
         textures: [],
         provides: [
             { name: 'transport_trace', signature: `Radiance transport_trace(${traceParams(program)})` },
-            { name: 'light_query_surface', signature: 'LightQuery light_query_surface(int mat, Hit hit, Direction wo)' },
+            { name: 'light_query_surface', signature: 'LightQuery light_query_surface(int mat, Hit hit)' },
             { name: 'light_query_medium', signature: 'LightQuery light_query_medium(Point p)' },
         ],
         requires: [...walkRequires(f, program), ...kernelRequires(f), ...lightRequires(f), ...equiangularRequires(f)],
@@ -113,17 +113,16 @@ function walkRequires(f: Flags, p: ProgramDescription): string[] {
 
 // ============================================================================
 // Light-query constructors (fable-light-bvh §3.2 v1.5) — the POLICY site for the
-// selection context: static technique files pass "everything they have" (mat, hit, wo)
+// selection context: static technique files pass "everything they have" (mat, hit)
 // through these instead of constructing LightQuery themselves, so context growth
 // (per-material support policy, spectral, curved frames) changes ONLY these bodies.
 // The query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta,
 // fable-rough-dielectric §3.3), and this is where it is answered; the twoSidedShading
 // decision folds the question away entirely when the scene has no such material.
-// In a curved space n is the shading normal turned toward wo, the side the receiver is seen
-// from and so the hemisphere a one-sided receiver scatters into: the S³ light bodies take the
-// arc leaving into it (spherical_light_arc), and a receiver hit on its back face would
-// otherwise be lit only through the arc it cannot scatter. The Euclidean query keeps the
-// outward normal for its one reader, the light tree.
+// q.n is hit.frame.n, which scene_intersect has already turned toward region_from, the side the
+// ray arrived from (structs.glsl Hit, §4.1), so it is the normal of the hemisphere a one-sided
+// receiver scatters into: the light tree's horizon term and the S³ light bodies' arc rule
+// (spherical_light_arc) read it as it is.
 // ============================================================================
 
 function lightQueryFns(f: Flags): ShaderBlock {
@@ -134,11 +133,8 @@ function lightQueryFns(f: Flags): ShaderBlock {
         origin: 'generated:transport/light-query',
         source: [
             '// ── Light-query constructors (generated policy — fable-light-bvh §3.2) ──',
-            'LightQuery light_query_surface(int mat, Hit hit, Direction wo) {',
-            ...(f.curved
-                ? ['    Direction n = ambient_dot(wo, hit.frame.n, hit.p) < 0.0 ? -hit.frame.n : hit.frame.n;',
-                    `    return LightQuery(hit.p, n, ${sided});`]
-                : [`    return LightQuery(hit.p, hit.frame.n, ${sided});`]),
+            'LightQuery light_query_surface(int mat, Hit hit) {',
+            `    return LightQuery(hit.p, hit.frame.n, ${sided});`,
             '}',
             'LightQuery light_query_medium(Point p) {',
             '    return LightQuery(p, Direction(0.0), false);   // no orientation at a medium event',

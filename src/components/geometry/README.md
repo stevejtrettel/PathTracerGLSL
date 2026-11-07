@@ -65,7 +65,9 @@ A primitive supplies:
 2. **A descriptor** (`PrimitiveDescriptor`, components/descriptors.ts): the schema
    row (`params` — ROW ORDER = GENERATED STRUCT FIELD ORDER = CTOR ORDER; each param
    declares `kind` (point | vector | direction | length — how it transforms under a
-   similarity), `shape`, `required`, `default`, `constraint`), the declared surface
+   similarity), `shape`, `required`, `default`, `constraint`, and `constraintIn`: the further
+   domain a space's body requires, keyed by space — an S³ sphere or disk radius lies in (0, π),
+   `SPHERICAL_RADIUS`), the declared surface
    (`provides.sdf` / `provides.analytic`), flat facts (`thin`),
    and — only when genuinely irregular — the `derivedFields`/`derivedCtorFields`
    pair (quad: the precompiled one-sided normal, a compile-time literal shared with

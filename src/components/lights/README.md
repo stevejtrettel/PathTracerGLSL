@@ -25,9 +25,10 @@ the descriptor rows). Type-first symbols; the `_light_` infix is deliberate:
 geodesics join the shading point to a light point, the short arc (length d) and the long arc
 (length 2π − d), leaving and arriving in opposite directions with the same area density sin² d;
 the body chooses the arc before the emitter's back-face test (`spherical_light_arc`, the S³
-occupant): a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`, n facing the side it is seen
-from) takes the arc leaving into its upper hemisphere with probability 1, anything else (a
-two-sided receiver, a medium event) each arc with probability ½, drawing one `random()`. The pdf
+occupant): a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; `q.n` is `hit.frame.n`, which
+`scene_intersect` has already turned toward the side the ray arrived from) takes the arc leaving
+into its upper hemisphere with probability 1, anything else (a two-sided receiver, a medium event)
+each arc with probability ½, drawing one `random()`. The pdf
 carries that probability; the emitter cosine is taken against the arrival direction of the arc
 the ray travelled, which `wo` gives at a hit. The generated arms pass `q.p` and `-wo` (= the
 departure direction in E³) to Euclidean bodies, `q` and `wo` to curved ones.
@@ -59,7 +60,9 @@ same isometry applied to them at o, 4-vectors — compiler/plan/curved.ts; the H
 `<kind>_hyperbolic.glsl`, use the area density sinh² r in place of r², the S³ bodies,
 `<kind>_spherical.glsl`, sin² r and the arc rule above), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
-loop derives unknown-key/required/shape checks from it and runs `validateAuthored`
+loop derives unknown-key/required/shape/constraint checks from it, including a row's
+`constraintIn` (the further domain a space's body requires: the S³ disk light's radius lies
+in (0, π), `SPHERICAL_RADIUS`), and runs `validateAuthored`
 only on well-shaped input; the desugar-totality contract test keeps it honest
 against the desugar functions in both drift directions), `params` (rows = generated
 struct fields = ctor order; radiometric rows are `Spectrum`; geometric rows carry a

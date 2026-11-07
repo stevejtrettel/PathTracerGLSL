@@ -32,7 +32,7 @@ import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported, phaseModelOf, VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
+import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, rowViolations, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
@@ -156,11 +156,8 @@ export function validate(
                 shapesOk = false;
                 continue;
             }
-            if (p.constraint !== undefined) {
-                const violation = constraintViolation(v as number | number[], p.constraint);
-                if (violation !== null) {
-                    bag.error('invalid-setting', `Light ${i} (${light.kind}): '${p.name}' ${violation}`).add();
-                }
+            for (const violation of rowViolations(v as number | number[], p, space)) {
+                bag.error('invalid-setting', `Light ${i} (${light.kind}): '${p.name}' ${violation}`).add();
             }
         }
         // emission (the one radiometric word) — required; a constant, a {param} (whose default
@@ -197,7 +194,7 @@ export function validate(
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         if (isInstancedObject(obj)) continue;   // prototype validated with its batch below
-        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag, gateSpace);
+        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag, space, gateSpace);
     }
 
     // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
@@ -1199,7 +1196,7 @@ export function validate(
             }
         }
         const proto = obj.prototype;
-        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag, gateSpace);
+        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag, space, gateSpace);
         // (A closed mesh PROTOTYPE was rejected here until instanced containment landed —
         // impl-plan-instanced-containment. Solid instances now claim an interior through
         // the same three-tier query their un-instanced siblings use, so `closed: true`
@@ -1457,10 +1454,11 @@ export function validate(
  * buffer would silently texelFetch garbage vertices on the GPU).
  *
  * `label` prefixes messages (`Object 3`, `Object 3 prototype`); `path` prefixes
- * diagnostic origins (`objects[3]` / `objects[3].prototype`).
+ * diagnostic origins (`objects[3]` / `objects[3].prototype`). `space` is the program's ambient
+ * space, whose rows' further domains (SpaceConstraints) apply.
  */
 function validateGeometryObject(
-    obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag,
+    obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag, space: string,
     gateSpace: (where: string, occupant: string, implementedIn: readonly string[]) => void,
 ): void {
     if ('kind' in obj) {
@@ -1589,7 +1587,7 @@ function validateGeometryObject(
                 `${label} (${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                 .add();
         } else {
-            validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, bag);
+            validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, space, bag);
         }
     }
 
@@ -1786,12 +1784,11 @@ function validatePrimitiveConstraint(
     schema: PrimitiveParamSpec,
     value: unknown,
     label: string,
+    space: string,
     bag: DiagnosticBag,
 ): void {
     // The shared D1 interpreter — one message voice for every family's rows.
-    if (schema.constraint === undefined) return;
-    const violation = constraintViolation(value as number | number[], schema.constraint);
-    if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
+    for (const violation of rowViolations(value as number | number[], schema, space)) bag.error('invalid-setting', `${label} ${violation}`).add();
 }
 
 // ============================================================================

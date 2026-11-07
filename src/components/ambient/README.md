@@ -66,7 +66,9 @@ S³ adds two facts no other space has. Two geodesics join any two points, of len
 leaving and arriving in opposite directions: `ambient_aim` keeps a shadow ray on the arc it
 travels, and the S³ light bodies choose an arc per sample (`spherical_light_arc`; the lights
 README). And every geodesic closes after 2π: `MAX_DIST` is 2π exactly, there is no sky (an
-environment is an error), and a ray that meets nothing reads 0.
+environment is an error), and a ray that meets nothing reads 0. A geodesic radius lies below π,
+the diameter of the space: the sphere, disk and disk-light radius rows declare `SPHERICAL_RADIUS`
+as their spherical `constraintIn`, and the Validator rejects a radius ≥ π.
 
 What the compiler does with it (all fp64 on the CPU, compiler/plan/curved.ts):
 

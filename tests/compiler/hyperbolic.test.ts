@@ -102,6 +102,11 @@ describe('H³ Validator rules', () => {
         expect(errorsOf(h3Furnace, furnace)).toBe('');
     });
 
+    it('accepts a ball radius above π: the S³ radius domain applies in S³ only', () => {
+        const ball = { ...h3DiskLight, objects: [{ type: 'sphere', parameters: { radius: 4 }, material: 'receiver' }] } as SceneDescription;
+        expect(errorsOf(ball, posedNee)).toBe('');
+    });
+
     it('rejects a curvature parameter', () => {
         expect(errorsOf({ ...h3Furnace, ambientSpace: { type: 'hyperbolic', parameters: { curvature: -2 } } }, furnace))
             .toContain('curvature fixed at magnitude 1');

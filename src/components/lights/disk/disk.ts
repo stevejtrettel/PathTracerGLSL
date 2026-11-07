@@ -9,6 +9,7 @@
 import type { LightKindDescriptor } from '../../descriptors.js';
 import { unitVec3 } from '../../geometry/index.js';
 import { radiantScalar } from '../power.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import lightDiskGLSL from './disk.glsl?raw';
 import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 import diskSphericalGLSL from './disk_spherical.glsl?raw';
@@ -26,7 +27,7 @@ export const diskLightDescriptor: LightKindDescriptor = {
     // toValues and region.parameters below read a plain value and cannot disagree.
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },
-        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' } },
+        { name: 'radius', shape: 'number', required: true, kind: 'length', constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },
         { name: 'normal', shape: 'vec3', required: false, kind: 'direction', default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
     ],
     params: [

@@ -152,9 +152,10 @@ bool spherical_plane_root(Ray ray, vec4 N, out float t) {
     return true;
 }
 
-// Whether the receiver of query q is a one-sided surface: !q.two_sided with n ≠ 0 (n faces the
-// side the receiver is seen from). Such a receiver scatters only into its upper hemisphere; a
-// two-sided receiver scatters into both, and a medium event (n = 0) has no orientation.
+// Whether the receiver of query q is a one-sided surface: !q.two_sided with n ≠ 0 (n is the hit's
+// frame.n, which faces the side the ray arrived from). Such a receiver scatters only into its upper
+// hemisphere; a two-sided receiver scatters into both, and a medium event (n = 0) has no
+// orientation.
 bool spherical_query_one_sided(LightQuery q) {
     return !q.two_sided && dot(q.n, q.n) > 0.0;
 }

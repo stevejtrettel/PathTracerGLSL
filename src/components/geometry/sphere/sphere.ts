@@ -3,6 +3,7 @@
 // fold is kind-derived (center: point → g·c, radius: length → s·r) — no override.
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import sphereGLSL from './sphere.glsl?raw';
 import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
 import sphereSphericalGLSL from './sphere_spherical.glsl?raw';
@@ -11,7 +12,7 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },
     ],
     glsl: {
         euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL },

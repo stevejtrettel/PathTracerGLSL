@@ -65,6 +65,12 @@ export type RowConstraint =
     | { kind: 'interval'; min: number; max: number }
     | { kind: 'closed-interval'; min: number; max: number };
 
+/** Further domains a row's value must lie in when the program runs in a particular space, keyed by
+ *  AMBIENT_SPACES key: what the occupant's body for that space requires beyond the row's own
+ *  `constraint` (in S³ a ball's or a disk's radius is a geodesic distance below π, the diameter of
+ *  the space). A key names a space the occupant has a body for (contract test). */
+export type SpaceConstraints = { readonly [space: string]: RowConstraint };
+
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
  *  the caller projects authored radiometric forms via `resolveLightValues` first. */
@@ -200,6 +206,8 @@ export interface AuthoredParamSpec {
     kind?: ParamKind;
     /** Separable domain rule, machine-readable (D1). */
     constraint?: RowConstraint;
+    /** The further domain the kind's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** One row of a light kind's parameter schema (struct-alignment batch): struct field
@@ -384,6 +392,8 @@ export interface PrimitiveParamSpec {
     /** Mathematical domain required by the implementation (the shared RowConstraint
      *  vocabulary — D1; Validator-interpreted, shape-agnostic). */
     constraint?: RowConstraint;
+    /** The further domain the shape's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** Call-site context for emitted per-primitive expressions: the query/hit point

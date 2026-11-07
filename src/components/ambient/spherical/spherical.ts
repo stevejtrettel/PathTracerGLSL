@@ -4,7 +4,14 @@
 
 import type { Vec3Tuple } from '../../geometry/similarity.js';
 import type { CurvedGeometry, Mat4, Vec4 } from '../isometry.js';
+import type { RowConstraint } from '../../descriptors.js';
 import { mat4Transpose } from '../isometry.js';
+
+/** The domain of a geodesic radius in S³ (a ball's, a disk's): (0, π). π is the diameter of the
+ *  space: the ball of radius π is all of S³, and a disk of radius ρ ≥ π is not the region the disk
+ *  bodies intersect and sample. The rows that hold such a radius declare it as their spherical
+ *  SpaceConstraints entry. */
+export const SPHERICAL_RADIUS: RowConstraint = { kind: 'interval', min: 0, max: Math.PI };
 
 export const sphericalGeometry: CurvedGeometry = {
     form: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3],

@@ -4,6 +4,25 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
+
+Review of the S³ step (curved-space design §2.4).
+
+- **`light_query_surface(int mat, Hit hit)` again, in every space.** The face-forwarding the S³
+  step added (n turned toward `wo` in curved programs) never ran: `scene_intersect` already turns
+  `hit.frame` and `hit.ng` toward `region_from` when the arrival direction leaves along the normal,
+  and the walk's `wo` is the same expression negated, so `ambient_dot(wo, hit.frame.n) ≥ 0` on
+  every hit (in a curved program every object is a primitive, where ng = frame.n). The `wo`
+  argument, the turn and the `curved` transport flag are gone; the arc rule reads `q.n =
+  hit.frame.n` directly. Generated programs differ only in that signature, its two calls and
+  comments; the 34 H³/S³ programs also lose the dead turn (digest: 539 programs, 23 line kinds,
+  nothing else).
+- **S³ radius domains are checked.** A row may declare `constraintIn`, a further domain its body
+  in one space requires (`SpaceConstraints`, components/descriptors.ts). The sphere, disk and
+  disk-light radius rows declare `SPHERICAL_RADIUS` = (0, π) for S³ (π is the diameter of the
+  space; the disk light's radius map and area assume ρ < π), so a radius ≥ π is a Validator
+  error there and still accepted in H³ and E³.
+
 ## 2026-11-07 — Spherical space S³ (curved-space step 3)
 
 [Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.4 and Part 1.

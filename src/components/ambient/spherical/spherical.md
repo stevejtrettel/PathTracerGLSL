@@ -53,9 +53,9 @@ light-sampling-twins, review-mc).
   zero at t₀ = atan(−P, W) mod π and t₀ + π; the first in (0, π] is returned. Every geodesic meets
   every great sphere.
 - **The arc rule for light samples (`spherical_light_arc`).** A one-sided surface receiver
-  (`!q.two_sided`, `q.n ≠ 0`, n facing the side the receiver is seen from) scatters only into its
-  upper hemisphere, and exactly one arc leaves into it: that arc is taken with probability 1, which
-  per sample equals summing both arcs. A two-sided receiver or a medium event (n = 0) takes each
+  (`!q.two_sided`, `q.n ≠ 0`; n is the hit's frame.n, which faces the side the ray arrived from)
+  scatters only into its upper hemisphere, and exactly one arc leaves into it: that arc is taken
+  with probability 1, which per sample equals summing both arcs. A two-sided receiver or a medium event (n = 0) takes each
   arc with probability ½. Measured in review-mc/arc_rule.ts: every surface case |z| ≤ 1.55 against
   cosine sampling; the medium case loses half the light (z −197) if the one-sided rule is applied
   without the `n ≠ 0` condition.

@@ -56,8 +56,10 @@ describe('S³ placements, light rows and light calls', () => {
         expect(glsl).toContain('ls = disk_light_sample(light_get_0(wl), q, xi);');
         expect(glsl).toContain('disk_light_pdf(light_get_0(light_hit.wl), q, light_hit.p, wo)');
         expect(glsl).toContain('lighting_pdf(s.prev_query, wo, lid, hit)');
-        // the query's normal faces the side the receiver is seen from
-        expect(glsl).toMatch(/LightQuery light_query_surface\(int mat, Hit hit, Direction wo\) \{\s*Direction n = ambient_dot\(wo, hit\.frame\.n, hit\.p\) < 0\.0 \? -hit\.frame\.n : hit\.frame\.n;/);
+        // the arc rule reads the query's n = hit.frame.n, which scene_intersect turns toward the
+        // side the ray arrived from
+        expect(glsl).toMatch(/LightQuery light_query_surface\(int mat, Hit hit\) \{\s*return LightQuery\(hit\.p, hit\.frame\.n, /);
+        expect(glsl).toContain('hit.frame = ambient_frame(hit.p, -hit.frame.n);');
     });
 
     it('the camera uniforms are the vec4 frame at exp_o(position)', () => {
@@ -113,5 +115,18 @@ describe('S³ Validator rules', () => {
         expect(errorsOf(box, furnace)).toContain("primitive 'box' has no spherical implementation");
         const quad = { ...s3LongArc, lights: [{ kind: 'quad', corner: [0, 1, 0], edge1: [0.2, 0, 0], edge2: [0, 0, 0.2], emission: 1 }] } as SceneDescription;
         expect(errorsOf(quad, posedNee)).toContain("light kind 'quad' has no spherical implementation");
+    });
+
+    it('rejects a ball, disk or disk-light radius of π or more, and accepts one just below π', () => {
+        const ball = (radius: number) => ({ ...s3LongArc, objects: [{ type: 'sphere', parameters: { radius }, material: 'receiver' }] } as SceneDescription);
+        const disk = (radius: number) => ({ ...s3LongArc, objects: [{ type: 'disk', parameters: { radius, normal: [0, 1, 0] }, material: 'receiver' }] } as SceneDescription);
+        const light = (radius: number) => ({ ...s3LongArc, lights: [{ kind: 'disk', ...S3_DISK_LIGHT, radius }] } as SceneDescription);
+        expect(errorsOf(ball(Math.PI), posedNee)).toContain("Object 0 (sphere): parameter 'radius' must be in (0, 3.141593) in spherical space");
+        expect(errorsOf(ball(4), posedNee)).toContain("parameter 'radius' must be in (0, 3.141593) in spherical space");
+        expect(errorsOf(disk(3.5), posedNee)).toContain("Object 0 (disk): parameter 'radius' must be in (0, 3.141593) in spherical space");
+        expect(errorsOf(light(3.5), posedNee)).toContain("Light 0 (disk): 'radius' must be in (0, 3.141593) in spherical space");
+        expect(errorsOf(ball(3.1), posedNee)).toBe('');
+        expect(errorsOf(disk(3.1), posedNee)).toBe('');
+        expect(errorsOf(light(3.1), posedNee)).toBe('');
     });
 });

@@ -157,8 +157,8 @@ normal computed in the object's frame is mapped back by the occupant's `isometry
 In S³ two geodesics join any two points (the short arc of length d and the long arc of length
 2π − d, leaving and arriving in opposite directions), and both carry light. A light sample chooses
 its arc inside the light's body, before the emitter's back-face test, from the stored
-`LightQuery`: a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; in a curved program `n`
-faces the side the receiver is seen from, `light_query_surface(mat, hit, wo)`) takes the arc
+`LightQuery`: a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; `q.n` is `hit.frame.n`,
+which `scene_intersect` has already turned toward the side the ray arrived from) takes the arc
 leaving into its upper hemisphere, and anything else takes each arc with probability ½. The MIS
 query `lighting_pdf(q, wo, light_id, light_hit)` takes `wo` at the emitter hit — the arrival
 direction reversed — because only the emitter cosine depends on the arc a ray travelled

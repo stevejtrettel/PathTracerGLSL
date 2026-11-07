@@ -16,7 +16,7 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
 import type { SpectrumKind } from '../../components/color/spectra/spectrumKind.js';
 import { SLIDER_KEYS, unknownKeysProblem, valueParamProblems } from '../../components/param.js';
-import type { SpectrumRole, RowConstraint, PropertySchema } from '../../components/descriptors.js';
+import type { SpectrumRole, RowConstraint, PropertySchema, SpaceConstraints } from '../../components/descriptors.js';
 import { MATERIAL_MODELS } from '../../components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS, phaseModelOf } from '../../components/volume_scattering/index.js';
 
@@ -29,6 +29,21 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
     if (c.kind === 'interval') return values.some((v) => !(v > c.min && v < c.max)) ? `must be in (${c.min}, ${+c.max.toFixed(6)})` : null;
     if (c.kind === 'closed-interval') return values.some((v) => !(v >= c.min && v <= c.max)) ? `must be in [${c.min}, ${c.max}]` : null;
     return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
+}
+
+/** The violations of a geometric row's value (a primitive's row, a light's authored row) in the
+ *  program's space: the row's own constraint, then the further domain its body in that space
+ *  requires (SpaceConstraints). */
+export function rowViolations(
+    value: number | number[], row: { constraint?: RowConstraint; constraintIn?: SpaceConstraints }, space: string,
+): string[] {
+    const found: string[] = [];
+    const own = row.constraint === undefined ? null : constraintViolation(value, row.constraint);
+    if (own !== null) found.push(own);
+    const inSpace = row.constraintIn?.[space];
+    const spaceViolation = inSpace === undefined ? null : constraintViolation(value, inSpace);
+    if (spaceViolation !== null) found.push(`${spaceViolation} in ${space} space`);
+    return found;
 }
 
 export interface PropertyValueContract {

@@ -9,6 +9,7 @@
 // agree bit-exactly (the one-sided pin, quadNormal's precedent).
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import diskGLSL from './disk.glsl?raw';
 import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 import diskSphericalGLSL from './disk_spherical.glsl?raw';
@@ -24,7 +25,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
     type: 'disk',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },   // bounds() below reads center+radius
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },   // bounds() below reads center+radius
         // A flat (+Y) disk is a sensible disk — normal defaults rather than requires
         // (plane's normal stays required: it IS the plane's identity).
         { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
