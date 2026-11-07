@@ -81,7 +81,7 @@ export function defineSDF(spec: SceneSDFSpec): string {
 
     const existing = PRIMITIVES[name];
     if (existing !== undefined) {
-        if (existing.local === true && existing.glsl === spec.glsl && rowsKey(existing.params) === rowsKey(spec.params)) {
+        if (existing.local === true && existing.glsl.euclidean?.source === spec.glsl && rowsKey(existing.params) === rowsKey(spec.params)) {
             // Hot-reload of the defining module: same definition, refresh the closures.
             registerLocal(spec, structName);
             return name;
@@ -141,7 +141,10 @@ function registerLocal(spec: SceneSDFSpec, _structName: string): void {
     const d: PrimitiveDescriptor = {
         type: spec.name,
         params: spec.params,
-        glsl: spec.glsl,
+        // A scene-local field is a Euclidean SDF (its march and finite-difference normals are
+        // Euclidean). It is reported under the folder path a registry occupant of its name
+        // would have.
+        glsl: { euclidean: { origin: `components/geometry/${spec.name}/${spec.name}.glsl`, source: spec.glsl } },
         provides: { sdf: true, analytic: false },
         similarityClosed: false,
         marchBound: spec.marchBound,

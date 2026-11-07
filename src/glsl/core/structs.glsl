@@ -78,7 +78,9 @@ const uint LIGHT_DELTA = 1u;
 // nothing arriving from below n", which is what LICENSES the light tree's
 // below-horizon cull; true = sphere support (rough glass), so the cull disarms and the
 // importance shapes on |n·d| instead. Orthogonal to n = 0: a medium event has neither
-// orientation nor sidedness.
+// orientation nor sidedness. At a surface n is hit.frame.n, which faces region_from, the side the
+// ray arrived from (§4.1): the S³ light bodies take the arc leaving into that hemisphere for a
+// one-sided receiver.
 struct LightQuery {
     Point p;
     Direction n;

@@ -5,7 +5,7 @@ with `g = mp.phase_g ∈ (−1,1)` the mean cosine — g > 0 forward-scattering 
 tissue), g < 0 back-scattering, g = 0 isotropic.
 
 - `hg_eval` returns `(1−g²) / (4π·d^{3/2})` with `d = 1 + g² − 2gc` and
-  `c = dot(wi, -wo)` — **the FORWARD convention**: c is measured from the propagation
+  `c = ambient_dot(wi, -wo, p)` (the metric at the event point `p`) — **the FORWARD convention**: c is measured from the propagation
   direction, so the forward peak sits at c = 1. pbrt's `+2gc` form pairs with the
   opposite dot; "fixing" this file against pbrt swaps forward/backward scattering AND
   desyncs eval from sample (the second-pass audit caught exactly that). The haze

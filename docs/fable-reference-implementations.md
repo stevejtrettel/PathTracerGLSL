@@ -116,8 +116,10 @@ Notes: TIR is not a special case — it is the reflection branch with F = 1 (tra
 
 ```glsl
 // phase_hg.glsl — conforms to §3.5. Fields read: mp.phase_g
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
-    float g = mp.phase_g, c = dot(wi, -wo);           // cos of angle from the FORWARD (propagation) direction
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize).
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    float g = mp.phase_g, c = ambient_dot(wi, -wo, p); // cos of angle from the FORWARD (propagation) direction
     // CONVENTION TRAP: with c measured from forward (-wo), the denominator is 1 + g² − 2gc
     // (forward peak at c=1 for g>0). PBRT's 1 + g² + 2gc form goes with cosθ = dot(wo, wi) —
     // mixing the two swaps forward/backward scattering AND desyncs eval from hg_sample below,
@@ -126,7 +128,7 @@ Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
     return Spectrum(((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8)))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta = (abs(g) < 1e-3)
         ? 1.0 - 2.0 * xi.x
@@ -136,14 +138,19 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     vec3 t, b; build_basis(-wo, t, b);                // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1: HG sampling is exact
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) { return spectrum_average(hg_eval(wi, wo, mp)); }
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) { return spectrum_average(hg_eval(wi, wo, p, mp)); }
 ```
+
+Note: `build_basis` is a Euclidean construction (vec3 cross), so this sampler is correct only in
+Euclidean space; a curved space needs the tangent frame at `p` instead. The family contract,
+with this caveat, is [src/components/volume_scattering/README.md](../src/components/volume_scattering/README.md);
+the implemented file is `src/components/volume_scattering/hg/hg.glsl`.
 
 ## 4. Shadow transmittance (v1: homogeneous, segment-walking)
 
@@ -271,10 +278,10 @@ Radiance transport_trace(Ray primary) {
                 if (ls.pdf > 0.0) {
                     Spectrum T = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance);
                     // §2.2: NO cosine at medium events — phase functions have none
-                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, m) * T / ls.pdf;
+                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, p_evt, m) * T / ls.pdf;
                 }
 
-                InteractionSample ms = hg_sample(-ray.direction, m, random2());
+                InteractionSample ms = hg_sample(-ray.direction, p_evt, m, random2());
                 throughput *= ms.weight;
                 prev_was_delta = false;  prev_bsdf_pdf = ms.pdf;  prev_p = p_evt;
                 ray = make_ray(p_evt, ms.wi);          // continue from the medium event (no surface offset)

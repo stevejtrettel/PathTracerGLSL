@@ -21,14 +21,14 @@ import type { SceneDescription, RenderStrategy, LightDescription } from '../../s
 import { glslangCheck } from '../helpers/glslangCheck.js';
 
 // Quad's math under the synthetic kind's symbols (struct name = Doortest + 'Light').
-const doortestGLSL = quadLightDescriptor.glsl
+const doortestGLSL = quadLightDescriptor.glsl.euclidean!.source
     .replace(/quad_light_/g, 'doortest_light_')
     .replace(/QuadLight/g, 'DoortestLight');
 
 const doortestDescriptor: LightKindDescriptor = {
     ...quadLightDescriptor,
     kind: 'doortest',
-    glsl: doortestGLSL,
+    glsl: { euclidean: { origin: 'components/lights/doortest/doortest.glsl', source: doortestGLSL } },
 };
 
 beforeAll(() => {

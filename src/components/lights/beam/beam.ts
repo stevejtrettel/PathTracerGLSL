@@ -10,7 +10,7 @@ import lightBeamGLSL from './beam.glsl?raw';
 
 export const beamLightDescriptor: LightKindDescriptor = {
     kind: 'beam',
-    glsl: lightBeamGLSL,
+    glsl: { euclidean: { origin: 'components/lights/beam/beam.glsl', source: lightBeamGLSL } },
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
     // NO deltaQuery fact: anisotropic delta (emission confined to one direction — an
     // equiangular pivot at the aperture would bias the estimate; spot's rejection path).

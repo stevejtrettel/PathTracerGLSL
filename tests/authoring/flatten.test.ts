@@ -29,7 +29,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
     it('flat scenes pass through by reference (flatten is the identity on them)', () => {
         const a = sphere();
         const b = sphere({ transform: { position: [1, 2, 3] } });
-        const out = flattenGroups([a, b]);
+        const out = flattenGroups([a, b], 'euclidean');
         expect(out[0]).toBe(a);
         expect(out[1]).toBe(b);
     });
@@ -37,7 +37,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
     it('composes group ∘ leaf: T(p) group over S(2) leaf = TRS(p, id, 2)', () => {
         const out = flattenGroups([
             group({ name: 'ball', transform: { position: [-1, -0.3, 0] }, children: [sphere({ transform: { scale: 2 } })] }),
-        ]);
+        ], 'euclidean');
         expect(tf(out[0])).toEqual({ position: [-1, -0.3, 0], scale: 2 });
     });
 
@@ -46,7 +46,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
             group({ transform: { position: [0.5, 0, 0] }, children: [
                 group({ transform: { position: [0, 0, 0.3] }, children: [sphere()] }),
             ] }),
-        ]);
+        ], 'euclidean');
         expect(tf(out[0])).toEqual({ position: [0.5, 0, 0.3] });
         expect(tf(out[0])).not.toHaveProperty('rotation');
         expect(tf(out[0])).not.toHaveProperty('scale');
@@ -60,7 +60,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
                     sphere({ name: 'ball', transform: { position: [0, 1, 0] } }),
                 ] }),
             ] }),
-        ]);
+        ], 'euclidean');
         // Composed rotation = 180°; leaf origin lands at (10,1,0); local (1,0,0) at (9,1,0).
         const origin = mapPoint(out[0], [0, 0, 0]);
         const px = mapPoint(out[0], [1, 0, 0]);
@@ -73,7 +73,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
             group({ transform: { position: [1, 0, 0], rotation: RY90, scale: 2 }, children: [
                 sphere({ transform: { position: [1, 0, 0] } }),
             ] }),
-        ]);
+        ], 'euclidean');
         // leaf origin: 2·Ry90(1,0,0) + (1,0,0) = (1,0,-2)
         const o = mapPoint(out[0], [0, 0, 0]);
         expect(o[0]).toBeCloseTo(1, 9); expect(o[1]).toBeCloseTo(0, 9); expect(o[2]).toBeCloseTo(-2, 9);
@@ -87,7 +87,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
                 sphere({ name: 'top' }),
                 group({ children: [sphere()] }),           // unnamed group, unnamed leaf
             ] }),
-        ]);
+        ], 'euclidean');
         // D5: a leaf's authored name is a PATH SEGMENT like a group's — two 'ball'
         // leaves in different groups flatten to distinct provenance paths (the old
         // name-replaces-path rule collided them). Root-level leaves keep bare names.
@@ -99,7 +99,7 @@ describe('flattenGroups (fable-transforms §4)', () => {
         const out = flattenGroups([
             group({ name: 'a', transform: { position: [1, 0, 0] }, children: [shared] }),
             group({ name: 'b', transform: { position: [2, 0, 0] }, children: [shared] }),
-        ]);
+        ], 'euclidean');
         expect(out).toHaveLength(2);
         expect(out[0]).not.toBe(out[1]);
         expect((tf(out[0]) as { position: Vec3 }).position).toEqual([1, 0, 0]);
@@ -109,18 +109,35 @@ describe('flattenGroups (fable-transforms §4)', () => {
     it('rejects a driven GROUP transform (static-composition rule)', () => {
         expect(() => flattenGroups([
             group({ name: 'turntable', transform: { rotation: { axis: [0, 1, 0], angle: { param: 'spin' } as any } }, children: [sphere()] }),
-        ])).toThrow(/driven|runtime graph/i);
+        ], 'euclidean')).toThrow(/driven|runtime graph/i);
     });
 
     it('rejects a driven LEAF under a transformed group; passes it under identity ancestors', () => {
         const driven = sphere({ transform: { position: { param: 'crane.tip' } as any } });
         expect(() => flattenGroups([
             group({ transform: { position: [1, 0, 0] }, children: [driven] }),
-        ])).toThrow(/driven|compose/i);
+        ], 'euclidean')).toThrow(/driven|compose/i);
         // identity ancestors: passes through, path stamped
-        const out = flattenGroups([group({ name: 'rig', children: [driven] })]);
+        const out = flattenGroups([group({ name: 'rig', children: [driven] })], 'euclidean');
         expect(tf(out[0])).toBe(driven.transform);
         expect(out[0].name).toBe('rig/#0');
+    });
+
+    it('rejects a transformed group in a curved space; passes identity groups', () => {
+        expect(() => flattenGroups([
+            group({ name: 'rig', transform: { position: [1, 0, 0] }, children: [sphere()] }),
+        ], 'hyperbolic')).toThrow(/hyperbolic space/);
+        expect(() => flattenGroups([
+            group({ name: 'rig', transform: { rotation: { axis: [0, 1, 0], angle: { param: 'spin' } as any } }, children: [sphere()] }),
+        ], 'hyperbolic')).toThrow(/hyperbolic space/);
+        const leaf = sphere({ transform: { position: [0.3, 0, 0] } });
+        const out = flattenGroups([group({ name: 'rig', transform: {}, children: [leaf] })], 'hyperbolic');
+        expect(tf(out[0])).toEqual(leaf.transform);
+        expect(out[0].name).toBe('rig/#0');
+    });
+
+    it('rejects an unknown ambient space', () => {
+        expect(() => flattenGroups([sphere()], 'elliptic')).toThrow(/unknown ambient space 'elliptic'/);
     });
 
     it('transformFromSimilarity: identity → undefined', () => {

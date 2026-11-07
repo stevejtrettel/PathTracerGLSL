@@ -8,6 +8,8 @@ import { analyze } from '../../src/compiler/analyze/Analyzer.js';
 import { DiagnosticBag } from '../../src/errors/core/DiagnosticBag.js';
 import { AMBIENT_SPACES } from '../../src/components/ambient/index.js';
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
+import { hyperbolicScene, hyperbolicPtStrategy } from '../../demos/hyperbolicScene.js';
+import { sphericalScene, sphericalPtStrategy } from '../../demos/sphericalScene.js';
 
 const scene: SceneDescription = {
     id: 'far',
@@ -33,6 +35,17 @@ describe('measurement.farClip', () => {
     it('defaults to the ambient descriptor (Euclidean 1000), emitted once', () => {
         expect(AMBIENT_SPACES.euclidean.farClip).toBe(1000);
         expect(defines(fragment())).toEqual(['#define MAX_DIST 1000.0']);
+    });
+
+    it('defaults to the curved descriptors (H³ 10, S³ 2π), emitted once and not by the occupant', () => {
+        // A curved scene needs an authored pose; any pose inside the working radius serves.
+        const posed = (st: RenderStrategy): RenderStrategy => ({
+            ...st, measurement: { ...st.measurement, camera: { ...st.measurement.camera, position: [0, 0.3, 0.9], target: [0, 0, 0] } },
+        });
+        const curvedDefines = (s: SceneDescription, st: RenderStrategy): string[] =>
+            defines([...new Compiler().compile(s, posed(st)).shaders.values()].map((x) => x.fragment).join('\n'));
+        expect(curvedDefines(hyperbolicScene, hyperbolicPtStrategy)).toEqual(['#define MAX_DIST 10.0']);
+        expect(curvedDefines(sphericalScene, sphericalPtStrategy)).toEqual([`#define MAX_DIST ${2 * Math.PI}`]);
     });
 
     it('overrides the default when authored', () => {

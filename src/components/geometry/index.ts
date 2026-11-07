@@ -14,7 +14,7 @@
 // placement tiers, region tables — stays in the intersection feature ("descriptors
 // declare facts; generators decide").
 
-import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues } from '../descriptors.js';
+import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveParamSpec, PrimitiveValues } from '../descriptors.js';
 import {
     IDENTITY_QUAT,
     IDENTITY_SIMILARITY,
@@ -109,6 +109,18 @@ export function primitiveBounds(type: string, values: PrimitiveValues): AABB | n
     return null;
 }
 
+/** The primitives whose `<type>_interval` a marched `type` calls, in chain order: its march
+ *  bound (an analytic object of a possibly different primitive), that bound's own bound, and
+ *  so on, until a bound is 'self' or 'unbounded'. Empty when the march needs no other
+ *  primitive. The intersection generator links these and the Validator gates them. */
+export function marchBoundTypes(type: string): string[] {
+    const chain: string[] = [];
+    for (let mb = PRIMITIVES[type]?.marchBound; typeof mb === 'object' && !chain.includes(mb.type); mb = PRIMITIVES[mb.type]?.marchBound) {
+        chain.push(mb.type);
+    }
+    return chain;
+}
+
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
  *  sdf; an explicit pin wins (the Validator rejects pins the primitive can't honor).
  *  undefined = unregistered type or unhonorable pin — callers diagnose. */
@@ -154,6 +166,29 @@ export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?
     });
     const derived = (d.derivedCtorFields?.(v) ?? []).map(formatValue);
     return `${structName(d)}(${[...args, ...derived].join(', ')})`;
+}
+
+/** A curved space's struct rows: the point row is folded into the object's placement (an
+ *  isometry — compiler/plan/curved.ts), so the struct keeps the intrinsic rows. */
+export function curvedRows(d: PrimitiveDescriptor): PrimitiveParamSpec[] {
+    return d.params.filter((f) => f.kind !== 'point');
+}
+
+/** The struct constructor in a curved space, over curvedRows: numbers as floats, a direction row
+ *  as a tangent vector at the object's origin o = (0,0,0,1), `Direction(x, y, z, 0.0)`, a vec3 of
+ *  lengths as vec3. A vector row (a parallelogram's edge) has no curved meaning, and derived
+ *  fields are Euclidean precomputations; no shape with a curved body has either. */
+export function emitCurvedCtor(d: PrimitiveDescriptor, values: PrimitiveValues): string {
+    if (d.derivedFields !== undefined) throw new Error(`geometry: '${d.type}' has derived fields, which have no curved form`);
+    const v = resolvePrimitiveValues(d, values);
+    const args = curvedRows(d).map((f) => {
+        const x = v[f.name]!;
+        if (!Array.isArray(x)) return formatFloat(x);
+        if (f.kind === 'direction') return `Direction(${x.map(formatFloat).join(', ')}, 0.0)`;
+        if (f.kind === 'length') return formatVec3(x);
+        throw new Error(`geometry: '${d.type}' row '${f.name}' (${f.kind}) has no curved form`);
+    });
+    return `${structName(d)}(${args.join(', ')})`;
 }
 
 /** `<type>_sdf(<point>, <ctor>)` — the signed-distance call (world-exact under

@@ -7,14 +7,15 @@
 // by the accumulation mode's own rule, and links its GLSL (generate/features/aov.ts).
 
 import type { PictureFacts } from '../../compiler/types.js';
+import type { SpaceBodies } from '../descriptors.js';
 import { albedo } from './albedo/albedo.js';
 import { normal } from './normal/normal.js';
 
 export interface AovDescriptor {
     /** Registry key — the name listed in `measurement.aovs`. Its function is `<name>_aov`. */
     name: string;
-    /** ?raw source defining `<name>_aov`. */
-    glsl: string;
+    /** Per space: the file defining `<name>_aov`. */
+    glsl: SpaceBodies;
     /** The seams `<name>_aov` calls beyond core math. */
     requires: string[];
     /** The picture this AOV adds. */

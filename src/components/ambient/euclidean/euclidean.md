@@ -33,5 +33,5 @@ every Euclidean picture bit-identical.
 
 Places the seam does NOT cover are listed in the family README: light samplers (they
 carry a METRIC EXEMPTION note — Euclidean solid-angle constructions that get new bodies
-per space), phase functions, the march and the placement arms, camera frames, environment
-samplers and equiangular placement.
+per space), the phase functions' sampling basis, the march and the placement arms, camera
+frames, environment samplers and equiangular placement.

@@ -4,7 +4,7 @@
 // cdf_rescale, the two-stage env wrapper). Adding a kind = one GLSL file + one
 // descriptor + one line here.
 
-import type { LightKindDescriptor } from '../descriptors.js';
+import type { LightKindDescriptor, SpaceList } from '../descriptors.js';
 import { pointLightDescriptor } from './point/point.js';
 import { quadLightDescriptor } from './quad/quad.js';
 import { sphereLightDescriptor } from './sphere/sphere.js';
@@ -40,12 +40,16 @@ export { radiantScalar } from './power.js';
  *  'uniform' — the naive baseline CDF.
  *  'bvh'     — stochastic light-tree descent (spatially-aware O(log n) selection;
  *              accel/light_tree builds, the lighting feature emits the walk pair). */
-export interface LightSelectionDescriptor { id: string; }
+export interface LightSelectionDescriptor {
+    id: string;
+    spaces: SpaceList;
+}
 export const DEFAULT_LIGHT_SELECTION = 'power';
 export const LIGHT_SELECTIONS: Record<string, LightSelectionDescriptor> = {
-    power: { id: 'power' },
-    uniform: { id: 'uniform' },
-    bvh: { id: 'bvh' },
+    // A CDF over the roster: no geometry, so the curved spaces whose lights it selects among.
+    power: { id: 'power', spaces: ['euclidean', 'hyperbolic', 'spherical'] },
+    uniform: { id: 'uniform', spaces: ['euclidean', 'hyperbolic', 'spherical'] },
+    bvh: { id: 'bvh', spaces: ['euclidean'] },
 };
 
 /** Apply the kind's authored-row defaults ONCE (D1: defaults-in-rows — the framework

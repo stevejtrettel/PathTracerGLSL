@@ -40,6 +40,8 @@ const ALLOWED_ROOT_FILES = new Set([
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
     'microfacet.ts',                       // materials shared part (the α derived field every microfacet model reads)
     'microfacetTwin.ts',                   // materials shared part (TS twin of glsl/core/microfacet.glsl's lobe + the §11.3 harness the models' tests run)
+    'support.md',                          // ambient: the generated space-support table (spaceSupport.test.ts)
+    'isometry.ts',                         // ambient shared part (curved-space CPU isometry algebra)
 ]);
 
 describe('components structure', () => {

@@ -4,6 +4,26 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Integration: measured metals and sheen, then curved spaces (H³, S³)
+
+`integrate` merges photo-materials at 8a52887 and sw at 861f175 (curved H³/S³ joined with the
+cube 3-torus).
+
+- **Material models in curved spaces.** A material descriptor's GLSL is keyed by ambient space.
+  `plastic`, `thin_dielectric`, `sheen`, `conductor` and `rough_conductor` have a Euclidean body
+  only, so the space gate rejects them in H³ and S³ by name (lambert stays the one curved-space
+  surface model). The support table (components/ambient/support.md) lists them.
+- **Bump mapping** is a new limitation row (Euclidean only): its height is a GLSL expression in
+  the world point, like the material expressions the uv/expression row already gates. Image
+  textures are lowered to expressions before validation, so that row covers them.
+- `unitLuminanceStandIn` also returns the normalized XYZ, which white balance reads through
+  `blackbodyColor` (same arithmetic as before).
+- tests/compiler/spaceGate.test.ts checks the five material models and bump mapping.
+- Snapshots (generated GLSL, program descriptions, scene data) regenerated after the merge.
+- Measured after the merge: tsc clean; vitest 159 files, 5397 tests pass (glslang included);
+  targeted witnesses conductor-gold, conductor-perfect, veach-metals, spectral-colorchecker-d65,
+  spectral-measured-lamps, h3-disk-light and s3-long-arc: 26 of 26 exact checks pass.
+
 ## 2026-11-07 — Photographs: fixes from a review of the six pictures
 
 - **Bugs and wrong text.** `photo-window`'s 3 cm table edge reused the top's `wood` material, so
@@ -73,6 +93,34 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 - Measured on the Apple M2 (`npm run shoot`, 1280 × 853, salt 1): glass 8192 spp 251 s; studio
   4096 spp 575 s; sponge 244 s; plaza 240 s; pavilion 330 s; window 997 s. Pictures in the
   gitignored renders/photo/.
+
+## 2026-11-07 — Curved spaces and the cube 3-torus in one tree
+
+The H³/S³ work and the 3-torus work, built side by side from the same commit, merged. Where
+they met:
+
+- **The far clip is one descriptor field in every space.** Each ambient descriptor declares
+  `farClip` (Euclidean 1000, H³ 10, S³ 2π), and core.ts emits it as the one `#define MAX_DIST`
+  before the occupant's block, or the authored `measurement.farClip`. The H³ and S³ occupants no
+  longer define MAX_DIST themselves (tests/compiler/farClip.test.ts checks one define per program
+  in each space). In S³ the emitted literal is 6.283185307179586 instead of `TWO_PI`; both round
+  to the same float32.
+- **Image-aware MIS takes the curved `lighting_pdf(q, wo, …)` signature.** In a quotient program
+  `lighting_pdf` passes `-wo` (the departure direction at q.p, which in E³ is the ray's
+  direction bit for bit) to `quotient_image` and `wo` to the cover's pdf; the cover's
+  sampler and pdf keep their private names and take the curved branch's `curved` flag.
+- The Validator runs the space gate and the curved checks, then the quotient rules; a
+  quotient on H³ or S³ is still an error (the only kind, `torus`, acts on Euclidean space).
+- The gallery has both sections, "Curved spaces" and "Closed manifolds".
+
+Checked: every compiled part of every suite scene that both parents compile equals the 3-way
+merge of the two parents' outputs (2,337 parts: shader text, uniforms and closures, parameters,
+source-map origins, scene data, warnings). The H³/S³ programs differ from the curved branch only
+in where MAX_DIST is defined, and the torus programs differ from the quotient branch only by the
+curved branch's changes to Euclidean programs (the `wo` signatures, `ambient_distance`, the
+phase functions' event point). The 14 frame cases are bit-identical to the curved branch's.
+Witnesses: the 11 h3-*/s3-* scenes (29 checks, no cache) and the 5 torus-* scenes (15 checks)
+pass.
 
 ## 2026-11-07 — Fog in the cube 3-torus (quotients plan Q1b)
 
@@ -154,6 +202,109 @@ roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the
 (4,096 and 16,384 spp) under independent salts: heavy tails predict a deficit that keeps
 shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
 deficit that stays near 2.8%.
+## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
+
+Review of the S³ step (curved-space design §2.4).
+
+- **`light_query_surface(int mat, Hit hit)` again, in every space.** The face-forwarding the S³
+  step added (n turned toward `wo` in curved programs) never ran: `scene_intersect` already turns
+  `hit.frame` and `hit.ng` toward `region_from` when the arrival direction leaves along the normal,
+  and the walk's `wo` is the same expression negated, so `ambient_dot(wo, hit.frame.n) ≥ 0` on
+  every hit (in a curved program every object is a primitive, where ng = frame.n). The `wo`
+  argument, the turn and the `curved` transport flag are gone; the arc rule reads `q.n =
+  hit.frame.n` directly. Generated programs differ only in that signature, its two calls and
+  comments; the 34 H³/S³ programs also lose the dead turn (digest: 539 programs, 23 line kinds,
+  nothing else).
+- **S³ radius domains are checked.** A row may declare `constraintIn`, a further domain its body
+  in one space requires (`SpaceConstraints`, components/descriptors.ts). The sphere, disk and
+  disk-light radius rows declare `SPHERICAL_RADIUS` = (0, π) for S³ (π is the diameter of the
+  space; the disk light's radius map and area assume ρ < π), so a radius ≥ π is a Validator
+  error there and still accepted in H³ and E³.
+
+## 2026-11-07 — Spherical space S³ (curved-space step 3)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.4 and Part 1.
+
+- **The occupant** `components/ambient/spherical/`: the unit sphere in R⁴ (Point and Direction are
+  vec4), MAX_DIST = 2π (exact: every geodesic closes), no sky, the chord-form distance
+  2·atan(|a − b|, |a + b|), the longest-axis tangent frame, `isometry_direction` = v·G⁻¹, and an
+  arc-aware `ambient_aim`: a shadow ray on the long arc leaves along −u with 2π − d left, so an
+  occluder on the far part of a long arc is tested. CPU geometry (exp_o, log_o, the rotation
+  transvection, g⁻¹ = gᵀ); `mat4Transpose` is now shared with H³.
+- **Bodies:** sphere (one atan pair, entry/exit by the inside test, mod 2π), plane (great sphere,
+  first of two roots per period), disk (the first of the two antipodal crossings inside it); point
+  light (I/sin²d per arc) and disk light (area 4π sin²(ρ/2), sin(r/2) = √u·sin(ρ/2)). lambert,
+  pinhole, fisheye and hg are listed under spherical (same files); power and uniform selection and
+  unrolled dispatch list spherical.
+- **Two arcs.** The S³ light bodies choose the arc before the emitter's back-face test
+  (`spherical_light_arc`): a one-sided surface receiver takes the arc leaving into its upper
+  hemisphere with probability 1; a two-sided receiver or a medium event takes each with
+  probability ½ (one extra `random()`). The pdf carries that probability.
+- **Curved light-body signatures:** `<kind>_light_sample(l, LightQuery q, xi)` and
+  `<kind>_light_pdf(l, q, light_p, wo)`, in H³ too. The MIS seam is now
+  `lighting_pdf(q, wo, light_id, light_hit)` with `wo` the arrival direction reversed at the
+  emitter hit, passed by `combiner_w_emitter(s, hit, wo)`; Euclidean arms pass `-wo`, which in E³
+  is the old `s.ray.direction` bit for bit. `light_query_surface(mat, hit, wo)`: in a curved
+  program n faces the side the receiver is seen from.
+- **Trigonometry on the GPU.** SwiftShader's sin and cos are off by up to 1.9e-4 (atan 2e-7, asin
+  7e-5; measured). With them, S³ hit points sat up to 1e-4 off the surface their root names, past
+  the 3e-5 spawn offset, and in `s3-medium` a quarter of the paths through the ball re-spawned on the
+  wrong side and carried the medium outside it (NEE 17% above pt). Every S³ position and body now
+  uses the occupant's `spherical_cos_sin` (|error| ≤ 7e-8) and `spherical_asin` (through atan).
+- **Witnesses** `s3-furnace`, `s3-long-arc`, `s3-long-arc-blocker`, `s3-point-light`,
+  `s3-medium` (tests/witnesses/scenes/s3Witness.ts) with the fp64 twin s3Twins.ts; the
+  space-free twin parts moved to curvedTwins.ts. Demo `spherical` (gallery section "Curved
+  spaces").
+
+## 2026-11-07 — H³ review fixes: witnesses that can fail, groups, procedural skies
+
+Review of the H³ step (curved-space design §2.3).
+
+- **h3-medium** now keeps its light out of frame: a disk light of radius 1.5 above and behind
+  the camera. Before, the light's 598 visible pixels carried 91.5% of the frame mean, so the
+  whole-frame gates could not see a bias of about 20% in the ball or floor. A phase sample from
+  the ball now reaches the light with probability 0.12 to 0.26, so MIS differs from NEE: the
+  largest per-pixel difference is 0.074 at the same salt (0.0016 before).
+- **h3-disk-light** uses a light of geodesic radius 1.2, up from 0.6. A Euclidean inverse-CDF
+  radius now raises E by 4.8% on axis (0.44% at radius 0.6), about 7× the 0.002 tolerance.
+- **New witnesses:** `h3-sky` (the sky 1 + key read at each camera ray's ideal endpoint, through
+  a pinhole and a fisheye placed away from o) and `h3-sky-ball` (a lambert ball under a constant
+  sky reads ρ·L; its placement is the {param}-driven mat4 uniform). `h3-furnace` also renders
+  through a fisheye. `h3-point-light` has two lights, under power and uniform selection. Every
+  key listed under hyperbolic is now rendered (support.md), the sky through constant and
+  procedural skies.
+- **Procedural skies in H³ crashed the App.** It baked the sampling table of every procedural
+  sky, but no chart has a hyperbolic body. `compileEnvironmentBake` now returns null for a sky
+  that is not sampled as a light, since no program reads its table.
+  `environmentSampledAsLight` (Analyzer.ts) is the one rule, shared with the Analyzer.
+- **`flattenGroups(nodes, space)`** takes the ambient space. In a curved space a group with a
+  transform is an error, because the function composes Euclidean similarities.
+- The H³ plane and disk bodies share the occupant's `hyperbolic_plane_root` and call
+  `hyperbolic_form` directly. Before, they called `ambient_dot` on a point.
+
+## 2026-11-07 — Hyperbolic space H³ (curved-space step 2)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.3 and Part 1, after three reviews.
+
+- **The occupant** `components/ambient/hyperbolic/`: the hyperboloid model (Point and Direction
+  are vec4), MAX_DIST = 10 arc length, fp_uncertainty = REL·w, the chord-form distance, the
+  longest-axis tangent frame, the ideal-point sky key, and `isometry_direction` for normals; its
+  CPU geometry (exp_o, log_o, transvection, exact inverse) behind `CurvedGeometry`
+  (components/ambient/isometry.ts). `ambient_distance` joins the contract in every space.
+- **Bodies in H³:** sphere, plane and disk shapes; point and disk lights (sinh² r area density,
+  the uniform-area geodesic disk sampler); lambert, pinhole, fisheye and hg as the same files
+  listed under both spaces (hg now builds its basis with `ambient_frame`, which changes the
+  sampled directions of Euclidean HG media but not their distribution).
+- **Placement:** every curved object has one inverse isometry (a baked `const mat4`, or a mat4
+  uniform when {param}-driven); point rows fold in as a pre-translation; lights read the isometry
+  of their backing region (compiler/plan/curved.ts). The camera ships four vec4 uniforms from
+  the target-centered frame (`curvedCameraBasis`).
+- **Validator:** curvature parameter and a missing camera pose are errors in curved spaces; new
+  limitation rows for marched objects and uv-reading or GLSL-expression materials; skies are
+  supported in H³ as lookups by BSDF rays.
+- **Witnesses** `h3-furnace`, `h3-disk-light`, `h3-point-light`, `h3-medium`, with fp64 twins
+  (tests/witnesses/scenes/h3Twins.ts); demo `hyperbolic` in the gallery's new "Curved spaces"
+  section.
 
 ## 2026-11-07 — Bladed thin-lens pupil and white balance
 

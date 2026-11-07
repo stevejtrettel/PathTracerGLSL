@@ -33,7 +33,7 @@ export function diffuseFresnelReflectance(eta: number): number {
 
 export const plasticDescriptor: MaterialModelDescriptor = {
     id: 'plastic',
-    glsl: plasticGLSL,
+    glsl: { euclidean: { origin: 'components/materials/plastic/plastic.glsl', source: plasticGLSL } },
     // Fields read (matches plastic.glsl's header): albedo, coat_eta, and the derived coat_fdr.
     properties: [
         // [0, 1] in both color models: the base's bounce series R/(1 − R·K) has a pole at

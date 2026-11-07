@@ -5,7 +5,7 @@ import thinDielectricGLSL from './thin_dielectric.glsl?raw';
 
 export const thinDielectricDescriptor: MaterialModelDescriptor = {
     id: 'thin_dielectric',
-    glsl: thinDielectricGLSL,
+    glsl: { euclidean: { origin: 'components/materials/thin_dielectric/thin_dielectric.glsl', source: thinDielectricGLSL } },
     // Fields read (matches thin_dielectric.glsl's header): sheet_eta.
     properties: [
         // η, the sheet's index relative to the medium around it (pbrt's and Mitsuba's

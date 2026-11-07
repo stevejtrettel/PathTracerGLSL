@@ -6,7 +6,7 @@ import roughConductorGLSL from './rough_conductor.glsl?raw';
 
 export const roughConductorDescriptor: MaterialModelDescriptor = {
     id: 'rough_conductor',
-    glsl: roughConductorGLSL,
+    glsl: { euclidean: { origin: 'components/materials/rough_conductor/rough_conductor.glsl', source: roughConductorGLSL } },
     // Fields read (matches rough_conductor.glsl's header): eta and k exactly as conductor
     // declares them (one struct field each when both are present), and roughness as ggx
     // declares it.

@@ -14,5 +14,5 @@ void light_sample_direct_medium(inout PathState s, int med_mat, Point p_evt, Dir
     Point light_p = ambient_geodesic(p_evt, ls.wi, ls.distance);
     Spectrum vis = shadow_transmittance(make_ray(p_evt, ls.wi, s.ray.wl), light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
-    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, m_evt) * vis * combiner_w_light_medium(ls, wo_med, m_evt) / ls.pdf;
+    s.radiance += s.throughput * ls.radiance * interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt) * vis * combiner_w_light_medium(ls, wo_med, p_evt, m_evt) / ls.pdf;
 }

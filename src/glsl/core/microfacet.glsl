@@ -9,7 +9,8 @@
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
 //           microfacet_to_local(), microfacet_from_local(), and the F-free reflection lobe
 //           microfacet_reflect_eval(), microfacet_reflect_pdf(), microfacet_reflect_sample().
-// Depends on: PI, TWO_PI (math), Frame/Point/Direction/Hit (structs), ambient_dot/ambient_normalize.
+// Depends on: PI, TWO_PI (math), Frame/Hit (structs), Point/Direction (the ambient occupant's
+//             types.glsl), ambient_dot/ambient_normalize.
 //
 // Convention (shared by every occupant): the local shading frame has n = +z, `a` is the
 // GGX roughness parameter α = roughness² clamped ≥ 1e-3 (the derived field mp.alpha,

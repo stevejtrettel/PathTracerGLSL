@@ -6,7 +6,7 @@ import { Compiler } from '../compiler/Compiler.js';
 import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
-import { ENV_EXTERN_NAMES } from '../components/env/index.js';
+import { ENV_EXTERN_NAMES, DEFAULT_ENV_CHART } from '../components/env/index.js';
 import { packSceneData } from './sceneData.js';
 import { uploadImages } from './images.js';
 import type { PackedChannel } from '../components/data/pack.js';
@@ -958,11 +958,11 @@ export class App {
 function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: string; compensation: boolean }> {
     const seen = new Map<string, { chart: string; compensation: boolean }>();
     for (const st of strategies ?? []) {
-        const chart = st.estimator.envSampler ?? 'equirect';
+        const chart = st.estimator.envSampler ?? DEFAULT_ENV_CHART;
         const compensation = st.estimator.envCompensation ?? false;
         seen.set(`${chart}|${compensation}`, { chart, compensation });
     }
-    if (seen.size === 0) seen.set('equirect|false', { chart: 'equirect', compensation: false });
+    if (seen.size === 0) seen.set(`${DEFAULT_ENV_CHART}|false`, { chart: DEFAULT_ENV_CHART, compensation: false });
     return [...seen.values()];
 }
 

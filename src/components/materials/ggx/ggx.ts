@@ -7,7 +7,7 @@ import ggxGLSL from './ggx.glsl?raw';
 
 export const ggxDescriptor: MaterialModelDescriptor = {
     id: 'ggx',
-    glsl: ggxGLSL,
+    glsl: { euclidean: { origin: 'components/materials/ggx/ggx.glsl', source: ggxGLSL } },
     // Fields read (matches ggx.glsl's header): f0, roughness. NO albedo — a conductor's
     // color IS its Fresnel f0; declaring both would invite double-tinting.
     properties: [

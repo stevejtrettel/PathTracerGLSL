@@ -2,15 +2,16 @@
 // named for that family).
 
 import { describe, it, expect } from 'vitest';
+import { inEveryBody } from '../helpers/spaceBodies.js';
 import { VOLUME_SCATTERING_MODELS } from '../../src/components/volume_scattering/index.js';
 
 describe('phase model GLSL symbols (<id>_eval/_sample/_pdf)', () => {
     for (const [id, d] of Object.entries(VOLUME_SCATTERING_MODELS)) {
         if (d === undefined) continue;
         it(`${id} defines all three ops`, () => {
-            expect(new RegExp(`Spectrum\\s+${id}_eval\\s*\\(`).test(d.glsl), `${id}_eval`).toBe(true);
-            expect(new RegExp(`InteractionSample\\s+${id}_sample\\s*\\(`).test(d.glsl), `${id}_sample`).toBe(true);
-            expect(new RegExp(`float\\s+${id}_pdf\\s*\\(`).test(d.glsl), `${id}_pdf`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`Spectrum\\s+${id}_eval\\s*\\(`)), `${id}_eval`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`InteractionSample\\s+${id}_sample\\s*\\(`)), `${id}_sample`).toBe(true);
+            expect(inEveryBody(d.glsl, new RegExp(`float\\s+${id}_pdf\\s*\\(`)), `${id}_pdf`).toBe(true);
         });
     }
 });

@@ -1,6 +1,8 @@
 // Environment importance tables: an RGB luminance proposal, independent of colour
 // representation. The sampler reads probabilities from the stored CDF differences.
 
+import { DEFAULT_ENV_CHART } from './index.js';
+
 export interface EnvImportanceTable {
     /** Conditional CDF per row (W×H) — texel column selection within the chosen row. */
     condCDF: Float32Array;
@@ -31,7 +33,7 @@ export function buildEnvImportanceTable(
     } = {},
 ): EnvImportanceTable {
     const blur = opts.blur ?? true;
-    const chart = opts.chart ?? 'equirect';
+    const chart = opts.chart ?? DEFAULT_ENV_CHART;
     const compensation = opts.compensation ?? false;
     if (hdrRGB.some(c => !Number.isFinite(c) || c < 0))
         throw new Error('Environment RGB samples must be finite and nonnegative');

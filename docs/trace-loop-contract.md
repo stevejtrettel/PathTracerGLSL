@@ -61,7 +61,7 @@ struct Ray { Point origin; Direction direction; Wavelengths wl; }; // no search 
   unit tangent bundle. The geodesic flow moves it: `ambient_flow(ray, t)` is the ray at arc length
   t — the point reached and the velocity there — and `ambient_geodesic(origin, direction, t)` is
   that point alone. Only the *space* changes (Euclidean → line, H³ → hyperbolic geodesic,
-  Schwarzschild → light path). Same `Ray`.
+  S³ → great circle, Schwarzschild → light path). Same `Ray`.
 - **`ray.direction` is the direction at the origin.** Anything that needs the direction where the
   ray ARRIVES — `wo` at a surface hit, the side test in `scene_intersect`, the continuation through
   a null interface, a medium event's incident direction — reads `ambient_flow(ray, t).direction`.
@@ -114,6 +114,13 @@ direction with `ambient_dot`, dots between the resulting local vectors are raw `
 `microfacet_from_local` normalizes the recombined world vector with `ambient_normalize` at the
 frame's point.
 
+Phase functions work in world space at the scattering event, so they take its point:
+`<id>_eval(wi, wo, p, mp)`, `<id>_sample(wo, p, mp, xi)`, `<id>_pdf(wi, wo, p, mp)` and the
+generated `interaction_medium_*` dispatch over them. The phase-angle cosine is
+`ambient_dot(wi, -wo, p)`, and a sampled direction is normalized with `ambient_normalize` at `p`.
+The sampling basis is the tangent frame at `p`, `ambient_frame(p, -wo)` (hg; rayleigh still uses
+core math's Euclidean `build_basis` and is Euclidean-only — components/volume_scattering/README.md).
+
 ## Updated signatures (vs the current slice)
 
 ```glsl
@@ -127,6 +134,7 @@ float    ambient_dot         (Direction a, Direction b, Point p);      // the me
 Direction ambient_normalize  (Direction v, Point p);                   // unit length in the metric at p
 Direction ambient_aim        (Point from, Direction along, Point to, out float remaining);
                                                                        // shadow-ray aim + arc length left (see below)
+float    ambient_distance    (Point a, Point b);                       // geodesic distance (light samplers, the aim's arc length)
 vec3     ambient_sky_key     (Point p, Direction v);                   // what the sky is looked up by, for the ray (p, v)
 ```
 The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`) and
@@ -134,7 +142,28 @@ The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`)
 measurement's `farClip` when authored, emitted by the compiler just before the occupant's block. A space states its geodesic formula once:
 `ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
 `environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
-is the direction.
+is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t; S³
+has no sky (an environment is an error there). `MAX_DIST` is an arc length: 1000 in Euclidean space,
+10 in H³ (float32 cosh overflows near 89; a scene within the working radius, about 3 from the
+origin, loses only sub-pixel grazing bands of its planes there), 2π in S³, where every geodesic
+closes: the first hit within one period is the first hit, and a ray that meets nothing in it reads
+0 exactly.
+
+In a curved space every object is intersected in its own frame: the generated arm moves the ray
+by the object's inverse isometry (`G⁻¹·origin`, `G⁻¹·direction`), the shape's closed form returns
+the arc length t (an isometry preserves it, so it is compared with `hit.t` unchanged), the hit
+point is taken along the WORLD ray (`ambient_geodesic(ray.origin, ray.direction, t)`), and the
+normal computed in the object's frame is mapped back by the occupant's `isometry_direction`
+(components/ambient/README.md, "Curved spaces").
+In S³ two geodesics join any two points (the short arc of length d and the long arc of length
+2π − d, leaving and arriving in opposite directions), and both carry light. A light sample chooses
+its arc inside the light's body, before the emitter's back-face test, from the stored
+`LightQuery`: a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; `q.n` is `hit.frame.n`,
+which `scene_intersect` has already turned toward the side the ray arrived from) takes the arc
+leaving into its upper hemisphere, and anything else takes each arc with probability ½. The MIS
+query `lighting_pdf(q, wo, light_id, light_hit)` takes `wo` at the emitter hit — the arrival
+direction reversed — because only the emitter cosine depends on the arc a ray travelled
+(components/lights/README.md).
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
 never mutated by intersection — it is a pure seed.
@@ -179,6 +208,11 @@ never mutated by intersection — it is a pure seed.
 
 ## Deferred (not this contract)
 
-Curved ambient occupants (H³/S³ first — docs/claude-2026-11-review/curved-spaces-design.md;
-`Point`→`vec4` there); BVH under non-straight geodesics
+Further curved ambient occupants (H²×R next — docs/claude-2026-11-review/curved-spaces-design.md).
+H³ (the hyperboloid model) and S³ (the unit sphere in R⁴) are registered (`Point` = `vec4`); which
+components run in each is decided
+outside the loop: each space-dependent occupant has a GLSL body per space it implements, and the
+Validator rejects a program that uses one without a body (components/ambient/README.md, "Who
+implements what"; the table is components/ambient/support.md).
+BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

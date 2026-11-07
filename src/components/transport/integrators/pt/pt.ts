@@ -117,10 +117,13 @@ function walkRequires(f: Flags, p: ProgramDescription): string[] {
 // selection context: static technique files pass "everything they have" (mat, hit)
 // through these instead of constructing LightQuery themselves, so context growth
 // (per-material support policy, spectral, curved frames) changes ONLY these bodies.
-// `mat` was in the signature ahead of need; fable-rough-dielectric §3.3 is the need —
-// the query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta), and
-// this is where it is answered. The twoSidedShading decision folds the question away
-// entirely when the scene has no such material.
+// The query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta,
+// fable-rough-dielectric §3.3), and this is where it is answered; the twoSidedShading
+// decision folds the question away entirely when the scene has no such material.
+// q.n is hit.frame.n, which scene_intersect has already turned toward region_from, the side the
+// ray arrived from (structs.glsl Hit, §4.1), so it is the normal of the hemisphere a one-sided
+// receiver scatters into: the light tree's horizon term and the S³ light bodies' arc rule
+// (spherical_light_arc) read it as it is.
 // ============================================================================
 
 function lightQueryFns(f: Flags): ShaderBlock {

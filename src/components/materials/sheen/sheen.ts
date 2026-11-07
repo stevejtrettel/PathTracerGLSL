@@ -5,7 +5,7 @@ import sheenGLSL from './sheen.glsl?raw';
 
 export const sheenDescriptor: MaterialModelDescriptor = {
     id: 'sheen',
-    glsl: sheenGLSL,
+    glsl: { euclidean: { origin: 'components/materials/sheen/sheen.glsl', source: sheenGLSL } },
     // Fields read (matches sheen.glsl's header): albedo, sheen_color, sheen_weight, and the
     // derived sheen_r.
     properties: [

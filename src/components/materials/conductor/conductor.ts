@@ -5,7 +5,7 @@ import conductorGLSL from './conductor.glsl?raw';
 
 export const conductorDescriptor: MaterialModelDescriptor = {
     id: 'conductor',
-    glsl: conductorGLSL,
+    glsl: { euclidean: { origin: 'components/materials/conductor/conductor.glsl', source: conductorGLSL } },
     // Fields read (matches conductor.glsl's header): the complex index η + iκ relative to the
     // outside medium, one value per wavelength lane (role 'optical'). The defaults (η = 0,
     // κ = 1, Mitsuba's) make a perfect mirror. κ > 0 keeps conductor_fresnel defined (η = κ = 0
