@@ -115,7 +115,7 @@ How a program is assembled:
   `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
   each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
   is an absolute far clip: `measurement.farClip` when authored (required in a quotient, where
-  it is a real truncation), else the ambient space's default (1000 in Euclidean space,
+  it is a real truncation, bounded per pixel only with fog), else the ambient space's default (1000 in Euclidean space,
   `farClipOf` in components/ambient). The environment and the directional light are found
   there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
@@ -239,15 +239,19 @@ How a program is assembled:
   constants/live controls and packed emitters in both modes. Surface dispersion uses
   one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
-- Closed manifolds (components/quotient/): the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z) in vacuum
-  (`ambientSpace.quotient`, required `measurement.farClip`): a generated cell walk, and NEE over
-  a 27-image table with partition MIS. Validator rules: no sky, delta lights, media, unbounded
-  or driven geometry; objects inside the fundamental domain except period-spanning unrotated
-  boxes (docs/claude-2026-11-review/quotients-plan.md, Milestone Q1a).
+- Closed manifolds (components/quotient/): the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), in vacuum
+  or filled with a homogeneous ambient fog (`ambientSpace.quotient`, required
+  `measurement.farClip`): a generated cell walk, NEE over a 27-image table with partition MIS,
+  medium event points reduced into the fundamental domain. Validator rules: no sky, delta
+  lights, unbounded or driven geometry, or media other than a homogeneous ambient fog; objects
+  inside the fundamental domain except period-spanning unrotated boxes. With fog the far clip's
+  error is bounded per pixel by (N+1)²·e^{−σR}·Le_max (components/quotient/README.md;
+  docs/claude-2026-11-review/quotients-plan.md, Milestone Q1).
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); media in a quotient (plan Q1b) and other quotients (Seifert–Weber, Q2); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
+registered); heterogeneous fog, GRIN and media inside objects in a quotient, and other
+quotients (Seifert–Weber, Q2); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.

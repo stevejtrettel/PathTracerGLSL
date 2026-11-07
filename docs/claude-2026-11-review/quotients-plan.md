@@ -1,8 +1,8 @@
 # Quotient manifolds M = X/Γ: realistic light, and the build plan
 
 **Date:** 2026-11-07
-**Status:** Milestone Q1a (the cube 3-torus in vacuum) is built on branch `quotient` (CHANGELOG
-2026-11-07); Q1b (fog) and Q2 are not. Model-written for the owner. This is the draft
+**Status:** Milestone Q1 (the cube 3-torus: Q1a in vacuum, Q1b with a homogeneous fog) is built
+on branch `quotient` (CHANGELOG 2026-11-07); Q2 is not. Model-written for the owner. This is the draft
 (`quotients/plan.md`) revised after two independent reviews: `quotients/review-0.md`
 (correctness: estimator, group theory, truncations) and `quotients/review-1.md` (simplicity and
 fit to the code). Every must-fix item of both reviews is applied; the table at the end says

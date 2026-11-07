@@ -4,6 +4,33 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Fog in the cube 3-torus (quotients plan Q1b)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1b.
+
+**What was built:**
+- A homogeneous `ambientMedium` is allowed in a quotient (absorbing, scattering, emitting;
+  constant or `{param}` coefficients). Heterogeneous or GRIN ambient media, and media inside
+  objects, remain Validator errors.
+- In quotient programs with media, the transport loop reduces each medium event point into the
+  fundamental domain (`quotient_reduce`) before NEE, the phase sample and the next segment, and
+  looks up the camera's starting region at its reduced point. Nothing else changed: the medium
+  arms read constants, and the media shadow walker runs through the walk unchanged.
+- The declared bound (quotient README, `measurement.farClip`): with fog of extinction σ the far
+  clip changes a pixel by at most (N+1)²·e^{−σR}·Le_max per channel, Le_max including the fog's
+  glow ε/σ.
+- Witnesses: `torus-fog` (an emitting absorbing fog with a black sphere; eight windows certified
+  by a float64 twin as seeing one sphere image through 0–5 face crossings, or nothing within R),
+  `torus-crystal-fog` (≡ its unrolled crystal in the same fog) and `torus-lights-fog` (pt ≡ pt-nee ≡
+  pt-mis ≡ pt-mis with the light tree, in fog).
+
+**Measured:** non-quotient programs unchanged (digest: 278 of 278 existing scenes identical in
+every part). `torus-fog` 8/8 windows equal to the twin to 4 digits; with the walk's distance sum
+broken, the five windows seen across faces fail (e.g. 0.1746 against 0.4768). Crystal twin in
+fog: Δmean 0.00%, rmse 0.63%. `torus-lights-fog`: Δmean 0.94%, χ²ᵣ 1.27 at 256 spp, and 0.33%,
+χ²ᵣ 1.45 at 1,024 spp. The mean gap shrinks with samples; the slight χ² rise is recorded and its
+cause is untested.
+
 ## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
 
 [Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1a (vacuum); its evidence and
