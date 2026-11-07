@@ -40,7 +40,10 @@ import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
 
-const BASE_URL = 'http://localhost:3000';
+// WITNESS_PORT lets runs from separate worktrees use separate dev servers; a run reuses a
+// server already on its port, so two worktrees on one port would test each other's code.
+const PORT = Number(process.env.WITNESS_PORT ?? 3000);
+const BASE_URL = `http://localhost:${PORT}`;
 const DEFAULT_SIZE = [160, 120];
 const DEFAULT_SPP = 64;
 const RENDER_TIMEOUT_MS = 8 * 60 * 1000; // per (scene, strategy) render
@@ -148,7 +151,7 @@ let devServer = null;
 async function ensureServer() {
     if (await serverUp()) return;
     process.stdout.write('starting dev server… ');
-    devServer = spawn('npm', ['run', 'dev'], {
+    devServer = spawn('npm', ['run', 'dev', '--', '--port', String(PORT), '--strictPort'], {
         cwd: new URL('..', import.meta.url).pathname,
         stdio: 'ignore',
         detached: false,
@@ -160,7 +163,7 @@ async function ensureServer() {
             return;
         }
     }
-    throw new Error('dev server did not come up on :3000 within 30s');
+    throw new Error(`dev server did not come up on :${PORT} within 30s`);
 }
 
 function cleanup() {
