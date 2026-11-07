@@ -120,19 +120,15 @@ export interface PackedInstanceBatch {
     cwbvh?: { nodes: Uint32Array; nodeCount: number; records: Float32Array };
 }
 
-/** Build a batch's payloads: a TLAS over the instance WORLD boxes (the prototype's local
- *  box under each placement), with placements AND attrs re-emitted by the SAME leaf
- *  permutation — Hit.element (the leaf-order placement index) indexes both correctly.
- *  Accepts either placement form (fable-instance-clouds §5): Similarity[] (from authored
- *  Transform[]) or the packed struct-of-arrays; both feed the SAME box/record loop via a
- *  per-instance accessor, so the two arms cannot diverge. */
-export function packInstanceBatch(localBox: AABB, placements: Similarity[] | PackedPlacements, attributeRows?: AttributeRowSpec[], paramsRecord?: ParamsRecordSpec, buildCwbvh = false): PackedInstanceBatch {
+/** The instance WORLD boxes of a batch, flat (6 per instance: min xyz, max xyz): the prototype's
+ *  local box under each placement. The TLAS build and the quotient Validator rule both read
+ *  these. Either placement form, through the one per-instance decode. */
+export function instanceWorldBoxes(localBox: AABB, placements: Similarity[] | PackedPlacements): Float64Array {
     const n = Array.isArray(placements) ? placements.length : placements.count;
     const d: DecodedPlacement = { qx: 0, qy: 0, qz: 0, qw: 1, s: 1, tx: 0, ty: 0, tz: 0 };
-    // World boxes, FLAT (Aug 8 allocation-discipline rewrite — no per-instance AABB
-    // objects or corner tuples at 1M instances). The corner transform below transcribes
-    // quatRotate ∘ similarityApplyPoint op-for-op — output is byte-identical to the old
-    // transformAABB(similarityApplyPoint) path (the bvhFlat reference-twin gate).
+    // Flat, with no per-instance AABB objects or corner tuples (a batch may hold 10⁶ instances).
+    // The corner transform below transcribes quatRotate ∘ similarityApplyPoint op for op, so the
+    // boxes equal transformAABB(similarityApplyPoint)'s bit for bit (the bvhFlat reference-twin test).
     const boxes = new Float64Array(6 * n);
     for (let i = 0; i < n; i++) {
         decodePlacement(placements, i, d);
@@ -155,6 +151,19 @@ export function packInstanceBatch(localBox: AABB, placements: Similarity[] | Pac
         boxes[6 * i] = minx; boxes[6 * i + 1] = miny; boxes[6 * i + 2] = minz;
         boxes[6 * i + 3] = maxx; boxes[6 * i + 4] = maxy; boxes[6 * i + 5] = maxz;
     }
+    return boxes;
+}
+
+/** Build a batch's payloads: a TLAS over the instance WORLD boxes (the prototype's local
+ *  box under each placement), with placements AND attrs re-emitted by the SAME leaf
+ *  permutation — Hit.element (the leaf-order placement index) indexes both correctly.
+ *  Accepts either placement form (fable-instance-clouds §5): Similarity[] (from authored
+ *  Transform[]) or the packed struct-of-arrays; both feed the SAME box/record loop via a
+ *  per-instance accessor, so the two arms cannot diverge. */
+export function packInstanceBatch(localBox: AABB, placements: Similarity[] | PackedPlacements, attributeRows?: AttributeRowSpec[], paramsRecord?: ParamsRecordSpec, buildCwbvh = false): PackedInstanceBatch {
+    const n = Array.isArray(placements) ? placements.length : placements.count;
+    const d: DecodedPlacement = { qx: 0, qy: 0, qz: 0, qw: 1, s: 1, tx: 0, ty: 0, tz: 0 };
+    const boxes = instanceWorldBoxes(localBox, placements);
     const { nodes, nodeCount, order } = buildBVHNodesFlat(boxes, n, TLAS_LEAF_SIZE);
     const place = paramsRecord !== undefined
         ? packParamsRecords(paramsRecord, placements, order, n, d)

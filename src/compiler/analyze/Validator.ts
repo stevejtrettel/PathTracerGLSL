@@ -31,6 +31,7 @@ import { isTonemapSupported } from '../../components/tonemap/index.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
+import { validateQuotient } from './quotient.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
@@ -57,6 +58,7 @@ export function validate(
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
+    validateQuotient(scene, strategy, bag);
 
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
     // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
