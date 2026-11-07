@@ -874,6 +874,7 @@ export function validate(
     // i.e. changed the integral, instead of failing).
     const measurementEnums: Array<[string, unknown, readonly string[]]> = [
         ['scattering', strategy.measurement.scattering, ['full', 'ignored']],
+        ['microfacet', strategy.measurement.microfacet, ['single-scattering', 'energy-compensated']],
         ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
         ['color', strategy.measurement.color, ['rgb', 'spectral']],
         ['response', strategy.measurement.response, ['radiance']],

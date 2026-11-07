@@ -4,7 +4,7 @@
 // registry); the DISTRIBUTION is not — D, Smith G₁ and VNDF sampling are one truth here,
 // so a program containing any one microfacet occupant links them exactly once and a
 // rough-glass-only scene needs no conductor.
-// Included when some present material model declares `usesMicrofacet` (the math_media
+// Included when some present material model declares `microfacet` (the math_media
 // pattern: conditional core, never wholesale).
 // Provides: microfacet_D(), microfacet_G1(), microfacet_sample_vndf(),
 //           microfacet_to_local(), microfacet_from_local().

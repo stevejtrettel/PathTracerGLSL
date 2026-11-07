@@ -25,6 +25,7 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         maxBounces: m.maxBounces,
         maxNullCrossings: m.maxNullCrossings ?? DEFAULT_MAX_NULL_CROSSINGS,
         scattering: m.scattering ?? 'full',
+        microfacet: m.microfacet ?? 'single-scattering',
         shadows: m.shadows ?? 'opaque-dielectrics',
         color: m.color ?? 'rgb',
         sensor: m.sensor ?? COLOR_MODELS[m.color ?? 'rgb'].defaultSensor,

@@ -4,6 +4,58 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Microfacet energy compensation (`measurement.microfacet`)
+
+Integration step 7 of the photorealism batch (owner decision P1, Q2), with the review's
+must-fix items applied.
+
+**What:** a new measurement truncation `measurement.microfacet: 'single-scattering' |
+'energy-compensated'`, default `'single-scattering'` (existing images unchanged; always
+recorded in the program description and the export stamp). Compensated, `ggx` and
+`rough_dielectric` multiply eval and the sample weight by a gain on ωₒ (Turquin 2019, as
+Blender Cycles ships it): 1 + F_ms(1 − E)/E for the conductor (F_avg = f0 + (1 − f0)/21 for
+Schlick), 1/A on both lobes for glass. Sampling and pdfs are unchanged. The gains read one
+built-in table, `ggx-smith-energy-v1` (RGBA32F, 32 × 32·32, 512 KiB: the energy albedo over
+√μ, √α and the index coordinate z, both sides of the interface, and E_avg), built by
+`tools/microfacet-energy/generate.ts` from `components/materials/microfacet_energy/build.ts`
+and uploaded by the App with a hash check like the spectral tables. Under
+`'single-scattering'` the compiler emits each present gain as the constant 1.
+- The descriptor fact `usesMicrofacet: true` became `microfacet: { energy: 'conductor' |
+  'dielectric' }`: the include gate and the gain in one fact.
+- The roughness rows of `ggx` and `rough_dielectric` are constrained to [0, 1] (the table's
+  range), and `ggx`'s f0 to [0, 1] (it keeps the conductor gain's bounce series convergent),
+  through the existing row constraint, in every program. No suite scene authors values
+  outside.
+- New witnesses: `ms-furnace` (white conductors at roughness 0.3 / 0.6 / 1, clear glass at
+  ior 1.5 and roughness 0.3 / 0.6 / 1, ior 1.33 at 1 and ior 2.0 at 0.6, in a samplable white
+  sky, under pt, pt-nee, pt-mis and spectral pt-mis) and `ms-furnace-control` (one white
+  conductor at roughness 1: single scattering reads 1 − ln 2 at the center, compensated 1).
+  Two `npm run frames` cases (`ggx`: veach-mis MIS, `rough-glass`: rough-mis MIS).
+
+**Measured:**
+- `frames compare` before/after: 22 of 22 pictures bit-identical, including the new `ggx` and
+  `rough-glass` cases and `spectral` (spectral-materials).
+- Digest: 255 of 279 existing scenes identical; the 24 scenes with `ggx` or
+  `rough_dielectric` differ only in the gain lines (the multiply by the gain, the generated
+  gain-of-1 functions, `ggx_fresnel_average`), comments and source-map line numbers; uniforms,
+  closures, parameters and scene data are identical. 2 new scenes.
+- TS: the table reproduces from `build.ts` bit for bit; furnace error through the lookup
+  (150 random conductor points, 70 per glass side): within the plan's bounds (max < 5e-3 /
+  8e-3, mean < 5e-4 / 1e-3); a colored conductor never exceeds 1 + 1e-3; the compensated twins
+  keep weight·pdf = eval·|cos| and pdf agreement on every lobe, and their mean sample weights
+  in the furnace are 1 within 1.5%.
+- Witnesses (SwiftShader, 512 spp): every `ms-furnace` sphere reads 1 within 0.5% under pt,
+  pt-mis and spectral pt-mis (tolerance 0.01) and within 1.2% under pt-nee (roughness ≥ 0.6,
+  tolerance 0.05); sky 1.0000. With eval's gain removed by hand, pt-nee read 0.36 (conductor,
+  roughness 1) and pt-mis 0.72: the witness checks the eval side. `ms-furnace-control`: 0.3052
+  (single scattering, expected 0.3069 ± 0.005) and 0.9999. Unchanged: `rough-furnace`
+  (1.0000; 0.9999 / 0.9978 / 0.9021), `veach-mis`, `rough-mis` (nee vs mis 0.23%, pt rmse
+  39.76%), `spectral-materials` (NEE vs MIS 0.23%).
+- The largest suite program binds 8 samplers; a compensated program adds 1.
+- Not used in the witness: glass at ior 2.4 and roughness 1. The gain makes sample weights
+  exceed 1, and inside strongly trapping glass the result is heavy-tailed (it read 2% low at
+  1024 spp under three of four estimators).
+
 ## 2026-11-07 — Derived material fields computed per hit when their input varies
 
 Integration step 6 of the photorealism batch (owner decision P1, Q1; the image-textures

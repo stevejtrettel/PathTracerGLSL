@@ -22,6 +22,7 @@ import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralMaterialsSuite } from './scenes/spectralMaterials.js';
+import { microfacetEnergySuite } from './scenes/microfacetEnergyWitness.js';
 import { spectralTrackingSuite } from './scenes/spectralTracking.js';
 import { spectralMediaSuite } from './scenes/spectralMedia.js';
 import { spectralSkiesSuite } from './scenes/spectralSkies.js';
@@ -161,6 +162,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralGaussianSuite,
     ...spectralDispersionSuite,
     ...spectralMaterialsSuite,
+    ...microfacetEnergySuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
     ...spectralTrackingSuite,

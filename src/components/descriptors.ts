@@ -122,10 +122,14 @@ export interface MaterialModelDescriptor {
     properties: PropertySchema[];
     /** DERIVED fields: join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
-    /** This model is written against glsl/core/microfacet.glsl (D / Smith G₁ / VNDF /
-     *  the frame maps). The INCLUDE GATE for that fixed-core library — declared, never
-     *  a model-name list in the generator (fable-rough-dielectric §4). Default false. */
-    usesMicrofacet?: boolean;
+    /** Present when this model is written against glsl/core/microfacet.glsl (D / Smith G₁ /
+     *  VNDF / the frame maps): the include gate for that library, declared rather than a
+     *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
+     *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
+     *  (materials/microfacet_energy): `microfacet_conductor_gain` or
+     *  `microfacet_dielectric_gain`. Under measurement.microfacet 'single-scattering' the
+     *  compiler emits that gain as the constant 1. */
+    microfacet?: { energy: 'conductor' | 'dielectric' };
     /** The model's albedo for the albedo guide (components/aov): the surface's color
      *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
      *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`

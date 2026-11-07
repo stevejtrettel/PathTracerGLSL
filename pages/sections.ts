@@ -127,7 +127,7 @@ export const gallerySections: GallerySection[] = [
         entries: [
             e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
             e('regions-transformed', 'regions-transformed-ref'),
-            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('rough-furnace-expr'), e('region-overlap'),
+            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('rough-furnace-expr'), e('ms-furnace'), e('ms-furnace-control'), e('region-overlap'),
             e('rough-grin', 'rough-grin-ref'),
             e('rough-sheet'),
         ],

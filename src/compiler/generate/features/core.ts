@@ -18,6 +18,8 @@ import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../../../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
+import microfacetEnergyGLSL from '../../../components/materials/microfacet_energy/microfacet_energy.glsl?raw';
+import { microfacetEnergyAsset } from '../../../components/materials/microfacet_energy/assets.js';
 import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
 
 /** The ambient occupant's block, from the registry (D3) — throws on an unregistered
@@ -29,6 +31,21 @@ function ambientBlock(type: string): { origin: string; source: string } {
 }
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
+
+/** The energy gains under measurement.microfacet 'single-scattering': the constant 1, which
+ *  folds out of the models' eval and sample. */
+const SINGLE_SCATTERING_GAINS = {
+    conductor: [
+        'Spectrum microfacet_conductor_gain(float mu_o, float a, Spectrum f_avg) {',
+        '    return SPECTRUM_ONE;   // single scattering: no compensation',
+        '}',
+    ].join('\n'),
+    dielectric: [
+        'float microfacet_dielectric_gain(float mu_o, float a, float eta) {',
+        '    return 1.0;   // single scattering: no compensation',
+        '}',
+    ].join('\n'),
+};
 
 export function contributeCore(plan: RenderPlan): FeatureContribution {
     // Conditional INCLUSION, not preprocessor gating (item-9 commit D): media-free
@@ -108,13 +125,23 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // shared by every microfacet MODEL. Gated on the descriptors' declared fact — a
     // program with no microfacet occupant carries none of it, and one with several
     // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
-    if (plan.program.materials.models.some((m) => MATERIAL_MODELS[m]?.usesMicrofacet === true)) {
+    // Then the energy gains those models call (materials/microfacet_energy): the table
+    // lookups under 'energy-compensated', otherwise a gain of 1 for each kind present.
+    const textures = [...(color.textures ?? [])];
+    const gains = [...new Set(plan.program.materials.models.flatMap((m) => MATERIAL_MODELS[m]?.microfacet?.energy ?? []))];
+    if (gains.length > 0) {
         blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
+        if (plan.program.measurement.microfacet === 'energy-compensated') {
+            blocks.push({ origin: 'components/materials/microfacet_energy/microfacet_energy.glsl', source: microfacetEnergyGLSL });
+            textures.push({ name: 'u_microfacetEnergy', source: `extern:${microfacetEnergyAsset.id}`, precision: 'highp' });
+        } else {
+            blocks.push({ origin: 'generated:microfacet-gains', source: gains.map((gain) => SINGLE_SCATTERING_GAINS[gain]).join('\n') });
+        }
     }
 
     return {
         ...emptyContribution('core'),
-        textures: color.textures ?? [],
+        textures,
         blocks,
         provides: [
             { name: 'wavelengths_sample', signature: 'WavelengthSample wavelengths_sample()', componentScoped: true },

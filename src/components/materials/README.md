@@ -66,6 +66,13 @@ LOBE_DELTA; albedo in [0, 1]; `coat_eta` is relative to the outside medium; see
 `plastic/plastic.md`).
 
 
+**Microfacet models** (`ggx`, `rough_dielectric`) declare `microfacet: { energy }`: the gate
+for `glsl/core/microfacet.glsl` and the energy gain their GLSL multiplies into eval and the
+sample weight. `microfacet_energy/` is the shared part behind the gains (not an occupant):
+the energy table, its TS twin and builder, and `microfacet_energy.glsl`, linked under
+`measurement.microfacet: 'energy-compensated'`; otherwise the compiler emits each gain as 1.
+Their roughness rows lie in [0, 1], the table's range (`microfacet_energy/microfacet_energy.md`).
+
 Index-consuming models mark their region-table row with `role: 'index'`.
 `modelIndexRow` exposes that declaration to the planner. Smooth and rough dielectrics
 accept scalar indices, [Cauchy](../color/spectra/cauchy/README.md), or

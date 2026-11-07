@@ -549,6 +549,10 @@ exports[`scene-data textures (byte fingerprints) > models 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > ms-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > ms-furnace-control 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > null-budget 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > null-budget-view 1`] = `null`;
