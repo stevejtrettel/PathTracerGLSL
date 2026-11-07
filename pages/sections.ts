@@ -43,12 +43,13 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Curved spaces',
-        blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, marched fields, curved light falloff, the sky at infinity) and spherical space S³ (two arcs between any two points, the antipodal lens, no sky)',
+        blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, marched fields, curved light falloff, the sky at infinity), spherical space S³ (two arcs between any two points, the antipodal lens, no sky) and the product H²×R (a falloff that depends on direction, upright columns, horizontal and vertical planes)',
         entries: [e('hyperbolic'), e('hyperbolic-sculpture'), e('h3-furnace'), e('h3-disk-light'), e('h3-point-light'), e('h3-medium'), e('h3-sky'), e('h3-sky-ball'),
             e('h3-sdf-ball', 'h3-sdf-ball-ref'), e('h3-klein-ball'), e('h3-sdf-furnace'), e('h3-sdf-blend'),
             e('spherical'), e('spherical-sculpture'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium'),
             e('s3-sdf-ball', 's3-sdf-ball-ref'), e('s3-sdf-furnace'), e('s3-sdf-blend'),
             e('h3-shapes'), e('s3-shapes'), e('h3-quad-light'), e('s3-quad-light'),
+            e('h2xr'), e('h2xr-furnace'), e('h2xr-disk-light'), e('h2xr-point-light'), e('h2xr-sky'),
             e('seifert-weber-room')],
     },
     {

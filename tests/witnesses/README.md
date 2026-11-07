@@ -87,6 +87,23 @@ and normals are checked against marched membership by tests/components/curvedSha
 shapes window does not see a normal's sign (the hit fill turns the normal toward the arriving ray).
 Not yet in a full sweep.
 
+## Curved-space witnesses (H²×R)
+
+`scenes/h2xrWitness.ts`: `h2xr-furnace` (a box of four vertical and two horizontal planes holding an
+emissive ball and column, every path Σ_{k≤6} 0.8^k, pinhole and fisheye; it checks bookkeeping, not
+where a surface is hit), `h2xr-disk-light` (a lambert disk receiver under a horizontal disk light of
+radius 1.2 off to the side, pt = pt-nee = pt-mis against the closed form; the d² density would read
+0.547, sinh² d 0.336 and the Euclidean radius map 0.511 against 0.499), `h2xr-point-light` (two
+oblique point lights on five windows: the disk, a vertical wall, a ball placed with a height and a
+rotated offset center, a column's wall and top cap; the d² density moves every window by 0.014 to
+0.036), `h2xr-sky` (black shapes under the sky 1 + key from a camera 1.2 from o: every silhouette, the
+{param}-driven ball placement and the key; the view direction as key reads 0.10 in red against 0.29,
+the ball without its height shift 0.302). The expected values are computed by the fp64 twin
+`scenes/h2xrTwins.ts`; `h2xrTwins.test.ts` recomputes them, checks the windows (covered, unshadowed)
+and the wrong models' values; `tests/components/h2xr.test.ts` checks the twin's formulas against an
+ODE integration, finite differences of exp, Monte Carlo ray hits and sphere tracing. Not yet in a
+full sweep.
+
 ## Closed-manifold witnesses (Seifert–Weber)
 
 `scenes/seifertWeberWitness.ts`: `seifert-weber-windows` (three emissive spheres of different

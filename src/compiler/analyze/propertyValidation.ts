@@ -34,6 +34,12 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
     if (c.kind === 'positive') return values.some((v) => v <= 0) ? 'must be > 0' : null;
     if (c.kind === 'interval') return values.some((v) => !(v > c.min && v < c.max)) ? `must be in (${c.min}, ${+c.max.toFixed(6)})` : null;
     if (c.kind === 'closed-interval') return values.some((v) => !(v >= c.min && v <= c.max)) ? `must be in [${c.min}, ${c.max}]` : null;
+    // Exact zero tests on the authored numbers: a direction is vertical or horizontal by how it is
+    // written ([0, 1, 0], [1, 0, 0.5]), never up to a tolerance.
+    if (c.kind === 'vertical') return Array.isArray(value) && (value[0] !== 0 || value[2] !== 0) ? 'must be vertical (x = z = 0)' : null;
+    if (c.kind === 'vertical-or-horizontal') {
+        return Array.isArray(value) && value[1] !== 0 && (value[0] !== 0 || value[2] !== 0) ? 'must be vertical (x = z = 0) or horizontal (y = 0)' : null;
+    }
     return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
 }
 

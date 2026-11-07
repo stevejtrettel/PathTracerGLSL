@@ -13,7 +13,7 @@ import type { PrimitiveValues } from '../../components/descriptors.js';
 import type { LightKindDescriptor, LightRowValue } from '../../components/descriptors.js';
 import { canonicalizePrimitiveParameters, primitive } from '../../components/geometry/index.js';
 import { IDENTITY_QUAT, similarityFromTransform, type Vec3Tuple } from '../../components/geometry/similarity.js';
-import { ORIGIN, mat4Apply, placementIsometry, tangentAtOrigin, type CurvedGeometry, type Mat4 } from '../../components/ambient/isometry.js';
+import { ORIGIN, placementIsometry, tangentAtOrigin, type CurvedGeometry, type Mat4 } from '../../components/ambient/isometry.js';
 import type { Transform } from '../types.js';
 
 /** The one point row of a set of rows, or undefined when there is none. The shapes and lights
@@ -59,8 +59,8 @@ export function curvedLightWorld(geom: CurvedGeometry, d: LightKindDescriptor, v
     const g = placementIsometry(geom, [0, 0, 0], IDENTITY_QUAT, at);
     const out: Record<string, number[]> = {};
     for (const row of d.params) {
-        if (row.kind === 'point') out[row.name] = mat4Apply(g, ORIGIN);
-        else if (row.kind === 'direction' || row.kind === 'vector') out[row.name] = mat4Apply(g, tangentAtOrigin(values[row.name] as Vec3Tuple));
+        if (row.kind === 'point') out[row.name] = geom.apply(g, ORIGIN);
+        else if (row.kind === 'direction' || row.kind === 'vector') out[row.name] = geom.applyTangent(g, tangentAtOrigin(values[row.name] as Vec3Tuple));
     }
     return out;
 }

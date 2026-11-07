@@ -13,6 +13,8 @@ import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import diskGLSL from './disk.glsl?raw';
 import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
 import diskSphericalGLSL from './disk_spherical.glsl?raw';
+import diskH2xrGLSL from './disk_h2xr.glsl?raw';
+import { H2XR_VERTICAL } from '../../ambient/h2xr/h2xr.js';
 
 /** The shared unit-vector formula (invLen multiply, canonicalPlane's op pattern) —
  *  compile-time, one source: geometry canonicalize AND the disk light's desugar. */
@@ -28,12 +30,13 @@ export const diskDescriptor: PrimitiveDescriptor = {
         { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },   // bounds() below reads center+radius
         // A flat (+Y) disk is a sensible disk — normal defaults rather than requires
         // (plane's normal stays required: it IS the plane's identity).
-        { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
+        { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 }, constraintIn: { h2xr: H2XR_VERTICAL } },
     ],
     glsl: {
         euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL },
         hyperbolic: { origin: 'components/geometry/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
         spherical: { origin: 'components/geometry/disk/disk_spherical.glsl', source: diskSphericalGLSL },
+        h2xr: { origin: 'components/geometry/disk/disk_h2xr.glsl', source: diskH2xrGLSL },
     },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry

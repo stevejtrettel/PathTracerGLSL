@@ -149,15 +149,18 @@ The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`)
 measurement's `farClip` when authored, emitted by the compiler just before the occupant's block. A space states its geodesic formula once:
 `ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
 `environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
-is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t; S³
-has no sky (an environment is an error there). `MAX_DIST` is an arc length: 1000 in Euclidean space,
-10 in H³ (float32 cosh overflows near 89; a scene within the working radius, about 3 from the
+is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t; in
+H²×R it is the ideal point of the ray's H² part with its angle from the vertical; S³ has no sky (an
+environment is an error there). `MAX_DIST` is an arc length: 1000 in Euclidean space,
+10 in H³ and H²×R (float32 cosh overflows near 89; a scene within the working radius, about 3 from the
 origin, loses only sub-pixel grazing bands of its planes there), 2π in S³, where every geodesic
 closes: the first hit within one period is the first hit, and a ray that meets nothing in it reads
 0 exactly.
 
 In a curved space every object is intersected in its own frame: the generated arm moves the ray
-by the object's inverse isometry (`G⁻¹·origin`, `G⁻¹·direction`), the shape's closed form returns
+by the object's inverse isometry, applied by the occupant's `isometry_point` and `isometry_tangent`
+(a matrix product in H³ and S³; in H²×R, whose isometries are affine on the 4-vector, a decode of
+the mat4 encoding), the shape's closed form returns
 the arc length t (an isometry preserves it, so it is compared with `hit.t` unchanged), the hit
 point is taken along the WORLD ray (`ambient_geodesic(ray.origin, ray.direction, t)`), and the
 normal computed in the object's frame is mapped back by the occupant's `isometry_direction`

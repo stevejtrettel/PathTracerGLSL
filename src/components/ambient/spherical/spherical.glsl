@@ -6,11 +6,11 @@
 // Provides: fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
-//           isometry_direction(); for the S³ bodies, spherical_cos_sin(), spherical_asin(),
-//           spherical_plane_root(), spherical_halfspace(), spherical_crossing(),
-//           spherical_plane_vector(), spherical_plane_distance(), spherical_light_arc() and
-//           spherical_light_arc_probability(); for marched fields, sdf_plane() and sdf_tube() (the
-//           rest of the vocabulary is components/ambient/sdf.glsl).
+//           isometry_point(), isometry_tangent(), isometry_direction(); for the S³ bodies,
+//           spherical_cos_sin(), spherical_asin(), spherical_plane_root(), spherical_halfspace(),
+//           spherical_crossing(), spherical_plane_vector(), spherical_plane_distance(),
+//           spherical_light_arc() and spherical_light_arc_probability(); for marched fields,
+//           sdf_plane() and sdf_tube() (the rest of the vocabulary is components/ambient/sdf.glsl).
 // Depends on: Point/Direction (types.glsl), Ray/Frame/LightQuery (structs), PI/TWO_PI and
 //             FP_UNCERTAINTY_REL/ABS (math), random() (the sampler, emitted before this block).
 
@@ -241,6 +241,15 @@ bool spherical_light_arc(LightQuery q, Direction u, out float probability) {
     probability = spherical_light_arc_probability(q);
     if (spherical_query_one_sided(q)) return dot(u, q.n) < 0.0;
     return random() < 0.5;
+}
+
+// An object's placement, an isometry of S³, is a linear map of R⁴ held as a mat4 m; these apply it
+// to a point and to a tangent vector (the same product).
+Point isometry_point(mat4 m, Point p) {
+    return m * p;
+}
+Direction isometry_tangent(mat4 m, Direction v) {
+    return m * v;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

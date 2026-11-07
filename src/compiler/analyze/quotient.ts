@@ -17,7 +17,7 @@ import { transformAABB, type AABB } from '../../components/accel/bvh/bvh.js';
 import { instanceWorldBoxes } from '../../components/intersection/instancing/instancing.js';
 import { emissionMayBeNonzero } from '../../components/color/values.js';
 import { curvedGeometryOf } from '../../components/ambient/index.js';
-import { ORIGIN, mat4Apply, type CurvedGeometry, type Vec4 } from '../../components/ambient/isometry.js';
+import { ORIGIN, type CurvedGeometry, type Vec4 } from '../../components/ambient/isometry.js';
 import { curvedConstantPlacement } from '../plan/curved.js';
 import mathGLSL from '../../glsl/core/math.glsl?raw';
 
@@ -175,7 +175,7 @@ function ballPlacement(geom: CurvedGeometry, ballInside: (c: Vec4, r: number) =>
     const ball = (type: string, parameters: Record<string, number | number[]>, transform: Transform | undefined): { c: Vec4; r: number } | null => {
         const { parameters: canonical, g } = curvedConstantPlacement(geom, type, parameters, transform);
         const r = primitiveBallBound(type, canonical);
-        return r === null ? null : { c: mat4Apply(g, ORIGIN), r };
+        return r === null ? null : { c: geom.apply(g, ORIGIN), r };
     };
     return {
         lightInside: (primitive, parameters) => {

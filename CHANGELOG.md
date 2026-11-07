@@ -415,6 +415,77 @@ deficit that stays near 2.8%.
 - **Demos** `hyperbolic-sculpture` and `spherical-sculpture`: a jack and a pierced ball, one GLSL
   body each for both spaces.
 
+## 2026-11-07 — H²×R, the first product geometry
+
+[Plan](docs/claude-2026-11-review/curved/h2xr-plan.md) (reviewed once; findings in its §10).
+
+- **The occupant** `components/ambient/h2xr/`: a point is (x, y, z, w) with the height y and
+  (x, z, w) on the hyperboloid of R^{2,1}; the tangent metric is the Minkowski form of R^{3,1} (as
+  H³). Geodesic flow with the H² part at speed s and the height linear, written with t·sinhc(st)
+  (no 1/s: vertical rays are exact); distance √(D_H² + Δy²); direction-to by asinhc of the H² log
+  direction; MAX_DIST 10; the sky key (sin β·ξ, cos β) from the ideal point ξ of the H² part and the
+  angle β from the vertical. sinhc/asinhc/atanhc are Taylor polynomials below 0.05: SwiftShader's
+  sinh, asinh and atanh have an absolute error near 0 (measured, h2xr.md).
+- **The area density** J = d²·sinh(D_H)/D_H (the Jacobi fields at angle β from the vertical grow
+  as sinh(t sin β)/sin β and t) replaces d² in the point light (E = I·cos θ/J) and the disk light's
+  pdf (J/(A·cos_l)); it depends on direction, not only on d.
+- **Placements**: an H²×R isometry is affine on the 4-vector, so its mat4 is an encoding (m[3][1]
+  the height shift). New occupant functions `isometry_point`/`isometry_tangent` apply a placement
+  (the generated arm and region query call them; H³ and S³ define them as the matrix product, so
+  their programs change in text only); `CurvedGeometry` gains compose/apply/applyTangent/rotation/
+  tangent (`linearIsometries` for H³ and S³: the same arithmetic, closures unchanged by the digest).
+  Rotations about the vertical only (a limitation row for any other).
+- **Shapes**: horizontal and vertical planes (the totally geodesic surfaces; a plane normal must be
+  vertical or horizontal, a new row constraint), horizontal disks, the capped vertical cylinder
+  (|x(τ)|² = sinh²R on the flow's x and z, a quadratic in e^{2st} that needs no tangency, met with
+  the slab), the metric ball by convex Newton on the
+  squared distance (no closed form; f is convex because H²×R is CAT(0)). lambert, pinhole,
+  fisheye, power/uniform selection and unrolled dispatch list h2xr; the environment row lists it
+  (BSDF lookup at the key). No media, no other materials, lights or cameras (support.md).
+- **Far from o** (beyond the working radius, about 3): float32 hyperboloid coordinates carry
+  relative error ε·w². The metric and frame go through the transported basis (E1, e_y, E2), a sum of
+  squares that cannot go negative (the plain form did, past about 4 from o: NaN directions in 2–14%
+  of a demo's pixels under NEE, measured); roots computed from ray origins far out can still be
+  garbage, so the demo's floor is a disk of radius 3.2, not a plane (with a plane, 11 NaN pixels in
+  307200 after 120 s; with the disk, 0).
+- **Witnesses** `h2xr-furnace`, `h2xr-disk-light`, `h2xr-point-light`, `h2xr-sky`
+  (tests/witnesses/scenes/h2xrWitness.ts) with the fp64 twin h2xrTwins.ts; occupant twins in
+  tests/components/h2xr.test.ts (RK4, finite differences of exp, Monte Carlo ray hits, sphere
+  tracing); compiler/Validator tests in tests/compiler/h2xr.test.ts. Demo `h2xr` (a colonnade) in
+  the gallery's "Curved spaces".
+
+Verification (SwiftShader, targeted witnesses, final commit 1a4d96c; 23 of 23 exact checks):
+- h2xr-furnace 3.9514 pinhole and fisheye (exact 3.951424).
+- h2xr-disk-light window vs 0.4991630: pt-nee 0.4982, pt-mis 0.4987, pt 0.5004; nee ≡ mis Δ 0.07%,
+  χ²ᵣ 0.27.
+- h2xr-point-light (power nee / mis / uniform nee): disk 0.2256 / 0.2256 / 0.2251 vs 0.2252589;
+  wall 0.0917 / 0.0917 / 0.0915 vs 0.0916891; ball 0.2727 / 0.2727 / 0.2711 vs 0.2726837;
+  column 0.1274 / 0.1274 / 0.1291 vs 0.1287049; cap 0.1001 / 0.1001 / 0.0998 vs 0.0998508.
+- h2xr-sky frame means (0.2873, 0.3689, 0.2100) vs (0.2870, 0.3682, 0.2098) pinhole and
+  (0.6585, 0.7002, 0.6265) vs (0.6586, 0.7001, 0.6264) fisheye.
+- h3-sky-ball and s3-furnace pass through the new isometry_point/_tangent seam.
+- The witnesses can fail (one mutation each, reverted; measured on f8f70a1, whose mutated lines
+  are the final ones, and on 1a4d96c for the column): point light J := d² — all 15 point-light
+  checks fail (wall 0.1273 vs 0.0917, the twin predicts 0.1274); the Euclidean disk-radius map
+  r = ρ√u — pt-nee 0.5093, pt-mis 0.5034 (twin 0.5106; pt unaffected, as it should be); the view
+  direction as sky key — 0.1029 vs 0.2870 (twin 0.1027); H³'s plane-root condition |P| < |W| (no
+  s) — furnace 3.9457 / 3.9421; isometry_point ignoring the height shift — sky 0.3026 (twin
+  0.3023); the column's τ not divided by s — disk, column and cap windows fail (column 0.1652).
+  isometry_direction without stripping the shift is caught only weakly (1 of 15 checks, ball
+  uniform 0.2703 vs 0.2727): the transported-basis frame drops most of the error. A departure-
+  instead-of-arrival emitter cosine is no bug for a horizontal disk (the vertical component of the
+  velocity is constant along a geodesic), so it was not used.
+- The first targeted run failed h2xr-furnace (3.9413 / 3.9333): the column's root assumed a
+  tangent direction (fixed in 1a4d96c, see Shapes).
+- Digest against the plan commit: 274 of 292 scenes identical (every Euclidean scene); the 13
+  H³/S³ programs differ only in the isometry_point/_tangent lines, their definitions and source-map
+  lines (uniform closures, parameters and scene data identical); 5 new H²×R scenes.
+- vitest: the H²×R files (h2xr component, twin and compiler tests: 38) and the gate, support-table
+  and snapshot files pass; the full run (under the machine's load average of 21) had 6 timeouts in
+  unrelated Euclidean/spectral/H³ files that pass when rerun alone, and the h2xr demo's
+  program-description snapshot, updated in f7321f0.
+- Demo: lab renders (SwiftShader, 640×480, pt-mis) checked by eye and for NaN (0 of 307200).
+
 ## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
 
 Review of the S³ step (curved-space design §2.4).

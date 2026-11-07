@@ -44,7 +44,7 @@ export interface SceneDescription {
 }
 
 export interface AmbientSpaceDescription {
-    type: 'euclidean' | 'hyperbolic' | 'spherical';
+    type: 'euclidean' | 'hyperbolic' | 'spherical' | 'h2xr';
     parameters?: { curvature?: number };
     /** A closed manifold M = X/Γ: the scene is one copy inside a fundamental domain D, and a ray
      *  leaving D through a face continues from the paired face (components/quotient/README.md).

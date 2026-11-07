@@ -17,6 +17,9 @@ import { hyperbolicGeometry } from './hyperbolic/hyperbolic.js';
 import sphericalTypesGLSL from './spherical/types.glsl?raw';
 import sphericalGLSL from './spherical/spherical.glsl?raw';
 import { sphericalGeometry } from './spherical/spherical.js';
+import h2xrTypesGLSL from './h2xr/types.glsl?raw';
+import h2xrGLSL from './h2xr/h2xr.glsl?raw';
+import { h2xrGeometry } from './h2xr/h2xr.js';
 import type { CurvedGeometry } from './isometry.js';
 
 export interface AmbientDescriptor {
@@ -47,6 +50,9 @@ export const AMBIENT_SPACES: Record<string, AmbientDescriptor> = {
     // 2π is exact rather than a clip: every geodesic closes after 2π, so the first hit in
     // (0, 2π) is the first hit (spherical/spherical.md).
     spherical: { type: 'spherical', typesGLSL: sphericalTypesGLSL, glsl: sphericalGLSL, farClip: 2 * Math.PI, curved: sphericalGeometry },
+    // 10 is an arc length, as in H³: the hyperboloid coordinates of a point 10 from the scene are
+    // about e¹⁰/2, still finite in float32 (h2xr/h2xr.md).
+    h2xr: { type: 'h2xr', typesGLSL: h2xrTypesGLSL, glsl: h2xrGLSL, farClip: 10, curved: h2xrGeometry },
 };
 
 /** The far clip a program uses (its `MAX_DIST`): the authored measurement.farClip, else the

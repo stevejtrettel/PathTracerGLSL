@@ -9,6 +9,7 @@ import { SPHERICAL_HALF_EXTENT } from '../../ambient/spherical/spherical.js';
 import cylinderGLSL from './cylinder.glsl?raw';
 import cylinderHyperbolicGLSL from './cylinder_hyperbolic.glsl?raw';
 import cylinderSphericalGLSL from './cylinder_spherical.glsl?raw';
+import cylinderH2xrGLSL from './cylinder_h2xr.glsl?raw';
 
 export const cylinderDescriptor: PrimitiveDescriptor = {
     type: 'cylinder',
@@ -21,6 +22,7 @@ export const cylinderDescriptor: PrimitiveDescriptor = {
         euclidean: { origin: 'components/geometry/cylinder/cylinder.glsl', source: cylinderGLSL },
         hyperbolic: { origin: 'components/geometry/cylinder/cylinder_hyperbolic.glsl', source: cylinderHyperbolicGLSL },
         spherical: { origin: 'components/geometry/cylinder/cylinder_spherical.glsl', source: cylinderSphericalGLSL },
+        h2xr: { origin: 'components/geometry/cylinder/cylinder_h2xr.glsl', source: cylinderH2xrGLSL },
     },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it

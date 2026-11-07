@@ -96,12 +96,12 @@ describe('the space gate (descriptor occupants)', () => {
         });
         const st = strategy({}, { camera: { type: 'thinlens', fov: 0.8, aperture: 0.1, focusDistance: 4 } as never, aovs: ['normal'] });
         expect(spaceErrors(s, st)).toEqual([
-            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
-            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
+            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
+            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
             "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
             "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean)",
             "Object 1: primitive 'torus' has no testspace implementation (implemented in: euclidean)",
-            "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
+            "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
             'marched objects: not implemented in testspace space (implemented in: euclidean, hyperbolic, spherical)',
             "measurement.aovs: AOV 'normal' has no testspace implementation (implemented in: euclidean)",
             "measurement.camera: camera 'thinlens' has no testspace implementation (implemented in: euclidean)",
@@ -180,7 +180,7 @@ describe('the hittable light\'s desugared parts', () => {
             try {
                 for (const directLighting of ['none', 'nee'] as const) {
                     expect(spaceErrors(mirrorLit(), strategy({ directLighting }))).toEqual([
-                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
+                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)",
                     ]);
                 }
             } finally { lambert[SPACE] = body; }
@@ -250,7 +250,7 @@ describe('curvedLimitations (features without a descriptor, resolved estimator o
         expect(reasons).toEqual([
             'an ambient medium: not implemented in testspace space (implemented in: euclidean)',
             'an environment sampled as a light: not implemented in testspace space (implemented in: euclidean)',
-            'an environment: not implemented in testspace space (implemented in: euclidean, hyperbolic)',
+            'an environment: not implemented in testspace space (implemented in: euclidean, hyperbolic, h2xr)',
             'deflecting (GRIN) media: not implemented in testspace space (implemented in: euclidean)',
             'emissive objects sampled as lights: not implemented in testspace space (implemented in: euclidean)',
             'instanced objects: not implemented in testspace space (implemented in: euclidean)',
@@ -281,7 +281,7 @@ describe('curvedLimitations (features without a descriptor, resolved estimator o
 
     it('checks the resolved light selection only when the program selects lights', () => {
         const lit = scene(SPACE, (x) => { x.lights.push({ kind: 'point', position: [0, 3, 0], emission: 5 } as never); });
-        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)";
+        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical, h2xr)";
         expect(spaceErrors(lit, strategy({ directLighting: 'nee' }))).toContain(power);
         expect(spaceErrors(lit, strategy())).not.toContain(power);
     });

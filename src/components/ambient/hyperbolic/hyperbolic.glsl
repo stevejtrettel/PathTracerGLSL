@@ -5,10 +5,11 @@
 // Provides: fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
-//           isometry_direction(); for the H³ bodies, hyperbolic_form(), hyperbolic_on_model(),
-//           hyperbolic_plane_root(), hyperbolic_halfspace(), hyperbolic_interval_hit(),
-//           hyperbolic_plane_vector() and hyperbolic_plane_distance(); for marched fields, sdf_plane()
-//           and sdf_tube() (the rest of the vocabulary is components/ambient/sdf.glsl).
+//           isometry_point(), isometry_tangent(), isometry_direction(); for the H³ bodies,
+//           hyperbolic_form(), hyperbolic_on_model(), hyperbolic_plane_root(), hyperbolic_halfspace(),
+//           hyperbolic_interval_hit(), hyperbolic_plane_vector() and hyperbolic_plane_distance(); for
+//           marched fields, sdf_plane() and sdf_tube() (the rest of the vocabulary is
+//           components/ambient/sdf.glsl).
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 
 // The far clip MAX_DIST (an arc length; nothing beyond it is geometry) is emitted just before
@@ -186,6 +187,15 @@ float sdf_plane(Point p, Direction n, float offset) {
 float sdf_tube(Point p, Point a, Direction u, float r) {
     vec4 w = p + hyperbolic_form(p, a) * a - hyperbolic_form(p, u) * u;
     return asinh(sqrt(max(hyperbolic_form(w, w), 0.0))) - r;
+}
+
+// An object's placement, an isometry of H³, is a linear map of R⁴ held as a mat4 m; these apply it
+// to a point and to a tangent vector (the same product).
+Point isometry_point(mat4 m, Point p) {
+    return m * p;
+}
+Direction isometry_tangent(mat4 m, Direction v) {
+    return m * v;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

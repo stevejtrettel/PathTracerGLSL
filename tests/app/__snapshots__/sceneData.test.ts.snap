@@ -272,6 +272,16 @@ exports[`scene-data textures (byte fingerprints) > gyroid-field 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > h2xr 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-disk-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-sky 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > h3-disk-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-furnace 1`] = `null`;

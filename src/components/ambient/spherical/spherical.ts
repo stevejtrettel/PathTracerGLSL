@@ -5,7 +5,7 @@
 import type { Vec3Tuple } from '../../geometry/similarity.js';
 import type { CurvedGeometry, Mat4, Vec4 } from '../isometry.js';
 import type { RowConstraint } from '../../descriptors.js';
-import { mat4Transpose } from '../isometry.js';
+import { linearIsometries, mat4Transpose } from '../isometry.js';
 
 /** The domain of a geodesic radius in S³ (a ball's, a disk's): (0, π). π is the diameter of the
  *  space: the ball of radius π is all of S³, and a disk of radius ρ ≥ π is not the region the disk
@@ -19,8 +19,12 @@ export const SPHERICAL_RADIUS: RowConstraint = { kind: 'interval', min: 0, max: 
  *  coincide, and a tube of radius ≥ π/2 about a great circle is no longer the region about it. */
 export const SPHERICAL_HALF_EXTENT: RowConstraint = { kind: 'interval', min: 0, max: Math.PI / 2 };
 
+/** The dot product of R⁴. */
+const form = (a: Vec4, b: Vec4): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+
 export const sphericalGeometry: CurvedGeometry = {
-    form: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3],
+    form,
+    ...linearIsometries(form),
 
     // exp_o(v) = (sin|v|·v̂, cos|v|).
     exp(v: Vec3Tuple): Vec4 {
