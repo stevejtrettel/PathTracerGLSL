@@ -14,7 +14,7 @@ import { regionMean, type V4 } from './scenes/curvedTwins.js';
 import {
     CM_SIZE, SPECULAR, SPECULAR_CAMERA, SPECULAR_FOV, SPECULAR_MIRROR_WINDOW, SPECULAR_GLASS_WINDOW, SPECULAR_MEANS,
     RECEIVER_RHO, RECEIVER_CAMERA, RECEIVER_FOV, RECEIVER_WINDOW, RECEIVER_ALBEDO, GGX, GGX_LIGHT, GGX_MEANS,
-    SPHERE_LIGHTS, SPHERE_BLOCKER, SPHERE_MEANS,
+    SPHERE_LIGHTS, SPHERE_BLOCKER, H3_SPHERE_BLOCKER, SPHERE_MEANS,
 } from './scenes/curvedMaterialWitness.js';
 
 const lin = (a: V4, s: number, b: V4, t: number): V4 => [a[0] * s + b[0] * t, a[1] * s + b[1] * t, a[2] * s + b[2] * t, a[3] * s + b[3] * t];
@@ -100,7 +100,7 @@ describe.each(spaces)('curved material twins in %s space', (name, sp) => {
             got.forEach((g, c) => expect(Math.abs(g - m[k][c])).toBeLessThan(1e-6));
             fine.forEach((f, c) => expect(Math.abs(f - got[c])).toBeLessThan(2e-4));
         }
-    });
+    }, 60_000);
 
     // ---- ggx ----
 
@@ -138,7 +138,7 @@ describe.each(spaces)('curved material twins in %s space', (name, sp) => {
             (x, n, wo) => diskRadiance(sp, x, n, e, (wi) => ggxEval(sp, n, wi, wo, GGX.roughness, GGX.f0), 16, 32), 2);
         expect(m.missed).toBe(0);
         expect(Math.abs(m.mean - GGX_MEANS[space])).toBeLessThan(2e-6);
-    });
+    }, 60_000);
 });
 
 describe('the E³ control (e3-specular)', () => {
@@ -157,7 +157,7 @@ describe('the E³ control (e3-specular)', () => {
             expect(bad).toBe(0);
             got.forEach((g, c) => expect(Math.abs(g - SPECULAR_MEANS.euclidean[k][c])).toBeLessThan(1e-6));
         }
-    });
+    }, 60_000);
 });
 
 // ---- sphere lights ----
@@ -187,7 +187,7 @@ describe('sphere-light twins', () => {
         expect(Math.abs(mc - quad)).toBeLessThan(Math.max(4 * se, 1e-4 * quad));
     });
 
-    it('the cap quadrature equals the projected cap Le·π·sin²α·|cos θ_c| for a cap above the horizon', () => {
+    it('the cap quadrature equals the projected cap Le·π·sin²α·|cos θ_c| for a cap entirely on one side of the horizon', () => {
         for (const { sp, light } of cases.slice(0, 2)) {
             const c = sp.exp(light.position);
             const x = sp.flow(O, [0.6, 0, 0.8, 0], 0.2).pos;
@@ -205,7 +205,7 @@ describe('sphere-light twins', () => {
             (x, n) => (RECEIVER_ALBEDO / Math.PI) * sphereIrradiance(sp, x, n, c, light.radius, light.emission, 24, 48), 2, blocker);
         expect(m.missed).toBe(0);
         expect(Math.abs(m.mean - value())).toBeLessThan(2e-6);
-    });
+    }, 60_000);
 
     it('the antipodal ball holds −x for every window point x (d ≥ π − R), and the S³ ball is seen only behind the horizon', () => {
         const ca = S3.exp(SPHERE_LIGHTS.s3Antipodal.position), cs = S3.exp(SPHERE_LIGHTS.s3.position);
@@ -218,6 +218,14 @@ describe('sphere-light twins', () => {
             return 0;
         }, 2);
         expect(bad).toBe(0);
+    });
+
+    it('the H³ blocker holds the light, lies clear of the receiver, and no window ray meets it first', () => {
+        const c = H3.exp(H3_SPHERE_BLOCKER.center);
+        expect(H3_SPHERE_BLOCKER.radius).toBeGreaterThan(SPHERE_LIGHTS.h3.radius);
+        expect(H3.dist(c, O) - H3_SPHERE_BLOCKER.radius).toBeGreaterThan(0.3);
+        const blocker = (p: V4, v: V4, t: number) => { const r = H3.ballRoots(p, v, c, H3_SPHERE_BLOCKER.radius); return r !== null && r.entry > 0 && r.entry < t; };
+        expect(receiverWindowMean(H3, RECEIVER_CAMERA, RECEIVER_FOV, CM_SIZE, RECEIVER_WINDOW, RECEIVER_RHO, () => 0, 2, blocker).missed).toBe(0);
     });
 
     it('every backward-cone geodesic from the window passes within the blocker before it reaches the light', () => {

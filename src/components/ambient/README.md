@@ -171,7 +171,8 @@ non-identity transform is an error there).
   the long arc, pt = pt-nee = pt-mis = the quadrature), `h3-rough-glass`/`s3-rough-glass` (roughness 0.6,
   pt = pt-nee = pt-mis; in S³ with a sphere light under the ½ rule), `h3-sphere-light`/`s3-sphere-light` (a lambert
   receiver under a sphere light; in S³ below it, lit only by the backward cone),
-  `s3-sphere-light-blocker` (an opaque ball on every backward-cone geodesic: 0) and
+  `h3-sphere-light-blocker` (an opaque ball holding the light: 0), `s3-sphere-light-blocker` (an opaque
+  ball on every backward-cone geodesic: 0) and
   `s3-sphere-light-antipodal` (−x inside the ball for every window point: albedo·Le exactly).
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).

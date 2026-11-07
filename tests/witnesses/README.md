@@ -84,8 +84,8 @@ pt-nee, pt-mis against the twin's quadrature); `h3-rough-glass`/`s3-rough-glass`
 roughness 0.6, lit from out of frame, in S³ by a disk and a sphere light: pt = pt-nee = pt-mis at
 1024 spp — at roughness 0.3 the same layout fails nee ≡ mis on χ² in E³ too, firefly-dominated);
 `h3-sphere-light`/`s3-sphere-light` (a lambert receiver under a sphere light; in S³ below it, lit only
-by the backward cone), `s3-sphere-light-blocker` (0) and `s3-sphere-light-antipodal` (albedo·Le
-exactly). The expected values are computed by the fp64 twins `scenes/curvedMaterialTwins.ts`;
+by the backward cone), `h3-sphere-light-blocker` and `s3-sphere-light-blocker` (0) and
+`s3-sphere-light-antipodal` (albedo·Le exactly). The expected values are computed by the fp64 twins `scenes/curvedMaterialTwins.ts`;
 `curvedMaterialTwins.test.ts` recomputes them and checks the twins against independent estimates.
 Not yet in a full sweep.
 

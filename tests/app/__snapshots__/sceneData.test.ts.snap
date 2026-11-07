@@ -118,6 +118,8 @@ exports[`scene-data textures (byte fingerprints) > driven-baked-theta2 1`] = `nu
 
 exports[`scene-data textures (byte fingerprints) > driven-theta2 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > e3-specular 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > embers 1`] = `
 {
   "nodes": "4096x9 b6ae125c4d9b689a",
@@ -262,13 +264,23 @@ exports[`scene-data textures (byte fingerprints) > h3-disk-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > h3-ggx 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > h3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-point-light 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > h3-rough-glass 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > h3-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > h3-sky-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-specular 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sphere-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sphere-light-blocker 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > haze 1`] = `null`;
 
@@ -691,6 +703,8 @@ exports[`scene-data textures (byte fingerprints) > rough-smooth-limit 1`] = `nul
 
 exports[`scene-data textures (byte fingerprints) > s3-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > s3-ggx 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > s3-long-arc 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > s3-long-arc-blocker 1`] = `null`;
@@ -698,6 +712,16 @@ exports[`scene-data textures (byte fingerprints) > s3-long-arc-blocker 1`] = `nu
 exports[`scene-data textures (byte fingerprints) > s3-medium 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > s3-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-rough-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-specular 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light-antipodal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light-blocker 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
 {

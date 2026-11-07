@@ -121,8 +121,9 @@ Each selection occupant lists the ambient `spaces` it is implemented in (ambient
 
 pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2), and in curved spaces on the
 h3-* and s3-* witnesses (s3-long-arc: a light reached only through the long arc; s3-medium: the ½
-rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc; h3-sphere-light,
-s3-sphere-light and its -blocker and -antipodal variants: the curved sphere light); a shadow ray is aimed
+rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc; h3-sphere-light
+and its -blocker variant, s3-sphere-light and its -blocker and -antipodal variants: the curved sphere
+light); a shadow ray is aimed
 at the sampled light point (`ambient_aim`) and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
 surface does not block it (shadow-aim-march, shadow-aim-far). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
 inside-sphere fallback, p-independent area arms (equiangular's area exit),

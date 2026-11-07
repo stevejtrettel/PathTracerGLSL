@@ -24,7 +24,7 @@ choices P1–P4 in its §4).
   reflections in a glass ball the curved sphere root put the hit beyond eps and the next spawn landed
   outside (paths with two internal reflections never arrived in H³: 0.9982 at maxBounces 4, twin
   0.9999; E³ arrived). Found by bounce-budget renders and an fp64 emulation of the curved path.
-- **Eleven witnesses** (tests/witnesses/scenes/curvedMaterialWitness.ts, twins in
+- **Twelve witnesses** (tests/witnesses/scenes/curvedMaterialWitness.ts, twins in
   curvedMaterialTwins.ts, checked by curvedMaterialTwins.test.ts), measured on SwiftShader:
   - `h3-specular`/`s3-specular` (mirror and glass balls in a box of six colored walls, exact per-ray
     twin): H³ mirror (0.7760, 0.2206, 0.0344) vs (0.7760, 0.2205, 0.0345), glass (0.3021, 0.9528,
@@ -37,14 +37,15 @@ choices P1–P4 in its §4).
     rule): nee ≡ mis Δmean 0.18%/0.23%, χ²ᵣ 0.51/0.96. At roughness 0.3 the check failed in E³ too
     (firefly-dominated).
   - `h3-sphere-light` 0.1136/0.1136/0.1140 vs 0.1136; `s3-sphere-light` (backward cone only)
-    0.2127/0.2127/0.2141 vs 0.2127; `s3-sphere-light-blocker` 0 under all three;
+    0.2127/0.2127/0.2141 vs 0.2127; `h3-sphere-light-blocker` and `s3-sphere-light-blocker` (an opaque
+    ball crossed just before the light, and on the backward cone) 0 under all three;
     `s3-sphere-light-antipodal` 0.5000 (albedo·Le) under all three.
   - The existing H³/S³ witnesses pass after the change. Each new witness fails under one deliberate
     mutation: wo taken as the departure direction (specular glass, both spaces), swapped η (E³
     control), Euclidean `dot` in microfacet_to_local (h3-ggx), no 1/cos_o in ggx_eval (s3-ggx), η²
     dropped in rough_dielectric_eval (rough glass, Δmean 16%/45%), a Euclidean-style cone (H³ sphere,
-    0.159), no flip (S³ sphere, 0), the near root along −ω (blocker, 0.213), no clamp (antipodal,
-    NaN). Dropping (1 − F) in rough_dielectric_pdf alone moved nee against mis by only 0.2%/1.1%.
+    0.159), no flip (S³ sphere, 0), the near root along −ω (S³ blocker, 0.213), the H³ light distance
+    halved (H³ blocker, 0.114; h3-sphere-light does not see it), no clamp (antipodal, NaN). Dropping (1 − F) in rough_dielectric_pdf alone moved nee against mis by only 0.2%/1.1%.
 - Euclidean output unchanged: digest 280 of 297 scenes identical (the rest are the curved programs
   with spheres, by the `sphere_root` refactor, and the new scenes), frames compare identical after the
   ray_spawn change.

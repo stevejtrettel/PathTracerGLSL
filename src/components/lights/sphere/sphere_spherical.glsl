@@ -3,8 +3,9 @@
 // so the sampled ball is the ball rays hit). Every geodesic from p also passes −p, so with d the
 // short distance from p to the center:
 //   - R < d < π − R: the ball is seen in two disjoint cones, the forward one about
-//     u = ambient_direction_to(p, center) with sin α = sin R / sin d (< 1, so α < π/2), and its
-//     negation — geodesics that leave away from the center, pass −p and reach the ball's far side;
+//     u = ambient_direction_to(p, center) with sin α = sin R / sin d, and its
+//     negation — geodesics that leave away from the center, pass −p and reach the ball's far side.
+//     Here R < π/2 (R < d < π − R), and α < π/2: tan α = tan R / sin of the tangent leg > 0;
 //   - d ≥ π − R: −p lies in the ball and every geodesic from p meets it; the forward "cone" is the
 //     hemisphere about u (sin²α clamped to 1) and the two together are every direction;
 //   - d ≤ R: p is inside the ball (never a surface point: the backing region is opaque), pdf 0 in
@@ -13,8 +14,10 @@
 // w(2 − w), 1 − cos α = sin²α/(1 + cos α)); then the route is chosen as for every S³ light
 // (spherical_light_arc, before anything else depends on it): a one-sided receiver takes −ω exactly
 // when ω lies below its normal, so each direction of its upper hemisphere comes from exactly one ω;
-// anything else takes −ω with probability ½. Each cone thus carries the density
-// p_arc/(2π(1 − cos α)), the same at every one of its directions. The distance is the ball's entry
+// anything else takes −ω with probability ½. Every direction the arc rule can produce that meets the
+// ball (for a one-sided receiver, those above its horizon) thus has the density p_arc/(2π(1 − cos α)),
+// which sphere_light_pdf returns for every direction that meets the ball (below a one-sided receiver's
+// horizon its BSDF is 0, so the value there is never used). The distance is the ball's entry
 // root along the chosen direction, sphere_root (the sphere body's root): along −ω that is the point
 // where ω's geodesic leaves the ball, reached the other way round, at 2π minus ω's exit root. The §6.1
 // byte-match invariant: sphere_light_pdf mirrors the sampler with the same expressions.

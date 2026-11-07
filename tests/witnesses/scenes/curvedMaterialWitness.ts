@@ -26,7 +26,10 @@
 //                                     S³ below it, where only the backward cone (geodesics that pass
 //                                     −x and reach the ball's far side) lights the receiver's top. pt,
 //                                     pt-nee and pt-mis against Le·∫ over the cap (the twin).
-//   s3-sphere-light-blocker         — the same with an opaque ball about −o on every backward-cone
+//   h3-sphere-light-blocker         — the H³ one with an opaque ball about the light's center, holding it:
+//                                     0. A light distance that stops short of the light's surface
+//                                     would not see the blocker.
+//   s3-sphere-light-blocker         — the S³ one with an opaque ball about −o on every backward-cone
 //                                     geodesic from the window: 0. A light distance that stops short of
 //                                     the ball's far side would not see the blocker.
 //   s3-sphere-light-antipodal       — the receiver with −x inside a large ball: every geodesic from x
@@ -261,6 +264,10 @@ export const SPHERE_LIGHTS = {
 /** The blocker: the s3-long-arc-blocker ball, radius 0.8 about −o. Every backward-cone geodesic from
  *  a window point x passes −x, within 0.4 of −o, at arc length π, before it reaches the light. */
 export const SPHERE_BLOCKER = { center: [0, Math.PI, 0] as Vec3, radius: 0.8 };
+/** The H³ blocker: an opaque ball of radius 0.5 about the H³ light's center, so it holds the light and
+ *  every geodesic from the receiver to the light's near side crosses it first, about 0.1 before the
+ *  light. A light distance that stops short of the light's surface (by more than that) misses it. */
+export const H3_SPHERE_BLOCKER = { center: SPHERE_LIGHTS.h3.position, radius: 0.5 };
 /** Twin window means ((albedo/π)·E, curvedMaterialTwins.sphereIrradiance, 2×2 points per pixel). */
 export const SPHERE_MEANS = { h3: 0.1136093, s3: 0.2126745 };
 
@@ -307,7 +314,10 @@ export const curvedMaterialSuite: Record<string, SceneSuiteEntry> = {
     'h3-rough-glass': roughGlassEntry('hyperbolic'),
     's3-rough-glass': roughGlassEntry('spherical'),
     'h3-sphere-light': sphereEntry('h3-sphere-light', 'hyperbolic', SPHERE_LIGHTS.h3, SPHERE_MEANS.h3,
-        'H³ sphere light above a lambert disk: the cone sin α = sinh R/sinh d and its pdf, the near-root distance (sphere_root), the backing ball placed by the light\'s isometry'),
+        'H³ sphere light above a lambert disk: the cone sin α = sinh R/sinh d and its pdf, the backing ball placed by the light\'s isometry (h3-sphere-light-blocker pins the distance)'),
+    'h3-sphere-light-blocker': sphereEntry('h3-sphere-light-blocker', 'hyperbolic', SPHERE_LIGHTS.h3, 0,
+        'H³ sphere-light distance: an opaque ball about the light\'s center holds it, so every shadow ray to the light crosses the blocker just before it — a light distance that stops short of the light\'s surface would not see it',
+        { objects: [{ type: 'sphere', parameters: H3_SPHERE_BLOCKER, material: 'blocker' }], materials: { blocker: { model: 'lambert', albedo: [0.5, 0.5, 0.5] } } }),
     's3-sphere-light': sphereEntry('s3-sphere-light', 'spherical', SPHERE_LIGHTS.s3, SPHERE_MEANS.s3,
         'S³ sphere light below a lambert disk, which only the backward cone lights: the flip rule for a one-sided receiver, the cone sin α = sin R/sin d, the entry root reached the other way round'),
     's3-sphere-light-blocker': sphereEntry('s3-sphere-light-blocker', 'spherical', SPHERE_LIGHTS.s3, 0,

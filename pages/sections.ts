@@ -40,7 +40,10 @@ export const gallerySections: GallerySection[] = [
         title: 'Curved spaces',
         blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, curved light falloff, the sky at infinity) and spherical space S³ (two arcs between any two points, the antipodal lens, no sky)',
         entries: [e('hyperbolic'), e('h3-furnace'), e('h3-disk-light'), e('h3-point-light'), e('h3-medium'), e('h3-sky'), e('h3-sky-ball'),
-            e('spherical'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium')],
+            e('h3-specular'), e('h3-ggx'), e('h3-rough-glass'), e('h3-sphere-light'), e('h3-sphere-light-blocker'),
+            e('spherical'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium'),
+            e('s3-specular'), e('s3-ggx'), e('s3-rough-glass'), e('s3-sphere-light'), e('s3-sphere-light-blocker'),
+            e('s3-sphere-light-antipodal'), e('e3-specular')],
     },
     {
         title: 'Instance clouds',

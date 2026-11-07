@@ -213,3 +213,22 @@ nee against mis by 0.2% (H³) and 1.1% (S³), inside the 2% tolerance: it change
 transmission lobe, where F is 4–10%. It was replaced by the η² factor dropped in rough_dielectric_eval
 (an eval/sample mismatch on the transmission lobe). The planned S³ ggx mutation did not apply on the
 first run (a regex miss) and was rerun.
+
+## 7. Review of the finished commits (one independent agent)
+
+The reviewer checked by algebra and fp64 scripts: `sphere_root` is arithmetic-identical to the old
+bodies; the sampler inputs (H³ a = cosh d, b = −sinh d cos θ, k = sinh²d sin²θ; S³ a = cos d,
+b = ±sin d cos θ) satisfy the root identities; `sphere_root` (outside) against a brute-force march in
+1020 cases (H³, S³ both routes, d > π/2, the hemisphere case) agrees to the march step; directions just
+outside the cone never meet the ball; both parallel-transport formulas are exact; the twins have no
+bug that would let a witness pass for the wrong reason. Applied:
+
+1. *A light distance that is too short was caught only on the S³ flip route* (its mutation
+   `0.5 * sphere_root` in the H³ body passes h3-sphere-light): added `h3-sphere-light-blocker`, an
+   opaque ball of radius 0.5 about the H³ light's center (0), and showed it fails under that mutation.
+   The S³ forward route has no such witness (its forward cone is below the receiver's horizon in
+   s3-sphere-light); s3-rough-glass constrains it only partly. Recorded, not built.
+2. *The S³ density comment overstated* ("the same at every one of its directions"; below a one-sided
+   receiver's horizon the sampler's density is 0): rewritten.
+3. *"sin α < 1, so α < π/2"* is not the reason: rewritten (R < π/2 there, and tan α > 0).
+4. *A test name* said "above the horizon" for an S³ cap below it: renamed.
