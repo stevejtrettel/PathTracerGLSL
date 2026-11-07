@@ -379,14 +379,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
         { name: 'scene_intersect', signature: 'bool scene_intersect(Ray ray, out Hit hit)' },
-        { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
+        { name: 'scene_region_at', signature: 'int scene_region_at(Point p)' },
         { name: 'material_of', signature: 'int material_of(int region)' },
     ];
     if (anyQuery) {
         provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
     }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p, Wavelengths wl)' });
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, Point p, Wavelengths wl)' });
     }
 
     if (dispersion !== null && dispersion.regions.length > 0)
@@ -511,7 +511,7 @@ function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm
     if (tabledTypes.length > 0) lines.push('');
 
     for (const obj of objects) {
-        lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
+        lines.push(`float sdf_${ids.get(obj.index)!}(Point p) {`);
         if (obj.placement !== undefined && isDrivenPlacement(obj.placement)) {
             // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
             // params absorb s in-shader — distances stay exact WORLD values, so the
@@ -1120,7 +1120,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 
 function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], instanceAccel: string, ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
-    lines.push('int scene_region_at(vec3 p) {');
+    lines.push('int scene_region_at(Point p) {');
     lines.push('    int region = -1;');
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
@@ -1559,7 +1559,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
 function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
-    lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of_material(int mat, Point p, Wavelengths wl) {');
     for (const mat of materials) {
         if (mat.medium?.ior !== undefined) {
             lines.push(`    if (mat == ${mat.id}) return ${emitIndex(mat.medium.ior as IndexProperty, color)};   // '${mat.name}' — deflecting: the medium's n(p)`);
@@ -1575,7 +1575,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
     lines.push('    return 1.0;'); // non-transmissive / ambient
     lines.push('}');
     lines.push('');
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     lines.push('    if (region < 0) return 1.0;');
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const m of meshes) {
@@ -1609,7 +1609,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
 function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
     // Instanced batches CLAIMING an interior (impl-plan-instanced-containment) earn rows by
@@ -1691,7 +1691,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
     lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ray.direction, hit.ng, hit.p) < 0.0) {');
+    lines.push('        if (ambient_dot(ambient_flow(ray, hit.t).direction, hit.ng, hit.p) < 0.0) {   // the arrival direction, at hit.p');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');

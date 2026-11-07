@@ -8,7 +8,7 @@
 // is the ledgered follow-up this occupant exists to force (audit F3 disposition).
 // Provides: checker_eval(), checker_sample(), checker_pdf(), checker_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
-//             PI, TWO_PI, SPECTRUM_ZERO, ambient_dot.
+//             PI, TWO_PI, SPECTRUM_ZERO, ambient_dot/ambient_normalize.
 
 Spectrum checker_albedo(Hit hit, MaterialProperties mp) {
     vec2 c = floor(hit.uv * mp.uv_scale);
@@ -31,7 +31,7 @@ InteractionSample checker_sample(Direction wo, Hit hit, MaterialProperties mp, f
     float phi = TWO_PI * u.x;
 
     InteractionSample s;
-    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.wi     = ambient_normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta, hit.p);
     s.weight = checker_albedo(hit, mp);         // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
     s.pdf    = cos_theta * (1.0 / PI);
     s.flags  = LOBE_REFLECTION;

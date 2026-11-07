@@ -1,23 +1,24 @@
-// Ambient-space registry (measurement pick-one family — the GEOMETRY-of-space axis,
-// the non-Euclidean seam). An ambient occupant = one folder (the ambient_* contract
-// GLSL: ambient_geodesic / ambient_frame / ambient_dot / ambient_parallel_transport /
-// ambient_direction_to)
-// + one line below (D3: the door exists BEFORE the first curved-space occupant, so
-// H³/Nil/Schwarzschild walk through a finished front door — the GGX lesson).
+// Ambient-space registry (measurement pick-one family — the geometry of the space the
+// light lives in). An ambient occupant = one folder (types.glsl: the Point and Direction
+// types; <type>.glsl: the ambient_* functions, MAX_DIST and fp_uncertainty — the contract
+// is in README.md) + one line below.
 //
-// Descriptors declare FACTS about one space; composition (where the block lands in the
-// program) stays in generate/features/core.ts. Origin is DERIVED from the key
-// (components/ambient/<type>/<type>.glsl — the path convention is the one truth).
+// Descriptors declare FACTS about one space; composition (where the blocks land in the
+// program) stays in generate/features/core.ts. Origins are DERIVED from the key
+// (components/ambient/<type>/types.glsl and <type>.glsl — the path convention is the one truth).
 
+import euclideanTypesGLSL from './euclidean/types.glsl?raw';
 import euclideanGLSL from './euclidean/euclidean.glsl?raw';
 
 export interface AmbientDescriptor {
     /** Registry key — `scene.ambientSpace.type` (Validator-gated against this registry). */
     type: string;
+    /** ?raw source defining `Point` and `Direction`, included right after the color model's types. */
+    typesGLSL: string;
     /** ?raw source providing the ambient_* contract surface (trace-loop-contract). */
     glsl: string;
 }
 
 export const AMBIENT_SPACES: Record<string, AmbientDescriptor> = {
-    euclidean: { type: 'euclidean', glsl: euclideanGLSL },
+    euclidean: { type: 'euclidean', typesGLSL: euclideanTypesGLSL, glsl: euclideanGLSL },
 };

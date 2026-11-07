@@ -13,7 +13,7 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl);
 
 where `film` is the continuous sub-pixel point (the `pixel/` family owns the footprint /
 sub-pixel jitter — the camera is a pure film-point → ray map, no RNG of its own). Returns a
-light-propagation seed (`Ray` = origin + unit direction + current wavelengths, no interval — the trace-loop contract). Camera parameters arrive as uniforms/defines the compiler's
+light-propagation seed (`Ray` = origin + unit direction + current wavelengths, no interval — the trace-loop contract; the direction is normalized with `ambient_normalize` at the camera position). Camera parameters arrive as uniforms/defines the compiler's
 camera feature owns (`u_cameraPosition/Target`, `TAN_FOV` — a constant fov bakes to a
 literal define; a `{param}` fov becomes a live uniform aliased through the same
 define, so the GLSL is unchanged either way — the §2.8 Value<T> pattern). Model-unique

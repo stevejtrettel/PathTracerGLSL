@@ -134,7 +134,7 @@ function lightQueryFns(f: Flags): ShaderBlock {
             `    return LightQuery(hit.p, hit.frame.n, ${sided});`,
             '}',
             'LightQuery light_query_medium(Point p) {',
-            '    return LightQuery(p, vec3(0.0), false);   // no orientation at a medium event',
+            '    return LightQuery(p, Direction(0.0), false);   // no orientation at a medium event',
             '}',
         ].join('\n'),
     };
@@ -407,7 +407,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             '        // A crossing past measurement.maxNullCrossings leaves the measured set: the path ends.',
             '        if (is_null_interface(mat)) {',
             '            s.current_medium = hit.region_to;',
-            '            s.ray = ray_spawn(hit, s.ray.direction);',
+            '            s.ray = ray_spawn(hit, ambient_flow(s.ray, hit.t).direction);   // on along the arrival direction',
             '            s.null_crossings++;',
             '            if (s.null_crossings > MAX_NULL_CROSSINGS) break;',
             '            bounce--;',
@@ -417,7 +417,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     }
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
-        '        Direction wo = -s.ray.direction;',
+        '        Direction wo = -ambient_flow(s.ray, hit.t).direction;   // back along the arrival direction',
     );
     if (aovs.length > 0) {
         // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null

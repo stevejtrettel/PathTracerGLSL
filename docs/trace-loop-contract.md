@@ -58,8 +58,14 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
 struct Ray { Point origin; Direction direction; Wavelengths wl; }; // no search interval
 ```
 - A `Ray` **encodes a geodesic by its initial conditions** — `(origin, direction)`, a point of the
-  unit tangent bundle. It flows via `ambient_geodesic(origin, direction, t)`; only the *space*
-  changes (Euclidean → line, H³ → hyperbolic geodesic, Schwarzschild → light path). Same `Ray`.
+  unit tangent bundle. The geodesic flow moves it: `ambient_flow(ray, t)` is the ray at arc length
+  t — the point reached and the velocity there — and `ambient_geodesic(origin, direction, t)` is
+  that point alone. Only the *space* changes (Euclidean → line, H³ → hyperbolic geodesic,
+  Schwarzschild → light path). Same `Ray`.
+- **`ray.direction` is the direction at the origin.** Anything that needs the direction where the
+  ray ARRIVES — `wo` at a surface hit, the side test in `scene_intersect`, the continuation through
+  a null interface, a medium event's incident direction — reads `ambient_flow(ray, t).direction`.
+  In Euclidean space the two are the same vector; in a curved space they are not.
 - `scene_intersect` seeds `Hit.wl` from `Ray.wl`; geometry helpers preserve it.
   `ray_spawn` inherits `Hit.wl`; local-frame rays preserve wavelengths without spatial scaling.
 - `direction` is a **unit** tangent — unit *in the metric*.
@@ -96,13 +102,17 @@ day curvature turns on, which is exactly why we name it now.
 
 **The rule (mechanical, so the compiler-less discipline is checkable by eye):**
 - world-space direction · direction, or the world↔frame projection (`to_local`/`from_local`) → **`ambient_dot`**
+- normalizing a world-space direction (a sampled direction recombined from frame components, a
+  reflection or refraction, a camera ray) → **`ambient_normalize(v, p)`** at the point it is tangent to
 - dots between vectors **already in local-frame components** → raw **`dot`** — the frame is
   metric-orthonormal by construction, so the metric is the identity there. *The metric is paid
   exactly once, at the world↔frame crossing.*
 
 Lambert works in world space, so every dot it takes is `ambient_dot`. The GGX-family materials
 evaluate in a local frame: `microfacet_to_local` (glsl/core/microfacet.glsl) projects each world
-direction with `ambient_dot`, and dots between the resulting local vectors are raw `dot`.
+direction with `ambient_dot`, dots between the resulting local vectors are raw `dot`, and
+`microfacet_from_local` normalizes the recombined world vector with `ambient_normalize` at the
+frame's point.
 
 ## Updated signatures (vs the current slice)
 
@@ -111,10 +121,19 @@ bool     scene_intersect     (Ray ray, out Hit hit);                   // hit.t 
 bool     <backend>_intersect (Ray ray, inout Hit hit);                 // accumulate nearest into hit (bound = hit.t); never mutate ray
 bool     scene_intersect_any (Ray ray, float maxDist);                 // occlusion bound is an argument
 Spectrum shadow_transmittance(Ray shadow_ray, Point light_p, int crossings_left);   // destination is a POINT — see below
-Point    ambient_geodesic    (Point origin, Direction dir, float t);   // UNCHANGED — the geodesic mechanism
-float    ambient_dot         (Direction a, Direction b, Point p);      // UNCHANGED — now actually called
-Direction ambient_direction_to(Point from, Point to);                 // unit start direction of the geodesic from → to (aims shadow rays)
+Point    ambient_geodesic    (Point origin, Direction dir, float t);   // the point at arc length t
+Ray      ambient_flow        (Ray r, float t);                         // the ray at arc length t (point + arrival velocity)
+float    ambient_dot         (Direction a, Direction b, Point p);      // the metric at p
+Direction ambient_normalize  (Direction v, Point p);                   // unit length in the metric at p
+Direction ambient_aim        (Point from, Direction along, Point to, out float remaining);
+                                                                       // shadow-ray aim + arc length left (see below)
+vec3     ambient_sky_key     (Point p, Direction v);                   // what the sky is looked up by, for the ray (p, v)
 ```
+The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`), `MAX_DIST` and
+`fp_uncertainty` (components/ambient/README.md). A space states its geodesic formula once:
+`ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
+`environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
+is the direction.
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
 never mutated by intersection — it is a pure seed.
@@ -122,9 +141,10 @@ never mutated by intersection — it is a pure seed.
 ## Supersedes
 
 - **Fable §5 `GeodesicState` + `geodesic_step` stepper — deleted.** The geodesic abstraction is
-  `ambient_geodesic(origin, dir, t) → Point`; that signature holds in *every* space, including a
-  black hole (which integrates the ODE internally — an implementation/perf detail of the ambient
-  module, never a type in the loop). There is no stepper state in the trace loop.
+  `ambient_geodesic(origin, dir, t) → Point` and `ambient_flow(ray, t) → Ray`; those signatures
+  hold in *every* space, including a black hole (which integrates the ODE internally — an
+  implementation/perf detail of the ambient module, never a type in the loop). There is no
+  stepper state in the trace loop.
 - **Fable §6.3** `shadow_transmittance(p, wi, dist)` → `shadow_transmittance(Ray, Point light_p, int crossings_left)`.
   **A shadow ray is defined by its DESTINATION, not a distance.** The scalar `maxDist` form (an
   earlier revision) was non-robust for the media segment-walk: the walker decremented `remaining`
@@ -135,17 +155,20 @@ never mutated by intersection — it is a pure seed.
   reaches the light via the emitter-hit, stayed correct). Passing the light POINT lets each segment
   re-derive the back-off against the fixed target (pbrt's `SpawnRayTo` discipline), so no drift can
   accumulate. **The ray is aimed at the destination as well.** The caller takes the origin from `ray_spawn`
-  (moved ε off the surface) and sets the direction to `ambient_direction_to(origin, light_p)`. A
+  (moved ε off the surface) and sets the direction to `ambient_aim(origin, ls.wi, light_p, …)`:
+  the unit direction at the origin of the geodesic to the light point that continues the arc the
+  sampled direction starts on (one arc in Euclidean space and H³; two in S³, where `along` picks
+  one, so an occluder on the far part of a long arc stays in the test). A
   ray that kept the direction computed from the unmoved hit point would be the true segment shifted
   by ε: it passes beside the light point, and when the light is seen at a slant it meets the light's
   own surface before the back-off — whenever ε·[(−n_g·n_l)/cos θ_l − cos θ] > `SHADOW_BACKOFF`
   (θ from the receiver's normal n_g, θ_l from the light's normal n_l). Only visibility uses the
   aimed direction; the BSDF, the cosine and the pdfs keep the sampled one (witnesses
   `shadow-aim-march`, `shadow-aim-far`). The media walk re-aims the same way at every null
-  crossing, where it re-spawns (`shadow-aim-fog`). The opaque fast path derives its `maxDist` from the point; the media walk measures
-  `length(light_p − seg_ray.origin) − SHADOW_BACKOFF` per segment (the back-off's derivation —
-  angle-amplified, never fp-relative — lives on the constant in core math). (length() is Euclidean; a geodesic
-  ambient-distance helper is the curved-space follow-up, like the straight-ray march itself.)
+  crossing, where it re-spawns along the arrival direction there (`ambient_flow`)
+  (`shadow-aim-fog`). Both forms take the far bound from the point: the arc length `ambient_aim`
+  returns from the segment's origin, minus `SHADOW_BACKOFF` (the back-off's derivation —
+  angle-amplified, never fp-relative — lives on the constant in core math).
   **`crossings_left` is the path's unspent null-crossing budget.** `measurement.maxNullCrossings`
   bounds the null crossings of a whole path, and a shadow ray is a path's last segment, so the
   caller passes what the path has left (`shadow_crossings_left(s)`, generated with the walk) and
@@ -155,6 +178,6 @@ never mutated by intersection — it is a pure seed.
 
 ## Deferred (not this contract)
 
-Curved ambient spaces (H³/Schwarzschild — `ambient_*` are the seam);
-`Point`→`vec4` per space; BVH under non-straight geodesics
+Curved ambient occupants (H³/S³ first — docs/claude-2026-11-review/curved-spaces-design.md;
+`Point`→`vec4` there); BVH under non-straight geodesics
 (open in the archive too); Fable's bare-`f`-vs-`f·cos` cosine-placement question (orthogonal).

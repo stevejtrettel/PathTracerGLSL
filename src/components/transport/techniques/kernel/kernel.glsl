@@ -6,11 +6,12 @@
 // Depends on: PathState core (ray/throughput/radiance ONLY — the static-file rule),
 //             combiner_w_env/combiner_w_emitter, kernel_record (generated),
 //             interaction_surface_sample/_emission, material_is_emissive,
-//             environment_radiance, scene_material_properties, material_of.
+//             environment_radiance, scene_material_properties, material_of, ambient_sky_key.
 
 void kernel_score_miss(inout PathState s) {
-    // Deferred scoring, boundary case: the sample escaped to the environment.
-    s.radiance += s.throughput * combiner_w_env(s) * environment_radiance(s.ray.direction, s.ray.wl);
+    // Deferred scoring, boundary case: the sample escaped to the environment, which is looked
+    // up at the sky point the ray reaches (ambient_sky_key).
+    s.radiance += s.throughput * combiner_w_env(s) * environment_radiance(ambient_sky_key(s.ray.origin, s.ray.direction), s.ray.wl);
 }
 
 void kernel_score_emitter_hit(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {

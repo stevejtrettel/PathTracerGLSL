@@ -20,23 +20,31 @@ import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
 import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
 
-/** The ambient occupant's block, from the registry (D3) — throws on an unregistered
- *  type as an unreachable backstop (the Validator rejects upstream). */
-function ambientBlock(type: string): { origin: string; source: string } {
-    const d = AMBIENT_SPACES[type];
-    if (d === undefined) throw new Error(`ambient space '${type}' has no occupant (Validator should have rejected it)`);
-    return { origin: `components/ambient/${d.type}/${d.type}.glsl`, source: d.glsl };
-}
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
+
+/** The ambient occupant's two blocks (its types, its functions), from the registry —
+ *  throws on an unregistered type as an unreachable backstop (the Validator rejects upstream). */
+function ambientBlocks(type: string): { types: ShaderBlock; functions: ShaderBlock } {
+    const d = AMBIENT_SPACES[type];
+    if (d === undefined) throw new Error(`ambient space '${type}' has no occupant (Validator should have rejected it)`);
+    return {
+        types: { origin: `components/ambient/${d.type}/types.glsl`, source: d.typesGLSL },
+        functions: { origin: `components/ambient/${d.type}/${d.type}.glsl`, source: d.glsl },
+    };
+}
 
 export function contributeCore(plan: RenderPlan): FeatureContribution {
     // Conditional INCLUSION, not preprocessor gating (item-9 commit D): media-free
     // programs contain no media structs/helpers at all. The last structural defines
     // died with this. (MIS math lives with its only caller: transport/math_mis.glsl.)
     const color = COLOR_MODELS[plan.program.measurement.color];
+    // The space the program's measurement names (its ambient occupant): its types precede
+    // the core structs, like the color model's; its functions follow core math.
+    const ambient = ambientBlocks(plan.program.measurement.ambient);
     const blocks: ShaderBlock[] = [
         { origin: `components/color/${color.id}/types.glsl`, source: color.typesGLSL },
+        ambient.types,
         { origin: 'glsl/core/structs.glsl', source: structsGLSL },
     ];
 
@@ -94,9 +102,9 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // The colour projection calls the sensor's measurement response.
         { origin: `components/sensor/${sensor.id}/${sensor.id}.glsl`, source: sensor.glsl },
         { origin: `components/color/${color.id}/${color.id}.glsl`, source: color.glsl },
-        // Ambient occupant from the registry (D3: the non-Euclidean door) — the plan's
-        // measurement.ambient decision picks it; origin derived from the key.
-        ambientBlock(plan.program.measurement.ambient),
+        // The ambient functions (and MAX_DIST, fp_uncertainty): after core math, whose
+        // FP_UNCERTAINTY_* constants fp_uncertainty reads; before ray.glsl, which calls them.
+        ambient.functions,
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).

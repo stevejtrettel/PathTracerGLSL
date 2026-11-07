@@ -1,14 +1,12 @@
 // Math utilities
-// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, fp_uncertainty(), build_basis(),
+// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, FP_UNCERTAINTY_REL/ABS, build_basis(),
 //           concentric_disk(), schlick_fresnel(),
 //           dielectric_fresnel()
+// The far clip MAX_DIST and fp_uncertainty() depend on the space; the ambient occupant
+// defines them (components/ambient/<type>/<type>.glsl).
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
-// MAX_DIST — the far clip: nothing beyond it is geometry, and the environment is found there
-// (by missed BSDF rays AND by environment NEE — they must agree). An ABSOLUTE length, so it
-// is a scene-scale truncation: geometry or an ambient medium extending past 1000 units is cut.
-#define MAX_DIST 1000.0
 #define EPS_INTERFACE 0.001   // §4.2 classification probe depth — 10× MARCH_EPSILON so a probe
                               // along the normal clears the marcher's stop-short residual
 
@@ -35,25 +33,23 @@
 // ~δ/cosθ_l for a positional error δ, without bound as the arrival grazes, cosθ_l → 0).
 // It is a fixed length, not derived: NEE does not see an occluder within 0.002 of the
 // light point, which a BSDF ray would. For the environment and directional lights
-// (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
+// (distance MAX_DIST) it trims 0.002 off the far clip (1000 units in Euclidean space).
 #define SHADOW_BACKOFF 0.002
 
-// fp_uncertainty — positional error bound of a FLOATING-POINT-ACCURATE point (analytic
-// roots, triangle tests, refined marches): coordinate-relative with a near-origin
-// absolute floor. Constants transcribed from Wächter & Binder, "A Fast and Robust
-// Method for Avoiding Self-Intersection", Ray Tracing Gems ch. 6 (int_scale = 256 ulps
-// → 256·2⁻²³ relative; float_scale = 2⁻¹⁶ absolute; their origin() = 1/32 threshold is
-// where the two branches cross, folded here into one max). Scalar-along-the-normal
-// rather than their per-component integer offset: the escape is spelled through
-// ambient_geodesic (the metric seam), and the legal window — hit error ~2e-7…2e-6
-// below, optical significance ≳1e-4 above — leaves ≥2 orders of margin on both sides.
-// Scale-free by construction, which is what dissolves the fixed-epsilon half of the
-// Validator's transform.scale warning.
+// FP_UNCERTAINTY_REL / _ABS — the constants of fp_uncertainty(p), the positional error
+// bound of a FLOATING-POINT-ACCURATE point (analytic roots, triangle tests, refined
+// marches): coordinate-relative with a near-origin absolute floor. Transcribed from
+// Wächter & Binder, "A Fast and Robust Method for Avoiding Self-Intersection", Ray
+// Tracing Gems ch. 6 (int_scale = 256 ulps → 256·2⁻²³ relative; float_scale = 2⁻¹⁶
+// absolute; their origin() = 1/32 threshold is where the two branches cross, folded into
+// one max). Scalar-along-the-normal rather than their per-component integer offset: the
+// escape is spelled through ambient_geodesic (the metric seam), and the legal window —
+// hit error ~2e-7…2e-6 below, optical significance ≳1e-4 above — leaves ≥2 orders of
+// margin on both sides. Scale-free by construction, which is what dissolves the
+// fixed-epsilon half of the Validator's transform.scale warning. The function itself
+// reads the point's coordinates, so the ambient occupant defines it.
 #define FP_UNCERTAINTY_REL 3.0517578125e-5   // 256 ulps: 256 × 2⁻²³
 #define FP_UNCERTAINTY_ABS 1.52587890625e-5  // 2⁻¹⁶ — the near-origin floor
-float fp_uncertainty(Point p) {
-    return max(FP_UNCERTAINTY_ABS, FP_UNCERTAINTY_REL * max(abs(p.x), max(abs(p.y), abs(p.z))));
-}
 
 // Declared-EUCLIDEAN sampler helper (light samplers, phase ONBs — sites carrying the
 // METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that

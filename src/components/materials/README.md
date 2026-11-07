@@ -27,7 +27,9 @@ Conventions (pinned; see contracts §2/§3 and trace-loop-contract):
   Jacobian). `sample.weight` = f·|cosθᵢ|/pdf (the §2.1 cancellation — do the algebra,
   don't compute the quotient). `sample.pdf` must equal `<id>_pdf` on the same pair —
   MIS depends on it (§11.3's triple).
-- Direction·normal products via `ambient_dot(v, n, p)` (metric discipline).
+- Direction·normal products via `ambient_dot(v, n, p)`, and a world direction a model builds
+  (a hemisphere sample, a reflection, a refraction) normalized with `ambient_normalize(v, hit.p)`
+  (metric discipline; `wo` arrives as the ray's arrival direction at `hit.p`).
 - Delta lobes: `pdf` field 0, `LOBE_DELTA` flag, `eval/pdf` functions return zero
   (§3.1); pure-delta models set `nonDeltaLobes: false` so NEE skips them.
 - `uc` selects among lobes; `u` is the 2D draw. Single-lobe models ignore `uc`.

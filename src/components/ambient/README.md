@@ -5,30 +5,55 @@ pick-one — one space per program.
 
 ## What an occupant supplies
 
-**GLSL** (`<space>.glsl`) implementing the metric seam (trace-loop-contract):
+Two GLSL files in its folder, registered by one line in `index.ts`:
+
+**`types.glsl`** — the typedefs every other file is written against, included right after
+the color model's types and before the core structs:
 
 ```glsl
-float ambient_dot(Direction a, Direction b, Point p);   // metric at p
-Point ambient_geodesic(Point o, Direction d, float t);  // exp map along the geodesic
-Direction ambient_direction_to(Point from, Point to);   // unit start direction of the geodesic from → to
+#define Point     ...   // a point of the space (vec3 in Euclidean space)
+#define Direction ...   // a tangent vector at a point
 ```
 
-plus whatever `ray_spawn`/`make_ray` need from the space. Euclidean unpacks to
-`dot(a, b)` and `o + t*d` — which is why every component writes `ambient_dot` and
-`ambient_geodesic` instead of the raw operations: the discipline is the whole
-preparation for curved spaces. `Point` is a typedef (currently `vec3`; becomes `vec4`
-for H³/Schwarzschild models — write against the typedef).
+**`<space>.glsl`** — the metric seam (trace-loop-contract), included after core math and
+before `ray.glsl`:
+
+```glsl
+#define MAX_DIST ...                                       // the far clip, an arc length
+float fp_uncertainty(Point p);                             // positional error of an fp-accurate point
+Point ambient_geodesic(Point o, Direction d, float t);     // the point at arc length t along the geodesic
+Ray   ambient_flow(Ray r, float t);                        // the ray moved by t: the point AND the arrival velocity
+float ambient_dot(Direction a, Direction b, Point p);      // the metric at p
+Direction ambient_normalize(Direction v, Point p);         // v at unit length in the metric at p
+Frame ambient_frame(Point p, Direction n);                 // orthonormal shading frame around n
+Direction ambient_parallel_transport(Direction v, Point from_p, Point to_p);
+Direction ambient_direction_to(Point from, Point to);      // unit start direction of the geodesic from → to
+Direction ambient_aim(Point from, Direction along, Point to, out float remaining);
+    // shadow-ray aim: the unit direction at `from` of the geodesic to `to` on the arc the ray
+    // travels (`along`, its current direction), and in `remaining` the arc length left to `to`
+vec3  ambient_sky_key(Point p, Direction v);               // where the sky is looked up for the ray (p, v)
+```
+
+`ambient_flow` computes its point with `ambient_geodesic`, so a space states its geodesic
+formula once.
+
+Euclidean space unpacks these to `o + t·d`, `dot`, `normalize`, `length(to − from)` and the
+direction itself — which is why components write the `ambient_*` names instead of the raw
+operations: every direction·direction product, every normalization of a world direction,
+every arrival direction (`ambient_flow(ray, t).direction`, not `ray.direction`), every
+shadow-ray aim and length, and every sky lookup goes through the seam. Points and tangent
+vectors are written as `Point` and `Direction`, never a literal `vec3`.
 
 ## Status & the honest caveat
 
-Sole occupant: `euclidean/`. H³ and Schwarzschild are the known next occupants (the
-reference doc §10 sketches the H³ form — shape-normative, unbuilt). Two places are
-DECLARED Euclidean-only beyond the seam and will need real work, not just a new
-occupant: the analytic medium bodies (distances along segments) and equiangular
-placement (extrinsic closest-approach geometry) — both say so in their headers.
+Sole occupant: `euclidean/`. Several places are Euclidean beyond the seam and need new
+bodies in a curved space, not just a new occupant: the light samplers (Euclidean solid-angle
+constructions; their files carry a METRIC EXEMPTION note), the phase functions (no point
+argument; `build_basis`), the SDF march and the similarity-placement arms, the camera frame
+uniforms, the environment samplers, and equiangular placement (extrinsic closest-approach
+geometry).
 
 ## Invariants & witnesses
 
-None space-specific yet (one occupant). The arrival witness for H³ is pinned by the
-swappability claim itself: every Euclidean scene must be byte-unchanged, and the first
-H³ scene exercises the seam end to end.
+None space-specific yet (one occupant). A respelling of the seam must leave every Euclidean
+scene bit-identical (`npm run frames -- compare`).

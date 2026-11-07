@@ -3,7 +3,7 @@
 // Provides: light_sample_direct().
 // Depends on: PathState core, combiner_w_light (generated), lighting_sample,
 //             shadow_transmittance, shadow_crossings_left (generated), material_has_nondelta_lobes,
-//             interaction_surface_eval, ray_spawn, ambient_direction_to, ambient_dot.
+//             interaction_surface_eval, ray_spawn, ambient_aim, ambient_dot.
 
 void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props) {
     // Pure-delta materials skip NEE: their eval is zero, the march would be wasted.
@@ -19,7 +19,8 @@ void light_sample_direct(inout PathState s, Hit hit, int mat, Direction wo, Mate
     // bound, and the null crossings this path may still make (measurement.maxNullCrossings).
     Point light_p = ambient_geodesic(hit.p, ls.wi, ls.distance);
     Ray shadow_ray = ray_spawn(hit, ls.wi);
-    shadow_ray.direction = ambient_direction_to(shadow_ray.origin, light_p);
+    float to_light;   // the walker re-derives the arc length from light_p itself
+    shadow_ray.direction = ambient_aim(shadow_ray.origin, ls.wi, light_p, to_light);
     Spectrum vis = shadow_transmittance(shadow_ray, light_p, shadow_crossings_left(s));
     if (spectrum_is_black(vis)) return;
     Spectrum f = interaction_surface_eval(mat, ls.wi, wo, hit, props);   // bare f (§2.2)

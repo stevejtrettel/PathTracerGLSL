@@ -1,8 +1,7 @@
 // Core struct definitions
 // Provides: Ray, Hit, Frame, LightSample, MaterialProperties
-
-#define Point vec3
-#define Direction vec3
+// Depends on: Point/Direction (the ambient occupant's types.glsl), Spectrum/Wavelengths (the
+//             color model's types.glsl).
 
 // A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
 // interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
