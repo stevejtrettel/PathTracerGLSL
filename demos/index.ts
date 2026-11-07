@@ -6,6 +6,7 @@
 
 import type { AnySceneSuiteEntry } from '../tests/witnesses/types.js';
 import { dataScenes } from './dataScenes.js';
+import { trialStillLifeEntry } from './trialStillLifeScene.js';
 import type { RenderStrategy, Vec3 } from '../src/compiler/types.js';
 import { withPose } from '../src/authoring/strategy.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
@@ -68,6 +69,7 @@ const cornellOneshotStrategy: RenderStrategy = {
 // untracked .inst files; registry-iterating tests skip them via isAsyncSceneEntry).
 export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     ...dataScenes,
+    'trial-still-life': trialStillLifeEntry,
     embers: {
         scene: embersScene,
         strategies: posed([9, 2.6, 9], [0, 0.8, 0], embersStrategy, embersMisStrategy, embersPtStrategy),

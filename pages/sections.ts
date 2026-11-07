@@ -57,7 +57,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Meshes',
         blurb: 'triangle meshes: BVH traversal, emissive mesh lights, closed-mesh containment (glass, fog, nesting)',
         entries: [
-            e('meshes'), e('models'), e('cacti'),
+            e('meshes'), e('models'), e('trial-still-life'), e('cacti'),
             e('mesh-furnace'),
             e('mesh-quad-twin', 'mesh-quad-ref'),
             e('mesh-light-twin', 'mesh-light-ref'), e('mesh-light-smooth'), e('mesh-slab-albedo'), e('mesh-scale-twin', 'mesh-scale-twin-ref'),

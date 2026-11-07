@@ -4,6 +4,37 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Trial asset pipeline: Poly Haven textures and glTF models
+
+Photographic scenes need real texture sets and models. Owner decision 20: models are converted
+offline (glTF → OBJ + textures).
+
+- **`tools/trial-assets.json`** gains four 2k JPG texture sets (albedo, roughness and OpenGL normal
+  map each): `wood_floor`, `marble_01`, `worn_plaster_wall`, `fabric_pattern_07`; and four models:
+  `ceramic_vase_01`, `brass_vase_03`, `wooden_bowl_02`, `food_apple_01`. Every map and model
+  texture is 2048 × 2048 (measured), so any of them can share a scene (one array layer size).
+  `rough_linen` was dropped for being 2048 × 2052.
+- **`tools/fetch-trial-assets.mjs`** fetches textures (one file per listed map) into
+  `public/trial/textures/<id>/` and models (the .gltf, its .bin and textures, at the paths the
+  .gltf names) into `public/trial/models/<id>/`, MD5-checked, then converts each model to
+  `<id>.obj`.
+- **`tools/gltf-to-obj.mjs`**: triangle primitives of the default scene, node transforms baked
+  (T·R·S, parent · child; normals by the inverse transpose; winding swapped under a mirroring
+  transform), TEXCOORD_0 written as `vt = (u, 1 − v)` (glTF's uv origin is the image's upper-left
+  corner, OBJ's and the renderer's the lower-left), texture file names in the OBJ header. Required
+  extensions, non-triangle modes, skins, morph targets, sparse or non-float attributes, embedded
+  buffers, texCoord ≠ 0, KHR_texture_transform and more than one material are errors.
+- **Demo `trial-still-life`** (async, needs the fetched files): the converted apple with its
+  diffuse map on a wood-floor quad.
+
+Verified: `tests/authoring/gltfToObj.test.ts` (13 tests; seven mutations of the converter, among
+them no v flip, normals by M, no mirror swap, byteStride ignored, parent transform ignored, each
+fail it); converter → parseOBJ → compileScene lists the image and reads it in the resolver. The
+real assets: all four models convert (2,616 to 10,296 triangles, uvs inside [0, 1], normals
+present). On the GPU (Chromium, ANGLE Metal, 1,361 samples) the apple renders with its skin wrapped
+seamlessly. The same render with the v flip removed shows black gaps across the apple, which
+confirms the flip. Digest before and after: 280 of 280 scenes identical.
+
 ## 2026-11-07 — Image textures for color rows
 
 Photorealism integration step 9 (docs/claude-2026-11-review/photoreal/image-textures/plan.md, with
