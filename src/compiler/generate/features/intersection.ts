@@ -11,7 +11,7 @@ import type { RenderPlan, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBa
 import { isDrivenPlacement } from '../../plan/types.js';
 import { emptyContribution, type FeatureContribution, type PlannedTexture } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
-import { formatFloat, formatMat3, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
+import { formatFloat, formatMat3, formatMat4, formatVec3, formatVec4 } from '../../../components/glsl-format.js';
 import { emitIndex } from '../color.js';
 import { modelTransmission, modelIndexRow } from '../../../components/materials/index.js';
 import {
@@ -19,11 +19,16 @@ import {
     primitive,
     structName,
     emitCtor,
+    emitCurvedCtor,
+    curvedRows,
     emitSdfCall,
     emitAnalyticTest,
     emitSignedDistance,
     emitSdfIntersect,
     emitSdfNormal,
+    marchBoundTypes,
+    marchBoundIn,
+    emitCurvedSdfNormal,
 } from '../../../components/geometry/index.js';
 import {
     classifySimilarity,
@@ -47,8 +52,11 @@ import { DATA_TEX_WIDTH } from '../../../components/data/pack.js';
 import { BVH_STACK_DEPTH, BVH_TFAR_PAD, bvhWalkLines, bvhPointWalkLines } from '../../../components/accel/bvh/bvh.js';
 import placementGLSL from '../../../glsl/core/placement.glsl?raw';
 import marchGLSL from '../../../glsl/core/march.glsl?raw';
+import curvedSdfGLSL from '../../../components/ambient/sdf.glsl?raw';
 import dataTextureGLSL from '../../../glsl/core/data_texture.glsl?raw';
 import { structFromRows } from '../schema.js';
+import { bodyFor } from '../../../components/descriptors.js';
+import { curvedGeometryOf } from '../../../components/ambient/index.js';
 
 export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // Class presence is a link-map decision (ProgramDescription.intersection.classes) —
@@ -104,6 +112,12 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
             Object.assign(parameters, rec.parameters);
         }
     }
+    // A curved space's {param}-driven objects: one mat4 isometry uniform each.
+    for (const o of plan.objects) {
+        if (o.isometry?.kind !== 'driven') continue;
+        uniforms.push(...o.isometry.uniforms);
+        Object.assign(parameters, o.isometry.parameters);
+    }
 
     // Primitive math for exactly the primitives PRESENT (registry order): each is one
     // wholesale file carrying BOTH backends' functions for that primitive (§2.12 —
@@ -127,43 +141,41 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     ]);
     // A MARCH BOUND is an analytic object of a possibly DIFFERENT primitive (a torus
     // bounds with a cylinder — impl-plan-sdf-as-shape §2.2), and the marched arm calls
-    // that primitive's `<type>_interval` over its struct. So the present set is closed
-    // under the bound relation for the types whose arms CALL the interval — the
-    // residual (unrolled) and instanced arms. A TABLED marched type's interval is the
-    // TLAS node box (impl-plan-sdf-accel T4), so its bound type is NOT dragged in
-    // (fable-sdf-contract B5 trimmed the previous everyone-closure). The fixpoint
-    // stands: a two-step bound chain must not be a link error discovered on the GPU.
-    const intervalSeeds = new Set<string>([
+    // that primitive's `<type>_interval` over its struct. So the present set gains the
+    // bound chain (marchBoundTypes, the one closure the Validator gates too) of each type
+    // whose arm CALLS the interval — the residual (unrolled) and instanced arms. A TABLED
+    // marched type's interval is the TLAS node box (impl-plan-sdf-accel T4), so its bound
+    // type is not linked.
+    const intervalSeeds = [
         ...plan.objects.filter((o) => o.intersect === 'march' && !(tableMode && o.tabled === true)).map((o) => o.type),
         ...plan.instanceBatches.flatMap((b) =>
             b.prototype.backend === 'primitive' && b.prototype.intersect === 'march' ? [b.prototype.shapeType] : []),
-    ]);
-    for (let grew = true; grew;) {
-        grew = false;
-        for (const type of [...intervalSeeds]) {
-            const mb = PRIMITIVES[type]?.marchBound;
-            if (mb === undefined || mb === 'self' || mb === 'unbounded') continue;
-            if (!presentTypes.has(mb.type)) { presentTypes.add(mb.type); grew = true; }
-            if (!intervalSeeds.has(mb.type)) { intervalSeeds.add(mb.type); grew = true; }
-        }
-    }
+    ];
+    const space = plan.program.measurement.ambient;
+    for (const type of intervalSeeds) for (const bound of marchBoundTypes(type, space)) presentTypes.add(bound);
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
+    // A curved space places every object by an isometry; its structs keep the intrinsic rows.
+    const curved = curvedGeometryOf(space) !== undefined;
     // Marching tolerances BEFORE the generated march block: march_epsilon()/
     // NORMAL_EPSILON are consumed ONLY by the generated intersects/normals now, so
     // the file rides exactly when something marches (exact linkage — an occupant
     // file no longer carries a marching half of its own).
     if (marchedTypes.size > 0) {
         blocks.push({ origin: 'glsl/core/march.glsl', source: marchGLSL });
+        // A curved program's fields are written against the curved SDF vocabulary.
+        if (curved) blocks.push({ origin: 'components/ambient/sdf.glsl', source: curvedSdfGLSL });
     }
     if (present.length > 0) {
         blocks.push({
             origin: 'generated:primitive-structs',
             source: ['// Generated primitive structs (rows are the single source — A1)',
-                ...present.map((d) => structFromRows(structName(d), [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
+                ...present.map((d) => structFromRows(structName(d), curved
+                    ? curvedRows(d)
+                    : [...d.params, ...(d.derivedFields ?? [])]))].join('\n'),
         });
     }
     for (const d of present) {
-        blocks.push({ origin: `components/geometry/${d.type}/${d.type}.glsl`, source: d.glsl });
+        blocks.push(bodyFor(d.glsl, space, `primitive '${d.type}'`));
     }
     // Generated marching boilerplate (fable-sdf-contract §4): the loop + the 4-tap
     // gradient, emitted per MARCHED type from its one authored field. AFTER the
@@ -173,13 +185,14 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // off-surface picks up ∇|∇f| contamination) keeps it; generation is the fallback.
     // Registry occupants stay generated-only (the contract test pins it).
     const authoredNormal = (d: ReturnType<typeof primitive>): boolean =>
-        d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(d.glsl);
+        !curved && d.local === true && new RegExp(`vec3\\s+${d.type}_sdf_normal\\b`).test(bodyFor(d.glsl, space, `primitive '${d.type}'`).source);
     if (marchedTypes.size > 0) {
         blocks.push({
             origin: 'generated:sdf-march',
             source: ['// Generated marching intersects + gradient normals (fable-sdf-contract §4)',
                 ...present.filter((d) => marchedTypes.has(d.type))
-                    .flatMap((d) => authoredNormal(d) ? [emitSdfIntersect(d)] : [emitSdfIntersect(d), emitSdfNormal(d)])].join('\n'),
+                    .flatMap((d) => authoredNormal(d) ? [emitSdfIntersect(d)]
+                        : [emitSdfIntersect(d, curved), curved ? emitCurvedSdfNormal(d) : emitSdfNormal(d)])].join('\n'),
         });
     }
 
@@ -189,6 +202,10 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     const namedShapes = generateNamedShapes(plan.objects, ids);
     if (namedShapes !== null) {
         blocks.push({ origin: 'generated:named-shapes', source: namedShapes });
+    }
+    const isometries = generateIsometryConsts(plan.objects, ids);
+    if (isometries !== null) {
+        blocks.push({ origin: 'generated:isometries', source: isometries });
     }
 
     // Hit.eps for floating-point-accurate hits (analytic roots and triangle tests): fp-scale, in
@@ -233,12 +250,13 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     // (scene_region_at), not an intersect path: point-in-object for a marched shape has
     // no closed form to fall back on. Tabled owners read theirs from the record (the
     // prototypes here, definitions with the table).
-    const marchedResidual = residual.filter((o) => o.intersect === 'march');
+    // A curved marched object answers containment through its shape's own field (no wrapper).
+    const marchedResidual = residual.filter((o) => o.intersect === 'march' && o.isometry === undefined);
     if (marchedResidual.length > 0 || tabledSdf.length > 0) {
         blocks.push({ origin: 'generated:sdf-fields', source: generateSdfFields(marchedResidual, tabledSdf, ids) });
     }
     if (residual.length > 0) {
-        blocks.push({ origin: 'generated:primitive-dispatch', source: generatePrimitiveDispatch(residual, anyQuery, ids, chartUv) });
+        blocks.push({ origin: 'generated:primitive-dispatch', source: generatePrimitiveDispatch(residual, anyQuery, ids, chartUv, space) });
     }
 
     // The rail's addressing (glsl/core/data_texture.glsl: data_texel1d at DATA_TEX_WIDTH)
@@ -373,20 +391,26 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
             mesh: hasMesh && residualMeshes.length > 0,
             instanced: hasInstanced && !tableMode,
             table: tableMode,
-        }, thinRegions, anyQuery),
+        }, thinRegions, anyQuery, plan.program.measurement.quotient !== undefined),
     });
+    // In a quotient the dispatcher above answers for the one scene copy in D (the cell query), and
+    // scene_intersect / scene_intersect_any walk the cells a ray crosses (components/quotient).
+    const quotient = plan.program.measurement.quotient;
+    if (quotient !== undefined) {
+        blocks.push({ origin: `generated:quotient-walk`, source: generateQuotientWalks(quotient.kind, anyQuery) });
+    }
 
     // T4 seams: the geometry/region contract surface (§2.3 tables + the trace-loop queries).
     const provides = [
         { name: 'scene_intersect', signature: 'bool scene_intersect(Ray ray, out Hit hit)' },
-        { name: 'scene_region_at', signature: 'int scene_region_at(vec3 p)' },
+        { name: 'scene_region_at', signature: 'int scene_region_at(Point p)' },
         { name: 'material_of', signature: 'int material_of(int region)' },
     ];
     if (anyQuery) {
         provides.push({ name: 'scene_intersect_any', signature: 'bool scene_intersect_any(Ray ray, float maxDist)' });
     }
     if (plan.materials.some((m) => modelTransmission(m.model))) {
-        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, vec3 p, Wavelengths wl)' });
+        provides.push({ name: 'ior_of', signature: 'float ior_of(int region, Point p, Wavelengths wl)' });
     }
 
     if (dispersion !== null && dispersion.regions.length > 0)
@@ -481,10 +505,32 @@ function generateNamedShapes(objects: PlannedPrimitiveObject[], ids: Map<number,
         const constName = hoistedShapeName(obj, ids);
         if (constName === null) continue;
         const d = primitive(obj.type);
-        lines.push(`const ${structName(d)} ${constName} = ${emitCtor(d, obj.parameters)};`);
+        lines.push(`const ${structName(d)} ${constName} = ${objectCtor(obj)};`);
     }
     if (lines.length === 0) return null;
     return ['// Generated named shapes (authored names, constant placement — compile-time data)', ...lines].join('\n');
+}
+
+/** An object's struct constructor in its own frame: the folded parameters in Euclidean space,
+ *  the intrinsic rows under a curved isometry. */
+function objectCtor(obj: PlannedPrimitiveObject): string {
+    const d = primitive(obj.type);
+    return obj.isometry !== undefined ? emitCurvedCtor(d, obj.parameters) : emitCtor(d, obj.parameters);
+}
+
+/** A curved object's G⁻¹ (world → object frame): its baked const or its uniform. */
+function isometryRef(obj: PlannedPrimitiveObject, ids: Map<number, string>): string {
+    const iso = obj.isometry!;
+    return iso.kind === 'driven' ? iso.uniform : `isometry_${ids.get(obj.index)!}`;
+}
+
+/** Each constantly placed curved object's G⁻¹ as one named const. */
+function generateIsometryConsts(objects: PlannedPrimitiveObject[], ids: Map<number, string>): string | null {
+    const lines = objects.flatMap((o) => o.isometry?.kind === 'constant'
+        ? [`const mat4 ${isometryRef(o, ids)} = ${formatMat4(o.isometry.inverse)};`]
+        : []);
+    if (lines.length === 0) return null;
+    return ['// Generated object isometries: G⁻¹, world → object frame (column-major)', ...lines].join('\n');
 }
 
 // ============================================================================
@@ -511,7 +557,7 @@ function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm
     if (tabledTypes.length > 0) lines.push('');
 
     for (const obj of objects) {
-        lines.push(`float sdf_${ids.get(obj.index)!}(vec3 p) {`);
+        lines.push(`float sdf_${ids.get(obj.index)!}(Point p) {`);
         if (obj.placement !== undefined && isDrivenPlacement(obj.placement)) {
             // Driven (§6.1): query in the RIGID frame; the similarity-closed primitive
             // params absorb s in-shader — distances stay exact WORLD values, so the
@@ -541,7 +587,8 @@ function generateSdfFields(objects: PlannedPrimitiveObject[], tabled: SdfLeafArm
  *  call and the bound restriction (impl-plan-sdf-as-shape §1). `bound` is null for the
  *  nearest-hit dispatch (the running nearest, hit.t, is the far limit) or the occlusion
  *  distance expression for the any-query, whose acceptance is strictly before it. */
-function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null, space: string): string[] {
+    if (obj.isometry !== undefined) return curvedSdfObjectArm(obj, ids, chartUv, bound, space);
     const d = primitive(obj.type);
     const pl = emitSdfPlacement(obj.placement);
     const far = bound ?? 'hit.t';
@@ -585,6 +632,50 @@ function sdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, cha
         const bref = mb === 'self' ? ref : emitCtor(primitive(mb.type), mb.values(obj.parameters), pl.scale);
         lines.push(`        float b0, b1;`);
         lines.push(`        if (${bt}_interval(${rayRef}, ${bref}, b0, b1)) {`);
+        for (const l of body('b0', `min(b1, ${far})`)) lines.push(`            ${l}`);
+        lines.push(`        }`);
+    }
+    lines.push('    }');
+    return lines;
+}
+
+/** One marched object's arm in a curved space — the curved closed-form arm with the bounded march in
+ *  place of the root: the ray moved into the object's frame by G⁻¹, the bound's interval there
+ *  (`sphere_interval`, or the open interval [0, the running nearest] for an unbounded field), the
+ *  generated march, and the generated normal taken at the ray's state at the hit (point and arrival
+ *  direction) and mapped back by isometry_direction. The marched tier's spawn offset is
+ *  MARCH_CLEARANCE, an arc length. The bound must sit at the object's origin (the Validator). */
+function curvedSdfObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null, space: string): string[] {
+    if (chartUv) throw new Error('intersection: a curved program with a uv-reading material (the Validator should have rejected it)');
+    const d = primitive(obj.type);
+    const inv = isometryRef(obj, ids);
+    const far = bound ?? 'hit.t';
+    const lines = ['    {', `        Ray lray = make_ray(isometry_point(${inv}, ray.origin), isometry_tangent(${inv}, ray.direction), ray.wl);`];
+    const constName = hoistedShapeName(obj, ids);
+    if (constName === null) lines.push(`        ${structName(d)} shape = ${objectCtor(obj)};`);
+    const ref = constName ?? 'shape';
+    const body = (t0: string, t1: string): string[] => {
+        const call = `${d.type}_sdf_intersect(lray, ${ref}, ${t0}, ${t1}, t)`;
+        if (bound !== null) return [`if (${call} && t < ${far}) return true;`];
+        return [
+            `if (${call} && t < hit.t) {`,
+            ...primitiveHitFill('    ', {
+                nWorld: `isometry_direction(${inv}, ${d.type}_sdf_normal(ambient_flow(lray, t), ${ref}))`,
+                region: obj.index,
+                uv: uvFill(d, 'hit.p', ref, false),
+                eps: 'MARCH_CLEARANCE',
+            }),
+            `}`,
+        ];
+    };
+    const mb = marchBoundIn(d, space);
+    if (mb === undefined || mb === 'unbounded') {
+        for (const l of body('0.0', far)) lines.push(`        ${l}`);
+    } else {
+        const bt = mb === 'self' ? d.type : mb.type;
+        const bref = mb === 'self' ? ref : emitCurvedCtor(primitive(mb.type), mb.values(obj.parameters));
+        lines.push(`        float b0, b1;`);
+        lines.push(`        if (${bt}_interval(lray, ${bref}, b0, b1)) {`);
         for (const l of body('b0', `min(b1, ${far})`)) lines.push(`            ${l}`);
         lines.push(`        }`);
     }
@@ -740,6 +831,7 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
     const d = primitive(obj.type);
     const sn = structName(d);
     const lines: string[] = [];
+    if (obj.isometry !== undefined) return curvedObjectArm(obj, ids, chartUv, bound);
     if (obj.placement !== undefined) {
         // Placed arm — DRIVEN (§6.1) or a CONSTANT placement retained for a patterned
         // shape (fable-imagery P1b): conjugate into the RIGID frame once, so hit-finding
@@ -791,6 +883,35 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
     return lines;
 }
 
+/** One closed-form object's arm in a curved space: the ray moved into the object's frame by its
+ *  G⁻¹ through the occupant's isometry_point/isometry_tangent (the occupant decodes its placement
+ *  mat4; arc length t is the same in both frames, so it is compared with world hits unchanged),
+ *  the hit point taken along the WORLD ray, the normal computed in the object's frame and mapped
+ *  back by isometry_direction. No material reads uv in a curved space (SPACE_LIMITATIONS), so the
+ *  uv is the unread placeholder. */
+function curvedObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>, chartUv: boolean, bound: string | null): string[] {
+    if (chartUv) throw new Error('intersection: a curved program with a uv-reading material (the Validator should have rejected it)');
+    const d = primitive(obj.type);
+    const inv = isometryRef(obj, ids);
+    const constName = hoistedShapeName(obj, ids);
+    const lines = ['    {', `        Ray lray = make_ray(isometry_point(${inv}, ray.origin), isometry_tangent(${inv}, ray.direction), ray.wl);`];
+    if (bound !== null) {
+        lines.push(`        if (${d.type}_intersect(lray, ${constName ?? objectCtor(obj)}, t) && t < ${bound}) return true;`, '    }');
+        return lines;
+    }
+    if (constName === null) lines.push(`        ${structName(d)} shape = ${objectCtor(obj)};`);
+    const ref = constName ?? 'shape';
+    lines.push(`        if (${d.type}_intersect(lray, ${ref}, t) && t < hit.t) {`);
+    lines.push(...primitiveHitFill('            ', {
+        nWorld: `isometry_direction(${inv}, ${d.type}_normal(ambient_geodesic(lray.origin, lray.direction, t), ${ref}))`,
+        region: obj.index,
+        uv: uvFill(d, 'hit.p', ref, false),
+        eps: 'spawn_eps_fp(hit.p)',
+    }));
+    lines.push('        }', '    }');
+    return lines;
+}
+
 /** THE primitive dispatch (impl-plan-sdf-as-shape T5) — ONE generated function over ONE
  *  list of objects. Which routine an object's arm calls is a per-object fact
  *  (`intersect`), not a scene-wide backend: a closed form and a bounded march sit side
@@ -798,13 +919,13 @@ function analyticObjectArm(obj: PlannedPrimitiveObject, ids: Map<number, string>
  *  Hit. This is the merge the measurement bought — before it there were two dispatches,
  *  two aggregators, and an "SDF backend" concept threaded through the whole compiler.
  *  region_from/to are classified once by the dispatcher (§4.2). */
-function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean): string {
+function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: boolean, ids: Map<number, string>, chartUv: boolean, space: string): string {
     const lines: string[] = ['// Generated primitive dispatch (closed forms + bounded marches, one list)'];
     lines.push('bool primitive_intersect(Ray ray, inout Hit hit) {');
     lines.push('    bool found = false;');
     lines.push('    float t;');
     for (const obj of objects) {
-        lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, null) : analyticObjectArm(obj, ids, chartUv, null)));
+        lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, null, space) : analyticObjectArm(obj, ids, chartUv, null)));
     }
     lines.push('    return found;');
     lines.push('}');
@@ -814,7 +935,7 @@ function generatePrimitiveDispatch(objects: PlannedPrimitiveObject[], anyQuery: 
         lines.push('bool primitive_intersect_any(Ray ray, float maxDist) {');
         lines.push('    float t;');
         for (const obj of objects) {
-            lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, 'maxDist') : analyticObjectArm(obj, ids, chartUv, 'maxDist')));
+            lines.push(...(obj.intersect === 'march' ? sdfObjectArm(obj, ids, chartUv, 'maxDist', space) : analyticObjectArm(obj, ids, chartUv, 'maxDist')));
         }
         lines.push('    return false;');
         lines.push('}');
@@ -1120,7 +1241,7 @@ function generateInstanceDispatch(batches: PlannedInstanceBatch[], anyQuery: boo
 
 function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], instanceAccel: string, ids: Map<number, string>, table?: PlannedSceneTable): string {
     const lines: string[] = ['// Generated point classification (§2.7 innermost-wins)'];
-    lines.push('int scene_region_at(vec3 p) {');
+    lines.push('int scene_region_at(Point p) {');
     lines.push('    int region = -1;');
     lines.push('    float best = -1.0e20;   // best = least-negative inside distance so far');
     lines.push('    float d;');
@@ -1130,12 +1251,17 @@ function generateSceneRegionAt(objects: PlannedPrimitiveObject[], meshes: Planne
     // the intersection method.
     for (const obj of objects) {
         if (table !== undefined && obj.tabled === true) continue;   // containment via the record loops below
-        if (obj.intersect === 'march') {
+        if (obj.intersect === 'march' && obj.isometry === undefined) {
             lines.push(`    d = sdf_${ids.get(obj.index)!}(p);`);
             lines.push(`    if (d < 0.0 && d > best) { best = d; region = ${obj.index}; }`);
             continue;
         }
-        if (obj.placement !== undefined && !primitive(obj.type).thin) {
+        if (obj.isometry !== undefined) {
+            // Curved: the shape's own distance at the point moved into its frame — an isometry
+            // preserves distance, so d is the world signed distance. Thin shapes claim nothing.
+            const d = primitive(obj.type);
+            lines.push(`    d = ${d.thin ? '1.0e20' : `${obj.type}_sdf(isometry_point(${isometryRef(obj, ids)}, p), ${hoistedShapeName(obj, ids) ?? objectCtor(obj)})`};`);
+        } else if (obj.placement !== undefined && !primitive(obj.type).thin) {
             // Placed (§6.1) — driven OR a patterned-shape's retained constant placement (P1b):
             // classify in the rigid frame with s-scaled params — d stays an exact WORLD signed
             // distance, so innermost-wins compares correctly across constant and placed objects.
@@ -1559,7 +1685,7 @@ function generateMaterialOfData(base: number, ambientMedium: number): string {
  *  1.0 arms, sized by the open-transmissive-mesh count (a warned configuration). */
 function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const lines: string[] = ['// Generated material -> IOR (impl-plan-region-materials: the region half is data)'];
-    lines.push('float ior_of_material(int mat, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of_material(int mat, Point p, Wavelengths wl) {');
     for (const mat of materials) {
         if (mat.medium?.ior !== undefined) {
             lines.push(`    if (mat == ${mat.id}) return ${emitIndex(mat.medium.ior as IndexProperty, color)};   // '${mat.name}' — deflecting: the medium's n(p)`);
@@ -1575,7 +1701,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
     lines.push('    return 1.0;'); // non-transmissive / ambient
     lines.push('}');
     lines.push('');
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     lines.push('    if (region < 0) return 1.0;');
     const byId = new Map(materials.map((m) => [m.id, m]));
     for (const m of meshes) {
@@ -1609,7 +1735,7 @@ function generateIorOfData(meshes: PlannedMesh[], batches: PlannedInstanceBatch[
 function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[], batches: PlannedInstanceBatch[], materials: PlannedMaterial[], color: 'rgb' | 'spectral'): string {
     const byId = new Map(materials.map((m) => [m.id, m]));
     const lines: string[] = ['// Generated region -> IOR table (§2.3 family; p = the GRIN-interface point argument)'];
-    lines.push('float ior_of(int region, vec3 p, Wavelengths wl) {');
+    lines.push('float ior_of(int region, Point p, Wavelengths wl) {');
     // CLOSED meshes have a real interior (fable-mesh-containment) and earn rows like any
     // solid; open meshes stay off the table (thin — the Validator's warning covers them).
     // Instanced batches CLAIMING an interior (impl-plan-instanced-containment) earn rows by
@@ -1662,8 +1788,11 @@ function generateIorOf(objects: PlannedPrimitiveObject[], meshes: PlannedMesh[],
 // residual (EPS_INTERFACE = 10× MARCH_EPSILON). Entering ⇒ region_to = owner; exiting ⇒
 // region_from = owner and the frame flips so n faces region_from (§4.1).
 
-function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean): string {
-    const lines: string[] = ['// Generated scene_intersect dispatcher'];
+function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; instanced: boolean; table: boolean }, thinRegions: number[], anyQuery: boolean, cell: boolean): string {
+    // In a quotient program this is the CELL query: the nearest hit of the scene copy in D within
+    // t_far of the ray's origin (the walk passes the cell's exit time); otherwise it is
+    // scene_intersect itself, bounded by the far clip.
+    const lines: string[] = [cell ? '// Generated cell query (the scene copy in D) — the quotient walk calls it' : '// Generated scene_intersect dispatcher'];
 
     // Zero-thickness owners (quads) never claim containment in scene_region_at, so
     // "owner covers its own side" is FALSE for them: a back-face hit must probe the entering
@@ -1677,9 +1806,18 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     }
 
     // scene_intersect — hit.t is the running nearest (a Hit is valid only when this returns true).
-    lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
-    lines.push('    hit.wl = ray.wl;');
-    lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+    if (cell) {
+        lines.push('bool scene_intersect_cell(Ray ray, float t_far, out Hit hit) {');
+        lines.push('    hit.wl = ray.wl;');
+        lines.push('    hit.t = t_far;   // running nearest = the cell\'s exit; rest of hit undefined until a backend fills it');
+    } else {
+        lines.push('bool scene_intersect(Ray ray, out Hit hit) {');
+        lines.push('    hit.wl = ray.wl;');
+        lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
+    }
+    lines.push(cell
+        ? '    hit.image = 0;   // the image in this query\'s own chart; the walk names the image it reached'
+        : '    hit.image = 0;   // no quotient: the scene has one image');
     lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');
     if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
@@ -1690,8 +1828,9 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
     lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
     lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
+    lines.push('        hit.arrival = ambient_flow(ray, hit.t).direction;   // the velocity at hit.p, in its chart');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ray.direction, hit.ng, hit.p) < 0.0) {');
+    lines.push('        if (ambient_dot(hit.arrival, hit.ng, hit.p) < 0.0) {');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
@@ -1715,7 +1854,7 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     // scene_intersect_any — occlusion within maxDist (only when the opaque shadow
     // fast path links it; the media shadow walker re-spawns scene_intersect instead).
     if (anyQuery) {
-        lines.push('bool scene_intersect_any(Ray ray, float maxDist) {');
+        lines.push(cell ? 'bool scene_intersect_any_cell(Ray ray, float maxDist) {' : 'bool scene_intersect_any(Ray ray, float maxDist) {');
         if (arms.primitive) lines.push('    if (primitive_intersect_any(ray, maxDist)) return true;');
         if (arms.mesh) lines.push('    if (mesh_intersect_any(ray, maxDist)) return true;');
         if (arms.instanced) lines.push('    if (instanced_intersect_any(ray, maxDist)) return true;');
@@ -1725,4 +1864,98 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     }
 
     return lines.join('\n');
+}
+
+// ============================================================================
+// Quotient walks (components/quotient): scene_intersect / scene_intersect_any across the cells
+// ============================================================================
+// Generated, not static: scene_intersect_any_cell exists only where the any-hit query is planned
+// (anyQuery), so the any-hit walk is gated exactly like today's scene_intersect_any. The group
+// math they call is the occupant's static block.
+
+function generateQuotientWalks(kind: string, anyQuery: boolean): string {
+    const walk = kind === 'torus' ? torusWalk : kind === 'seifert-weber' ? seifertWeberWalk : undefined;
+    if (walk === undefined) throw new Error(`quotient '${kind}' has no walk (Validator should have rejected it)`);
+    return [
+        `// Generated ${kind} walk (components/quotient/${kind}/${kind}.md)`,
+        ...walk(false),
+        ...(anyQuery ? ['', ...walk(true)] : []),
+    ].join('\n');
+}
+
+function torusWalk(any: boolean): string[] {
+    // The walk of components/quotient/torus/torus.md, transcribed from the float32 twin
+    // (tests/components/quotient/torusWalk.test.ts): the cell of the origin, then cells in order of
+    // arc length; each query sees the ray translated by −L∘k and started at the cell's entry point,
+    // clipped to the cell's exit, so its first hit is the nearest hit of the lifted scene.
+    return [
+        any ? 'bool scene_intersect_any(Ray ray, float maxDist) {' : 'bool scene_intersect(Ray ray, out Hit hit) {',
+        '    vec3 k = floor(ray.origin / TORUS_PERIOD + 0.5);                // the cell of the origin',
+        '    vec3 s = vec3(ray.direction.x >= 0.0 ? 1.0 : -1.0,',
+        '                  ray.direction.y >= 0.0 ? 1.0 : -1.0,',
+        '                  ray.direction.z >= 0.0 ? 1.0 : -1.0);              // the step on each axis',
+        '    float t_enter = 0.0;',
+        '    for (int n = 0; n < TORUS_MAX_CELLS; n++) {                      // a bound for segments ≤ MAX_DIST',
+        '        vec3 t_next = torus_face_times(ray, k, s);',
+        '        float t_exit = min(min(t_next.x, t_next.y), t_next.z);',
+        '        // The local ray starts at this cell\'s entry point, so its hit is accurate to ~|L|·eps.',
+        '        Ray local = Ray(ray.origin + ray.direction * t_enter - TORUS_PERIOD * k, ray.direction, ray.wl);',
+        ...(any ? [
+            '        if (scene_intersect_any_cell(local, min(t_exit, maxDist) - t_enter)) return true;',
+            '        if (t_exit >= maxDist) return false;',
+        ] : [
+            '        if (scene_intersect_cell(local, min(t_exit, MAX_DIST) - t_enter, hit)) {',
+            '            hit.t += t_enter;                                        // arc length from ray.origin',
+            '            hit.image = quotient_image_index(k);                     // cell k, in the coordinates of ray.origin',
+            '            return true;',
+            '        }',
+            '        if (t_exit >= MAX_DIST) return false;                        // the far clip',
+        ]),
+        '        // Cross one face: the first axis attaining t_exit (x, then y, then z).',
+        '        if (t_exit == t_next.x) k.x += s.x; else if (t_exit == t_next.y) k.y += s.y; else k.z += s.z;',
+        '        t_enter = max(t_enter, t_exit);                                 // never backward under rounding',
+        '    }',
+        '    return false;   // not reached: TORUS_MAX_CELLS bounds every segment of length ≤ MAX_DIST',
+        '}',
+    ];
+}
+
+function seifertWeberWalk(any: boolean): string[] {
+    // The walk of components/quotient/seifert-weber/seifert-weber.md, whose step is the float32
+    // twin's (tests/components/quotient/seifertWeberWalk.test.ts): the ray (its origin in D)
+    // queries the scene copy in D clipped at the face where it leaves D; if it meets nothing
+    // there, it moves to the face and through the face's pairing, renormalized, and repeats. The
+    // hit is in D's chart; its image is named by the crossings made (quotient_image_index). A
+    // segment that would cross more than QUOTIENT_MAX_CROSSINGS faces ends: a miss, or occluded
+    // for a shadow ray, so the cap only ever removes light.
+    return [
+        any ? 'bool scene_intersect_any(Ray ray, float maxDist) {' : 'bool scene_intersect(Ray ray, out Hit hit) {',
+        '    Ray r = ray;                                                     // the current cell\'s ray, in D\'s chart',
+        '    float t_acc = 0.0;                                               // arc length from ray.origin to r.origin',
+        ...(any ? [] : ['    int first_face = -1;']),
+        '    for (int n = 0; n <= QUOTIENT_MAX_CROSSINGS; n++) {             // n: the faces crossed so far',
+        '        int face;',
+        '        float tau = seifert_weber_exit(r, face);',
+        '        float t_exit = atanh(tau);',
+        ...(any ? [
+            '        if (scene_intersect_any_cell(r, min(t_exit, maxDist - t_acc))) return true;',
+            '        t_acc += t_exit;',
+            '        if (t_acc >= maxDist) return false;',
+        ] : [
+            '        if (scene_intersect_cell(r, min(t_exit, MAX_DIST - t_acc), hit)) {',
+            '            hit.t += t_acc;                                          // arc length from ray.origin',
+            '            hit.image = quotient_image_index(n, first_face);',
+            '            return true;',
+            '        }',
+            '        t_acc += t_exit;',
+            '        if (t_acc >= MAX_DIST) return false;                         // the far clip',
+        ]),
+        '        r = seifert_weber_cross(r, tau, face);',
+        ...(any ? [] : ['        if (n == 0) first_face = face;']),
+        '    }',
+        any
+            ? '    return true;    // the crossing cap: occluded (the cap only ever removes light)'
+            : '    return false;   // the crossing cap: a miss (the cap only ever removes light)',
+        '}',
+    ];
 }

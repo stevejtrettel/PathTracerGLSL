@@ -122,7 +122,7 @@ the table: witnesses establish them.
 | `MAX_DIST` | `1000.0` | far clip |
 | `fp_uncertainty(Point p)` | today's body (constants stay in math.glsl) | spawn offsets |
 
-`ambient_parallel_transport` stays as it is (no caller; in-progress seam).
+`ambient_parallel_transport` carries a spawned ray's direction to its moved origin (`ray_spawn`; the identity in E³). Without it a specular chain in a curved space accumulates a non-tangent error of about eps·cos per bounce, and after two internal reflections in a glass ball the next spawn lands on the wrong side ([curved/next-materials-plan.md](curved/next-materials-plan.md) §6).
 
 ### 2.2 Step 1 — Euclidean respelling, bit-identical, no new mechanism
 
@@ -206,8 +206,9 @@ Box, cylinder, torus (with the march through ambient_flow and curved normals), q
 centered (a, b) rectangle, the sphere light (cone sampler; S³ flip rule: sample the forward
 cone, flip ω below n or with probability ½, light distance 2π − far root), other materials with
 witnesses, Klein-chart Euclidean SDFs in H³, meshes through Klein/gnomonic charts, image-sky NEE
-in H³ (Jacobian 1/((x+v)₄)², evaluated at the scattering vertex), H²×R, isometric App controls,
-quotients ([quotients plan](quotients-plan.md) when written).
+in H³ (Jacobian 1/((x+v)₄)², evaluated at the scattering vertex), isometric App controls,
+quotients ([quotients plan](quotients-plan.md) when written). H²×R has its own plan and first
+subset: [curved/h2xr-plan.md](curved/h2xr-plan.md).
 
 ## 7. Provisional choices (model's, unconfirmed)
 

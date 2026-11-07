@@ -8,7 +8,7 @@ import orthographicGLSL from './orthographic.glsl?raw';
 
 export const orthographicDescriptor: CameraModelDescriptor = {
     type: 'orthographic',
-    glsl: orthographicGLSL,
+    glsl: { euclidean: { origin: 'components/camera/orthographic/orthographic.glsl', source: orthographicGLSL } },
     authoredParams: [
         { name: 'scale', shape: 'number', required: true, constraint: { kind: 'positive' } },
     ],

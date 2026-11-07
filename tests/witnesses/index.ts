@@ -2,6 +2,10 @@ import { spectralDispersionSuite } from './scenes/spectralDispersion.js';
 import { spectralBlackbodySuite } from './scenes/spectralBlackbody.js';
 import { blackbodyRoutesSuite } from './scenes/blackbodyRoutes.js';
 import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
+import { filterEdgeSuite } from './scenes/filterEdgeWitness.js';
+import { bokehEdgeSuite } from './scenes/bokehEdgeWitness.js';
+import { conductorSuite } from './scenes/conductorWitness.js';
+import { measuredColorsSuite } from './scenes/measuredColorsWitness.js';
 // witnesses/index.ts — the GPU witness registry: the executable form of
 // docs/fable-validation-scenes.md.
 //
@@ -18,10 +22,17 @@ import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
 // See ./README.md for the gate policy (χ² vs rmse) and how to add a witness.
 
 import { spectralGrinSuite } from './scenes/spectralGrin.js';
+import { h3Suite } from './scenes/h3Witness.js';
+import { s3Suite } from './scenes/s3Witness.js';
+import { curvedShapesSuite } from './scenes/curvedShapesWitness.js';
+import { curvedSdfSuite } from './scenes/curvedSdfWitness.js';
+import { h2xrSuite } from './scenes/h2xrWitness.js';
+import { curvedMaterialSuite } from './scenes/curvedMaterialWitness.js';
 import { spectralEmissionSuite } from './scenes/spectralEmission.js';
 import { spectralExpressionsSuite } from './scenes/spectralExpressions.js';
 import { spectralLiveSuite } from './scenes/spectralLive.js';
 import { spectralMaterialsSuite } from './scenes/spectralMaterials.js';
+import { microfacetEnergySuite } from './scenes/microfacetEnergyWitness.js';
 import { spectralTrackingSuite } from './scenes/spectralTracking.js';
 import { spectralMediaSuite } from './scenes/spectralMedia.js';
 import { spectralSkiesSuite } from './scenes/spectralSkies.js';
@@ -30,6 +41,14 @@ import { spectralFoundationSuite } from './scenes/spectralFoundation.js';
 import type { SceneSuiteEntry } from './types.js';
 import type { RenderStrategy, Vec3 } from '../../src/compiler/types.js';
 import { withPose } from '../../src/authoring/strategy.js';
+import {
+    torusCrystal, torusCrystalRef, torusCrystalStrategy, torusLights, torusLightsStrategies,
+    torusFog, torusFogStrategy, FOG_WINDOWS, FOG_IMAGE, fogWindowRegion, torusCrystalFog, torusCrystalFogRef, torusLightsFog,
+} from './scenes/torusWitness.js';
+import {
+    seifertWeberWindows, seifertWeberWindowsStrategy, SW_WINDOWS, SW_WINDOWS_IMAGE, swWindowValue, swWindowRegion, SW_WINDOWS_CAP,
+    seifertWeberLights, seifertWeberLightsStrategies, SW_LIGHTS_CAP,
+} from './scenes/seifertWeberWitness.js';
 
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
 import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
@@ -37,7 +56,7 @@ import {
     instanceLightsTwin, instanceLightsSky, instanceLightsRef, instanceLightsNeeStrategy, instanceLightsMisStrategy, instanceLightsRefStrategy,
     glowShell, glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy,
 } from './scenes/instanceLightsWitness.js';
-import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
+import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy, furnaceGaussianStrategy } from './scenes/furnaceBox.js';
 import {
     guidesScene, guidesStrategies, GUIDES_WITNESS, WALL_G,
     guidesGrinTraversal, guidesGrinSubstep, guidesGrinSubstepScatter, guidesGrinCapture, guidesGrinElsewhere, guidesGrinStrategies, GUIDES_GRIN_WITNESS,
@@ -60,6 +79,17 @@ import { sdfTableTwin, sdfInstanceTwin, sdfInstanceTwinRef, sdfInstanceStrategy,
 import { fieldGlass, fieldGlassNeeStrategy, fieldGlassMisStrategy, fieldGlassPtStrategy } from './scenes/customFieldWitness.js';
 import { etaScene, etaStrategy, cornellGlass, analyticGlass, glassStrategy } from './scenes/dielectricWitness.js';
 import { exprConst, exprConstRef, exprTwinStrategy } from './scenes/exprMaterialWitness.js';
+import {
+    bumpTiltScene, bumpTiltPtStrategy, bumpTiltNeeStrategy, bumpTiltMisStrategy, bumpTiltSpectralStrategy,
+    BUMP_TILT_VALUE, BUMP_TILT_POSE, BUMP_TILT_REGIONS,
+    bumpSidesScene, bumpSidesNeeStrategy, bumpSidesMisStrategy, BUMP_SIDES_VALUE, BUMP_SIDES_POSE, BUMP_SIDES_REGIONS,
+} from './scenes/bumpWitness.js';
+import {
+    imageTextureScene, imageTextureLinearScene, imageTextureSpectralScene,
+    imageTexturePtStrategy, imageTextureNeeStrategy, imageTextureMisStrategy, imageTextureSpectralStrategy,
+    QUADRANTS, quadrantRadiance, grayQuadrantRadiance,
+} from './scenes/imageTextureWitness.js';
+import type { Quadrant } from '../glsl/imageTextureTwin.js';
 import { meshSlabAlbedoScene, meshScaleTwin, meshScaleTwinRef, meshScaleStrategy, MESH_TWIN_SCALE, MESH_TWIN_POSE } from './scenes/meshMarginWitness.js';
 import { nullBudgetViewScene, nullViewStrategies, NULL_VIEW_POSE, NULL_VIEW_THROUGH, nullBudgetScene, nullBudgetStrategies, NULL_BUDGET_POSE, SLABS } from './scenes/nullBudgetWitness.js';
 import { MAX_DIST } from './scenes/shaderConstants.js';
@@ -103,6 +133,15 @@ import {
     roughGrin, roughGrinRef, roughGrinStrategy,
 } from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
+import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from './scenes/plasticWitness.js';
+import {
+    thinPaneScene, thinPaneStrategies, THIN_PANE_POSE, THIN_PANE_REGIONS, THIN_PANE_NORMAL, THIN_PANE_TILTED,
+} from './scenes/thinPaneWitness.js';
+import {
+    sheenFurnaceScene, SHEEN_FURNACE_SPHERE,
+    sheenFuzzScene, sheenFuzzStrategies, SHEEN_FUZZ_POSE, SHEEN_FUZZ_REGIONS, SHEEN_FUZZ_VALUES,
+} from './scenes/sheenWitness.js';
+import { roughFurnaceExpr, veachMisVarying } from './scenes/derivedRoughnessWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
     diskBake, diskBakeRef, diskBakeStrategy,
@@ -114,7 +153,7 @@ import {
     beamFogScene, beamFogNeeStrategy, beamFogMisStrategy,
 } from './scenes/directionalBeamWitness.js';
 import { softbeamWallScene, softbeamNeeStrategy, softbeamMisStrategy } from './scenes/softbeamWitness.js';
-import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
+import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
     conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
@@ -157,22 +196,36 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralBlackbodySuite,
     ...blackbodyRoutesSuite,
     ...spectralGaussianSuite,
+    ...conductorSuite,
+    ...measuredColorsSuite,
     ...spectralDispersionSuite,
     ...spectralMaterialsSuite,
+    ...microfacetEnergySuite,
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
     ...spectralTrackingSuite,
+    ...filterEdgeSuite,
+    ...bokehEdgeSuite,
+    ...h3Suite,
+    ...s3Suite,
+    ...curvedShapesSuite,
+    ...curvedSdfSuite,
+    ...h2xrSuite,
+    ...curvedMaterialSuite,
     'thinlens-zero': {
         scene: camCornell,
-        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),
+        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy),
         exercises:
-            'thin-lens correctness anchor: aperture = 0 (key 2) must reproduce the pinhole image (key 1) exactly — the lens disk collapses to a point. Both cameras draw xiLens, so the arms share the RNG stream.',
-        expected: 'key 1 (pinhole) and key 2 (thin-lens, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
+            'thin-lens correctness anchor: aperture = 0 must reproduce the pinhole image (key 1) exactly, with the disk pupil (key 2) and with a six-bladed one (key 3) — either pupil collapses to a point. All cameras draw xiLens, so the arms share the RNG stream.',
+        expected: 'keys 1 (pinhole), 2 (thin-lens, aperture 0) and 3 (six blades, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
         witness: {
             spp: 64,
             // Identical-stream arms (only thin-lens\'s normalize(dir·k) round-trip differs
             // in the last fp bits) → the display-space RMSE gate, not χ².
-            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' }],
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.002, rmse: 0.01, label: 'six-bladed thin-lens aperture-0 ≡ pinhole' },
+            ],
         },
     },
     'two-light': {
@@ -286,9 +339,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     furnace: {
         scene: furnaceBox,
-        strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy),
+        strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy, furnaceGaussianStrategy),
         exercises:
-            'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer',
+            'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer. Key 3 = the gaussian pixel filter (a flat field is filter-invariant)',
         expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5); key 2 identical (the variance statistic must not touch the mean)',
         witness: {
             spp: 48,
@@ -298,6 +351,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // Same RNG stream + same mix() update ⇒ the two means should agree to
                 // fp32 noise, not just statistically — hence the near-zero gates.
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance statistic leaves the mean untouched' },
+                // A flat field is the same under every pixel filter, so this arm cannot see a
+                // wrong kernel (filter-edge does). It is a smoke gate: the gaussian links,
+                // and border pixels, whose film points may fall outside the image, stay finite.
+                { kind: 'mean', value: 0.4, tol: 0.008, strategy: 2, label: 'F-BOX 0.4 (gaussian pixel filter; smoke)' },
             ],
         },
     },
@@ -1429,6 +1486,110 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             ]),
         },
     },
+    'plastic-furnace': {
+        scene: plasticFurnaceScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic (smooth 1.5 coat over a white Lambertian base) in the open furnace: the coat\'s delta lobe and the diffuse lobe in one model, K, the 1/η² compression, the lobe selection, and NEE/MIS seeing only the diffuse lobe',
+        expected:
+            'with R = 1 the directional albedo is 1 at every angle, so every pixel, sphere or sky, reads 1.0 on all three keys',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].flatMap(strategy => [
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.008, strategy,
+                    region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                    label: `plastic A = 1 at the sphere center (key ${strategy + 1})`,
+                },
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.005, strategy,
+                    label: `plastic A = 1 over the whole frame, grazing rim included (key ${strategy + 1})`,
+                },
+            ]),
+        },
+    },
+    'plastic-chroma': {
+        scene: plasticChromaScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy),
+        exercises:
+            'plastic with a colored base (0.8, 0.5, 0.2) under a 1.5 coat in the open furnace: the per-channel bounce series R/(1 − R·K)',
+        expected:
+            'sphere center = A(1) = (0.632833, 0.316071, 0.127997) on all three keys (Mitsuba\'s default linear form would read 0.232 in blue)',
+        witness: {
+            // 384, not furnace-sky's 96: the pt-nee arm (uniform-sphere sky sampling) has ~1%
+            // relative noise over the center region at 96 spp. Measured at 96 spp on key 1:
+            // plastic +1.46% (and furnace-sky's Lambert sphere +1.55% on the same stream).
+            spp: 384,
+            checks: [0, 1, 2].map(strategy => ({
+                kind: 'mean' as const, value: PLASTIC_CHROMA_CENTER, tol: 0.008, strategy,
+                region: { x: 0.45, y: 0.45, w: 0.1, h: 0.1 },
+                label: `plastic A(1) per channel (key ${strategy + 1})`,
+            })),
+        },
+    },
+    'thin-pane': {
+        scene: thinPaneScene,
+        strategies: posed(THIN_PANE_POSE.position, THIN_PANE_POSE.target, ...thinPaneStrategies),
+        exercises:
+            'thin_dielectric (a glass sheet of η 1.5) over an emitter, orthographic: the sheet\'s total reflectance 2R/(1 + R), straight-through transmission at weight 1, back-face hits on a zero-thickness owner, and the η convention at 60° incidence; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            `right half (the emitter seen directly) 1.0; facing and flipped panes T_tot(1) = ${THIN_PANE_NORMAL} (a single interface would read 0.96); the pane tilted to cos 0.5 T_tot = ${THIN_PANE_TILTED} (an inverted η reads 0), on every key`,
+        witness: {
+            // Each pane pixel is a Bernoulli draw (T_tot of the paths score 1, the rest 0): at
+            // 256 spp over a ~1200-pixel region the mean's σ is under 1e-3.
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                { kind: 'mean' as const, value: 1.0, tol: 0.005, strategy, region: THIN_PANE_REGIONS.direct, label: `emitter seen directly (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.facing, label: `pane facing the camera (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_NORMAL, tol: 0.005, strategy, region: THIN_PANE_REGIONS.flipped, label: `pane seen from its back (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: THIN_PANE_TILTED, tol: 0.005, strategy, region: THIN_PANE_REGIONS.tilted, label: `pane at cos 0.5 (key ${strategy + 1})` },
+            ]),
+        },
+    },
+    'sheen-furnace': {
+        scene: sheenFurnaceScene,
+        strategies: posed([0, 0, 3.5], [0, 0, 0], furnaceSkyNeeStrategy, furnaceSkyMisStrategy, furnaceSkyPtStrategy,
+            { ...furnaceSkyMisStrategy, id: 'spectral-pt-mis', measurement: { ...furnaceSkyMisStrategy.measurement, color: 'spectral' } }),
+        exercises:
+            'sheen (fuzz over Lambert) in the open furnace with fuzz color = base albedo = 0.4: the albedo-scaling layer (1 − W·E) and the lobe mixture; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            'every sphere pixel reads 0.4 at every angle (the directional albedo is W·c·E + (1 − W·E)·ρ = ρ when c = ρ), the sky 1.0, on all four keys',
+        witness: {
+            // 384, as plastic-furnace: the pt-nee arm's uniform-sphere sky sampling.
+            spp: 384,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                {
+                    kind: 'mean' as const, value: 0.4, tol: 0.006, strategy, region: SHEEN_FURNACE_SPHERE,
+                    label: `sheen A = ρ = 0.4 over the sphere, grazing included (key ${strategy + 1})`,
+                },
+                {
+                    kind: 'mean' as const, value: 1.0, tol: 0.005, strategy,
+                    region: { x: 0.02, y: 0.88, w: 0.1, h: 0.1 },
+                    label: `sky = L = 1.0 (key ${strategy + 1})`,
+                },
+            ]),
+        },
+    },
+    'sheen-fuzz': {
+        scene: sheenFuzzScene,
+        strategies: posed(SHEEN_FUZZ_POSE.position, SHEEN_FUZZ_POSE.target, ...sheenFuzzStrategies),
+        exercises:
+            'sheen\'s fuzz lobe alone (base albedo 0) under a unit sky, orthographic, on a convex roof at μ_o = 0.2 and 0.5: the fit E, the LTC density D (NEE and MIS integrate it; it must be normalized), the LTC sampler (pt draws it), the coverage W and the fuzz color; keys 1–4 = pt-nee, pt-mis, pt, spectral pt-mis',
+        expected:
+            `each band reads W·c·E(μ_o, r): left top ${SHEEN_FUZZ_VALUES.leftTop}, left bottom (${SHEEN_FUZZ_VALUES.leftBottom.join(', ')}), right top ${SHEEN_FUZZ_VALUES.rightTop}, right bottom ${SHEEN_FUZZ_VALUES.rightBottom}, on every key (the spectral key checks the gray bands)`,
+        witness: {
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap(strategy => [
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.leftTop, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.leftTop, label: `μ_o 0.2, r 0.5 (key ${strategy + 1})` },
+                ...(strategy === 3 ? [] : [{ kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.leftBottom, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.leftBottom, label: `μ_o 0.2, r 1, W 0.5, c (1, 0.5, 0.25) (key ${strategy + 1})` }]),
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.rightTop, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.rightTop, label: `μ_o 0.5, r 1 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: SHEEN_FUZZ_VALUES.rightBottom, tol: 0.006, strategy, region: SHEEN_FUZZ_REGIONS.rightBottom, label: `μ_o 0.5, r 0.7 (key ${strategy + 1})` },
+            ]),
+        },
+    },
     'sky-lamp': {
         scene: skyLampScene,
         strategies: posed([0, 1.4, 5], [0, 0.9, 0], skyLampNeeStrategy, skyLampMisStrategy, skyLampPtStrategy),
@@ -2283,6 +2444,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             ],
         },
     },
+    'veach-mis-varying': {
+        scene: veachMisVarying,
+        strategies: posed([0, 1.3, 5.5], [0, 0.55, 0], veachMisStrategy, veachNeeStrategy, veachPtStrategy),
+        exercises:
+            'GGX roughness authored as a formula of the shading point (0.05 → 0.6 along x, one material on all four '
+            + 'plates): α = max(1e-3, roughness²) is computed per hit in the material lookup, and every scoring '
+            + 'site (BSDF sample, its MIS pdf, NEE eval and pdf) must read the same per-hit α',
+        expected:
+            'keys 1 (pt-mis), 2 (pt-nee), 3 (pt) converge to the same image, each plate a gradient from a sharp '
+            + 'reflection (left) to a broad one (right); divergence implicates a scoring site reading α from another point',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.03, label: 'varying-roughness GGX mis ≡ nee' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 1.2, label: 'varying-roughness GGX pt tripwire' },
+            ],
+        },
+    },
     // ── Rough dielectric (fable-rough-dielectric §5) ────────────────────────────
     // All four gates are PRE-CALIBRATION estimates until the owner's first sweep
     // (impl-plan-rough-dielectric T4); the energy numbers are RECORDED there, since
@@ -2552,6 +2731,257 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: 0.98, tol: 0.06, region: { x: 0.18, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.05 throughput' },
                 { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
                 { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
+            ],
+        },
+    },
+    'torus-crystal': {
+        scene: torusCrystal,
+        strategies: [torusCrystalStrategy],
+        exercises:
+            'the cube 3-torus walk (components/quotient/torus): two matte balls, a glossy ball and an emissive '
+            + 'sphere in D, seen through the faces of D in every direction; pt, maxBounces 2, farClip 3.65',
+        expected:
+            'equals torus-crystal-ref (the same spheres unrolled into plain E³ out to (N+1)·R) up to float32 '
+            + 'rounding: a wrong face pairing, a wrong cell offset or a lost hit shows as a different picture',
+        witness: {
+            checks: [
+                { kind: 'twin', other: { scene: 'torus-crystal-ref' }, meanTol: 0.01, rmse: 0.05, label: 'teleporting walk ≡ unrolled crystal (pt, same salt)' },
+            ],
+        },
+    },
+    'torus-crystal-ref': {
+        scene: torusCrystalRef,
+        strategies: [torusCrystalStrategy],
+        exercises: 'the torus-crystal twin\'s other half: every lattice copy within (N+1)·R of the camera, as four instanced sphere batches in plain E³, with the same farClip',
+        expected: 'the twin target — see torus-crystal',
+    },
+    'torus-lights': {
+        scene: torusLights,
+        strategies: torusLightsStrategies,
+        exercises:
+            'partition MIS in the 3-torus (components/quotient): NEE samples one of 27 light images, MIS names the image a '
+            + 'BSDF ray hit (0 density outside the table); a sphere light near two faces and a disk light of 4× its power '
+            + 'deeper in D, a glossy ball, a jungle gym of spanning beams; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
+        expected: 'all four keys converge to the same image',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh): shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor (path-found light images) tripwire' },
+                { kind: 'noise', strategies: [2, 0], label: 'σ/µ report: pt-mis (27 images) against pt' },
+            ],
+        },
+    },
+    'torus-fog': {
+        scene: torusFog,
+        strategies: [torusFogStrategy],
+        exercises:
+            'an absorbing, emitting ambient fog in the cube 3-torus (σ_a = 0.5, ε = σ_a·Le, Le = 1) with one black sphere in D; '
+            + 'pt, farClip 4: the fog\'s glow along each camera ray measures the arc length to the first sphere image, summed '
+            + 'across the faces of D, or the far clip',
+        expected:
+            'a window seeing one sphere image reads Le·(1 − e^{−σ_a·t}) averaged over its pixels (the float64 twin\'s value, '
+            + 'tests/witnesses/torusFog.test.ts); a window seeing nothing within R reads 1 − e^{−2} = 0.864665',
+        witness: {
+            size: FOG_IMAGE,
+            spp: 64,
+            checks: FOG_WINDOWS.map((w) => ({
+                kind: 'mean' as const,
+                value: w.value,
+                tol: 0.002,
+                region: fogWindowRegion(w),
+                source: { tier: 'exact' as const, from: 'Le·(1 − e^{−σ_a·t}) over the pixel footprints, float64 twin over the sphere images' },
+                label: w.cell === 'miss'
+                    ? `window (${w.x0}, ${w.y0}): nothing within R`
+                    : `window (${w.x0}, ${w.y0}): sphere image in cell ${w.cell.join(',')} (${w.cell.reduce((s, v) => s + Math.abs(v), 0)} face crossings)`,
+            })),
+        },
+    },
+    'torus-crystal-fog': {
+        scene: torusCrystalFog,
+        strategies: [torusCrystalStrategy],
+        exercises:
+            'torus-crystal in a scattering ambient fog (σ_s = 0.3, σ_a = 0.1): medium events at points the walk reports in '
+            + 'the origin\'s chart, reduced into D; pt, maxBounces 2, farClip 3.65',
+        expected: 'equals torus-crystal-fog-ref (the same spheres and fog unrolled into plain E³ out to (N+1)·R) up to float32 rounding',
+        witness: {
+            checks: [
+                { kind: 'twin', other: { scene: 'torus-crystal-fog-ref' }, meanTol: 0.01, rmse: 0.05, label: 'teleporting walk in fog ≡ unrolled crystal in fog (pt, same salt)' },
+            ],
+        },
+    },
+    'torus-crystal-fog-ref': {
+        scene: torusCrystalFogRef,
+        strategies: [torusCrystalStrategy],
+        exercises: 'the torus-crystal-fog twin\'s other half: every lattice copy within (N+1)·R of the camera in plain E³, in the same fog, with the same farClip',
+        expected: 'the twin target — see torus-crystal-fog',
+    },
+    'torus-lights-fog': {
+        scene: torusLightsFog,
+        strategies: torusLightsStrategies,
+        exercises:
+            'torus-lights in a scattering ambient fog (σ_s = 0.25, σ_a = 0.1): partition MIS at surface and medium vertices, '
+            + 'medium event points reduced into D; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
+        expected: 'all four keys converge to the same image',
+        witness: {
+            spp: 1024,   // at 256 spp the nee/mis mean gap read 0.94% against the 1% gate; 0.33% here
+            checks: [
+                { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh) in fog: shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor in fog (path-found light images) tripwire' },
+            ],
+        },
+    },
+    'bump-tilt': {
+        scene: bumpTiltScene,
+        strategies: posed(BUMP_TILT_POSE.position, BUMP_TILT_POSE.target, bumpTiltPtStrategy, bumpTiltNeeStrategy, bumpTiltMisStrategy, bumpTiltSpectralStrategy),
+        exercises:
+            'Bump mapping (materials/README, shading-normal perturbation): h = p.x tilts a Lambert plane\'s '
+            + 'shading normal 45°; the frame swap in the walk, the flip (far rows) and the ng mask, under pt, '
+            + 'pt-nee, pt-mis and a spectral pt-nee',
+        expected:
+            'every plane pixel reads the lune ρ(1+cos 45°)/2 = 0.341421, flipped or not, on all four keys; '
+            + 'the sky reads 1.0. 0.458579 (ρ·L_b·(1−cos 45°)/2 more, from the emitter below the surface) means '
+            + 'the mask is missing; 0.682843 (the lune × L_b, L_b = 2) in the far rows means the flip is missing',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            checks: [0, 1, 2, 3].flatMap((strategy) => [
+                { kind: 'mean' as const, value: BUMP_TILT_VALUE, tol: 0.006, strategy, region: BUMP_TILT_REGIONS.unflipped, label: `near rows (unflipped) = ρ(1+cos45°)/2 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: BUMP_TILT_VALUE, tol: 0.006, strategy, region: BUMP_TILT_REGIONS.flipped, label: `far rows (flipped) = ρ(1+cos45°)/2 (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: 1.0, tol: 0.004, strategy, region: BUMP_TILT_REGIONS.sky, label: `sky = L = 1 (key ${strategy + 1})` },
+            ]),
+        },
+    },
+    'bump-sides': {
+        scene: bumpSidesScene,
+        strategies: posed(BUMP_SIDES_POSE.position, BUMP_SIDES_POSE.target, bumpSidesNeeStrategy, bumpSidesMisStrategy),
+        exercises:
+            'Bump mapping seen from both sides of a thin quad: the orientation sign σ (the relief must not invert '
+            + 'from behind) and the gradient sign, under two directional lights (pt-nee, pt-mis)',
+        expected:
+            'A front = ρ and B back = ρ (each shading normal faces its light head-on). ρ/√2 means no bump; '
+            + '0 on B means a wrong σ; 0 on A means a wrong gradient sign',
+        witness: {
+            size: [64, 64],
+            // Each sample reads 2ρ or 0 (one light of two is picked): σ of a region mean
+            // ≈ ρ/√(512·~190 px) ≈ 0.0013 at this budget.
+            spp: 512,
+            checks: [0, 1].flatMap((strategy) => [
+                { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.aFront, label: `quad A front = ρ (key ${strategy + 1})` },
+                { kind: 'mean' as const, value: BUMP_SIDES_VALUE, tol: 0.005, strategy, region: BUMP_SIDES_REGIONS.bBack, label: `quad B back = ρ (key ${strategy + 1})` },
+            ]),
+        },
+    },
+    'image-texture': {
+        scene: imageTextureScene,
+        strategies: [imageTexturePtStrategy, imageTextureNeeStrategy, imageTextureMisStrategy],
+        exercises:
+            'Image textures (src/glsl/shared/image_texture.glsl): an sRGB RGB image as a Lambert albedo on an '
+            + 'orthographic quad under a unit sky — the uv flip, the half-texel offset, decode-before-blend, the '
+            + 'repeat wrap and the channel order, under pt, pt-nee and pt-mis',
+        expected:
+            'each quadrant reads the exact mean of the albedo field over it, per channel (quadrantMean); a swapped '
+            + 'top/bottom or left/right, a missing half-texel offset or a decode after the blend each move some '
+            + 'quadrant by ≥ 0.05 (the fixture header lists them)',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            // pt reads ρ at every sample; NEE samples the sky uniformly (σ ≈ 1.3ρ a sample, about 0.002
+            // over a quadrant at this budget).
+            checks: [0, 1, 2].flatMap((strategy) => (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: quadrantRadiance(q, true), tol: 0.008, strategy, region: QUADRANTS[q], label: `${q} = albedo mean (key ${strategy + 1})` }
+            ))),
+        },
+    },
+    'image-texture-linear': {
+        scene: imageTextureLinearScene,
+        strategies: [imageTexturePtStrategy],
+        exercises: 'Image textures read as linear data (colorspace \'linear\'): the decode is skipped',
+        expected: 'each quadrant reads the mean of the codes/255 field over it; the sRGB-decoded values of image-texture mean the flag was ignored',
+        witness: {
+            size: [64, 64],
+            spp: 64,
+            checks: (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: quadrantRadiance(q, false), tol: 0.004, region: QUADRANTS[q], label: `${q} = linear albedo mean` }
+            )),
+        },
+    },
+    'image-texture-spectral': {
+        scene: imageTextureSpectralScene,
+        strategies: [imageTextureSpectralStrategy],
+        exercises: 'Image textures in a spectral program: the filtered RGB is lifted as a reflectance (a gray image, which lifts exactly)',
+        expected: 'each quadrant reads the G table\'s sRGB-decoded mean in all three channels',
+        witness: {
+            size: [64, 64],
+            spp: 256,
+            checks: (Object.keys(QUADRANTS) as Quadrant[]).map((q) => (
+                { kind: 'mean' as const, value: grayQuadrantRadiance(q), tol: 0.008, region: QUADRANTS[q], label: `${q} = gray albedo mean (spectral)` }
+            )),
+        },
+    },
+    'rough-furnace-expr': {
+        scene: roughFurnaceExpr,
+        strategies: posed([0, 0, 4.2], [0, 0, 0], roughFurnaceStrategy),
+        exercises:
+            'rough-furnace with each roughness authored as a GLSL formula evaluating to its constant: α is computed per '
+            + 'hit in the material lookup instead of on the host',
+        expected:
+            'the same image as rough-furnace up to float rounding: same integrand, same random numbers, α equal to '
+            + 'the host value within rounding',
+        witness: {
+            spp: 64,
+            checks: [
+                // Identical stream; the small tolerances absorb only the rounding of α in fp32
+                // against the host-computed literal (the expr-const tolerances).
+                { kind: 'twin', other: { scene: 'rough-furnace' }, meanTol: 0.002, rmse: 0.01, label: 'per-hit α ≡ host α' },
+            ],
+        },
+    },
+    'seifert-weber-windows': {
+        scene: seifertWeberWindows,
+        strategies: [seifertWeberWindowsStrategy],
+        exercises:
+            'the Seifert–Weber walk (components/quotient/seifert-weber): three emissive spheres of different colors at '
+            + 'generic positions in the dodecahedral domain D, pt with maxBounces 0 and farClip 6; every pixel reads the '
+            + 'emission of the first sphere image within 6, seen through up to 8 face crossings, or 0',
+        expected:
+            'each window certified by the float64 twin (brute force over the sphere images in the cover, '
+            + 'tests/witnesses/seifertWeberWindows.test.ts) reads its sphere\'s emission exactly, or 0; a wrong pairing '
+            + '(twist, face order, chart) shows a different sphere or nothing in the windows seen across a face',
+        witness: {
+            size: SW_WINDOWS_IMAGE,
+            spp: 16,
+            checks: [
+                ...SW_WINDOWS.map((w) => ({
+                    kind: 'mean' as const,
+                    value: swWindowValue(w),
+                    tol: 1e-3,
+                    region: swWindowRegion(w),
+                    source: { tier: 'exact' as const, from: 'float64 twin over the sphere images in the cover, one-pixel margin' },
+                    label: w.sphere === 'miss'
+                        ? `window (${w.x0}, ${w.y0}): nothing within R`
+                        : `window (${w.x0}, ${w.y0}): sphere ${w.sphere} through ${w.crossings} face crossing${w.crossings === 1 ? '' : 's'}`,
+                })),
+                { kind: 'walk-counter', cap: SW_WINDOWS_CAP, label: 'walk counter, camera rays (report only)' },
+            ],
+        },
+    },
+    'seifert-weber-lights': {
+        scene: seifertWeberLights,
+        strategies: seifertWeberLightsStrategies,
+        exercises:
+            'partition MIS in the Seifert–Weber space (components/quotient/seifert-weber): NEE samples one of 13 images of '
+            + 'a disk light near face 0 (the light in D and its copies across the 12 faces), MIS names the image a BSDF ray '
+            + 'hit by its crossing count (0 density beyond one crossing); three lambert balls, maxBounces 3, farClip 8; '
+            + 'pt / pt-nee / pt-mis',
+        expected: 'all three keys converge to the same image',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [1, 2], meanTol: 0.01, label: 'pt-nee ≡ pt-mis: shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2], meanTol: 0.01, rmse: 0.25, label: 'pt anchor (path-found light images) tripwire' },
+                { kind: 'noise', strategies: [2, 0], label: 'σ/µ report: pt-mis (13 images) against pt' },
+                { kind: 'walk-counter', strategy: 2, cap: SW_LIGHTS_CAP, label: 'walk counter, pt-mis paths and shadow rays (report only)' },
             ],
         },
     },

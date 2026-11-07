@@ -108,6 +108,7 @@ function walkRequires(f: Flags, p: ProgramDescription): string[] {
     if (f.dispersion) req.push('surface_uses_dispersion');
     // The generated light-query constructor's runtime arm (fable-rough-dielectric §3.3).
     if (f.twoSided) req.push('material_two_sided');
+    if (f.perturbed) req.push('material_shading_frame');
     return req;
 }
 
@@ -116,10 +117,13 @@ function walkRequires(f: Flags, p: ProgramDescription): string[] {
 // selection context: static technique files pass "everything they have" (mat, hit)
 // through these instead of constructing LightQuery themselves, so context growth
 // (per-material support policy, spectral, curved frames) changes ONLY these bodies.
-// `mat` was in the signature ahead of need; fable-rough-dielectric §3.3 is the need —
-// the query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta), and
-// this is where it is answered. The twoSidedShading decision folds the question away
-// entirely when the scene has no such material.
+// The query's two-sidedness is a per-MATERIAL fact (support 'sphere' ∧ non-delta,
+// fable-rough-dielectric §3.3), and this is where it is answered; the twoSidedShading
+// decision folds the question away entirely when the scene has no such material.
+// q.n is hit.frame.n, which scene_intersect has already turned toward region_from, the side the
+// ray arrived from (structs.glsl Hit, §4.1), so it is the normal of the hemisphere a one-sided
+// receiver scatters into: the light tree's horizon term and the S³ light bodies' arc rule
+// (spherical_light_arc) read it as it is.
 // ============================================================================
 
 function lightQueryFns(f: Flags): ShaderBlock {
@@ -134,7 +138,7 @@ function lightQueryFns(f: Flags): ShaderBlock {
             `    return LightQuery(hit.p, hit.frame.n, ${sided});`,
             '}',
             'LightQuery light_query_medium(Point p) {',
-            '    return LightQuery(p, vec3(0.0), false);   // no orientation at a medium event',
+            '    return LightQuery(p, Direction(0.0), false);   // no orientation at a medium event',
             '}',
         ].join('\n'),
     };
@@ -168,7 +172,13 @@ function pathState(f: Flags): ShaderBlock {
         ...kernelStateInit(f),
     );
     if (f.dispersion) lines.push('    s.wavelengths_collapsed = false;');
-    if (f.media) lines.push('    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
+    if (f.media) {
+        // In a quotient the camera may sit in any cell; the region is looked up at the point of
+        // the fundamental domain D equivalent to it, where the one scene copy lives.
+        lines.push(f.quotient
+            ? '    s.current_medium = scene_region_at(quotient_reduce(ray.origin));   // camera may start inside a medium'
+            : '    s.current_medium = scene_region_at(ray.origin);   // camera may start inside a medium');
+    }
     if (f.nulls) lines.push('    s.null_crossings = 0;');
     if (f.transmission) lines.push('    s.eta_scale = 1.0;');
     lines.push('    return s;', '}');
@@ -373,7 +383,12 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
                 '                // a bent event is not recomputable from (origin, dir, t), so every scattering',
                 '                // arm reports position + incident direction on exit_p/exit_dir).',
                 `                if (bounce == ${N}) break;   // a scattering event: over budget`,
-                '                Point p_evt = ms.exit_p;',
+                // In a quotient the arm reports the event in the chart of the ray's origin, possibly
+                // many cells away; the vertex is moved to the equivalent point of D, so NEE, the
+                // phase continuation and the next walk start in D like every surface vertex.
+                f.quotient
+                    ? '                Point p_evt = quotient_reduce(ms.exit_p);   // the equivalent point of D'
+                    : '                Point p_evt = ms.exit_p;',
                 '                Direction wo_med = -ms.exit_dir;',
             );
             if (f.nee && !f.equiangular) lines.push('                light_sample_direct_medium(s, med_mat, p_evt, wo_med);');
@@ -407,7 +422,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
             '        // A crossing past measurement.maxNullCrossings leaves the measured set: the path ends.',
             '        if (is_null_interface(mat)) {',
             '            s.current_medium = hit.region_to;',
-            '            s.ray = ray_spawn(hit, s.ray.direction);',
+            '            s.ray = ray_spawn(hit, ambient_flow(s.ray, hit.t).direction);   // on along the arrival direction',
             '            s.null_crossings++;',
             '            if (s.null_crossings > MAX_NULL_CROSSINGS) break;',
             '            bounce--;',
@@ -417,8 +432,13 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     }
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
-        '        Direction wo = -s.ray.direction;',
+        '        Direction wo = -hit.arrival;   // back along the arrival direction',
     );
+    if (f.perturbed) {
+        // A bumped material shades in its perturbed frame. Every later reader — the guides, NEE's
+        // cosine, the light query, the BSDF ops — sees this one frame, so the techniques agree.
+        lines.push('        hit.frame = material_shading_frame(mat, hit, wo);   // bump: the shading normal (materials/README)');
+    }
     if (aovs.length > 0) {
         // THE AOV CAPTURE (components/aov README). bounce == 0 here means the first non-null
         // surface, reached with no scattering event or GRIN traversal before it (nulls keep

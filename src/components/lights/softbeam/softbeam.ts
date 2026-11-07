@@ -14,7 +14,7 @@ import lightSoftbeamGLSL from './softbeam.glsl?raw';
 
 export const softbeamLightDescriptor: LightKindDescriptor = {
     kind: 'softbeam',
-    glsl: lightSoftbeamGLSL,
+    glsl: { euclidean: { origin: 'components/lights/softbeam/softbeam.glsl', source: lightSoftbeamGLSL } },
     delta: false,
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },

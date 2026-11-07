@@ -12,7 +12,8 @@
  */
 export class TextureRegistry {
     private gl: WebGL2RenderingContext;
-    private textures = new Map<string, WebGLTexture>();
+    /** Each texture with the target it binds to (TEXTURE_2D, or TEXTURE_2D_ARRAY). */
+    private textures = new Map<string, { texture: WebGLTexture; target: GLenum }>();
 
     constructor(gl: WebGL2RenderingContext) {
         this.gl = gl;
@@ -27,17 +28,18 @@ export class TextureRegistry {
         this.textures.clear();
     }
 
-    /** Register a texture under a stable name, deleting any texture it replaces. */
-    register(name: string, texture: WebGLTexture): void {
-        const oldTexture = this.textures.get(name);
-        if (oldTexture) {
-            this.gl.deleteTexture(oldTexture);
+    /** Register a texture under a stable name, with the target it binds to, deleting any
+     *  texture it replaces. */
+    register(name: string, texture: WebGLTexture, target: GLenum = this.gl.TEXTURE_2D): void {
+        const old = this.textures.get(name);
+        if (old) {
+            this.gl.deleteTexture(old.texture);
         }
-        this.textures.set(name, texture);
+        this.textures.set(name, { texture, target });
     }
 
-    /** Look up a texture by name (undefined if not registered). */
-    get(name: string): WebGLTexture | undefined {
+    /** Look up a texture and its bind target by name (undefined if not registered). */
+    get(name: string): { texture: WebGLTexture; target: GLenum } | undefined {
         return this.textures.get(name);
     }
 
@@ -53,7 +55,7 @@ export class TextureRegistry {
 
     /** Clean up all textures. */
     dispose(): void {
-        for (const texture of this.textures.values()) {
+        for (const { texture } of this.textures.values()) {
             this.gl.deleteTexture(texture);
         }
         this.textures.clear();

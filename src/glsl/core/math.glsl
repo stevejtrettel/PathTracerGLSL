@@ -1,14 +1,13 @@
 // Math utilities
-// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, fp_uncertainty(), build_basis(),
+// Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, FP_UNCERTAINTY_REL/ABS, build_basis(),
 //           concentric_disk(), schlick_fresnel(),
-//           dielectric_fresnel()
+//           dielectric_fresnel(), conductor_fresnel()
+// The far clip MAX_DIST and fp_uncertainty() depend on the space: the compiler emits MAX_DIST
+// from the ambient descriptor (or the measurement's farClip), and the ambient occupant defines
+// fp_uncertainty() (components/ambient/<type>/<type>.glsl).
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718
-// MAX_DIST — the far clip: nothing beyond it is geometry, and the environment is found there
-// (by missed BSDF rays AND by environment NEE — they must agree). An ABSOLUTE length, so it
-// is a scene-scale truncation: geometry or an ambient medium extending past 1000 units is cut.
-#define MAX_DIST 1000.0
 #define EPS_INTERFACE 0.001   // §4.2 classification probe depth — 10× MARCH_EPSILON so a probe
                               // along the normal clears the marcher's stop-short residual
 
@@ -35,25 +34,23 @@
 // ~δ/cosθ_l for a positional error δ, without bound as the arrival grazes, cosθ_l → 0).
 // It is a fixed length, not derived: NEE does not see an occluder within 0.002 of the
 // light point, which a BSDF ray would. For the environment and directional lights
-// (distance MAX_DIST) it trims 0.002 off a 1000-unit far clip.
+// (distance MAX_DIST) it trims 0.002 off the far clip (1000 units in Euclidean space).
 #define SHADOW_BACKOFF 0.002
 
-// fp_uncertainty — positional error bound of a FLOATING-POINT-ACCURATE point (analytic
-// roots, triangle tests, refined marches): coordinate-relative with a near-origin
-// absolute floor. Constants transcribed from Wächter & Binder, "A Fast and Robust
-// Method for Avoiding Self-Intersection", Ray Tracing Gems ch. 6 (int_scale = 256 ulps
-// → 256·2⁻²³ relative; float_scale = 2⁻¹⁶ absolute; their origin() = 1/32 threshold is
-// where the two branches cross, folded here into one max). Scalar-along-the-normal
-// rather than their per-component integer offset: the escape is spelled through
-// ambient_geodesic (the metric seam), and the legal window — hit error ~2e-7…2e-6
-// below, optical significance ≳1e-4 above — leaves ≥2 orders of margin on both sides.
-// Scale-free by construction, which is what dissolves the fixed-epsilon half of the
-// Validator's transform.scale warning.
+// FP_UNCERTAINTY_REL / _ABS — the constants of fp_uncertainty(p), the positional error
+// bound of a FLOATING-POINT-ACCURATE point (analytic roots, triangle tests, refined
+// marches): coordinate-relative with a near-origin absolute floor. Transcribed from
+// Wächter & Binder, "A Fast and Robust Method for Avoiding Self-Intersection", Ray
+// Tracing Gems ch. 6 (int_scale = 256 ulps → 256·2⁻²³ relative; float_scale = 2⁻¹⁶
+// absolute; their origin() = 1/32 threshold is where the two branches cross, folded into
+// one max). Scalar-along-the-normal rather than their per-component integer offset: the
+// escape is spelled through ambient_geodesic (the metric seam), and the legal window —
+// hit error ~2e-7…2e-6 below, optical significance ≳1e-4 above — leaves ≥2 orders of
+// margin on both sides. Scale-free by construction, which is what dissolves the
+// fixed-epsilon half of the Validator's transform.scale warning. The function itself
+// reads the point's coordinates, so the ambient occupant defines it.
 #define FP_UNCERTAINTY_REL 3.0517578125e-5   // 256 ulps: 256 × 2⁻²³
 #define FP_UNCERTAINTY_ABS 1.52587890625e-5  // 2⁻¹⁶ — the near-origin floor
-float fp_uncertainty(Point p) {
-    return max(FP_UNCERTAINTY_ABS, FP_UNCERTAINTY_REL * max(abs(p.x), max(abs(p.y), abs(p.z))));
-}
 
 // Declared-EUCLIDEAN sampler helper (light samplers, phase ONBs — sites carrying the
 // METRIC EXEMPTION). Deliberately distinct from ambient_frame(), the METRIC SEAM that
@@ -99,4 +96,33 @@ float dielectric_fresnel(float cos_i, float eta) {
     float r_par  = (cos_i - eta * cos_t) / (cos_i + eta * cos_t);
     float r_perp = (eta * cos_i - cos_t) / (eta * cos_i + cos_t);
     return 0.5 * (r_par * r_par + r_perp * r_perp);
+}
+
+// EXACT (unpolarized) Fresnel reflectance of a conductor with complex index eta + i·k
+// relative to the outside medium, per wavelength lane (componentwise), at incidence cosine
+// cos_i in [0, 1]: the house's third Fresnel form, shared by the smooth and rough conductor
+// models as dielectric_fresnel is by the two glasses. Mitsuba 3's fresnel_conductor
+// (include/mitsuba/render/fresnel.h), equal to pbrt-v4's FrComplex. With c = cos_i,
+// s² = 1 − c², t = η² − κ² − s², A = √(t² + 4η²κ²), a = √(½(A + t)):
+//   r_s = (A + c² − 2ca)/(A + c² + 2ca),  r_p = r_s (A c² + s⁴ − 2ca s²)/(A c² + s⁴ + 2ca s²),
+//   F = ½ (r_s + r_p).
+// A ≥ |t|, but rounding can leave A + t slightly negative where it vanishes (κ → 0 near
+// grazing), so that root clamps at 0 (Mitsuba's safe_sqrt). At c = 1,
+// F = ((η−1)² + κ²)/((η+1)² + κ²); η = 0 with κ > 0 gives F = 1 exactly (a perfect mirror).
+// η = κ = 0 is 0/0 at c = 1; the conductor rows require κ > 0.
+// TS twin: components/materials/conductor/fresnel.ts.
+Spectrum conductor_fresnel(float cos_i, Spectrum eta, Spectrum k) {
+    float c2 = cos_i * cos_i;
+    float s2 = 1.0 - c2;
+    float s4 = s2 * s2;
+    Spectrum t = eta * eta - k * k - s2;
+    Spectrum A = sqrt(t * t + 4.0 * eta * eta * k * k);
+    Spectrum a = sqrt(max(0.5 * (A + t), 0.0));
+    Spectrum term1 = A + c2;
+    Spectrum term2 = 2.0 * cos_i * a;
+    Spectrum r_s = (term1 - term2) / (term1 + term2);
+    Spectrum term3 = A * c2 + s4;
+    Spectrum term4 = term2 * s2;
+    Spectrum r_p = r_s * (term3 - term4) / (term3 + term4);
+    return 0.5 * (r_s + r_p);
 }

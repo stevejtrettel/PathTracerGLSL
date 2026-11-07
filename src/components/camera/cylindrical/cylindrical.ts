@@ -11,7 +11,7 @@ const HFOV_PATH = 'camera.cylHfov';
 
 export const cylindricalDescriptor: CameraModelDescriptor = {
     type: 'cylindrical',
-    glsl: cylindricalGLSL,
+    glsl: { euclidean: { origin: 'components/camera/cylindrical/cylindrical.glsl', source: cylindricalGLSL } },
     authoredParams: [
         { name: 'hfov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // horizontal sweep, DEGREES
     ],

@@ -48,6 +48,11 @@ pairs); the triple identity weight·pdf = eval·|cosθᵢ| (exact, float-noise o
 sample/query pdf agreement. All three + the χ² histogram over the spec grid live in
 `ggx.test.ts` (the TS twin — line-for-line with `ggx.glsl`, change one change both).
 
+Everything above except F is the F-free reflection lobe `microfacet_reflect_{eval,pdf,sample}`
+in `glsl/core/microfacet.glsl`, which reports the Fresnel argument |ωₒ·h| and the energy-gain
+argument |cos θₒ| with its value. `ggx.glsl` multiplies Schlick's F (and the energy gain) into
+it; a second reflection-only microfacet model differs from ggx only in that Fresnel line.
+
 ## Witnesses
 
 `veach-mis` (4 roughness × 3 light sizes; pt/pt-nee/pt-mis §11.2 equality; the power

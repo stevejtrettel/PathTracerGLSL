@@ -33,17 +33,18 @@
 // rerun with --headed. Perf frames are never cached (milliseconds are machine state,
 // not pure functions of the inputs). Run perf alone on a quiet machine.
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
+import { devServer } from './devServer.mjs';
 
 // WITNESS_PORT lets runs from separate worktrees use separate dev servers; a run reuses a
 // server already on its port, so two worktrees on one port would test each other's code.
-const PORT = Number(process.env.WITNESS_PORT ?? 3000);
-const BASE_URL = `http://localhost:${PORT}`;
+const server = devServer(Number(process.env.WITNESS_PORT ?? 3000));
+const BASE_URL = server.baseUrl;
 const DEFAULT_SIZE = [160, 120];
 const DEFAULT_SPP = 64;
 const RENDER_TIMEOUT_MS = 8 * 60 * 1000; // per (scene, strategy) render
@@ -135,45 +136,6 @@ function cacheWrite(key, obj) {
         writeFileSync(join(CACHE_DIR, `${key}.json`), JSON.stringify(obj));
     } catch (e) { process.stdout.write(`  (cache write failed: ${e})\n`); }
 }
-
-// ---------------------------------------------------------------------------
-// Dev server: reuse a running one, else spawn `npm run dev` and kill it on exit.
-async function serverUp() {
-    try {
-        const res = await fetch(`${BASE_URL}/lab.html`, { signal: AbortSignal.timeout(1500) });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
-
-let devServer = null;
-async function ensureServer() {
-    if (await serverUp()) return;
-    process.stdout.write('starting dev server… ');
-    devServer = spawn('npm', ['run', 'dev', '--', '--port', String(PORT), '--strictPort'], {
-        cwd: new URL('..', import.meta.url).pathname,
-        stdio: 'ignore',
-        detached: false,
-    });
-    for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 500));
-        if (await serverUp()) {
-            console.log('up.');
-            return;
-        }
-    }
-    throw new Error(`dev server did not come up on :${PORT} within 30s`);
-}
-
-function cleanup() {
-    if (devServer && !devServer.killed) devServer.kill();
-}
-process.on('exit', cleanup);
-process.on('SIGINT', () => {
-    cleanup();
-    process.exit(130);
-});
 
 // ---------------------------------------------------------------------------
 // Stats (all on linear HDR RGBA float arrays, bottom-left origin — readPixels order)
@@ -395,6 +357,97 @@ async function renderVarianceOnce(browser, sceneId, strategyIdx, [W, H], spp) {
     }
 }
 
+/**
+ * The `walk-counter` render: the strategy's own program with counters added to its Seifert–Weber
+ * walk (components/quotient/seifert-weber; scene_intersect and scene_intersect_any, generated in
+ * compiler/generate/features/intersection.ts). The page's shaderSource is wrapped before the app
+ * loads, and every fragment shader that holds the walk is edited at fixed anchors in the generated
+ * text (each must occur exactly as often as expected, or the render fails):
+ *   - after each crossing (seifert_weber_cross) the segment's crossing count and the largest
+ *     constraint defect of the new ray state, max(|⟨p,p⟩ + 1|, |⟨p,v⟩|, |⟨v,v⟩ − 1|), are kept;
+ *   - at each crossing cap a capped segment is counted;
+ *   - the pixel's sample is replaced by (capped segments, most crossings in one segment, largest
+ *     defect), and the accumulator sums the first channel and keeps the maximum of the others
+ *     over the samples.
+ * Nothing else changes, so the walk runs the arithmetic the witness program runs (an added
+ * computation can still change how the GPU compiler schedules or contracts it).
+ */
+async function renderWalkCounter(browser, registry, sceneId, strategyIdx, [W, H], spp) {
+    const entry = registry[sceneId];
+    const strategyId = entry.strategyIds[strategyIdx];
+    const page = await browser.newPage();
+    const pageErrors = [];
+    page.on('pageerror', e => pageErrors.push(String(e)));
+    try {
+        await page.addInitScript(() => {
+            const once = (src, from, to, count) => {
+                const n = src.split(from).length - 1;
+                if (!count.includes(n)) throw new Error(`walk-counter: '${from.trim()}' occurs ${n} times (expected ${count.join(' or ')})`);
+                return { src: src.split(from).join(to), n };
+            };
+            const patch = (src) => {
+                if (!src.includes('seifert_weber_cross(r, tau, face);')) return src;
+                let r = once(src, 'bool scene_intersect(Ray ray, out Hit hit) {', [
+                    'int walk_probe_caps = 0;',
+                    'int walk_probe_most = 0;',
+                    'float walk_probe_drift = 0.0;',
+                    'void walk_probe_cross(Ray r, int n) {',
+                    '    walk_probe_most = max(walk_probe_most, n + 1);',
+                    '    float d = max(abs(hyperbolic_form(r.origin, r.origin) + 1.0), max(abs(hyperbolic_form(r.origin, r.direction)), abs(hyperbolic_form(r.direction, r.direction) - 1.0)));',
+                    '    walk_probe_drift = max(walk_probe_drift, d);',
+                    '}',
+                    'bool scene_intersect(Ray ray, out Hit hit) {',
+                ].join('\n'), [1]);
+                const walks = once(r.src, '        r = seifert_weber_cross(r, tau, face);\n', '        r = seifert_weber_cross(r, tau, face);\n        walk_probe_cross(r, n);\n', [1, 2]);
+                r = once(walks.src, '    return false;   // the crossing cap', '    walk_probe_caps++;\n    return false;   // the crossing cap', [1]);
+                r = once(r.src, '    return true;    // the crossing cap', '    walk_probe_caps++;\n    return true;    // the crossing cap', [walks.n - 1]);
+                r = once(r.src, '    vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);\n',
+                    '    vec3 color = color_to_pixel(film, ray.direction, L, camera_sample);\n    color = vec3(float(walk_probe_caps), float(walk_probe_most), walk_probe_drift);\n', [1]);
+                r = once(r.src, '    vec3 radiance_new = average_update(radiance_previous, color, u_sampleCount);\n',
+                    '    vec3 radiance_new = u_sampleCount == 0 ? color : vec3(radiance_previous.r + color.r, max(radiance_previous.gb, color.gb));\n', [1]);
+                window.__walkCounterPatched = (window.__walkCounterPatched ?? 0) + 1;
+                return r.src;
+            };
+            const original = WebGL2RenderingContext.prototype.shaderSource;
+            WebGL2RenderingContext.prototype.shaderSource = function (shader, src) {
+                let out = src;
+                try { out = patch(src); } catch (e) { window.__walkCounterError = String(e); }
+                return original.call(this, shader, out);
+            };
+        });
+        await page.goto(`${BASE_URL}/lab.html?scene=${sceneId}&witness`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => window.app !== undefined, null, { timeout: 120_000 });
+        const t0 = Date.now();
+        await page.evaluate(([w, h, sid, salt]) => {
+            const app = window.app;
+            app.stop();
+            app.pinResetSalt(salt);
+            app.selectRendererByStrategy(sid);
+            app.resize(w, h);
+        }, [W, H, strategyId, WITNESS_SALT]);
+        await page.evaluate(n => {
+            window.__witnessDone = false; window.__witnessError = null;
+            window.app.renderProduction(n)
+                .then(() => { window.__witnessDone = true; })
+                .catch(e => { window.__witnessError = String(e); });
+        }, spp);
+        await waitForRender(page);
+        const { error, patched, px } = await page.evaluate(() => ({
+            error: window.__walkCounterError ?? null,
+            patched: window.__walkCounterPatched ?? 0,
+            px: Array.from(window.app.readExport('radiance')),
+        }));
+        if (error) throw new Error(error);
+        if (patched === 0) throw new Error(`${sceneId} / ${strategyId}: no program holds the Seifert–Weber walk`);
+        if (pageErrors.length) throw new Error(`page errors: ${pageErrors.join(' | ')}`);
+        if (px.length !== W * H * 4) throw new Error(`readback is not ${W}×${H}`);
+        process.stdout.write(`  counted ${sceneId} / ${strategyId} @ ${W}×${H} ×${spp}spp (${((Date.now() - t0) / 1000).toFixed(1)}s, ${patched} program(s) counted)\n`);
+        return { px: new Float32Array(px), W, H };
+    } finally {
+        await page.close();
+    }
+}
+
 /** Wait for the production render fired with __witnessDone = false. A RELOADED page (the dev
  *  server reloads the lab when a file in its import graph is saved) has neither flag — the old
  *  predicate (`__witnessError !== null`) read that as "finished" and the runner then read back a
@@ -585,6 +638,22 @@ async function runCheck(browser, registry, sceneId, spec, check) {
         return { sceneId, label, pass, detail: `σ/µ @ ${spp}spp: ${parts.join(', ')}` };
     }
 
+    if (check.kind === 'walk-counter') {
+        // REPORT-ONLY: the Seifert–Weber walk's own statistics, counted on the GPU by the program
+        // itself (renderWalkCounter). Never cached: the counted program is not the witness program.
+        const { px, W, H } = await renderWalkCounter(browser, registry, sceneId, check.strategy ?? 0, size, spp);
+        let caps = 0, most = 0, drift = 0;
+        for (let i = 0; i < W * H; i++) {
+            caps += px[4 * i];
+            most = Math.max(most, px[4 * i + 1]);
+            drift = Math.max(drift, px[4 * i + 2]);
+        }
+        return {
+            sceneId, label, pass: true,
+            detail: `${W}×${H}×${spp} paths: ${Math.round(caps)} capped segments (cap ${check.cap}), at most ${most} faces in one segment, constraint drift ≤ ${drift.toExponential(2)}`,
+        };
+    }
+
     if (check.kind === 'perf') {
         // ms/frame on the REAL GPU (--perf mode only — main() filters). Warmup frames
         // absorb compile/upload/pipeline warm; then 3 timed batches, each closed by an
@@ -768,7 +837,26 @@ const FRAME_CASES = [
     { id: 'oneshot', scene: 'cornell-oneshot', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'spectral', scene: 'spectral-materials', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'medium', scene: 'fog-area', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-mis in scattering fog: the phase pdf weighs light samples taken at medium vertices.
+    { id: 'medium-mis', scene: 'fog-area', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
     { id: 'grin', scene: 'grin-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-nee shadow rays through the media walker across two marched null interfaces.
+    { id: 'shadow-media', scene: 'shadow-aim-fog', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // {param}-driven placements: a rotated, scaled box and a scaled sphere through the placed arms.
+    { id: 'driven', scene: 'driven', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // Rayleigh and HG fog boxes behind the two-model medium dispatch.
+    { id: 'rayleigh', scene: 'rayleigh', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // pt-mis under an image sky: direction-dependent sky lookups and the environment pdf.
+    { id: 'image-sky', scene: 'sky', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'fisheye', scene: 'cornell-fisheye', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // A GGX conductor and a rough dielectric (both lobes) under MIS: the microfacet models' eval,
+    // sample and pdf all reach the picture.
+    { id: 'ggx', scene: 'veach-mis', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'rough-glass', scene: 'rough-mis', strategy: 1, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    // Rough dielectric spheres in a furnace (microfacet core without ggx) and the delta mirror
+    // (the conductor's Schlick f0 without microfacet core).
+    { id: 'rough-furnace', scene: 'rough-furnace', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
+    { id: 'mirror', scene: 'mirror', strategy: 0, size: [64, 64], spp: 8, pictures: ['radiance'] },
     // 150×100 in 64px tiles = 3×2 tiles with partial edges (tile sizes round up to 64, app/tiling.ts).
     { id: 'tiled', scene: 'cornell-area', strategy: 0, size: [150, 100], spp: 8, tileSize: 64 },
 ];
@@ -969,7 +1057,7 @@ async function recordTiledCase(browser, c, dir) {
 
 async function framesRecord(dir) {
     if (existsSync(join(dir, 'manifest.json'))) throw new Error(`${dir} already holds a record; choose a new directory`);
-    await ensureServer();
+    await server.ensure();
     const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const t0 = Date.now();
     try {
@@ -991,7 +1079,7 @@ async function framesRecord(dir) {
         console.log(`frames: ${cases.length} cases recorded in ${dir} (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
     } finally {
         await browser.close();
-        cleanup();
+        server.stop();
     }
 }
 
@@ -1139,7 +1227,7 @@ const YELLOW = s => `\x1b[33m${s}\x1b[0m`;
 const modeChecks = spec => spec.checks.filter(c => perfMode ? c.kind === 'perf' : c.kind !== 'perf');
 
 async function main() {
-    await ensureServer();
+    await server.ensure();
 
     // Numeric sweep: SwiftShader (deterministic software rasterizer — the frame cache
     // depends on it). Perf: the real GPU (ANGLE Metal on macOS); --headed as the
@@ -1264,13 +1352,13 @@ async function main() {
         process.exitCode = failed + disagreed;
     } finally {
         await browser.close();
-        cleanup();
+        server.stop();
     }
 }
 
 const framesAt = argv.indexOf('--frames');
 (framesAt >= 0 ? framesMain(argv.slice(framesAt + 1)) : main()).catch(err => {
     console.error(err);
-    cleanup();
+    server.stop();
     process.exit(1);
 });

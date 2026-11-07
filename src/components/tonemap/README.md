@@ -40,3 +40,19 @@ passthrough (identity curve, no encode, exposure forced to 1.0 — the §11 prob
 `view.tonemap.type` is an open string, and the Validator rejects any type without an
 occupant in `TONEMAP_MODELS` (`isTonemapSupported`), so adding one needs no other edit.
 `exposure` must be finite and > 0.
+
+## White balance
+
+`view.tonemap.whiteBalance: <kelvin>` (in the blackbody range, 1000–40000 K) shows the white of a
+Planck source at that temperature as D65 white: the Bradford adaptation, a constant 3×3 matrix on
+linear sRGB (`whiteBalance.ts`; pbrt-v4's `WhiteBalance` with a Planck source white at every
+temperature). A scene lit by `blackbody(T)` lights renders neutral at `whiteBalance: T`. It is a
+view: a fixed linear map of each converged pixel, so it commutes with the mean. The display pass
+folds exposure into it (`DISPLAY_VIEW = exposure·M`) and applies it before `safe_color`, because
+the matrix has negative entries and the curves must not see a negative channel. It applies to
+every picture shown through the tonemap view, the variance picture included; there the matrix
+acts on per-channel variances, which is not the variance of the balanced color, so that picture
+is for looking only (as exposure already scales it by k, not k²). Without `whiteBalance` the
+display text is the exposure scalar alone. The raw probe path (`none`) applies no view transform:
+neither exposure nor white balance. HDR exports carry the unbalanced estimate, as they carry the
+unexposed one; PNG exports are drawn by the display pass and so are balanced.

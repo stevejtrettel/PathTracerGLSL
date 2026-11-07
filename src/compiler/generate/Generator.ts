@@ -40,11 +40,10 @@ export function generate(
     // against future channel/texture creep, not a working constraint.
     const SAMPLER_FLOOR = 16;
     for (const [shaderId, shader] of shaders) {
-        // Counts BOTH float and integer samplers (usampler2D shares the same unit pool).
-        const samplers = [...shader.fragment.matchAll(/uniform\s+(?:highp\s+)?u?sampler2D\s+(\w+)/g)].map((m) => m[1]);
+        const samplers = samplerRoster(shader.fragment);
         if (samplers.length > SAMPLER_FLOOR) {
             bag.error('invalid-setting',
-                `Program '${shaderId}' binds ${samplers.length} sampler2D uniforms — over the guaranteed WebGL2 floor of ${SAMPLER_FLOOR} fragment texture units (MAX_TEXTURE_IMAGE_UNITS). Roster: ${samplers.join(', ')}. Scenes must fit the portability floor (fable-data-rail §5).`)
+                `Program '${shaderId}' binds ${samplers.length} samplers — over the guaranteed WebGL2 floor of ${SAMPLER_FLOOR} fragment texture units (MAX_TEXTURE_IMAGE_UNITS). Roster: ${samplers.join(', ')}. Scenes must fit the portability floor (fable-data-rail §5).`)
                 .add();
         }
     }
@@ -88,4 +87,11 @@ export function generate(
         ldrRecipe: buildLdrRecipe(pictures),   // the display re-run as data — the engine reads, never knows
         sourceMaps,
     };
+}
+
+/** The sampler uniforms a shader source declares, in order. Every sampler type the compiler
+ *  declares takes one texture unit from the same pool: sampler2D, the integer usampler2D and the
+ *  material image array's sampler2DArray. */
+export function samplerRoster(source: string): string[] {
+    return [...source.matchAll(/uniform\s+(?:highp\s+)?u?sampler2D(?:Array)?\s+(\w+)/g)].map((m) => m[1]);
 }

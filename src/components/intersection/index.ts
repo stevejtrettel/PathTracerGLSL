@@ -14,11 +14,13 @@
 // accel/bvh/bvh.glsl (slab test, stack depth).
 
 import { bvhWalkLines } from '../accel/bvh/bvh.js';
+import type { SpaceList } from '../descriptors.js';
 
 /** Mesh traversal engines — occupants of `estimator.meshTraversal` (impl-plan-mesh-bvh).
  *  Bias-free by contract (estimator section): every occupant must produce the SAME
  *  converged image — the estimator-swap equality witness (mesh-quad-twin) is the gate. */
 export interface MeshTraversalDescriptor {
+    spaces: SpaceList;
     /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     nodeTexture: boolean;
     /** The nearest-hit call for one mesh wrapper — rail v2: fixed channel uniforms +
@@ -32,11 +34,13 @@ export const DEFAULT_MESH_TRAVERSAL = 'bvh';
 
 export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
     brute: {
+        spaces: ['euclidean'],
         nodeTexture: false,
         nearestCall: (s, o) => `mesh_nearest_local(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, gLocal, uv)`,
         anyCall: (s, o) => `mesh_any_local(u_data_vertices, u_data_indices, ${s.vbase}u, ${s.tbase}u, ${o.triCount}u, ${o.ro}, ${o.rd}, maxDist)`,
     },
     bvh: {
+        spaces: ['euclidean'],
         nodeTexture: true,
         nearestCall: (s, o) => `mesh_nearest_bvh(u_data_vertices, u_data_indices, u_data_normals, u_data_uvs, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.smooth}, ${o.ro}, ${o.rd}, hit.t, nLocal, gLocal, uv)`,
         anyCall: (s, o) => `mesh_any_bvh(u_data_vertices, u_data_indices, u_data_nodes, ${s.vbase}u, ${s.tbase}u, ${s.nbase}u, ${o.ro}, ${o.rd}, maxDist)`,
@@ -46,6 +50,7 @@ export const MESH_TRAVERSALS: Record<string, MeshTraversalDescriptor> = {
 /** Instance traversal engines — occupants of `estimator.instanceAccel` (impl-plan-tlas).
  *  Same bias-free contract; the estimator-swap witness is instance-twin's equality arm. */
 export interface InstanceAccelDescriptor {
+    spaces: SpaceList;
     /** This engine walks the nodes channel (exact linkage: gates `data_nodes`). */
     tlasTexture: boolean;
     /** This engine walks the INTEGER cwbvh node channel (exact linkage: gates
@@ -69,6 +74,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
     /** Linear scan over every placement (the A/B baseline) — reads the (TLAS-order, but
      *  order-independent) placement texture. */
     linear: {
+        spaces: ['euclidean'],
         tlasTexture: false,
         walk: (_s, count, _bound, leaf) => [
             `    for (int i = 0; i < ${count}; i++) {`,
@@ -81,6 +87,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
      *  internal / A>=0 leaf count+offset). The skeleton is THE shared emitter
      *  (bvhWalkLines — the scene-table walks ride the same one). */
     tlas: {
+        spaces: ['euclidean'],
         tlasTexture: true,
         walk: (s, _count, bound, leaf) => bvhWalkLines(s.tlasBase, bound, [
             'for (int j = 0; j < cnt; j++) {',
@@ -97,6 +104,7 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
      *  data-dependent loop (the ANGLE D3D unroller rule); no structs on the hot path
      *  (the Adreno precision rule). */
     cwbvh: {
+        spaces: ['euclidean'],
         tlasTexture: false,
         nodesqTexture: true,
         walk: (s, _count, bound, leaf) => [
@@ -162,7 +170,9 @@ export const INSTANCE_ACCELS: Record<string, InstanceAccelDescriptor> = {
  *  Bias-free by contract; the bazaar equality witness is the gate. The regimes differ
  *  structurally throughout the intersection feature, so the registry carries membership +
  *  default (the Validator's enum source), not emitters. */
-export interface ObjectDispatchDescriptor { }
+export interface ObjectDispatchDescriptor {
+    spaces: SpaceList;
+}
 
 export const DEFAULT_OBJECT_DISPATCH = 'unrolled';
 
@@ -187,9 +197,9 @@ export const MARCHED_TABLE_THRESHOLD = 9;
 
 export const OBJECT_DISPATCHES: Record<string, ObjectDispatchDescriptor> = {
     /** The research regime: params baked into GLSL, named symbols, linear arms. */
-    unrolled: {},
+    unrolled: { spaces: ['euclidean', 'hyperbolic', 'spherical', 'h2xr'] },
     /** The scale regime: typed records + ONE scene TLAS; residual arm for driven/unbounded. */
-    table: {},
+    table: { spaces: ['euclidean'] },
 };
 
 // ── Scene-table wire format (fable-object-tables §2/§3) — shared by the adapter (sizes),

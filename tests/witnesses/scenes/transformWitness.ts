@@ -181,7 +181,7 @@ export const flattenTree: SceneDescription = {
                 material: 'lamp',
             }],
         },
-    ]),
+    ], 'euclidean'),
     materials: bakeMaterials,
     lights: [],
     environment: bakeEnv,

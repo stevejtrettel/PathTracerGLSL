@@ -242,6 +242,39 @@ with the diff audited to a named class; the witness sweep is owner-run at the en
   (the bound type's whole file is dragged in where `<bt>_interval` is never
   called) and add the two-step bound-chain test the fixpoint promises.
 
+## 8a. Curved spaces (H³, S³)
+
+The contract holds unchanged in a curved space; what differs is where the field lives and how the
+march moves (plan and verification: docs/claude-2026-11-review/curved/sdf-plan.md).
+
+- **The field** is a function of a point of the model, `float <type>_sdf(Point p, S s)` with p a
+  vec4 in the object's own frame (the object is placed by an isometry; scale is not available). It
+  must be a true geodesic distance or a 1-Lipschitz lower bound of one — the conservativeness law,
+  in the space's metric. The vocabulary (`sdf_point`, `sdf_ball`, `sdf_plane`, `sdf_tube`, the smooth
+  combinators) is listed in components/ambient/README.md; it is exact distances and operations that
+  keep the 1-Lipschitz property.
+- **The march** is the same generated loop with the field point re-flowed from the seed,
+  `ambient_geodesic(ray.origin, ray.direction, t)`; t is arc length. The search interval is the
+  bound's interval clamped by the running nearest, which starts at MAX_DIST (10 in H³, 2π in S³).
+  `march_epsilon(t)` and MARCH_CLEARANCE are arc lengths, unchanged. A marched hit's offset from the
+  surface (acceptance residual plus fp error) stays below MARCH_CLEARANCE within about 3.5 of the
+  world origin in H³.
+- **The normal** is generated per space: four taps at arc length NORMAL_EPSILON along tetrahedral
+  combinations of an orthonormal tangent frame at the hit (`ambient_frame` of the arrival
+  direction), never finite differences of model coordinates.
+- **The bound** is a sphere centered at the object's origin or `'unbounded'` (only the sphere has
+  curved bodies; the Validator rejects an off-center bound). In S³ an origin inside the bound
+  searches [0, 2π]: a geodesic leaving the bound comes back around before it closes.
+- **`defineSDF`** takes its bodies keyed by space (`glsl: { hyperbolic, spherical }`, one source may
+  serve both); the TS twin and the Validator's two sampling gates apply to the Euclidean body only
+  (curved bodies are not sampled at compile time). `kleinChart: true` serves H³ with the Euclidean
+  body evaluated at k(p) = p.xyz/p.w: the chart never stretches distance (|k(p) − k(q)| ≤ d(p, q)),
+  so a Euclidean 1-Lipschitz lower bound stays one in H³; it marches unbounded, so the field must be
+  a lower bound everywhere in the unit ball, and an accepted hit's true residual can reach
+  march_epsilon·cosh²ρ at distance ρ from the object's origin.
+- Registry marched shapes (torus, bottle, knob, menger, apollonian) have no curved bodies; the
+  space gate rejects them.
+
 ## 9. Deferred ledger
 
 - **Data outputs** (`<type>_data` — orbit traps; `Hit.uv` is a surface chart, not
@@ -256,6 +289,11 @@ with the diff audited to a named class; the witness sweep is owner-run at the en
   the distance estimate; the shading normal stays the numerical gradient of the
   final field (the two coexist, deliberately — verified in the old tracer).
 - **Composition operators** (§7's trigger).
+- **Curved spaces**: compile-time sampling gates for curved `defineSDF` bodies (a geodesic sampler
+  over the bounding ball); off-center and non-sphere march bounds; a per-space footprint model for
+  `march_epsilon(t)` (H³ footprints grow like sinh t, S³ shrink near 2π); the Klein door's bound
+  mapped from chart coordinates (r → atanh r) instead of marching unbounded; curved torus, box and
+  cylinder bodies.
 - **Per-shape march EPSILON** (only the budget now; epsilon needs §4's
   derived-coupling rule built first).
 - **SDF instancing** (unchanged from sdf-as-shape: the frame wrapper with the

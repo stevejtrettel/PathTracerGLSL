@@ -27,6 +27,9 @@ export interface SceneDescription {
     lights: LightDescription[];
     /** What a ray sees when it hits nothing. Defaults to `none` (black). */
     environment?: EnvironmentDescription;
+    /** Images a material's color rows may read, by name (a row's value `{ texture: name }`). Only
+     *  the images some material reads are loaded. */
+    textures?: Record<string, ImageTextureDescription>;
     /**
      * Material name of the AMBIENT medium (§2.4) — what region −1 is filled with; absent =
      * vacuum. A foggy world is just `ambientMedium: 'fog'`. material_of(-1) resolves to it.
@@ -41,9 +44,20 @@ export interface SceneDescription {
 }
 
 export interface AmbientSpaceDescription {
-    type: 'euclidean' | 'hyperbolic' | 'spherical';
+    type: 'euclidean' | 'hyperbolic' | 'spherical' | 'h2xr';
     parameters?: { curvature?: number };
+    /** A closed manifold M = X/Γ: the scene is one copy inside a fundamental domain D, and a ray
+     *  leaving D through a face continues from the paired face (components/quotient/README.md).
+     *  `torus`: the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), D = [−L/2, L/2]³ around the origin, so
+     *  coordinates authored in D read as in plain E³. Euclidean only.
+     *  `seifert-weber`: the Seifert–Weber dodecahedral space H³/Γ, D the regular dodecahedron
+     *  about the origin with dihedral angle 72° (inradius 0.996, circumradius 1.903). Hyperbolic
+     *  only. */
+    quotient?: QuotientDescription;
 }
+
+/** The quotient group (components/quotient registry key `kind`) and its parameters. */
+export type QuotientDescription = { kind: 'torus'; size: Vec3 } | { kind: 'seifert-weber' };
 
 // --- Environment (what a missed ray sees) ---
 //
@@ -304,12 +318,28 @@ export interface SellmeierIndex { sellmeier: { B: Vec3; C: Vec3 }; }
 export type SpectralIndex = CauchyIndex | SellmeierIndex;
 export type IndexProperty = ScalarProperty | SpectralIndex;
 
+/** An 8-bit image file (PNG or JPEG) and how its codes encode the values: 'srgb' (the sRGB
+ *  transfer curve, for colors) or 'linear' (codes/255, for data). Required: neither the file
+ *  extension nor an embedded profile says which. All of a scene's read images share one size. */
+export interface ImageTextureDescription {
+    url: string;
+    colorspace: 'srgb' | 'linear';
+}
+
+/** A color row read from a declared image at the hit's uv: bilinear between texels decoded to
+ *  linear, repeating, with uv scaled by `uvScale` first (a number scales both axes; default 1).
+ *  uv (0, 0) is the image's bottom-left corner. Reflectance rows only; not on spheres. */
+export interface TextureValue {
+    texture: string;
+    uvScale?: number | [number, number];
+}
+
 /** Spectrum-valued authored property. A scalar is an intentional achromatic broadcast,
  * including a scalar ValueParam default; the Planner resolves it to a vec3 uniform default. */
-export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
+export type SpectrumProperty = number | Vec3 | GlslExpression | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue | TextureValue;
 
 /** A spectrum given by a named kind (components/color/spectra/) rather than as a plain value. */
-export type NamedSpectrumValue = BlackbodyValue | GaussianValue;
+export type NamedSpectrumValue = BlackbodyValue | GaussianValue | MeasuredValue;
 
 /** Authored temperature and reference brightness, preserved through scene planning.
  * RGB evaluates the signed projection of the same normalized Planck spectrum. */
@@ -328,10 +358,19 @@ export interface GaussianValue {
     gaussian: { center: number; width: number; peak: number; floor?: number };
 }
 
+/** A measured spectrum, by table name (color/spectra/measured/README.md): a metal's optical
+ *  constant (`metal-<Ag|Al|Au|Cu|CuZn>-<eta|k>`), a ColorChecker reflectance
+ *  (`colorchecker-<patch>`) or a CIE illuminant (`illuminant-<A|D65|FL2|FL11|LED-B3>`). Each table
+ *  goes in settings of its own role. `scale`, on illuminants only, is the reference CIE Y of the
+ *  emission (default 1), in renderer-relative units. */
+export interface MeasuredValue {
+    measured: { table: string; scale?: Value<number> };
+}
+
 /** A Spectrum VALUE — constant or `{param}`-driven, NO spatial expression (SpectrumProperty
  * minus GlslExpression). The Model B split surface for radiometric values that are read at a
  * point but never vary spatially: light emission and the constant-env color. */
-export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | BlackbodyValue;
+export type SpectrumValue = number | Vec3 | ValueParam<number> | ValueParam<Vec3> | NamedSpectrumValue;
 
 /** Union used by generic planner helpers. Public fields use the narrower aliases above. */
 export type MaterialProperty = ScalarProperty | SpectrumProperty | SpectralIndex;
@@ -392,6 +431,13 @@ export function mediumRoutesToTracking(
     // majorant-free by the Validator carve, so the tracking route's σ̄ machinery must not fire).
     if (mediumIsDeflecting(med)) return false;
     return isHeterogeneousMedium(med) || (isEmissiveMedium(med) && scatters);
+}
+
+/** Some material's medium routes to the null-collision arms under this measurement's
+ *  scattering setting. */
+export function sceneRoutesToTracking(scene: SceneDescription, scattering: 'full' | 'ignored'): boolean {
+    return Object.values(scene.materials).some((m) =>
+        m.medium !== undefined && mediumRoutesToTracking(m.medium, mediumScatters(m.medium, scattering)));
 }
 
 /**
@@ -502,15 +548,32 @@ export interface MaterialDescription {
      * shapes `true` is a Validator error (V1-C2) — emissive SDFs stay path-only and still glow.
      */
     sampleAsLight?: boolean;
+    /** Bump mapping: a height field tilts the shading normal (materials/README, "Shading-normal
+     *  perturbation"). Any surface model; not 'none'. */
+    bump?: BumpDescription;
     /**
      * Open vocabulary (materials-§7): the legal property keys are the material's own
      * model's schema rows, not this interface — a new model's new property (`sheen: 0.7`)
      * is authored directly, and the Validator warns on any key the model does not read.
      * The named fields above are the current models' properties, kept for
-     * autocomplete/docs. The meta-keys (MATERIAL_META_KEYS: model/medium/sampleAsLight)
+     * autocomplete/docs. The meta-keys (MATERIAL_META_KEYS: model/medium/sampleAsLight/bump)
      * are reserved (registry-test-enforced against row-source collisions).
      */
-    [key: string]: MaterialProperty | MaterialModel | MediumDescription | boolean | undefined;
+    [key: string]: MaterialProperty | MaterialModel | MediumDescription | BumpDescription | boolean | undefined;
+}
+
+/** The keys of a bump record. */
+export const BUMP_KEYS = ['height', 'step'] as const;
+
+/** A bump: the surface is displaced along its outward normal by h(p) for shading only (the
+ *  geometry and its silhouette are unchanged). */
+export interface BumpDescription {
+    /** h(p) in world units: a float GLSL expression in the world point `p` (and its declared
+     *  params); it may call the Perlin functions. */
+    height: GlslExpression;
+    /** The central-difference step along the surface, in world units. Required: it is a length
+     *  in the scene's units, so no default fits every scene (README: the error law). */
+    step: number;
 }
 
 // --- Lights ---
@@ -596,6 +659,14 @@ export interface MeasurementDescription {
     /** Truncation — limit: 'full'. 'ignored' renders scattering media absorbing-only
      *  (the research A/B formerly expressed as volumeIntegrator 'none' on a scattering scene). */
     scattering?: 'full' | 'ignored';
+    /** Truncation — limit: multiple scattering on the Smith microsurface (Heitz 2016, not
+     *  built). 'single-scattering' (the default) keeps one bounce between microfacets, so
+     *  rough conductors and rough glass lose energy (E = 1 − ln 2 ≈ 0.31 for a white
+     *  conductor at roughness 1, normal incidence). 'energy-compensated' restores that energy
+     *  with a gain on ωₒ (Turquin 2019; components/materials/microfacet_energy): exact in
+     *  total for a white conductor and a lossless dielectric, up to the table's error
+     *  (≤ 0.6%), approximate in the angular shape and color of the restored energy. */
+    microfacet?: 'single-scattering' | 'energy-compensated';
     /** Truncation — limit: transparent-shadow refinement (contracts §10.2). The §6.3 v1
      *  policy (shadow rays treat dielectric interfaces as opaque), now a DECLARED bias. */
     shadows?: 'opaque-dielectrics';
@@ -605,12 +676,32 @@ export interface MeasurementDescription {
     color?: 'rgb' | 'spectral';
     /** Measurement response; defaults to the colour model's compatible sensor. */
     sensor?: string;
+    /** The pixel filter: the kernel h_j over the film against which each pixel integrates
+     *  radiance (a components/pixel registry key). 'box' (the default) is the indicator of
+     *  the pixel square; 'gaussian' is an untruncated normal with σ = 0.5 px. Not a
+     *  truncation: each kernel is its own exact measurement, and changing it changes the
+     *  converged image. */
+    pixel?: string;
     /** First-hit pictures kept beside the main picture (components/aov registry keys, at most
      *  one each), RGB only. Each is a guide for a denoiser: a sample is the AOV's value at the
      *  first non-null surface the path reaches before any scattering event, times the path's
      *  weight on arrival, so its expected value is that value times the transmittance along
      *  the camera ray; a sample is 0 when no such surface is reached. */
     aovs?: string[];
+    /** Truncation — limit: ∞ (exact when the scene's horizon is nearer). The far clip: an arc
+     *  length past which a segment (camera, BSDF or shadow ray) meets nothing and carries 0,
+     *  and where a missed ray finds the sky. Absent = the ambient space's default (Euclidean:
+     *  1000). Required in a quotient space (`ambientSpace.quotient`), where nothing escapes and
+     *  the clip is the only end of a segment that meets nothing; there it must be at least
+     *  the quotient's floor (the 3-torus: twice the fundamental domain's diameter; the
+     *  Seifert–Weber space: 2R_c + 2r_in = 5.80), so that every light image NEE samples is
+     *  reachable by a BSDF ray. In a quotient filled with a homogeneous fog of extinction σ
+     *  the clip's error is bounded per pixel and channel by (N+1)²·e^{−σ·farClip}·Le_max
+     *  (N = maxBounces, Le_max the largest emitted radiance, the fog's glow ε/σ included;
+     *  components/quotient/README.md derives the glow term, which the quotients plan's bound
+     *  leaves out); without fog it has no stated bound. A finite
+     *  number > 0. */
+    farClip?: number;
 }
 
 /**
@@ -744,6 +835,8 @@ export interface CameraPose {
  *  Numeric fields are PLAIN numbers — every camera control is always live (the
  *  instrument principle) — EXCEPT the perspective `fov`, whose `Value<number>` spelling
  *  is load-bearing: a `{param}` fov carries the slider's path and range (scenes use it).
+ *  Fields that select the projection or the pupil's shape (fisheye `projection`, thin-lens
+ *  `blades` and `bladeRotation`) are structural: compile-time defines, not controls.
  *  Per-model field docs live on the descriptors. */
 export type CameraDescription = CameraPose & {
     type: string;
@@ -756,9 +849,11 @@ export type CameraDescription = CameraPose & {
  *  support it (today `average`). */
 export type AccumulationDescription = { type: string; variance?: boolean; [key: string]: unknown };
 
-/** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` is the
- *  shared display-glue control every curve honors. */
-export type DisplayDescription = { type: string; exposure?: number; [key: string]: unknown };
+/** Tonemap — OPEN (D2): `type` is a TONEMAP_MODELS registry key; `exposure` and
+ *  `whiteBalance` are the shared display glue every curve honors. `whiteBalance` is a
+ *  temperature in kelvin: the white of a Planck source at it is shown as D65 white
+ *  (components/tonemap/whiteBalance.ts). The raw probe path ('none') applies neither. */
+export type DisplayDescription = { type: string; exposure?: number; whiteBalance?: number; [key: string]: unknown };
 
 /**
  * GLSL shader program (vertex + fragment)

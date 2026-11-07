@@ -6,6 +6,8 @@
 
 import type { AnySceneSuiteEntry } from '../tests/witnesses/types.js';
 import { dataScenes } from './dataScenes.js';
+import { trialStillLifeEntry } from './trialStillLifeScene.js';
+import { photoScenes } from './photo/index.js';
 import type { RenderStrategy, Vec3 } from '../src/compiler/types.js';
 import { withPose } from '../src/authoring/strategy.js';
 import { cornellBox, cornellStrategy } from '../tests/witnesses/scenes/cornellBox.js';
@@ -26,6 +28,7 @@ import { sdfFieldScene, sdfFieldTableStrategy } from './sdfFieldScene.js';
 import { sdfKnotScene, sdfKnotStrategy } from './sdfKnotScene.js';
 import { sdfShapesScene, sdfShapesStrategy, sdfShapesPtStrategy } from './sdfShapesScene.js';
 import { fractalsScene, fractalsStrategy } from './fractalsScene.js';
+import { proceduralTexturesScene, proceduralTexturesStrategy } from './proceduralTexturesScene.js';
 import { customFieldsScene, customFieldsStrategy } from './customFieldsScene.js';
 import { glassLabScene, glassLabStrategies } from './glassLabScene.js';
 import { sssLabScene, sssStrategy, sssShortStrategy, sssNoScatterStrategy, sssPtStrategy } from './sssLabScene.js';
@@ -34,8 +37,10 @@ import { bottleArrayScene, bottleArrayStrategy, bottleArrayNoScatterStrategy, bo
 import { originalPresetsScene, originalPresetsStrategy, originalPresetsDeepStrategy, originalPresetsNoScatterStrategy } from './originalPresetsScene.js';
 import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
+import { torusRoomScene, torusRoomStrategy, torusRoomPtStrategy } from './torusScene.js';
+import { seifertWeberRoomScene, seifertWeberRoomStrategy, seifertWeberRoomPtStrategy } from './seifertWeberScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
-import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
+import { hearthScene, hearthNeeStrategy, hearthPtStrategy, hearthWhiteBalanceStrategy } from './hearthScene.js';
 import { spectralShowcaseScene, spectralShowcaseStrategies } from './spectralShowcaseScene.js';
 import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
 import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
@@ -49,6 +54,10 @@ import { spheresScene, spheresStrategy, spheresLinearStrategy } from './spheresS
 import { cactiScene, cactiStrategy, cactiMisStrategy } from './cactiScene.js';
 import { grandBazaarScene, grandBazaarStrategy, grandBazaarMisStrategy } from './grandBazaarScene.js';
 import { embersScene, embersStrategy, embersMisStrategy, embersPtStrategy } from './embersScene.js';
+import { hyperbolicScene, hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy } from './hyperbolicScene.js';
+import { sphericalScene, sphericalMisStrategy, sphericalNeeStrategy, sphericalPtStrategy } from './sphericalScene.js';
+import { hyperbolicSculptureScene, sphericalSculptureScene, sculptureMisStrategy, sculptureNeeStrategy, sculptureWideMisStrategy, sculptureWideNeeStrategy } from './curvedSculptureScene.js';
+import { h2xrScene, h2xrMisStrategy, h2xrNeeStrategy, h2xrPtStrategy } from './h2xrScene.js';
 
 /** Camera pose is MEASUREMENT data — stamp it onto shared strategy literals per entry. */
 const posed = (position: Vec3, target: Vec3, ...strategies: RenderStrategy[]) =>
@@ -67,6 +76,67 @@ const cornellOneshotStrategy: RenderStrategy = {
 // untracked .inst files; registry-iterating tests skip them via isAsyncSceneEntry).
 export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     ...dataScenes,
+    'trial-still-life': trialStillLifeEntry,
+    ...photoScenes,
+    hyperbolic: {
+        scene: hyperbolicScene,
+        strategies: posed([0, 0.35, 0.95], [0, -0.55, -0.25], hyperbolicMisStrategy, hyperbolicNeeStrategy, hyperbolicPtStrategy),
+        exercises:
+            'DEMO — hyperbolic space H³ (the hyperboloid model): a floor, a backdrop plane and two rings of resting balls '
+            + 'under a disk light and a sky. Equal balls at equal spacing fill rings whose length grows like 2π·sinh ρ; '
+            + 'the floor and the backdrop are ultraparallel, so the sky shows between them. Keys 1/2/3 = pt-mis / pt-nee / pt '
+            + '(same image). The orbit and fly controls move the pose in exp coordinates (not isometric motion yet).',
+        expected: 'warm light pooling on the floor under the lamp, soft contact shadows, balls shrinking quickly with distance, a strip of blue sky between the floor and the backdrop',
+    },
+    'seifert-weber-room': {
+        scene: seifertWeberRoomScene,
+        strategies: posed([0.45, 0.4, 0.6], [-0.4, -0.1, -0.6], seifertWeberRoomStrategy, seifertWeberRoomPtStrategy),
+        exercises:
+            'DEMO — the Seifert–Weber space H³/Γ (components/quotient/seifert-weber): a closed hyperbolic manifold whose '
+            + 'cell is a regular dodecahedron with 72° dihedral angles, opposite faces glued with a 3/10 twist. Beads in the '
+            + 'cell\'s corners and at its edge midpoints trace the tiling of H³ by copies of the cell (pale nodes of twenty '
+            + 'around every vertex, teal rings of five around every edge); a two-sided lamp hangs at the center beside two '
+            + 'small balls. NEE samples one of 13 images of each lamp face (partition MIS); farClip 6. Keys 1/2 = pt-mis / pt '
+            + '(same image).',
+        expected: 'the lamp at the center of a cage of pale nodes joined by teal rings, the cage repeating outward and shrinking quickly into a fine lattice',
+    },
+    spherical: {
+        scene: sphericalScene,
+        strategies: posed([0, 0.2, 0.65], [0, 0.1, -1], sphericalMisStrategy, sphericalNeeStrategy, sphericalPtStrategy),
+        exercises:
+            'DEMO — spherical space S³ (the unit-sphere model): a floor plane, a ring of resting balls and one ball near '
+            + 'the floor\'s far side, under two disk lights. The floor is a great sphere, so it also closes overhead; '
+            + 'the ring holds few balls (a circle of radius ρ has length 2π·sin ρ); the far ball is magnified near the '
+            + 'antipode. No sky: light reaches every point along both arcs. Keys 1/2/3 = pt-mis / pt-nee / pt (same image).',
+        expected: 'the ring of balls with soft contact shadows on the floor, the floor rising behind them and closing overhead as a ceiling, a large dim teal shape above (the far ball, magnified near the antipode)',
+    },
+    'hyperbolic-sculpture': {
+        scene: hyperbolicSculptureScene,
+        strategies: posed([0.1, 0.05, 1.05], [-0.3, -0.45, -0.3], sculptureMisStrategy, sculptureNeeStrategy),
+        exercises:
+            'DEMO — marched fields in H³: two scene-local sculptures written against the curved SDF vocabulary '
+            + '(geodesic balls, tubes about geodesics, smooth unions and a smooth subtraction), sphere-traced along '
+            + 'geodesics, on a floor under a disk light and a sky. Keys 1/2 = pt-mis / pt-nee (same image).',
+        expected: 'a terracotta jack (six round tips on three arms, rounded joints) floating just above the floor left of center with its shadow below, a bone-white ball pierced by three tunnels resting on the floor to the right, a small blue ball between them; the floor curves away like a dome with blue sky beyond its edge',
+    },
+    'spherical-sculpture': {
+        scene: sphericalSculptureScene,
+        strategies: posed([0.1, 0.12, 1.0], [-0.3, -0.42, -0.3], sculptureWideMisStrategy, sculptureWideNeeStrategy),
+        exercises:
+            'DEMO — marched fields in S³: the same two sculptures (one GLSL body serves both spaces), on a floor that is a '
+            + 'great sphere, under a warm and a cool disk light that reach every point along both arcs. Keys 1/2 = pt-mis / pt-nee.',
+        expected: 'the terracotta jack and the pierced bone-white ball on a pale floor, seen through a wide (1.5 rad) lens; the ball nearest the edge of the frame is stretched; warm light from above, cool light from the right',
+    },
+    h2xr: {
+        scene: h2xrScene,
+        strategies: posed([0.1, 0.35, 0.6], [-0.05, -0.55, -1.0], h2xrMisStrategy, h2xrNeeStrategy, h2xrPtStrategy),
+        exercises:
+            'DEMO — H²×R (the hyperbolic plane times the line): a floor, a backdrop wall and two rings of columns '
+            + 'with balls resting between the inner ones, under a disk light and a dim sky. The outer ring, at twice the '
+            + 'radius, needs nearly three times the columns (a circle of radius ρ has length 2π·sinh ρ); the columns stay '
+            + 'upright and parallel while the floor recedes hyperbolically. Keys 1/2/3 = pt-mis / pt-nee / pt (same image).',
+        expected: 'a pool of warm light under the lamp, upright columns receding in two rings, the outer ring dense, soft contact shadows of the balls, the backdrop wall in the distance',
+    },
     embers: {
         scene: embersScene,
         strategies: posed([9, 2.6, 9], [0, 0.8, 0], embersStrategy, embersMisStrategy, embersPtStrategy),
@@ -127,7 +197,7 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         exercises:
             'DEMO — the FIRST triangle meshes (impl-plan-meshes v0): a flat-shaded icosahedron (20 faces, per-face geometric normals — visible facets) beside a smooth icosphere (80 faces, per-vertex normals → barycentric-smooth), both on an analytic quad floor, one point light. Brute-force traversal (no BVH yet); transforms are ray-into-local.',
         expected:
-            'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+            'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image; key 3 is key 1 white-balanced to 2900 K (view.tonemap.whiteBalance): at the default temperature the tiles and the wall show their own colors as under white light (ivory, blue-gray slate, warm gray), not orange',
     },
     'spectral-showcase': {
         scene: spectralShowcaseScene,
@@ -139,11 +209,11 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     },
     hearth: {
         scene: hearthScene,
-        strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy),
+        strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy, hearthWhiteBalanceStrategy),
         exercises:
             'DEMO — the blackbody lamp + the FIRST Hit.uv reader (impl-plan-blackbody-uv): a quad lamp whose emission is {blackbody: {kelvin, scale}} — both dials DRIVEN (temperature normalization is CPU-derived; scale is independent and the power CDF re-weights live) — over a `checker` floor mixing two albedos in Hit.uv (today the placeholder planar xz chart, visibly)',
         expected:
-            'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+            'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image; key 3 is key 1 white-balanced to 2900 K (view.tonemap.whiteBalance): at the default temperature the tiles and the wall show their own colors as under white light (ivory, blue-gray slate, warm gray), not orange',
     },
     charts: {
         scene: uvChartsScene,
@@ -200,6 +270,19 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
             'DEMO — expression-driven materials (fable-imagery P2): albedo as a FORMULA over the surface chart `uv` (P1) and the shading point `p`, live sliders, zero recompiles. Left sphere = a cosine palette over uv (rainbow bands following the (θ,φ) chart); right sphere = a 3D sinusoid over the world point p (works chart-or-not). Same GlslExpression idiom the fog uses, pointed at material rows. Drag paint.freq. Keys 1 (pt-nee) / 2 (pt).',
         expected:
             'two spheres painted by math over a gray floor — the left one banded in rainbow stripes that wrap its surface, the right one a soft multicolor blob field; drag paint.freq to add bands/detail LIVE with no recompile; keys 1 and 2 converge',
+    },
+    'procedural-textures': {
+        scene: proceduralTexturesScene,
+        strategies: posed([0.35, 1.75, 4.2], [0, 0.75, 0], proceduralTexturesStrategy),
+        exercises:
+            'DEMO — the Perlin library (glsl/core/perlin.glsl, pbrt-v4 noise) called from albedo formulas at the '
+            + 'world point p: marble on a Menger sponge (sin bands shifted by fBm), wood rings on a torus, stone '
+            + 'speckle (turbulence) on a sphere. Solid noise needs no surface chart, so the fractal is textured '
+            + 'like any other surface.',
+        expected:
+            'a pale marble sponge with thin dark blue-gray veins that run continuously across its holes and faces, '
+            + 'a brown torus with concentric darker growth rings that wobble, and a gray speckled pebble, on a gray floor '
+            + 'under an overhead panel',
     },
     laser: {
         scene: laserScene,
@@ -526,5 +609,13 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         initialParameters: {
             'camera.fov': 0.9,
         },
+    },
+    'torus-room': {
+        scene: torusRoomScene,
+        strategies: posed([0.95, 0.9, 0.85], [-0.2, -1.3, -0.9], torusRoomStrategy, torusRoomPtStrategy),
+        exercises:
+            'DEMO — the cube 3-torus E³/(2Z)³ (components/quotient/torus): one cell holds three beams through its center, three balls (terracotta, glass, gold) and two sphere lamps; every ray leaving the cell comes back through the opposite face, so the room repeats in every direction. NEE samples one of 27 images of each lamp (partition MIS); farClip 16',
+        expected:
+            'an endless jungle gym of beams receding in every direction, with the same three balls and the warm and cool lamps repeating in every room; key 1 (pt-mis) and key 2 (pt) converge to the same image',
     },
 };

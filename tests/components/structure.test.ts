@@ -16,7 +16,7 @@ const ROOT = resolve(__dirname, '../../src/components');
 
 const FAMILIES = [
     'materials', 'lights', 'volume_scattering', 'geometry', 'intersection', 'accel', 'data', 'ambient',
-    'sampler', 'sensor', 'color', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport',
+    'sampler', 'sensor', 'color', 'pixel', 'camera', 'accumulator', 'tonemap', 'env', 'transport', 'quotient',
 ];
 
 // Family-root files that are NOT occupant folders (shared parts + registries + docs).
@@ -32,10 +32,17 @@ const ALLOWED_ROOT_FILES = new Set([
     'custom.ts',                           // geometry shared part (defineSDF — scene-local fields, fable-sdf-contract §5.2)
     'boundCheck.ts',                       // geometry shared part (twin-sampled bound containment — the §3 gate's core)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
+    'whiteBalance.ts',                     // tonemap shared part (the white-balance matrix, display glue every curve honors)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'values.ts',                           // colour shared questions about authored spectrum values
     'spectrumKind.ts',                     // color/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)
+    'standIn.ts',                          // color/spectra shared part (the daylight RGB stand-in of a function of wavelength)
     'table.ts',                            // lights shared part (light-table layout truth — fable-light-bvh §4)
+    'microfacet.ts',                       // materials shared part (the α derived field every microfacet model reads)
+    'microfacetTwin.ts',                   // materials shared part (TS twin of glsl/core/microfacet.glsl's lobe + the §11.3 harness the models' tests run)
+    'support.md',                          // ambient: the generated space-support table (spaceSupport.test.ts)
+    'isometry.ts',                         // ambient shared part (curved-space CPU isometry algebra)
+    'sdf.glsl',                            // ambient shared part (the curved spaces' SDF vocabulary)
 ]);
 
 describe('components structure', () => {

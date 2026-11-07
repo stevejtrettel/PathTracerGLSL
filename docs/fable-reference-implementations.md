@@ -116,8 +116,10 @@ Notes: TIR is not a special case — it is the reflection branch with F = 1 (tra
 
 ```glsl
 // phase_hg.glsl — conforms to §3.5. Fields read: mp.phase_g
-Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
-    float g = mp.phase_g, c = dot(wi, -wo);           // cos of angle from the FORWARD (propagation) direction
+// p is the scattering event's point: the cosine and the sampled direction's normalization use
+// the metric there (ambient_dot, ambient_normalize).
+Spectrum hg_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {
+    float g = mp.phase_g, c = ambient_dot(wi, -wo, p); // cos of angle from the FORWARD (propagation) direction
     // CONVENTION TRAP: with c measured from forward (-wo), the denominator is 1 + g² − 2gc
     // (forward peak at c=1 for g>0). PBRT's 1 + g² + 2gc form goes with cosθ = dot(wo, wi) —
     // mixing the two swaps forward/backward scattering AND desyncs eval from hg_sample below,
@@ -126,7 +128,7 @@ Spectrum hg_eval(Direction wi, Direction wo, MediumProperties mp) {
     return Spectrum(((1.0 - g * g) / (4.0 * PI * d * sqrt(max(d, 1e-8)))));
 }
 
-InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
+InteractionSample hg_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {
     float g = mp.phase_g;
     float cos_theta = (abs(g) < 1e-3)
         ? 1.0 - 2.0 * xi.x
@@ -136,14 +138,19 @@ InteractionSample hg_sample(Direction wo, MediumProperties mp, vec2 xi) {
     vec3 t, b; build_basis(-wo, t, b);                // frame around the propagation direction
 
     InteractionSample s;
-    s.wi     = normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta);
+    s.wi     = ambient_normalize(t * (sin_theta * cos(phi)) + b * (sin_theta * sin(phi)) + (-wo) * cos_theta, p);
     s.weight = SPECTRUM_ONE;                          // phase/pdf = 1: HG sampling is exact
-    s.pdf    = spectrum_average(hg_eval(s.wi, wo, mp)); // scalar; HG is grayscale
+    s.pdf    = spectrum_average(hg_eval(s.wi, wo, p, mp)); // scalar; HG is grayscale
     s.flags  = LOBE_MEDIUM;
     return s;
 }
-float hg_pdf(Direction wi, Direction wo, MediumProperties mp) { return spectrum_average(hg_eval(wi, wo, mp)); }
+float hg_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) { return spectrum_average(hg_eval(wi, wo, p, mp)); }
 ```
+
+Note: `build_basis` is a Euclidean construction (vec3 cross), so this sampler is correct only in
+Euclidean space; a curved space needs the tangent frame at `p` instead. The family contract,
+with this caveat, is [src/components/volume_scattering/README.md](../src/components/volume_scattering/README.md);
+the implemented file is `src/components/volume_scattering/hg/hg.glsl`.
 
 ## 4. Shadow transmittance (v1: homogeneous, segment-walking)
 
@@ -271,10 +278,10 @@ Radiance transport_trace(Ray primary) {
                 if (ls.pdf > 0.0) {
                     Spectrum T = shadow_transmittance(make_ray(p_evt, ls.wi), ls.distance);
                     // §2.2: NO cosine at medium events — phase functions have none
-                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, m) * T / ls.pdf;
+                    radiance += throughput * ls.radiance * hg_eval(ls.wi, -ray.direction, p_evt, m) * T / ls.pdf;
                 }
 
-                InteractionSample ms = hg_sample(-ray.direction, m, random2());
+                InteractionSample ms = hg_sample(-ray.direction, p_evt, m, random2());
                 throughput *= ms.weight;
                 prev_was_delta = false;  prev_bsdf_pdf = ms.pdf;  prev_p = p_evt;
                 ray = make_ray(p_evt, ms.wi);          // continue from the medium event (no surface offset)
@@ -473,7 +480,8 @@ float lighting_pdf(Point p, Direction wi, int light_id, Hit light_hit) {
 > `microfacet_sample_vndf` (plus the frame maps) — the FIXED stdlib every microfacet
 > model links, so a rough-dielectric-only program needs no conductor. The math below is
 > unchanged; only the home and the prefix are. `ggx.glsl` is now the conductor MODEL
-> alone.
+> alone. The F-free lobe below (everything but F) is `microfacet_reflect_{eval,pdf,sample}`
+> in the same file; `ggx.glsl` multiplies Schlick's F into it.
 
 ```glsl
 // ggx.glsl — rough conductor, Smith separable masking, Schlick Fresnel.
@@ -600,6 +608,41 @@ if (dot(m, wil) * wil.z < 0.0 || dot(m, wol) * wol.z < 0.0) return zero;   // ba
 
 `interaction_surface_pdf` returns the F-weighted density of whichever lobe could have
 produced `wi` (the side of `wi` decides) — MIS then sees the whole material.
+
+---
+
+## 7c. Conductor Fresnel — complex index, per wavelength lane (Mitsuba 3 / pbrt-v4)
+
+Used by `conductor` (delta reflection, weight F) and `rough_conductor` (the §7 lobe with this F
+in place of Schlick's). η + iκ is the metal's complex index **relative to the outside medium**,
+taken as given (pbrt and Mitsuba do the same; a metal under water is not corrected). Each
+wavelength lane gets its own F — reflection does not depend on λ for its direction, so there is
+no hero collapse (pbrt's `ConductorMaterial` evaluates `FrComplex` per lane with no
+`TerminateSecondary`). Transcribed from Mitsuba 3's real form
+(`include/mitsuba/render/fresnel.h`, `fresnel_conductor`), which equals pbrt-v4's complex
+`FrComplex` (`src/pbrt/util/scattering.h`) to 6e-14 in double precision over the shipped
+metals; in float32 the real form stays within 4e-6 of double, the complex form within 9e-5.
+
+```glsl
+// c = cos θᵢ ∈ [0, 1]; componentwise over the Spectrum lanes (vec3 RGB, vec4 spectral).
+Spectrum conductor_fresnel(float cos_i, Spectrum eta, Spectrum k) {
+    float c2 = cos_i * cos_i, s2 = 1.0 - c2, s4 = s2 * s2;
+    Spectrum t = eta * eta - k * k - s2;
+    Spectrum A = sqrt(t * t + 4.0 * eta * eta * k * k);    // A ≥ |t|
+    Spectrum a = sqrt(max(0.5 * (A + t), 0.0));            // rounding can make A + t < 0
+    Spectrum r_s = (A + c2 - 2.0 * cos_i * a) / (A + c2 + 2.0 * cos_i * a);
+    Spectrum r_p = r_s * (A * c2 + s4 - 2.0 * cos_i * a * s2) / (A * c2 + s4 + 2.0 * cos_i * a * s2);
+    return 0.5 * (r_s + r_p);
+}
+```
+
+Limits: c = 1 gives ((η−1)² + κ²)/((η+1)² + κ²); c = 0 gives 1; η = 0 with κ > 0 gives exactly 1
+(a perfect mirror, the defaults η = 0, κ = 1); κ → 0 with η > 1 is `dielectric_fresnel(c, 1/η)`.
+η = κ = 0 is 0/0 at c = 1, so κ > 0 is a row constraint. The rough model keeps the house's
+separable Smith G (as Mitsuba's `roughconductor`); pbrt-v4's `ConductorBxDF` uses the
+height-correlated G. Single scattering only: the conductor energy gain (§ microfacet_energy)
+would need this F's hemispherical average per lane, which is not built, so
+`measurement.microfacet: 'energy-compensated'` rejects `rough_conductor`.
 
 ---
 

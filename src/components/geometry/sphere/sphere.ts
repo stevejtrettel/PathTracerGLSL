@@ -3,15 +3,24 @@
 // fold is kind-derived (center: point → g·c, radius: length → s·r) — no override.
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import sphereGLSL from './sphere.glsl?raw';
+import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
+import sphereSphericalGLSL from './sphere_spherical.glsl?raw';
+import sphereH2xrGLSL from './sphere_h2xr.glsl?raw';
 
 export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },
     ],
-    glsl: sphereGLSL,
+    glsl: {
+        euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL },
+        hyperbolic: { origin: 'components/geometry/sphere/sphere_hyperbolic.glsl', source: sphereHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/sphere/sphere_spherical.glsl', source: sphereSphericalGLSL },
+        h2xr: { origin: 'components/geometry/sphere/sphere_h2xr.glsl', source: sphereH2xrGLSL },
+    },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
     // exactly, so a marched arm is confined to precisely this shape's interval.
@@ -23,4 +32,6 @@ export const sphereDescriptor: PrimitiveDescriptor = {
         const r = v.radius as number;
         return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
     },
+    // The ball itself.
+    ballBound: (v) => v.radius as number,
 };

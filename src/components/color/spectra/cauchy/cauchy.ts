@@ -33,7 +33,7 @@ export const cauchyKind: SpectrumKind<CauchyIndex> = {
     // An index is never emission.
     constantNonzero: () => false,
     mayBeNonzero: () => false,
-    glsl: { origin: 'components/color/spectra/cauchy/cauchy.glsl', source: cauchyGLSL },
+    glsl: () => ({ origin: 'components/color/spectra/cauchy/cauchy.glsl', source: cauchyGLSL }),
     dispersive: v => v.cauchy[1] !== 0 || (v.cauchy[2] ?? 0) !== 0,
     emit(v, ctx) {
         // Without B and C the index is A at every wavelength.

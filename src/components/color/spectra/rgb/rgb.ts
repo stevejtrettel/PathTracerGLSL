@@ -7,13 +7,13 @@ import { isValueParam } from '../../../param.js';
 import { formatFloat, formatSpectrum } from '../../../glsl-format.js';
 
 /** Plain values. In RGB programs a typed color is used exactly as typed; in spectral programs
- *  the colour model lifts it by the slot's role. */
+ *  the colour model lifts it by the slot's role (an optical constant like a coefficient). */
 export const rgbKind: SpectrumKind = {
     id: 'rgb',
     label: 'RGB',
     // The fallback: kindOf returns it for anything the named kinds do not claim.
     is: (_value): _value is unknown => true,
-    roles: ['reflectance', 'coefficient', 'emission', 'index'],
+    roles: ['reflectance', 'coefficient', 'emission', 'index', 'optical'],
     liveParams: v => isValueParam(v) ? [v.param] : [],
     toRGB(v, _role, params) {
         const raw = isValueParam(v) ? params[v.param] ?? v.default : v;

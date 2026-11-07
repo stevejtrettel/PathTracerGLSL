@@ -23,6 +23,7 @@ import { EMISSION_KEY } from '../components/materials/index.js';
 import { recordPack, sdfRecordPack } from './generate/records.js';
 import { resolveLightValues } from './generate/features/lighting.js';
 import { regionLightKind } from './plan/dataTenants.js';
+import type { ImageLayer } from './analyze/imageTextures.js';
 
 /** Where a world-space box comes from: known now, or the root box of a BVH the App builds
  *  (a mesh geometry slot's BLAS under a placement, or an instance batch's TLAS). */
@@ -74,10 +75,14 @@ export interface SceneDataPlan {
     };
     /** Region→material ids, four per texel (present with the object table). */
     regionMaterials?: { base: number; texels: number; ids: number[] };
+    /** The images material rows read, in layer order: the App loads them into one RGBA8 2D-array
+     *  texture (extern MATERIAL_TEXTURES_EXTERN), all at one size. Present only when non-empty. */
+    images?: ImageLayer[];
 }
 
-/** Build the scene-data plan from the placed scene, which every renderer on the scene shares. */
-export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): SceneDataPlan {
+/** Build the scene-data plan from the placed scene, which every renderer on the scene shares, and
+ *  the images its materials read (in layer order). */
+export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene, images: ImageLayer[]): SceneDataPlan {
     const { tenants, layout } = plan.data;
     const meshObjects = sceneMeshes(scene.objects);
     const batchObjects = sceneInstanceBatches(scene.objects);
@@ -187,6 +192,7 @@ export function sceneDataPlanOf(scene: SceneDescription, plan: PlacedScene): Sce
             .map((o) => o.materialId);
         out.regionMaterials = { base: layout.regionMaterials.base, texels: Math.ceil(tenants.tenants.regionMaterials.count / 4), ids };
     }
+    if (images.length > 0) out.images = images;
 
     return out;
 }

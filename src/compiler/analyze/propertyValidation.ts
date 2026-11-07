@@ -9,6 +9,12 @@
 //     the setting's domain, the row's own constraint or else its role's;
 //   - kind: a named kind sits in a setting of one of its roles, its declared numbers pass the
 //     same checks, and its own rules hold.
+// A material row that feeds a derived field computed only on the host (MaterialDerivedSpec.fn,
+// no per-hit form) takes only a constant or a slider: the derived value is computed from the
+// row's numbers, and a formula or a named kind has no numbers there.
+// An optical row (a metal's η, κ) takes a constant, a scalar slider (a float widget) or a named
+// kind: a formula's RGB result and a colored slider have no per-wavelength reading in a spectral
+// program, and one rule serves both color models.
 // A formula's numbers are not known before the render; its domain is the author's contract.
 
 import { GLSL_EXPRESSION_KEYS, isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
@@ -16,9 +22,9 @@ import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { namedKindOf } from '../../components/color/spectra/index.js';
 import type { SpectrumKind } from '../../components/color/spectra/spectrumKind.js';
 import { SLIDER_KEYS, unknownKeysProblem, valueParamProblems } from '../../components/param.js';
-import type { SpectrumRole, RowConstraint, PropertySchema } from '../../components/descriptors.js';
-import { MATERIAL_MODELS } from '../../components/materials/index.js';
-import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+import type { SpectrumRole, RowConstraint, PropertySchema, SpaceConstraints } from '../../components/descriptors.js';
+import { MATERIAL_MODELS, hostDerivedFieldFedBy } from '../../components/materials/index.js';
+import { VOLUME_SCATTERING_MODELS, phaseModelOf } from '../../components/volume_scattering/index.js';
 
 /** The one interpreter of RowConstraint, with one message voice for every family's rows.
  *  Scalar rules apply per component; min-length needs a vec3. */
@@ -28,7 +34,28 @@ export function constraintViolation(value: number | number[], c: RowConstraint):
     if (c.kind === 'positive') return values.some((v) => v <= 0) ? 'must be > 0' : null;
     if (c.kind === 'interval') return values.some((v) => !(v > c.min && v < c.max)) ? `must be in (${c.min}, ${+c.max.toFixed(6)})` : null;
     if (c.kind === 'closed-interval') return values.some((v) => !(v >= c.min && v <= c.max)) ? `must be in [${c.min}, ${c.max}]` : null;
+    // Exact zero tests on the authored numbers: a direction is vertical or horizontal by how it is
+    // written ([0, 1, 0], [1, 0, 0.5]), never up to a tolerance.
+    if (c.kind === 'vertical') return Array.isArray(value) && (value[0] !== 0 || value[2] !== 0) ? 'must be vertical (x = z = 0)' : null;
+    if (c.kind === 'vertical-or-horizontal') {
+        return Array.isArray(value) && value[1] !== 0 && (value[0] !== 0 || value[2] !== 0) ? 'must be vertical (x = z = 0) or horizontal (y = 0)' : null;
+    }
     return Array.isArray(value) && Math.hypot(...value) < c.value ? `length must be >= ${c.value}` : null;
+}
+
+/** The violations of a geometric row's value (a primitive's row, a light's authored row) in the
+ *  program's space: the row's own constraint, then the further domain its body in that space
+ *  requires (SpaceConstraints). */
+export function rowViolations(
+    value: number | number[], row: { constraint?: RowConstraint; constraintIn?: SpaceConstraints }, space: string,
+): string[] {
+    const found: string[] = [];
+    const own = row.constraint === undefined ? null : constraintViolation(value, row.constraint);
+    if (own !== null) found.push(own);
+    const inSpace = row.constraintIn?.[space];
+    const spaceViolation = inSpace === undefined ? null : constraintViolation(value, inSpace);
+    if (spaceViolation !== null) found.push(`${spaceViolation} in ${space} space`);
+    return found;
 }
 
 export interface PropertyValueContract {
@@ -53,7 +80,19 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
     for (const [name, mat] of Object.entries(scene.materials)) {
         if (mat.model !== 'none') {
             for (const field of MATERIAL_MODELS[mat.model]?.properties ?? []) {
-                report(valueProblems((mat as unknown as Record<string, unknown>)[field.source], rowSetting(field), `Material '${name}': ${field.source}`));
+                const value = (mat as unknown as Record<string, unknown>)[field.source];
+                const label = `Material '${name}': ${field.source}`;
+                const derived = hostDerivedFieldFedBy(mat.model, field.source);
+                const kind = namedKindOf(value);
+                if (derived !== undefined && (kind !== undefined || isGlslExpression(value))) {
+                    report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);
+                    continue;
+                }
+                if (field.role === 'optical' && (isGlslExpression(value) || (isValueParam(value as never) && Array.isArray((value as { default?: unknown }).default)))) {
+                    report([`${label} is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not ${isGlslExpression(value) ? 'an expression' : 'a vec3 {param}'}`]);
+                    continue;
+                }
+                report(valueProblems(value, rowSetting(field), label));
             }
         }
 
@@ -77,7 +116,7 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
             report(valueProblems(v, contract, label));
         }
 
-        const phase = VOLUME_SCATTERING_MODELS[mat.medium.model ?? 'hg'];
+        const phase = VOLUME_SCATTERING_MODELS[phaseModelOf(mat.medium)];
         for (const field of phase?.properties ?? []) {
             report(valueProblems((mat.medium as unknown as Record<string, unknown>)[field.source], rowSetting(field), `Material '${name}': medium.${field.source}`));
         }
@@ -103,9 +142,10 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
     const beside = unknownKeysProblem(value, [kind.id]);
     if (beside !== null) return [`${label}: the ${kind.label} value has ${beside}`];
     if (setting.role === undefined || !kind.roles.includes(setting.role)) {
-        const role = kind.roles[0];
-        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role} form`];
+        const roles = kind.roles.length === 1 ? kind.roles[0] : `${kind.roles.slice(0, -1).join(', ')} or ${kind.roles[kind.roles.length - 1]}`;
+        return [`${label}: ${kind.label} is ${/^[aeiou]/.test(roles) ? 'an' : 'a'} ${roles} form`];
     }
+    const role = setting.role;
     const problems: string[] = [];
     const fields = kind.fields;
     if (fields !== undefined) {
@@ -120,10 +160,14 @@ function kindProblems(kind: SpectrumKind, value: object, setting: PropertyValueC
         for (const [name, field] of Object.entries(fields)) {
             const number = (numbers as Record<string, unknown>)[name];
             if (number === undefined && field.optional) continue;
+            if (field.name) {
+                if (typeof number !== 'string') problems.push(`${label}: ${kind.label} ${name} must be a name`);
+                continue;
+            }
             problems.push(...numberProblems(number, field.triple ? 'vec3' : 'scalar', field.domain, `${label}: ${kind.label} ${name}`, field.slider ?? false));
         }
     }
-    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message));
+    if (problems.length === 0) kind.validate?.(value, label, (message) => problems.push(message), role);
     return problems;
 }
 

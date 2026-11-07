@@ -13,6 +13,7 @@
 // shared frame with per-projection concerns.
 
 import type { Vec3Tuple } from '../geometry/similarity.js';
+import { tangentAtOrigin, type CurvedGeometry, type Vec4 } from '../ambient/isometry.js';
 
 export interface CameraBasis {
     /** Unit view direction (position → target). */
@@ -53,4 +54,42 @@ export function cameraBasis(position: Vec3Tuple, target: Vec3Tuple): CameraBasis
     const right = normalize(cross(forward, upRef));
     const up = cross(right, forward);
     return { forward, right, up };
+}
+
+/** The camera frame in a curved space: the camera point and an orthonormal tangent frame there,
+ *  all 4-vectors (the uniforms u_cameraPosition/Forward/Right/Up). */
+export interface CurvedCameraBasis {
+    position: Vec4;
+    forward: Vec4;
+    right: Vec4;
+    up: Vec4;
+}
+
+/**
+ * The look-at frame in a curved space, by the TARGET-CENTERED up rule: pull the scene back by the
+ * transvection T to the target, so the target sits at o and the camera at P′ = T⁻¹·exp_o(position);
+ * take today's Euclidean look-at at o along −log_o(P′) (cameraBasis, its up rule included); push
+ * that frame forward by T·T(log_o P′). An orbit at fixed elevation about the target is then an
+ * exact rotation about the target's vertical geodesic (the origin-centered alternative rolls the
+ * horizon by up to 54° in H³). The composed product loses orthonormality far from o in H³, so the
+ * frame is Gram–Schmidt-ed under the form at P = exp_o(position), the authored camera point.
+ * In E³ (exp = identity, T = translation) this is cameraBasis itself.
+ */
+export function curvedCameraBasis(geom: CurvedGeometry, position: Vec3Tuple, target: Vec3Tuple): CurvedCameraBasis {
+    const T = geom.transvection(target);
+    const v = geom.log(geom.apply(geom.inverse(T), geom.exp(position)));
+    const b = cameraBasis(v, [0, 0, 0]);
+    const G = geom.compose(T, geom.transvection(v));
+    const P = geom.exp(position);
+    const scale = (a: Vec4, k: number): Vec4 => [a[0] * k, a[1] * k, a[2] * k, a[3] * k];
+    const minus = (a: Vec4, c: Vec4, k: number): Vec4 => [a[0] - k * c[0], a[1] - k * c[1], a[2] - k * c[2], a[3] - k * c[3]];
+    const unit = (a: Vec4): Vec4 => scale(a, 1 / Math.sqrt(geom.form(a, a)));
+    const tangent = (a: Vec4): Vec4 => geom.tangent(P, a);   // onto T_P
+    const forward = unit(tangent(geom.applyTangent(G, tangentAtOrigin(b.forward))));
+    let right = tangent(geom.applyTangent(G, tangentAtOrigin(b.right)));
+    right = unit(minus(right, forward, geom.form(right, forward)));
+    let up = tangent(geom.applyTangent(G, tangentAtOrigin(b.up)));
+    up = minus(up, forward, geom.form(up, forward));
+    up = unit(minus(up, right, geom.form(up, right)));
+    return { position: P, forward, right, up };
 }

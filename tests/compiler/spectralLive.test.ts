@@ -39,7 +39,7 @@ describe('live spectral colours', () => {
         expect(sky.compute(liveChanged)).not.toEqual(sky.compute(liveDefaults));
         for (const values of [liveDefaults, liveChanged, dark]) {
             const constant = spectralLiveAt(values);
-            const plan = planRenderers(analyze(constant), constant, [strategy], new DiagnosticBag('test')).plans[0];
+            const plan = planRenderers(analyze(constant), constant, [strategy], new DiagnosticBag('test'), []).plans[0];
             expect(finite.compute(values)).toEqual(computeSelectPdf(plan.lights, 'power'));
             expect(sky.compute(values)).toEqual(envSelectionProbability(plan));
         }

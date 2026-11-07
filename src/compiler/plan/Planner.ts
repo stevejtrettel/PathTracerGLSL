@@ -6,14 +6,17 @@ import { COLOR_MODELS, resolveWavelengthSampler } from '../../components/color/i
 import type { SceneDescription, RenderStrategy, MaterialModel, MediumDescription, MeshObject, Vec3, MaterialProperty, BlackbodyValue, GlslExpression, ValueParam, Transform, ParameterMetadata, SpectrumValue, DataReads, SpectralIndex } from '../types.js';
 import { isValueParam, mediumRoutesToTracking, mediumWeightsAbsorption, mediumScatters, isMeshObject, isInstancedObject } from '../types.js';
 import type { SceneFeatures } from '../analyze/types.js';
+import type { ImageLayer } from '../analyze/imageTextures.js';
+import { scatteringComputed } from '../analyze/Analyzer.js';
 import { resolveColorProperty, resolveScalarProperty } from './values.js';
 import { MATERIAL_MODELS, modelTwoSidedShading, modelIndexRow, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, applyAuthoredDefaults, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
-import { isRadiometric } from '../../components/descriptors.js';
+import { isLaneSpectrum, isRadiometric } from '../../components/descriptors.js';
 import { lightTableLayout } from '../../components/lights/table.js';
 import { meshWorldArea } from '../../components/lights/mesh/mesh.js';
 import { tonemapModel } from '../../components/tonemap/index.js';
-import { VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+import { VOLUME_SCATTERING_MODELS, phaseModelOf } from '../../components/volume_scattering/index.js';
+import { DEFAULT_ENV_CHART } from '../../components/env/index.js';
 import { PRIMITIVES, primitive, primitiveBounds, canonicalizePrimitiveParameters, classifyPlacement, resolveBackend } from '../../components/geometry/index.js';
 import {
     IDENTITY_QUAT,
@@ -30,17 +33,20 @@ import {
     type Vec3Tuple,
 } from '../../components/geometry/similarity.js';
 import { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMesh, SceneInstanceBatch, SceneLight, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
+import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMesh, SceneInstanceBatch, SceneLight, PlannedPrimitiveObject, PlannedMesh, PlannedInstanceBatch, PlannedMaterial, PlannedMedium, PlannedLight, PlannedSceneTable, ProgramDescription, PlannedPipeline, DrivenPlacement, PlannedPlacement, IsometryPlacement, ResolvedProperty, ResolvedEnvironment } from './types.js';
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, materialHasExpression, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads, objectDispatchOf, LIGHT_BACKING_MODEL } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
+import { curvedGeometryOf } from '../../components/ambient/index.js';
+import { placementIsometry, type CurvedGeometry } from '../../components/ambient/isometry.js';
+import { curvedShape, curvedLightWorld, curvedConstantPlacement } from './curved.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
 import { sceneInstanceBatches, instanceAttributeRows, placementCount } from '../../components/intersection/instancing/instancing.js';
-import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH, MARCHED_TABLE_THRESHOLD } from '../../components/intersection/index.js';
+import { DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
 
 /** Registered primitive types — unknowns must diagnose here, not throw downstream
  *  (impl-plan-geometry-descriptors: the capability IS the descriptor fact). */
@@ -67,11 +73,13 @@ function resolveEnvironment(env: SceneDescription['environment']): ResolvedEnvir
  * strategy's decisions against it (planProgram). The data layout holds the union of the optional
  * structures those decisions read, and the scene is placed in it once (placeScene). Each
  * renderer's RenderPlan is that placed scene with its own decisions and pipeline, so every
- * renderer on the scene sees the same scene facts at the same addresses.
+ * renderer on the scene sees the same scene facts at the same addresses. `images` are the layers
+ * the scene's lowered texture values read (analyze/imageTextures.ts); with any, every program
+ * declares the image lookup.
  */
-export function planRenderers(features: SceneFeatures, scene: SceneDescription, strategies: RenderStrategy[], bag: DiagnosticBag): { reads: DataReads; placed: PlacedScene; plans: RenderPlan[] } {
+export function planRenderers(features: SceneFeatures, scene: SceneDescription, strategies: RenderStrategy[], bag: DiagnosticBag, images: ImageLayer[]): { reads: DataReads; placed: PlacedScene; plans: RenderPlan[] } {
     const scenePlan = planScene(scene, bag);
-    const programs = strategies.map((strategy) => planProgram(features, scene, strategy, scenePlan));
+    const programs = strategies.map((strategy) => planProgram(features, scene, strategy, scenePlan, images.length > 0));
     const reads = unionDataReads(programs.map(dataReadsOf));
     const placed = placeScene(scene, scenePlan, reads);
     return { reads, placed, plans: programs.map((program) => ({ ...placed, program, pipeline: planPipeline(program) })) };
@@ -100,6 +108,7 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             model: mat.model,
             values: resolveMaterialValues(mat.model, mat as unknown as Record<string, MaterialProperty | undefined>),
             medium: mat.medium === undefined ? null : resolveMedium(mat.medium),
+            ...(mat.bump !== undefined ? { bump: { height: mat.bump.height, step: mat.bump.step } } : {}),
         });
     }
 
@@ -125,6 +134,9 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
     // ordinal on both sides; they just never plan).
     const meshOrdinals = new Map(sceneMeshes(scene.objects).map((m, i) => [m, i] as const));
     const batchOrdinals = new Map(sceneInstanceBatches(scene.objects).map((b, i) => [b, i] as const));
+    // A curved space places every object by an isometry (compiler/plan/curved.ts); Euclidean
+    // space folds similarities into the parameters below.
+    const geom = curvedGeometryOf(scene.ambientSpace.type);
     let objectIndex = 0;
     for (const obj of scene.objects) {
         if (isMeshObject(obj)) {
@@ -216,6 +228,15 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
         }
         const matId = materialIdMap.get(obj.material)!;   // validated by Validator
 
+        if (geom !== undefined) {
+            // Curved: the closed form or the bounded march in the object's own frame, placed by its
+            // isometry.
+            const index = objectIndex++;
+            const { parameters, isometry } = curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index);
+            objects.push({ index, materialId: matId, type: obj.type, intersect: backend === 'sdf' ? 'march' : 'closed-form', name: obj.name, parameters, isometry });
+            continue;
+        }
+
         if (backend === 'sdf') {
             // Placement (fable-transforms §5.2/§6): constant → the point param folds into
             // the placement as a pre-translation and the wrapper owns all positioning;
@@ -278,12 +299,12 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
     // Each light's values are made here. The data layout sizes the light table and tree from
     // the same list, so they cannot disagree.
     //
-    // An authored HITTABLE light desugars to an emissive region: a synthesized material (the
-    // backing model is lambert with albedo 0 — the only site that chooses it) and an object of
-    // the kind's backing primitive. The material's emission is the same value the light's rows
-    // were built from (authoredLightEmission), so the hit side and the sampler agree exactly
-    // (any mismatch makes pt and pt-nee converge to different images). An emissive OBJECT's
-    // region id is its scene index.
+    // An authored HITTABLE light desugars to an emissive region: a synthesized material of
+    // model LIGHT_BACKING_MODEL (lambert, albedo 0) and an object of the kind's backing
+    // primitive. The material's emission is the same value the light's rows were built from
+    // (authoredLightEmission), so the hit side and the sampler agree exactly (any mismatch
+    // makes pt and pt-nee converge to different images). An emissive OBJECT's region id is
+    // its scene index.
     const lights: SceneLight[] = lightRosterOf(scene).map((entry, id): SceneLight => {
         const d = LIGHT_KINDS[entry.kind];
         if ('authored' in entry.source) {
@@ -291,16 +312,24 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             // Row defaults applied once by the framework (the record the Validator judged).
             const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
             const values = d.toValues(authored, authoredLightEmission(light.emission));
-            if (d.region === undefined) return { id, kind: entry.kind, values };
+            if (d.region === undefined) return { id, kind: entry.kind, values, ...(geom === undefined ? {} : { world: curvedLightWorld(geom, d, values) }) };
             const matId = materialIndex++;
             materials.push({
                 id: matId,
                 name: `__light_${id}`,
-                model: 'lambert',
-                values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: authoredLightEmission(light.emission) as MaterialProperty }),
+                model: LIGHT_BACKING_MODEL,
+                values: resolveMaterialValues(LIGHT_BACKING_MODEL, { albedo: [0.0, 0.0, 0.0], emission: authoredLightEmission(light.emission) as MaterialProperty }),
                 medium: null,
             });
             const regionId = objectIndex++;
+            if (geom !== undefined) {
+                // Curved: the region is placed by the isometry its anchor makes, and the light's world
+                // rows are that isometry applied (curvedLightWorld), so the sampled disk or quad is the
+                // one rays hit.
+                const { parameters, isometry, pre } = curvedPlacement(geom, d.region.primitive, d.region.parameters(authored), undefined, regionId);
+                objects.push({ index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form', parameters, isometry });
+                return { id, kind: entry.kind, regionId, values, world: curvedLightWorld(geom, d, values, pre) };
+            }
             // Canonicalization (the disk's unit normal) is the same formula the kind's toValues
             // applies, so hit side and sample side stay bit-identical.
             objects.push({
@@ -458,7 +487,7 @@ export function placeScene(scene: SceneDescription, scenePlan: ScenePlan, reads:
 // Program description — what the generated program does
 // ============================================================================
 
-function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan): ProgramDescription {
+function planProgram(features: SceneFeatures, scene: SceneDescription, strategy: RenderStrategy, scenePlan: ScenePlan, readsImages: boolean): ProgramDescription {
     const { lights, materials, objects, meshes, instanceBatches } = scenePlan;
     // Surface models = the models of the PLANNED materials — the one list that already
     // includes the desugared area lights' synthesized emitter materials, so a new hittable
@@ -467,6 +496,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // models fall out of the registry filter. Registry insertion order pins the dispatch
     // order (deterministic snapshots).
     const present = new Set(materials.map((m) => m.model));
+    const perturbed = materials.filter((m) => m.bump !== undefined).map((m) => m.id);
     const brdfModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[]).filter((m) => present.has(m));
 
     // Directional-emission gates (softbeam v0): kinds declaring the emissionCone fact
@@ -516,8 +546,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     const measurement = resolveMeasurement(scene, strategy);
     const scattering = measurement.scattering;
     const vs = strategy.estimator.volumeSampling ?? 'analytic';
-    const scatteringArms = features.media.hasScatteringMedia
-        && scattering === 'full'
+    const scatteringArms = scatteringComputed(features, scattering)
         && (vs === 'analytic' || vs === 'delta-tracking');
     // Heterogeneous media (fable-heterogeneous-media.md; emission P5): some medium
     // ROUTES to a null-collision arm, so the delta/ratio occupant is included.
@@ -554,14 +583,13 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
     // Object dispatch (hoisted so regionLookup shares the decision — one truth):
     // scene-dependent default (T6) past MARCHED_TABLE_THRESHOLD; an explicit
     // strategy always wins.
-    const objectDispatch = strategy.estimator.objectDispatch
-        ?? (objects.filter((o) => o.intersect === 'march').length >= MARCHED_TABLE_THRESHOLD ? 'table' : DEFAULT_OBJECT_DISPATCH);
+    const objectDispatch = objectDispatchOf(scene, strategy);
 
     // Dispersion needs a spectral program: RGB evaluates every index at the d line.
-    const dispersion = measurement.color === 'spectral' ? planDispersion(scenePlan) : { record: null, kinds: new Set<string>() };
+    const dispersion = measurement.color === 'spectral' ? planDispersion(scenePlan) : { record: null, values: [] };
     return {
         dispersion: dispersion.record,
-        spectrumKinds: measurement.color === 'spectral' ? spectrallyEvaluatedKinds(scenePlan, scene, dispersion.kinds) : [],
+        spectrumKinds: measurement.color === 'spectral' ? spectrallyEvaluatedKinds(scenePlan, scene, dispersion.values) : [],
         measurement,
         estimator: {
             wavelengths: resolveWavelengthSampler(COLOR_MODELS[measurement.color], strategy.estimator.wavelengths),
@@ -575,7 +603,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
                 ? (strategy.estimator.mediumLightSampling ?? 'vertex')
                 : 'vertex',
             envSampler: {
-                chart: strategy.estimator.envSampler ?? 'equirect',
+                chart: strategy.estimator.envSampler ?? DEFAULT_ENV_CHART,
                 compensation: strategy.estimator.envCompensation ?? false,
             },
             // 'exponential' is reserved-not-built: the Validator rejects it before
@@ -588,9 +616,15 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             },
         },
         view: {
+            // The raw probe path ('none') applies no view transform; white balance is recorded
+            // only when authored, so programs without it describe exactly as before.
             tonemap: strategy.view.tonemap.type === 'none'
                 ? { type: 'none' }
-                : { type: strategy.view.tonemap.type, exposure: strategy.view.tonemap.exposure },
+                : {
+                    type: strategy.view.tonemap.type,
+                    exposure: strategy.view.tonemap.exposure,
+                    ...(strategy.view.tonemap.whiteBalance !== undefined ? { whiteBalance: strategy.view.tonemap.whiteBalance } : {}),
+                },
         },
         // Seam decisions (impl-plan-exact-linkage): each generated dispatch/query exists
         // iff some included technique links it — the same conditions the techniques'
@@ -617,8 +651,10 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             anyQuery: lighting !== null && !features.media.hasMedia,
             // Any leaf with a {param} transform field (fable-transforms §6) — gates
             // glsl/core/placement.glsl + the rigid-frame query tiers. (Instanced batches
-            // also need placement.glsl — the feature includes it on `instanced` too.)
-            drivenPlacement: scene.objects.some((o) => !isInstancedObject(o) && isDrivenTransform(o.transform)),
+            // also need placement.glsl — the feature includes it on `instanced` too.) A curved
+            // space's driven objects carry mat4 isometry uniforms instead and need neither.
+            drivenPlacement: curvedGeometryOf(scene.ambientSpace.type) === undefined
+                && scene.objects.some((o) => !isInstancedObject(o) && isDrivenTransform(o.transform)),
         },
         materials: {
             models: brdfModels,
@@ -647,6 +683,12 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // reading only `p` still turns charts on — correctness-safe (a uv-formula is NEVER
             // missed), slightly wasteful. Precise per-formula uv-detection is the noted follow-up.
             materialsReadUv: Object.keys(scene.materials).some((name) => materialReadsUv(name, scene)),
+            // The noise library, for the material formulas (rows and bump heights) to call.
+            ...(Object.keys(scene.materials).some((name) => materialHasExpression(name, scene)) || perturbed.length > 0 ? { noise: true as const } : {}),
+            // Bumped materials: the walk's frame swap and their masked interaction arms.
+            ...(perturbed.length > 0 ? { perturbed } : {}),
+            // The image lookup and the image array, for the lowered texture values to call.
+            ...(readsImages ? { images: true as const } : {}),
         },
         media: {
             present: features.media.hasMedia,
@@ -670,7 +712,7 @@ function planProgram(features: SceneFeatures, scene: SceneDescription, strategy:
             // live (the phase is invoked only at scatter events); [] otherwise.
             models: scatteringArms
                 ? Object.keys(VOLUME_SCATTERING_MODELS).filter((k) =>
-                    Object.values(scene.materials).some((m) => m.medium !== undefined && (m.medium.model ?? 'hg') === k))
+                    Object.values(scene.materials).some((m) => m.medium !== undefined && phaseModelOf(m.medium) === k))
                 : [],
         },
         emitters: {
@@ -761,7 +803,18 @@ export const placementOf = similarityFromTransform;
 /** Reader of one TRS field from the live parameter map (constants baked in). */
 type FieldReader<T> = (params: Record<string, unknown>) => T;
 
-export function buildDrivenPlacement(transform: Transform, index: number): DrivenPlacement {
+/** The live readers of a transform's three fields, the parameter paths they read and their slider
+ *  metadata — shared by the Euclidean lowering (buildDrivenPlacement) and the curved one
+ *  (buildDrivenIsometry), which differ only in the uniform they compute. */
+interface TransformReaders {
+    paths: string[];
+    parameters: Record<string, ParameterMetadata>;
+    readPosition: FieldReader<Vec3Tuple>;
+    readRotation: FieldReader<Quat>;
+    readScale: FieldReader<number>;
+}
+
+function transformReaders(transform: Transform, index: number): TransformReaders {
     const paths: string[] = [];
     const parameters: Record<string, ParameterMetadata> = {};
     let warned = false;
@@ -849,6 +902,11 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
         const c = (scl ?? 1) as number;
         readScale = () => c;
     }
+    return { paths, parameters, readPosition, readRotation, readScale };
+}
+
+export function buildDrivenPlacement(transform: Transform, index: number): DrivenPlacement {
+    const { paths, parameters, readPosition, readRotation, readScale } = transformReaders(transform, index);
 
     // The §6.1 rigid-form inverse, computed fp64 host-side (rigidInverse = the ONE ABI truth,
     // shared with instancing's constant-placement lowering).
@@ -865,6 +923,35 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
             { name: uniformQ, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalQ({}), compute: evalQ },
             { name: uniformTS, type: 'vec4', parameterPath: paths[0], parameterPaths: paths, default: evalTS({}), compute: evalTS },
         ],
+        parameters,
+    };
+}
+
+/** A curved object's intrinsic parameters, its anchor `pre` (curvedShape) and its placement: the
+ *  inverse of g = T(position)·R(rotation)·T(pre), baked when the transform is constant, a mat4
+ *  uniform when it is {param}-driven. */
+function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; pre: Vec3Tuple; isometry: IsometryPlacement } {
+    if (isDrivenTransform(transform)) {
+        const { parameters, pre } = curvedShape(type, rawParameters);
+        return { parameters, pre, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
+    }
+    const { parameters, pre, g } = curvedConstantPlacement(geom, type, rawParameters, transform);
+    return { parameters, pre, isometry: { kind: 'constant', inverse: geom.inverse(g) } };
+}
+
+/** The curved-space lowering of a driven transform: one mat4 uniform `u_object<i>Isometry`, the
+ *  inverse of g = T(position)·R(rotation)·T(pre) recomputed in fp64 from the parameter map
+ *  (`pre` is the shape's folded point row). The scale field is not read: a scale other than 1
+ *  is rejected in curved spaces (SPACE_LIMITATIONS). */
+export function buildDrivenIsometry(geom: CurvedGeometry, transform: Transform, pre: Vec3Tuple, index: number): IsometryPlacement {
+    const { paths, parameters, readPosition, readRotation } = transformReaders(transform, index);
+    const evalInverse = (p: Record<string, unknown>): number[] =>
+        geom.inverse(placementIsometry(geom, readPosition(p), readRotation(p), pre));
+    const uniform = `u_object${index}Isometry`;
+    return {
+        kind: 'driven',
+        uniform,
+        uniforms: [{ name: uniform, type: 'mat4', parameterPath: paths[0], parameterPaths: paths, default: evalInverse({}), compute: evalInverse }],
         parameters,
     };
 }
@@ -934,8 +1021,10 @@ export function resolveMaterialValues(
     if (model === 'none') return values;
     for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
         const v = authored[row.source];
-        values[row.source] = row.role === 'index' && namedKindOf(v) !== undefined ? v as SpectralIndex : row.glslType === 'Spectrum'
-            ? resolveColorProperty(v, [row.default, row.default, row.default])
+        // An optical slider is a scalar (a float widget); its vec3 uniform broadcasts it.
+        values[row.source] = row.role === 'index' && namedKindOf(v) !== undefined ? v as SpectralIndex
+            : row.role === 'optical' && isValueParam(v) ? v as ValueParam<number>
+            : row.glslType === 'Spectrum' ? resolveColorProperty(v, [row.default, row.default, row.default])
             : resolveScalarProperty(v, row.default);
     }
     return values;
@@ -945,7 +1034,7 @@ export function resolveMaterialValues(
  *  are the medium's OWN model's schema rows (union fields of other present models fall
  *  back to their row defaults at emit time). */
 function resolveMedium(med: MediumDescription): PlannedMedium {
-    const model = med.model ?? 'hg';
+    const model = phaseModelOf(med);
     const values: PlannedMedium['values'] = {};
     for (const row of VOLUME_SCATTERING_MODELS[model]?.properties ?? []) {
         values[row.source] = resolveScalarProperty(
@@ -976,14 +1065,15 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
  *  the pbrt worldRadius for `power(values, ctx)` (impl-plan-directional-beam P6).
  *  VARIANCE-ONLY by contract (selection weights; cdf_rescale keeps them unbiased), so
  *  coarse by license: folded analytic objects through the bounds fact (unbounded
- *  primitives — plane — and local-frame/driven objects skipped), closed meshes as
+ *  primitives — plane — and local-frame/driven/curved objects skipped), closed meshes as
  *  placed spheres around their local boxes; SDF objects and instance batches skipped.
  *  Nothing boundable → 10, the constant the directional descriptor's ctx-fallback twins. */
 function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[]): number {
     let r = 0;
     let any = false;
     for (const o of analytic) {
-        if (o.placement !== undefined) continue;   // local-frame parameters are not world boxes
+        // Local-frame parameters (a similarity's or a curved isometry's) are not world boxes.
+        if (o.placement !== undefined || o.isometry !== undefined) continue;
         const b = primitiveBounds(o.type, o.parameters) ?? undefined;
         if (b === undefined) continue;
         // Max corner norm of the world AABB: per-axis worst magnitude, combined.
@@ -1014,40 +1104,44 @@ function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[])
     return any ? Math.max(r, 1e-3) : 10;
 }
 
-/** The named kinds a spectral program evaluates at wavelengths, in registry order: a named
- *  kind in any radiometric setting (a material row, a light row, the constant sky's
- *  emission), and the dispersive index kinds. */
-function spectrallyEvaluatedKinds(scenePlan: ScenePlan, scene: SceneDescription, dispersive: Set<string>): string[] {
-    const used = new Set(dispersive);
+/** The named kinds a spectral program evaluates at wavelengths, in registry order, each with
+ *  its distinct values: a named kind in any radiometric or optical setting (a material row, a
+ *  light row, the constant sky's emission), and the dispersive index values. */
+function spectrallyEvaluatedKinds(scenePlan: ScenePlan, scene: SceneDescription, dispersive: unknown[]): ProgramDescription['spectrumKinds'] {
     const values = [
+        ...dispersive,
         ...scenePlan.materials.flatMap(m => (MATERIAL_MODELS[m.model]?.properties ?? [])
-            .filter(row => isRadiometric(row.role)).map(row => m.values[row.source])),
+            .filter(row => isLaneSpectrum(row.role)).map(row => m.values[row.source])),
         ...scenePlan.lights.flatMap(l => LIGHT_KINDS[l.kind].params
             .filter(row => isRadiometric(row.role)).map(row => l.values[row.name])),
         ...(scene.environment?.type === 'constant' ? [scene.environment.color] : []),
     ];
+    const byKind = new Map<string, Map<string, unknown>>();
     for (const v of values) {
         const kind = namedKindOf(v);
-        if (kind !== undefined) used.add(kind.id);
+        if (kind === undefined) continue;
+        if (!byKind.has(kind.id)) byKind.set(kind.id, new Map());
+        byKind.get(kind.id)!.set(JSON.stringify(v), v);
     }
-    return SPECTRUM_KINDS.filter(k => used.has(k.id)).map(k => k.id);
+    return SPECTRUM_KINDS.filter(k => byKind.has(k.id)).map(k => ({ id: k.id, values: [...byKind.get(k.id)!.values()] }));
 }
 
 /** Dispersive index materials and the real interiors they fill; only real interiors supply a
- *  region index, thin meshes and batches remain vacuum. Also returns the index kinds used. */
-function planDispersion(scene: ScenePlan): { record: ProgramDescription['dispersion']; kinds: Set<string> } {
+ *  region index, thin meshes and batches remain vacuum. Also returns the dispersive index
+ *  values. */
+function planDispersion(scene: ScenePlan): { record: ProgramDescription['dispersion']; values: unknown[] } {
     const indexMaterials = scene.materials.filter(m => modelIndexRow(m.model) !== undefined).map(m => m.id);
-    const kinds = new Set<string>();
+    const values: unknown[] = [];
     const dispersiveMaterials = new Set(scene.materials.filter(m => {
         const row = modelIndexRow(m.model);
         const value = row !== undefined ? m.values[row.source] : undefined;
         const kind = namedKindOf(value);
         if (m.medium?.ior !== undefined || kind === undefined || !kind.dispersive(value)) return false;
-        kinds.add(kind.id);
+        values.push(value);
         return true;
     }).map(m => m.id));
     const regions = [...scene.objects, ...scene.meshes.filter(m => m.closed),
         ...scene.instanceBatches.filter(b => b.hasInterior === true)]
         .filter(o => dispersiveMaterials.has(o.materialId)).map(o => o.index);
-    return { record: dispersiveMaterials.size > 0 ? { indexMaterials, regions } : null, kinds };
+    return { record: dispersiveMaterials.size > 0 ? { indexMaterials, regions } : null, values };
 }

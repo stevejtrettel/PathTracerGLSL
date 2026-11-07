@@ -18,7 +18,7 @@ const fixture = (): SceneDescription => ({ ...structuredClone(minimalScene), mat
     sphere: { model: 'dielectric', ior: { cauchy: [1.5, 0.01] } }, ground: { model: 'lambert', albedo: 0.5 },
 } });
 function program(scene: SceneDescription, strategy = spectral) {
-    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag()).plans[0].program;
+    return planRenderers(analyze(scene), scene, [strategy], new DiagnosticBag(), []).plans[0].program;
 }
 describe('Cauchy authoring and dispersion planning', () => {
     it('uses micrometre coefficients and the fixed RGB d-line reference', () => {
@@ -58,7 +58,7 @@ describe('Cauchy authoring and dispersion planning', () => {
             expect(walk.indexOf('if (bounce ==')).toBeLessThan(walk.indexOf('collapse_wavelengths(s)'));
             expect(walk.indexOf('collapse_wavelengths(s)')).toBeLessThan(walk.indexOf('light_sample_direct(s'));
             expect(program(scene, choice).dispersion).toEqual({ indexMaterials: [0], regions: [1] });
-            expect(program(scene, choice).spectrumKinds).toEqual(['cauchy']);
+            expect(program(scene, choice).spectrumKinds.map((k) => k.id)).toEqual(['cauchy']);
         });
     }
     it('records only index consumers and real interiors', () => {
@@ -75,7 +75,7 @@ describe('Cauchy authoring and dispersion planning', () => {
         scene.objects = [{ kind: 'instanced', prototype: { type: 'sphere', parameters: { radius: 1 }, material: 'sphere' },
             placements: [{ position: [-1, 0, 0] }, { position: [1, 0, 0] }] }];
         expect(program(scene).dispersion).toEqual({ indexMaterials: [0], regions: [0] });
-        expect(program(scene).spectrumKinds).toEqual(['cauchy']);
+        expect(program(scene).spectrumKinds.map((k) => k.id)).toEqual(['cauchy']);
         for (const [id, shader] of compiler.compile(scene, spectral).shaders) glslangCheck(shader.fragment, 'frag', id);
     });
     it('retains constant-index data under mixed renderer ordering', () => {
@@ -129,7 +129,7 @@ describe('Sellmeier authoring', () => {
             const strategy = { ...spectral, estimator: { ...spectral.estimator, objectDispatch } };
             const p = program(scene, strategy);
             expect(p.dispersion).toEqual({ indexMaterials: [0], regions: [1] });
-            expect(p.spectrumKinds).toEqual(['sellmeier']);
+            expect(p.spectrumKinds.map((k) => k.id)).toEqual(['sellmeier']);
             const renderer = compiler.compile(scene, strategy);
             for (const [id, shader] of renderer.shaders) glslangCheck(shader.fragment, 'frag', id);
             const source = [...renderer.shaders.values()].map(s => s.fragment).join('\n');
@@ -137,7 +137,7 @@ describe('Sellmeier authoring', () => {
             expect(source).not.toContain('cauchy_index');
             // Both forms coexist without changing the material or transport contracts.
             scene.materials.ground = { model: 'dielectric', ior: { cauchy: [1.4, 0.01] } };
-            expect(program(scene, strategy).spectrumKinds).toEqual(['cauchy', 'sellmeier']);
+            expect(program(scene, strategy).spectrumKinds.map((k) => k.id)).toEqual(['cauchy', 'sellmeier']);
             for (const [id, shader] of compiler.compile(scene, strategy).shaders) glslangCheck(shader.fragment, 'frag', id);
         });
     }

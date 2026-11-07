@@ -87,7 +87,7 @@ describe('boxed-SDF table plan (fable-sdf-accel T2)', () => {
 // the twin passed at 0.00%/0.00% while comparing the table against itself.
 describe('the sdf-table-twin arms stay two regimes', () => {
     const dispatchOf = (strategy: typeof sdfTableStrategy) =>
-        planRenderers(analyze(sdfTableTwin), sdfTableTwin, [strategy], new DiagnosticBag('test')).plans[0].program.intersection.objectDispatch;
+        planRenderers(analyze(sdfTableTwin), sdfTableTwin, [strategy], new DiagnosticBag('test'), []).plans[0].program.intersection.objectDispatch;
 
     it('the unrolled arm really plans unrolled (never inherits the scene-dependent default)', () => {
         expect(dispatchOf(sdfUnrolledStrategy)).toBe('unrolled');

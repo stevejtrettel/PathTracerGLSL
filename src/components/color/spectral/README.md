@@ -5,7 +5,7 @@ with a CIE 1931 sensor by default. Current public support is nonnegative RGB
 emission and constant/image/procedural skies, reflectance colours in [0,1], live RGB
 colour parameters, surface RGB expressions, PT/NEE/MIS, light-tree selection and
 instancing with constant or per-instance RGB colours. Homogeneous and heterogeneous media support absorption, scattering and volume emission.
-Wavelength-independent GRIN and [Planck blackbody emission](../spectra/blackbody/README.md) are supported; Cauchy and Sellmeier indices are also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar, Cauchy and Sellmeier wavelength-dependent IOR; see the
+Wavelength-independent GRIN, [Planck blackbody emission](../spectra/blackbody/README.md) and [measured tables](../spectra/measured/README.md) (metal η and κ, ColorChecker reflectances, CIE illuminants) are supported; Cauchy and Sellmeier indices are also supported; other non-RGB forms remain rejected. All six existing surface models are supported: Lambert, checker, mirror, GGX, dielectric and rough dielectric. Glass supports scalar, Cauchy and Sellmeier wavelength-dependent IOR; see the
 [index/collapse contract](../spectra/cauchy/README.md).
 
 ## Measurement and sampling
@@ -200,6 +200,18 @@ This is an author contract; the compiler does not prove arbitrary GLSL bounds an
 no runtime clamp. Parameter bounds describe the controls, not the resulting colour;
 a negative phase parameter is valid when its formula still returns valid RGB.
 Expressions return RGB, not explicit wavelength-dependent spectra.
+
+A material expression may call the solid-noise functions `perlin_noise(vec3)`,
+`perlin_fbm(vec3, omega, octaves)` and `perlin_turbulence(vec3, omega, octaves)`
+(src/glsl/core/perlin.glsl, pbrt-v4's noise). The program includes them when some material
+row is an expression. Their header states the bounds that keep a formula inside its domain.
+
+An image texture (`{ texture: name, uvScale? }` in a reflectance row, the image declared in
+`scene.textures` with its `colorspace`) becomes such an expression before Analyze:
+`image_texture(layer, uv, srgb).rgb` (src/glsl/shared/image_texture.glsl). It filters the decoded
+texels in RGB and the resolver lifts the filtered value, as pbrt-v4 does; Mitsuba's lift of each
+texel before the blend is a different field. Its values lie in [0, 1] by construction, so the
+reflectance domain holds without an author contract.
 
 Expression emission remains path-found under the existing light eligibility rules;
 it is not inserted into the finite-light sampling roster or light tree. PT, NEE and

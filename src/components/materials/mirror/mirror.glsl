@@ -10,7 +10,7 @@
 // f0-from-(η,k) authoring sugar).
 // Provides: mirror_eval(), mirror_sample(), mirror_pdf(), mirror_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
-//             LOBE_DELTA, SPECTRUM_ZERO/ONE, ambient_dot, schlick_fresnel (core math).
+//             LOBE_DELTA, SPECTRUM_ZERO/ONE, ambient_dot/ambient_normalize, schlick_fresnel (core math).
 
 Spectrum mirror_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return SPECTRUM_ZERO; } // pure delta
 float    mirror_pdf (Direction wi, Direction wo, Hit hit, MaterialProperties mp) { return 0.0; }
@@ -24,7 +24,7 @@ InteractionSample mirror_sample(Direction wo, Hit hit, MaterialProperties mp, fl
     Spectrum F = schlick_fresnel(mp.f0, cos_i);
 
     InteractionSample s;
-    s.wi     = normalize(2.0 * cos_i * n - wo);
+    s.wi     = ambient_normalize(2.0 * cos_i * n - wo, hit.p);
     s.weight = F;                        // F·|cos|/pdf with the delta cancellation (§2.1)
     s.pdf    = 0.0;
     s.flags  = LOBE_REFLECTION | LOBE_DELTA;

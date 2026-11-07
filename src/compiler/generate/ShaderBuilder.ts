@@ -16,6 +16,8 @@ import displayMathGLSL from '../../glsl/shared/display.glsl?raw';
 import blueNoiseGLSL from '../../glsl/shared/noise.glsl?raw';
 import viewsGLSL from '../../glsl/shared/views.glsl?raw';
 import { tonemapModel, type TonemapDescriptor } from '../../components/tonemap/index.js';
+import { whiteBalanceMatrix } from '../../components/tonemap/whiteBalance.js';
+import { formatFloat } from '../../components/glsl-format.js';
 
 export interface ShaderBuildResult {
     shaders: Map<string, ShaderProgram>;
@@ -77,6 +79,7 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
     // 'none' is the raw probe path: exposure forced to 1.0 so a pixel IS the accumulator
     // value (§11). Every encoding occupant applies the requested exposure.
     const exposure = tonemap.type === 'none' ? 1.0 : (tonemap.exposure ?? 1.0);
+    const view = displayView(tonemap.whiteBalance, exposure);   // the Planner records no white balance under 'none'
     // The display pass's resources are declared HERE, not in the tonemap occupants: one
     // sampler per picture (the pass's texture inputs), u_picture choosing among them when
     // there is more than one, and the engine builtin u_resolution — occupants contain the
@@ -92,7 +95,7 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
         ...pictures.map((p) => `uniform sampler2D ${p.display};`),
         ...(pictures.length > 1 ? ['uniform int u_picture;'] : []),
         ...(dither ? ['uniform sampler2D u_blueNoise;'] : []),
-        `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
+        view.declaration,
     ].join('\n');
     return [
         { origin: 'generated:display-header', source: header },
@@ -102,8 +105,32 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
         ...(dither ? [{ origin: 'glsl/shared/noise.glsl', source: blueNoiseGLSL }] : []),
         // Origin DERIVED from the registry key (D2 — the path convention is the one truth).
         { origin: `components/tonemap/${model.type}/${model.type}.glsl`, source: model.glsl },
-        { origin: 'generated:display-main', source: buildDisplayMain(model, pictures) },
+        { origin: 'generated:display-main', source: buildDisplayMain(model, pictures, view.apply) },
     ];
+}
+
+/** The linear part of the view, applied to a tonemap-view picture before the curve: exposure,
+ *  times the white-balance matrix when one is authored. `apply(x)` is the GLSL for the
+ *  transformed, sanitized color. White balance acts before safe_color, because its matrix has
+ *  negative entries: a saturated color can map to a negative channel, which the curves must not
+ *  see. Every tonemap-view picture goes through it, the variance picture included; the matrix
+ *  applied to per-channel variances is not the variance of the balanced color (that needs the
+ *  covariances), so a balanced variance picture is for looking only, as its exposure scaling
+ *  (by k, not k²) already makes it. */
+function displayView(whiteBalance: number | undefined, exposure: number): { declaration: string; apply: (x: string) => string } {
+    if (whiteBalance === undefined) {
+        return {
+            declaration: `#define DISPLAY_EXPOSURE ${exposure.toPrecision(8)}`,
+            apply: (x) => `safe_color(${x}) * DISPLAY_EXPOSURE`,
+        };
+    }
+    const M = whiteBalanceMatrix(whiteBalance);
+    // GLSL fills a mat3 column by column.
+    const columns = [0, 1, 2].flatMap((col) => [0, 1, 2].map((row) => formatFloat(exposure * M[row][col])));
+    return {
+        declaration: `const mat3 DISPLAY_VIEW = mat3(${columns.join(', ')});`,
+        apply: (x) => `safe_color(DISPLAY_VIEW * ${x})`,
+    };
 }
 
 /** The composed display main() — policy/plumbing (generated), calling the occupant's
@@ -112,8 +139,8 @@ function buildDisplayBlocks(tonemap: ProgramDescription['view']['tonemap'], pict
  *  (its index in the planned list) chooses which — GLSL ES 3.00 cannot index samplers
  *  dynamically. When some picture uses a data view ('unit', 'signed'), each branch computes
  *  its own final color instead (buildDataViewMain). */
-function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]): string {
-    if (pictures.some((p) => p.view !== 'tonemap')) return buildDataViewMain(model, pictures);
+function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[], view: (x: string) => string): string {
+    if (pictures.some((p) => p.view !== 'tonemap')) return buildDataViewMain(model, pictures, view);
     // Dither in display-code space, right before the implicit 8-bit write: ±½ LSB of
     // blue noise, INDEPENDENT per channel (blue_noise returns a decorrelated RGB triple),
     // turns quantization banding into imperceptible high-frequency grain.
@@ -124,12 +151,12 @@ function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]):
     const [main, ...rest] = pictures;
     const fetch = (p: PlannedPicture) => `texture(${p.display}, uv).rgb`;
     const pick = rest.length === 0
-        ? [`    vec3 color = safe_color(${fetch(main)}) * DISPLAY_EXPOSURE;`]
+        ? [`    vec3 color = ${view(fetch(main))};`]
         : [
             '    vec3 picture;',
             ...rest.map((p, i) => `    ${i === 0 ? 'if' : 'else if'} (u_picture == ${p.attachment}) picture = ${fetch(p)};`),
             `    else picture = ${fetch(main)};`,
-            '    vec3 color = safe_color(picture) * DISPLAY_EXPOSURE;',
+            `    vec3 color = ${view('picture')};`,
         ];
     return [
         'void main() {',
@@ -146,7 +173,7 @@ function buildDisplayMain(model: TonemapDescriptor, pictures: PlannedPicture[]):
  *  exposure, the curve, the sRGB encode), a data picture through its fixed view (views.glsl),
  *  which applies neither exposure nor the curve and keeps negative values until it maps them.
  *  The dither, when the occupant encodes to display bytes, is applied once after the choice. */
-function buildDataViewMain(model: TonemapDescriptor, pictures: PlannedPicture[]): string {
+function buildDataViewMain(model: TonemapDescriptor, pictures: PlannedPicture[], view: (x: string) => string): string {
     const viewFn: Record<PlannedPicture['view'], string> = { tonemap: 'view_tonemap', unit: 'view_unit', signed: 'view_signed' };
     const shown = (p: PlannedPicture) => `${viewFn[p.view]}(texture(${p.display}, uv).rgb)`;
     const [main, ...rest] = pictures;
@@ -154,7 +181,7 @@ function buildDataViewMain(model: TonemapDescriptor, pictures: PlannedPicture[])
     return [
         ...(tonemapped ? [
             'vec3 view_tonemap(vec3 picture) {',
-            '    vec3 color = safe_color(picture) * DISPLAY_EXPOSURE;',
+            `    vec3 color = ${view('picture')};`,
             `    color = ${model.curveFn}(color);`,
             ...(model.encodesToDisplay ? ['    color = clamp(linear_to_srgb(color), 0.0, 1.0);'] : []),
             '    return color;',
@@ -218,10 +245,10 @@ function buildUniformDeclarations(uniforms: PlannedUniform[], textures: PlannedT
     }
 
     // Feature-declared external textures (§2.10): the sampler declaration matches the
-    // pass-input name PipelineBuilder threads through as `extern:<name>`. Integer
+    // pass-input name PipelineBuilder threads through as `extern:<name>`. Integer and array
     // samplers carry explicit highp (no default precision for them in ES 3.00).
     for (const t of textures) {
-        const precision = t.samplerType === 'usampler2D' || t.precision === 'highp' ? 'highp ' : '';
+        const precision = t.samplerType !== undefined || t.precision === 'highp' ? 'highp ' : '';
         lines.push(`uniform ${precision}${t.samplerType ?? 'sampler2D'} ${t.name};`);
     }
 

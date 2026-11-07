@@ -54,7 +54,13 @@ exports[`scene-data textures (byte fingerprints) > blackbody-lamp-batch 1`] = `
 
 exports[`scene-data textures (byte fingerprints) > blackhole 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > bokeh-edge 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bump-sides 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > bump-tilt 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > cacti 1`] = `
 {
@@ -74,6 +80,12 @@ exports[`scene-data textures (byte fingerprints) > chrome 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > clamp 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > clamp-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-gold 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > conjugation 1`] = `null`;
 
@@ -118,6 +130,8 @@ exports[`scene-data textures (byte fingerprints) > driven-baked-theta2 1`] = `nu
 
 exports[`scene-data textures (byte fingerprints) > driven-theta2 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > e3-specular 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > embers 1`] = `
 {
   "nodes": "4096x9 b6ae125c4d9b689a",
@@ -144,6 +158,8 @@ exports[`scene-data textures (byte fingerprints) > expr-const 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > expr-const-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > field-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > filter-edge 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > flatten-tree 1`] = `null`;
 
@@ -258,6 +274,52 @@ exports[`scene-data textures (byte fingerprints) > gyroid-field 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > h2xr 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-disk-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h2xr-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-disk-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-ggx 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-klein-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-medium 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-quad-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-rough-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-ball-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-blend 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sdf-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-shapes 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sky 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sky-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-specular 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sphere-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > h3-sphere-light-blocker 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > haze 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > hearth 1`] = `null`;
@@ -282,6 +344,16 @@ exports[`scene-data textures (byte fingerprints) > hundred-spheres 1`] = `
   "records": "4096x1 0da2482c95cd5bcb",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > hyperbolic 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > hyperbolic-sculpture 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-linear 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > image-texture-spectral 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > instance-fog 1`] = `
 {
@@ -549,6 +621,10 @@ exports[`scene-data textures (byte fingerprints) > models 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > ms-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > ms-furnace-control 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > null-budget 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > null-budget-view 1`] = `null`;
@@ -637,6 +713,10 @@ exports[`scene-data textures (byte fingerprints) > perf-sdf-cluster-128 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > plastic-chroma 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > plastic-furnace 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > porcelain 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
@@ -649,6 +729,8 @@ exports[`scene-data textures (byte fingerprints) > porcelain-array 1`] = `
 exports[`scene-data textures (byte fingerprints) > proc-sky 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > proc-sky-rotated 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > procedural-textures 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rayleigh 1`] = `null`;
 
@@ -665,6 +747,8 @@ exports[`scene-data textures (byte fingerprints) > regions-transformed-ref 1`] =
 
 exports[`scene-data textures (byte fingerprints) > rough-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > rough-furnace-expr 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > rough-grin 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-grin-ref 1`] = `null`;
@@ -674,6 +758,40 @@ exports[`scene-data textures (byte fingerprints) > rough-mis 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > rough-sheet 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-smooth-limit 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-ggx 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-long-arc 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-long-arc-blocker 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-medium 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-point-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-quad-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-rough-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-ball 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-ball-ref 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-blend 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sdf-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-shapes 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-specular 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light-antipodal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-sphere-light-blocker 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
 {
@@ -712,6 +830,12 @@ exports[`scene-data textures (byte fingerprints) > sdf-table-twin 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > seifert-weber-lights 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > seifert-weber-room 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > seifert-weber-windows 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > shadow-aim-far 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > shadow-aim-fog 1`] = `null`;
@@ -719,6 +843,10 @@ exports[`scene-data textures (byte fingerprints) > shadow-aim-fog 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > shadow-aim-march 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > shadow-medium 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sheen-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > sheen-fuzz 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sky 1`] = `null`;
 
@@ -762,6 +890,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-blackbody-tree 1`] =
   "records": "4096x1 aecdcae316b2858e",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > spectral-colorchecker-d65 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-colored-furnace 1`] = `null`;
 
@@ -875,6 +1005,13 @@ exports[`scene-data textures (byte fingerprints) > spectral-materials 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > spectral-measured-lamps 1`] = `
+{
+  "nodes": "4096x1 7bb8a806d83cff31",
+  "records": "4096x1 8ece9f215a148954",
+}
+`;
+
 exports[`scene-data textures (byte fingerprints) > spectral-mirror 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-packed 1`] = `
@@ -892,6 +1029,8 @@ exports[`scene-data textures (byte fingerprints) > spectral-packed-ref 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > spectral-plane 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spectral-plastic 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spectral-proc-sky 1`] = `null`;
 
@@ -930,6 +1069,10 @@ exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > spherical 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > spherical-sculpture 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > spot 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sss-furnace 1`] = `null`;
@@ -944,6 +1087,8 @@ exports[`scene-data textures (byte fingerprints) > sun 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > sun-haze 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > thin-pane 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > thinlens-zero 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > tiny-sphere 1`] = `null`;
@@ -951,6 +1096,42 @@ exports[`scene-data textures (byte fingerprints) > tiny-sphere 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > tiny-sphere-light 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > tonemap 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-fog-ref 1`] = `
+{
+  "nodes": "4096x22 6c870d4a3bf99324",
+  "records": "4096x6 c996e477a42bb7f4",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-crystal-ref 1`] = `
+{
+  "nodes": "4096x22 6c870d4a3bf99324",
+  "records": "4096x6 c996e477a42bb7f4",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-fog 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > torus-lights 1`] = `
+{
+  "nodes": "4096x1 30c4bd8c026da13d",
+  "records": "4096x1 17dce84c7e609e13",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-lights-fog 1`] = `
+{
+  "nodes": "4096x1 30c4bd8c026da13d",
+  "records": "4096x1 17dce84c7e609e13",
+}
+`;
+
+exports[`scene-data textures (byte fingerprints) > torus-room 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > transform-bake 1`] = `null`;
 
@@ -963,7 +1144,11 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
 }
 `;
 
+exports[`scene-data textures (byte fingerprints) > veach-metals 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > veach-mis-varying 1`] = `null`;
 
 exports[`scene-data textures — instanced sphere lights with per-instance emission > instance-lights with an emission attribute 1`] = `
 {

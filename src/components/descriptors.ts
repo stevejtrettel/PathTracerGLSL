@@ -15,6 +15,38 @@ import type { MaterialModel, ValueParam, BlackbodyValue } from '../compiler/type
 import type { Similarity } from './geometry/similarity.js';
 import type { AABB } from './accel/bvh/bvh.js';
 
+/** A GLSL file and the path it is reported under (its program block's origin). */
+export interface GlslFile {
+    origin: string;
+    source: string;
+}
+
+/** An occupant's GLSL in each ambient space it implements, keyed by AMBIENT_SPACES key. An
+ *  occupant supports a space exactly when it has a body for it: compiling in a space is no
+ *  evidence of being correct there (a point light falls off as 1/r² in E³ and 1/sinh² r in
+ *  H³). There is no wildcard key. A body that is correct in several spaces is listed under
+ *  each space it has been checked in, with one origin. */
+export type SpaceBodies = { readonly [space: string]: GlslFile | undefined };
+
+/** The ambient spaces an occupant implements when its code is emitted from TypeScript rather
+ *  than kept in a GLSL file (the estimator registries: light selection, mesh traversal,
+ *  instance traversal, object dispatch). The same rule as SpaceBodies: a space is listed only
+ *  once the occupant has been checked in it. */
+export type SpaceList = readonly string[];
+
+/** The spaces an occupant implements, in the order its bodies are listed. */
+export function spacesOf(glsl: SpaceBodies): string[] {
+    return Object.keys(glsl).filter((space) => glsl[space] !== undefined);
+}
+
+/** The occupant's body for `space`. Throws when there is none: the Validator's space gate
+ *  rejects such a program before generation. */
+export function bodyFor(glsl: SpaceBodies, space: string, occupant: string): GlslFile {
+    const body = glsl[space];
+    if (body === undefined) throw new Error(`${occupant} has no ${space} body (the Validator's space gate should have rejected it)`);
+    return body;
+}
+
 /** THE one constraint vocabulary (descriptor-unification D1): a rule a machine can READ —
  *  one checker, one error voice, one contract test, UI-consumable ranges. Shared by every
  *  family's rows (primitives, material/phase properties, lights' authored params).
@@ -31,7 +63,22 @@ export type RowConstraint =
     | { kind: 'positive' }
     | { kind: 'min-length'; value: number }
     | { kind: 'interval'; min: number; max: number }
-    | { kind: 'closed-interval'; min: number; max: number };
+    | { kind: 'closed-interval'; min: number; max: number }
+    /** A direction along ±y (x = z = 0 exactly). */
+    | { kind: 'vertical' }
+    /** A direction along ±y or in the xz-plane (y = 0 exactly). */
+    | { kind: 'vertical-or-horizontal' };
+
+/** Further domains a row's value must lie in when the program runs in a particular space, keyed by
+ *  AMBIENT_SPACES key: what the occupant's body for that space requires beyond the row's own
+ *  `constraint` (in S³ a ball's or a disk's radius is a geodesic distance below π, the diameter of
+ *  the space). A key names a space the occupant has a body for (contract test). */
+export type SpaceConstraints = { readonly [space: string]: RowConstraint };
+
+/** Coupled rules a space's body adds over several rows, keyed by AMBIENT_SPACES key (the coupled
+ *  counterpart of SpaceConstraints): messages the Validator emits verbatim, over well-shaped
+ *  values. A key names a space the occupant has a body for (contract test). */
+export type SpaceRules<V> = { readonly [space: string]: (values: V) => string[] };
 
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
@@ -42,13 +89,25 @@ export type LightRowValue = number | number[] | ValueParam<number> | ValueParam<
  *  (reflectance, a fraction in [0,1]; coefficient, a rate per unit length). */
 export type RadiometricRole = 'reflectance' | 'coefficient' | 'emission';
 
-/** A spectrum setting's role: a radiometric role, or a refractive index. The role belongs to the
- *  setting, never to the value in it; it decides how RGB converts, and the allowed domain. */
-export type SpectrumRole = RadiometricRole | 'index';
+/** A spectrum setting's role: a radiometric role, a refractive index, or an optical constant.
+ *  The role belongs to the setting, never to the value in it; it decides how RGB converts, and
+ *  the allowed domain.
+ *    index   — a real refractive index, one number per path (a dispersive index forces the
+ *              one-time hero collapse);
+ *    optical — a dimensionless optical constant (a metal's η or κ), one number per wavelength
+ *              lane, never collapsed. */
+export type SpectrumRole = RadiometricRole | 'index' | 'optical';
 
-/** Whether a role reads light or a multiplier of light, as opposed to an index. */
+/** Whether a role reads light or a multiplier of light, as opposed to an index or an optical
+ *  constant. */
 export function isRadiometric(role: SpectrumRole | undefined): role is RadiometricRole {
-    return role !== undefined && role !== 'index';
+    return role !== undefined && role !== 'index' && role !== 'optical';
+}
+
+/** Whether a setting of this role is a Spectrum evaluated per wavelength lane: the radiometric
+ *  roles and the optical constants. */
+export function isLaneSpectrum(role: SpectrumRole | undefined): role is RadiometricRole | 'optical' {
+    return isRadiometric(role) || role === 'optical';
 }
 
 /**
@@ -82,15 +141,27 @@ export type PropertySchema<TSource extends string = string> = {
     storage: 'field' | 'region-table';
 }
 
-/** A DERIVED material property (D4 — the CameraDerived rail on the schema): a pure
- *  function of this model's ROW values, computed HOST-SIDE — baked as a literal when
- *  every input is constant, a compute-closure uniform when any input is driven (the
- *  u_majorant pattern; `fn` runs for BOTH the plan-time bake and the per-frame value,
- *  so the two can never drift). Lands in MaterialProperties as a struct field the
- *  occupant reads (`mp.<name>`) — GLSL never recomputes a pure function of its own
- *  rows per evaluation (ggx's alpha = max(1e-3, roughness²) is the first occupant). */
+/** A DERIVED material property: a pure function of this model's ROW values, landing in
+ *  MaterialProperties as a struct field the occupant reads (`mp.<name>`), so the occupant
+ *  never repeats the formula (ggx's alpha = max(1e-3, roughness²)).
+ *  Where it is computed depends on the material's input values:
+ *  - every input a constant or a {param}: on the HOST by `fn`, baked as a literal when all
+ *    are constant, else a compute-closure uniform (`fn` runs for both the plan-time bake and
+ *    the per-frame value);
+ *  - some input varying over the surface (a GLSL expression or a per-instance attribute):
+ *    per hit by `glsl`, in the material lookup after the input rows are assigned. A field
+ *    without `glsl` (an expensive derivation, such as plastic's quadrature) takes only
+ *    constant or {param} inputs, which the Validator enforces (hostDerivedFieldFedBy).
+ *  `fn` and `glsl` are the same function in two languages; the materials contract test
+ *  evaluates `glsl` against `fn`. A Spectrum field has no per-hit form: nothing needs one,
+ *  and its formula would have to be written for both color models' Spectrum types. */
 export type MaterialDerivedSpec = (
-    | { glslType: 'float' }
+    | {
+          glslType: 'float';
+          /** The per-hit form: a GLSL float expression over the inputs, given each input's
+           *  struct field (`props.<name>`) keyed by row source. Its inputs are field rows. */
+          glsl?(fields: Record<string, string>): string;
+      }
     | { glslType: 'Spectrum'; role: RadiometricRole }
 ) & {
     name: string;
@@ -103,17 +174,24 @@ export type MaterialDerivedSpec = (
 /** A surface material model: one GLSL file + these facts (contracts §3.2/§3.3). */
 export interface MaterialModelDescriptor {
     id: MaterialModel;
-    /** ?raw source providing <id>_eval / <id>_sample / <id>_pdf / <id>_emission
-     *  in the (uc, u) sampler form. */
-    glsl: string;
+    /** Per space: <id>_eval / <id>_sample / <id>_pdf / <id>_emission in the (uc, u)
+     *  sampler form. */
+    glsl: SpaceBodies;
     /** Fields this model READS → scene-scoped struct + resolver (§3.4, R2). */
     properties: PropertySchema[];
-    /** DERIVED fields (D4) — join the struct union like rows; never authored. */
+    /** DERIVED fields: join the struct union like rows; never authored. */
     derived?: MaterialDerivedSpec[];
-    /** This model is written against glsl/core/microfacet.glsl (D / Smith G₁ / VNDF /
-     *  the frame maps). The INCLUDE GATE for that fixed-core library — declared, never
-     *  a model-name list in the generator (fable-rough-dielectric §4). Default false. */
-    usesMicrofacet?: boolean;
+    /** Present when this model is written against glsl/core/microfacet.glsl (D / Smith G₁ /
+     *  VNDF / the F-free reflection lobe / the frame maps): the include gate for that library, declared rather than a
+     *  model-name list in the generator (fable-rough-dielectric §4). `energy` names the
+     *  energy-compensation gain the model's GLSL multiplies into its eval and sample weight
+     *  (materials/microfacet_energy): `microfacet_conductor_gain` or
+     *  `microfacet_dielectric_gain`; 'none' for a model with no GGX lobe to compensate (sheen
+     *  reads only the frame maps); 'not-built' for a model whose GGX lobe has no gain yet
+     *  (rough_conductor: its F_avg is per lane), which measurement.microfacet
+     *  'energy-compensated' rejects rather than render it single-scattering. Under
+     *  'single-scattering' the compiler emits a gain as the constant 1. */
+    microfacet?: { energy: 'conductor' | 'dielectric' | 'none' | 'not-built' };
     /** The model's albedo for the albedo guide (components/aov): the surface's color
      *  independent of lighting and view, in [0, 1] (the compiler clamps). `{ row }` names one
      *  of this model's own Spectrum properties; `{ fn }` names a function its own `.glsl`
@@ -137,8 +215,9 @@ export interface MaterialModelDescriptor {
          *  conflated fact when a reader asks only half of it). The reader is light
          *  SELECTION: the light tree's below-horizon cull is licensed by a
          *  hemisphere claim, so a sphere-support receiver that runs NEE must get a
-         *  two-sided query. A future translucent model answers 'sphere' with
-         *  transmission FALSE (no index change) — which is why one flag cannot serve. */
+         *  two-sided query. thin_dielectric answers 'sphere' with transmission FALSE
+         *  (light passes through with no index change), as a translucent model would —
+         *  which is why one flag cannot serve. modelTransmitsWithoutCrossing reads that pair. */
         support: 'hemisphere' | 'sphere';
         /** May emit — eligibility for the emission gate + light registry (§6.2);
          *  whether a given MATERIAL emits stays a per-value analysis. */
@@ -168,6 +247,8 @@ export interface AuthoredParamSpec {
     kind?: ParamKind;
     /** Separable domain rule, machine-readable (D1). */
     constraint?: RowConstraint;
+    /** The further domain the kind's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** One row of a light kind's parameter schema (struct-alignment batch): struct field
@@ -212,8 +293,8 @@ export interface LightKindDescriptor {
     /** Registry key — validated against the registry (A2/A3: adding a kind touches
      *  no union). */
     kind: string;
-    /** ?raw source per the struct contract above. */
-    glsl: string;
+    /** Per space: the functions of the struct contract above. */
+    glsl: SpaceBodies;
     /** Delta kinds: not hittable, LIGHT_DELTA, no region, no <kind>_light_pdf. */
     delta: boolean;
     /** ISOTROPIC delta-query fact (equiangular placement): which rows carry the
@@ -251,6 +332,9 @@ export interface LightKindDescriptor {
     };
     valuesFromRegion?(parameters: Record<string, number | number[]>, Le: number[] | BlackbodyValue): Record<string, LightRowValue>;
     validateAuthored?(authored: Record<string, unknown>): string[];
+    /** The coupled rules the kind's body in a space adds (the curved quad light: orthogonal
+     *  edges and a bounded rectangle), over the same well-shaped authored record. */
+    validateAuthoredIn?: SpaceRules<Record<string, unknown>>;
     /** Struct rows, keyed into PlannedLight.values (row order = ctor order; the
      *  struct is GENERATED from them — A1). */
     params: LightParamSpec[];
@@ -300,8 +384,8 @@ export interface LightPowerContext {
  *  schema machinery, second struct family. */
 export interface VolumeScatteringModelDescriptor {
     id: string;
-    /** ?raw source providing <id>_eval / <id>_sample / <id>_pdf (LOBE_MEDIUM). */
-    glsl: string;
+    /** Per space: <id>_eval / <id>_sample / <id>_pdf (LOBE_MEDIUM). */
+    glsl: SpaceBodies;
     properties: PropertySchema[];
 }
 
@@ -352,6 +436,8 @@ export interface PrimitiveParamSpec {
     /** Mathematical domain required by the implementation (the shared RowConstraint
      *  vocabulary — D1; Validator-interpreted, shape-agnostic). */
     constraint?: RowConstraint;
+    /** The further domain the shape's body in a space requires (SpaceConstraints). */
+    constraintIn?: SpaceConstraints;
 }
 
 /** Call-site context for emitted per-primitive expressions: the query/hit point
@@ -373,6 +459,8 @@ export interface PrimitiveEmitCtx {
  *  `vec3 <type>_normal(vec3 p, <Type>)` iff `provides.analytic`. Call sites
  *  construct the struct from compile-time literals (constant placement) or
  *  s-scaled expressions (driven rigid frame); all emission is DERIVED from the row.
+ *  A curved-space body (components/ambient/README.md, "Curved spaces") is the shape at the
+ *  origin of its own frame: Point/Direction in place of vec3, the struct without its point row.
  *
  *  Descriptor functions receive RESOLVED values (row defaults already applied) and
  *  return NUMBERS — the framework does all GLSL formatting; descriptors never build
@@ -382,12 +470,12 @@ export interface PrimitiveDescriptor {
     /** ONE schema row for both backends (order = struct field order = constructor
      *  order — see PrimitiveParamSpec). */
     params: PrimitiveParamSpec[];
-    /** ?raw source with this primitive's math. SELF-CONTAINED: an occupant's helpers
+    /** Per space, this primitive's math. SELF-CONTAINED: an occupant's helpers
      *  are its own, prefixed and file-private (bottle's combinators, knob's vendored
      *  operators, menger's cell box). Files are included WHOLESALE, so a helper defined
      *  in two of them is a link error — shared vocabulary would need a shared file, and
      *  there is deliberately none until scene-level composition is designed. */
-    glsl: string;
+    glsl: SpaceBodies;
     /** Declared occupant surface — declare-and-verify, both directions (the contract
      *  test checks symbols exist iff declared). sdf also serves analytic containment
      *  (scene_region_at) — the sdf slot's three clauses bind approximate SDFs too. */
@@ -403,8 +491,9 @@ export interface PrimitiveDescriptor {
      *  (classifyPlacement) and the instance params-tier record. Independent of
      *  `provides` — closure is about parameter storage, never intersection method. */
     similarityClosed: boolean;
-    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant provides
-     *  `vec2 <type>_uv(vec3 p, <Type>)`, and hit-fill sites call it instead of the planar
+    /** Declares a real per-primitive UV chart (fable-imagery P1): the occupant's Euclidean body
+     *  provides `vec2 <type>_uv(vec3 p, <Type>)` (curved spaces have no charts yet — a uv-reading
+     *  material is a limitation row there), and hit-fill sites call it instead of the planar
      *  placeholder WHEN some scene material reads uv (the scene-level program.materials.
      *  materialsReadUv gate — no chart trig when nothing consumes it). Contract-test-checked
      *  (symbol exists iff declared). Absent/false = planar-placeholder uv only. */
@@ -423,6 +512,12 @@ export interface PrimitiveDescriptor {
      *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype
      *  (Validator-rejected). Finite analytic primitives (sphere/quad/disk) declare it. */
     bounds?(values: PrimitiveValues): AABB;
+    /** The radius of a ball about the shape's point row (its center; the origin when it has
+     *  none) that contains the shape: a geodesic ball in a curved space, where the shape sits
+     *  at o with its canonical rows (the point row removed). Read by the Seifert–Weber
+     *  Validator rule, which needs each object inside the dodecahedron D. Absent = no such
+     *  bound is declared. */
+    ballBound?(values: PrimitiveValues): number;
     /** THE MARCH BOUND (impl-plan-sdf-as-shape §2.2, owner-decided Aug 10 2026): the
      *  ANALYTIC OBJECT that bounds this shape's surface, so a marched intersect runs
      *  only over the interval where the ray is inside it. Required of every primitive
@@ -478,6 +573,13 @@ export interface PrimitiveDescriptor {
      *  (`constraint`); this is for multi-row facts only (quad's parallel-edges — the
      *  area couples edge1 AND edge2). Runs after the C7 shape loop passes. */
     validateValues?(values: PrimitiveValues): string[];
+    /** The coupled rules the shape's body in a space adds (SpaceRules), over the same
+     *  resolved values: the curved quad's orthogonal edges, a bounded H³ box. */
+    validateValuesIn?: SpaceRules<PrimitiveValues>;
+    /** In a curved space, the authored point the placement carries the shape's frame origin o
+     *  to (the pre-translation of compiler/plan/curved.ts), when that is not its point row: the
+     *  quad's center corner + (edge1 + edge2)/2. Absent: the point row (o when there is none). */
+    curvedAnchor?(values: PrimitiveValues): [number, number, number];
     /** SCENE-LOCAL marker (fable-sdf-contract §5.2): this descriptor was minted by
      *  `defineSDF` in a scene module, not authored as a components/geometry folder.
      *  The folder/structure/registry contract tests cover folder occupants only —
@@ -491,6 +593,10 @@ export interface PrimitiveDescriptor {
      *  their twins test-side (tests/components/fieldTwins.ts) — this slot exists
      *  because a scene-local definition has no test file to keep one in. */
     fieldTwin?(p: number[], values: PrimitiveValues): number;
+    /** Scene-local fields only (defineSDF's `kleinChart`): the hyperbolic body is the Euclidean
+     *  field evaluated at the Klein chart k(p) = p.xyz/p.w of the object's frame. Such a field
+     *  marches unbounded in H³ (its declared bound is a fact about chart coordinates). */
+    kleinChart?: boolean;
     /** Similarity-closure fold OVERRIDE (fable-transforms §5.1). ABSENT = derived
      *  from kinds (point → g·p, vector → sR·v, direction → R·d, length → s·ℓ).
      *  Declare only when a parameter's rule couples several pieces (plane: the new

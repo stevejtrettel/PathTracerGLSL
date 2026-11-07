@@ -14,7 +14,7 @@
 // placement tiers, region tables — stays in the intersection feature ("descriptors
 // declare facts; generators decide").
 
-import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues } from '../descriptors.js';
+import type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveParamSpec, PrimitiveValues } from '../descriptors.js';
 import {
     IDENTITY_QUAT,
     IDENTITY_SIMILARITY,
@@ -43,7 +43,7 @@ import { apollonianDescriptor } from './apollonian/apollonian.js';
 
 export type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues, PrimitiveParamSpec } from '../descriptors.js';
 export { canonicalPlane } from './plane/plane.js';
-export { quadCross, quadNormal } from './quad/quad.js';
+export { quadCross, quadNormal, curvedQuadProblems } from './quad/quad.js';
 export { unitVec3 } from './disk/disk.js';
 
 /** Registry insertion order = deterministic emission order for primitive includes. */
@@ -109,6 +109,33 @@ export function primitiveBounds(type: string, values: PrimitiveValues): AABB | n
     return null;
 }
 
+/** The radius of a ball about the primitive's point row that contains it (`ballBound`), or null
+ *  when the primitive declares none (or is unregistered). */
+export function primitiveBallBound(type: string, values: PrimitiveValues): number | null {
+    const d = PRIMITIVES[type];
+    if (d?.ballBound === undefined) return null;
+    return d.ballBound(resolvePrimitiveValues(d, values));
+}
+
+/** The primitives whose `<type>_interval` a marched `type` calls, in chain order: its march
+ *  bound (an analytic object of a possibly different primitive), that bound's own bound, and
+ *  so on, until a bound is 'self' or 'unbounded'. Empty when the march needs no other
+ *  primitive. The intersection generator links these and the Validator gates them. */
+export function marchBoundTypes(type: string, space = 'euclidean'): string[] {
+    const chain: string[] = [];
+    const d = PRIMITIVES[type];
+    for (let mb = d === undefined ? undefined : marchBoundIn(d, space); typeof mb === 'object' && !chain.includes(mb.type); mb = PRIMITIVES[mb.type]?.marchBound) {
+        chain.push(mb.type);
+    }
+    return chain;
+}
+
+/** The march bound a marched shape uses in `space`: its declared bound, except that a Klein-chart
+ *  field marches unbounded in H³ (its bound is stated in chart coordinates). */
+export function marchBoundIn(d: PrimitiveDescriptor, space: string): PrimitiveDescriptor['marchBound'] {
+    return d.kleinChart === true && space === 'hyperbolic' ? 'unbounded' : d.marchBound;
+}
+
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
  *  sdf; an explicit pin wins (the Validator rejects pins the primitive can't honor).
  *  undefined = unregistered type or unhonorable pin — callers diagnose. */
@@ -154,6 +181,29 @@ export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?
     });
     const derived = (d.derivedCtorFields?.(v) ?? []).map(formatValue);
     return `${structName(d)}(${[...args, ...derived].join(', ')})`;
+}
+
+/** A curved space's struct rows: the point row is folded into the object's placement (an
+ *  isometry — compiler/plan/curved.ts), so the struct keeps the intrinsic rows. A vector row (the
+ *  quad's edges) is a tangent vector at the object's origin o, typed Direction like a direction
+ *  row. Derived fields are Euclidean precomputations and are not part of a curved struct. */
+export function curvedRows(d: PrimitiveDescriptor): PrimitiveParamSpec[] {
+    return d.params.filter((f) => f.kind !== 'point').map((f) => (f.kind === 'vector' ? { ...f, kind: 'direction' as const } : f));
+}
+
+/** The struct constructor in a curved space, over curvedRows: numbers as floats, a direction or
+ *  vector row as a tangent vector at the object's origin o = (0,0,0,1), `Direction(x, y, z, 0.0)`,
+ *  a vec3 of lengths as vec3. */
+export function emitCurvedCtor(d: PrimitiveDescriptor, values: PrimitiveValues): string {
+    const v = resolvePrimitiveValues(d, values);
+    const args = curvedRows(d).map((f) => {
+        const x = v[f.name]!;
+        if (!Array.isArray(x)) return formatFloat(x);
+        if (f.kind === 'direction') return `Direction(${x.map(formatFloat).join(', ')}, 0.0)`;
+        if (f.kind === 'length') return formatVec3(x);
+        throw new Error(`geometry: '${d.type}' row '${f.name}' (${f.kind}) has no curved form`);
+    });
+    return `${structName(d)}(${args.join(', ')})`;
 }
 
 /** `<type>_sdf(<point>, <ctor>)` — the signed-distance call (world-exact under
@@ -229,9 +279,13 @@ export function emitSignedDistance(d: PrimitiveDescriptor, values: PrimitiveValu
  * `refine` fact gets no polish and no cost — a true distance field's accepted
  * residual is already ≤ march_epsilon.
  */
-export function emitSdfIntersect(d: PrimitiveDescriptor): string {
+export function emitSdfIntersect(d: PrimitiveDescriptor, curved = false): string {
     const steps = d.stepBudget !== undefined ? String(d.stepBudget) : 'MAX_MARCH_STEPS';
-    const f = (at: string) => `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
+    // The field point at arc length t: re-flowed from the seed each step (ambient_geodesic) in a
+    // curved space; Euclidean programs keep the line's own spelling, the same point.
+    const f = (at: string) => curved
+        ? `${d.type}_sdf(ambient_geodesic(ray.origin, ray.direction, ${at}), s)`
+        : `${d.type}_sdf(ray.origin + ${at} * ray.direction, s)`;
     // With `refine`: acceptance must be CONFIRMED BY A SIGN CROSSING (the glass-lab
     // ring finding, Aug 11 round 3 — exact normals + refinement both exonerated the
     // artifact): a near-tangent ray can dip inside the acceptance shell and MISS,
@@ -343,6 +397,27 @@ export function emitSdfNormal(d: PrimitiveDescriptor): string {
         `                   + ${call('k.yyx')}`,
         `                   + ${call('k.yxy')}`,
         `                   + ${call('k.xxx')});`,
+        `}`,
+    ].join('\n');
+}
+
+/** The generated gradient normal in a curved space: `at` is the ray at the hit (the point and its
+ *  arrival direction, a unit tangent there), and ambient_frame of that direction is an orthonormal
+ *  basis (t, b, n) of the tangent space. The four taps are at arc length NORMAL_EPSILON along the
+ *  tetrahedral unit combinations k_j of the basis, and the normal is Σ f_j k_j normalized — a tangent
+ *  vector by construction, independent of the basis up to O(NORMAL_EPSILON), in the shape's frame;
+ *  the caller maps it to world. */
+export function emitCurvedSdfNormal(d: PrimitiveDescriptor): string {
+    const tap = (c: string) => `${c} * ${d.type}_sdf(ambient_geodesic(f.p, ${c}, NORMAL_EPSILON), s)`;
+    return [
+        `Direction ${d.type}_sdf_normal(Ray at, ${structName(d)} s) {`,
+        `    Frame f = ambient_frame(at.origin, at.direction);`,
+        `    const float k = 0.5773;`,
+        `    Direction d0 = k * ( f.t - f.b - f.n);`,
+        `    Direction d1 = k * (-f.t - f.b + f.n);`,
+        `    Direction d2 = k * (-f.t + f.b - f.n);`,
+        `    Direction d3 = k * ( f.t + f.b + f.n);`,
+        `    return ambient_normalize(${tap('d0')} + ${tap('d1')} + ${tap('d2')} + ${tap('d3')}, f.p);`,
         `}`,
     ].join('\n');
 }

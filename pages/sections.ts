@@ -32,9 +32,34 @@ const e = (id: string, ...partners: string[]): SectionEntry =>
 
 export const gallerySections: GallerySection[] = [
     {
+        title: 'Photographs',
+        blurb: 'scenes composed to look like photographs: real-world scale, a full-frame lens, studio and sky HDRIs, Poly Haven textures and models (needs fetched assets)',
+        entries: [e('photo-studio'), e('photo-sponge'), e('photo-plaza'), e('photo-window'), e('photo-glass'), e('photo-pavilion')],
+    },
+    {
         title: 'Spectral foundations',
         blurb: 'four-wavelength transport, CIE sensor response, live colours, packed data and surface materials',
-        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-expressions'), e('spectral-expressions-constant', 'spectral-expressions-ref'), e('spectral-mirror'), e('spectral-eta'), e('spectral-inclusion'), e('spectral-blackbody', 'spectral-blackbody-ref'), e('spectral-blackbody-changed', 'spectral-blackbody-changed-ref'), e('spectral-blackbody-tree'), e('blackbody-lamp-batch'), e('blackbody-equiangular'), e('spectral-gaussian-plane'), e('spectral-blackbody-softbeam'), e('spectral-showcase'), e('spectral-dispersion-prism'), e('spectral-dispersion-beam'), e('spectral-dispersion-bk7'), e('spectral-dispersion-slab'), e('spectral-blackbody-direct'), e('spectral-blackbody-receiver'), e('spectral-grin'), e('spectral-grin-slab'), e('spectral-grin-vacuum'), e('spectral-grin-scatter', 'spectral-grin-scatter-ref'), e('spectral-grin-furnace-hard'), e('spectral-grin-furnace-emit'), e('spectral-grin-furnace-scatter'), e('spectral-emit'), e('spectral-emit-tracking'), e('spectral-emit-clamp'), e('spectral-emit-vacuum'), e('spectral-emit-vacuum-tracking'), e('spectral-emit-budget'), e('spectral-emit-driven'), e('spectral-emit-scatter'), e('spectral-tracking-slab'), e('spectral-tracking-clamp'), e('spectral-tracking-shadow'), e('spectral-tracking-fog'), e('spectral-slab'), e('spectral-shadow-slab'), e('spectral-scatter-furnace'), e('spectral-fog'), e('spectral-rayleigh-furnace'), e('spectral-fog-placement'), e('spectral-sky'), e('spectral-proc-sky'), e('sky-missed-cap'), e('spectral-comp-empty'), e('spectral-image-constant', 'spectral-image-constant-ref')],
+        entries: [e('spectral-direct'), e('spectral-furnace'), e('spectral-colored-furnace'), e('spectral-plane'), e('spectral-packed'), e('spectral-packed-ref'), e('spectral-live'), e('spectral-live-ref'), e('spectral-live-changed'), e('spectral-live-changed-ref'), e('spectral-materials'), e('spectral-expressions'), e('spectral-expressions-constant', 'spectral-expressions-ref'), e('spectral-mirror'), e('spectral-plastic'), e('spectral-eta'), e('spectral-inclusion'), e('spectral-blackbody', 'spectral-blackbody-ref'), e('spectral-blackbody-changed', 'spectral-blackbody-changed-ref'), e('spectral-blackbody-tree'), e('blackbody-lamp-batch'), e('blackbody-equiangular'), e('spectral-gaussian-plane'), e('spectral-colorchecker-d65'), e('spectral-measured-lamps'), e('spectral-blackbody-softbeam'), e('spectral-showcase'), e('spectral-dispersion-prism'), e('spectral-dispersion-beam'), e('spectral-dispersion-bk7'), e('spectral-dispersion-slab'), e('spectral-blackbody-direct'), e('spectral-blackbody-receiver'), e('spectral-grin'), e('spectral-grin-slab'), e('spectral-grin-vacuum'), e('spectral-grin-scatter', 'spectral-grin-scatter-ref'), e('spectral-grin-furnace-hard'), e('spectral-grin-furnace-emit'), e('spectral-grin-furnace-scatter'), e('spectral-emit'), e('spectral-emit-tracking'), e('spectral-emit-clamp'), e('spectral-emit-vacuum'), e('spectral-emit-vacuum-tracking'), e('spectral-emit-budget'), e('spectral-emit-driven'), e('spectral-emit-scatter'), e('spectral-tracking-slab'), e('spectral-tracking-clamp'), e('spectral-tracking-shadow'), e('spectral-tracking-fog'), e('spectral-slab'), e('spectral-shadow-slab'), e('spectral-scatter-furnace'), e('spectral-fog'), e('spectral-rayleigh-furnace'), e('spectral-fog-placement'), e('spectral-sky'), e('spectral-proc-sky'), e('sky-missed-cap'), e('spectral-comp-empty'), e('spectral-image-constant', 'spectral-image-constant-ref')],
+    },
+    {
+        title: 'Curved spaces',
+        blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, marched fields, curved light falloff, the sky at infinity), spherical space S³ (two arcs between any two points, the antipodal lens, no sky) and the product H²×R (a falloff that depends on direction, upright columns, horizontal and vertical planes)',
+        entries: [e('hyperbolic'), e('hyperbolic-sculpture'), e('h3-furnace'), e('h3-disk-light'), e('h3-point-light'), e('h3-medium'), e('h3-sky'), e('h3-sky-ball'),
+            e('h3-sdf-ball', 'h3-sdf-ball-ref'), e('h3-klein-ball'), e('h3-sdf-furnace'), e('h3-sdf-blend'),
+            e('h3-specular'), e('h3-ggx'), e('h3-rough-glass'), e('h3-sphere-light'), e('h3-sphere-light-blocker'),
+            e('spherical'), e('spherical-sculpture'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium'),
+            e('s3-sdf-ball', 's3-sdf-ball-ref'), e('s3-sdf-furnace'), e('s3-sdf-blend'),
+            e('s3-specular'), e('s3-ggx'), e('s3-rough-glass'), e('s3-sphere-light'), e('s3-sphere-light-blocker'),
+            e('s3-sphere-light-antipodal'), e('e3-specular'),
+            e('h3-shapes'), e('s3-shapes'), e('h3-quad-light'), e('s3-quad-light'),
+            e('h2xr'), e('h2xr-furnace'), e('h2xr-disk-light'), e('h2xr-point-light'), e('h2xr-sky'),
+            e('seifert-weber-room')],
+    },
+    {
+        title: 'Closed manifolds',
+        blurb: 'quotient spaces M = X/Γ: the cube 3-torus, where every ray that leaves the cell returns through the opposite face, in vacuum and in a homogeneous fog; and the Seifert–Weber dodecahedral space, a closed hyperbolic manifold',
+        entries: [e('torus-room'), e('torus-crystal', 'torus-crystal-ref'), e('torus-lights'), e('torus-fog'), e('torus-crystal-fog', 'torus-crystal-fog-ref'), e('torus-lights-fog'),
+            e('seifert-weber-windows'), e('seifert-weber-lights')],
     },
     {
         title: 'Instance clouds',
@@ -57,7 +82,7 @@ export const gallerySections: GallerySection[] = [
         title: 'Meshes',
         blurb: 'triangle meshes: BVH traversal, emissive mesh lights, closed-mesh containment (glass, fog, nesting)',
         entries: [
-            e('meshes'), e('models'), e('cacti'),
+            e('meshes'), e('models'), e('trial-still-life'), e('cacti'),
             e('mesh-furnace'),
             e('mesh-quad-twin', 'mesh-quad-ref'),
             e('mesh-light-twin', 'mesh-light-ref'), e('mesh-light-smooth'), e('mesh-slab-albedo'), e('mesh-scale-twin', 'mesh-scale-twin-ref'),
@@ -111,7 +136,7 @@ export const gallerySections: GallerySection[] = [
             e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('instance-lights-sky'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'), e('fog-area-ignored'),
             e('orb'), e('cornell-disk'), e('shadow-aim-march'), e('shadow-aim-far'), e('shadow-aim-fog'),
             e('disk-bake', 'disk-bake-ref'),
-            e('spot'), e('veach-mis'),
+            e('spot'), e('veach-mis'), e('veach-mis-varying'),
             e('sun'), e('beam-wall'), e('beam-slab'), e('beam-fog'), e('laser'),
             e('softbeam-wall'), e('laser-soft'),
         ],
@@ -127,17 +152,19 @@ export const gallerySections: GallerySection[] = [
         entries: [
             e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
             e('regions-transformed', 'regions-transformed-ref'),
-            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('region-overlap'),
+            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('rough-furnace-expr'), e('ms-furnace'), e('ms-furnace-control'), e('region-overlap'),
             e('rough-grin', 'rough-grin-ref'),
             e('rough-sheet'),
         ],
     },
     {
         title: 'Materials & texturing',
-        blurb: 'surface models and texturing: mirror + GGX showcase, blackbody emission, UV charts, expression albedos',
+        blurb: 'surface models and texturing: mirror + GGX showcase, the plastic coat, thin glass panes, sheen (fuzz over Lambert), measured metals, blackbody emission, UV charts, expression albedos, bump mapping, image textures',
         entries: [
-            e('chrome'), e('mirror'), e('hearth'), e('charts'), e('paint'),
+            e('chrome'), e('mirror'), e('plastic-furnace'), e('plastic-chroma'), e('thin-pane'), e('sheen-furnace'), e('sheen-fuzz'), e('conductor-gold'), e('conductor-perfect', 'conductor-perfect-ref'), e('veach-metals'), e('hearth'), e('charts'), e('paint'), e('procedural-textures'),
             e('expr-const', 'expr-const-ref'),
+            e('bump-tilt'), e('bump-sides'),
+            e('image-texture', 'image-texture-linear', 'image-texture-spectral'),
         ],
     },
     {
@@ -162,8 +189,8 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Cameras & view',
-        blurb: 'the camera family, the fisheye sub-projections, accumulation occupants, the first-hit guide pictures, and the tonemap roster',
-        entries: [e('cornell'), e('cornell-fisheye'), e('cornell-oneshot'), e('thinlens-zero'), e('guides', 'guides-grin-traversal', 'guides-grin-substep', 'guides-grin-substep-scatter', 'guides-grin-capture', 'guides-grin-elsewhere'), e('tonemap')],
+        blurb: 'the camera family, the fisheye sub-projections, the lens pupils, the pixel filters, accumulation occupants, the first-hit guide pictures, and the tonemap roster',
+        entries: [e('cornell'), e('cornell-fisheye'), e('cornell-oneshot'), e('thinlens-zero'), e('bokeh-edge'), e('filter-edge'), e('guides', 'guides-grin-traversal', 'guides-grin-substep', 'guides-grin-substep-scatter', 'guides-grin-capture', 'guides-grin-elsewhere'), e('tonemap')],
     },
     {
         title: 'Core validation',

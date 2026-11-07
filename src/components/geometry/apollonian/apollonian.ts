@@ -31,7 +31,7 @@ export const apollonianDescriptor: PrimitiveDescriptor = {
         { name: 'thickness', kind: 'length', shape: 'number', required: false, default: 0.012, constraint: { kind: 'positive' } },
         { name: 'iterations', kind: 'scalar', shape: 'number', required: false, default: 8, constraint: { kind: 'positive' } },
     ],
-    glsl: apollonianGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/apollonian/apollonian.glsl', source: apollonianGLSL } },
     provides: { sdf: true, analytic: false },
     marchBound: {
         type: 'box',

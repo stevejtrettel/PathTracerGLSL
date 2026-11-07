@@ -9,6 +9,8 @@ import type { CameraModelDescriptor, CameraControl, CameraDerived } from '../ind
 import type { CameraDesc } from '../../../compiler/plan/types.js';
 import fisheyeGLSL from './fisheye.glsl?raw';
 
+const body = { origin: 'components/camera/fisheye/fisheye.glsl', source: fisheyeGLSL };
+
 const FOV_PATH = 'camera.fisheyeFov';
 
 /** u_fisheyeK = the projection's radial constant, so FISHEYE_THETA(rho, K) is trig-free.
@@ -39,7 +41,8 @@ function maxFov(projection: string): { max: number; inclusive: boolean } {
 
 export const fisheyeDescriptor: CameraModelDescriptor = {
     type: 'fisheye',
-    glsl: fisheyeGLSL,
+    // One file, checked in every space it lists: it is written against the ambient seam alone.
+    glsl: { euclidean: body, hyperbolic: body, spherical: body, h2xr: body },
     authoredParams: [
         { name: 'fov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // full angular field, radians
         { name: 'projection', shape: 'enum', required: true, values: ['equidistant', 'equisolid', 'stereographic', 'orthographic'] },

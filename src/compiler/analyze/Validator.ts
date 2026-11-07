@@ -1,24 +1,28 @@
 // compiler/analyze/Validator.ts
 
 import { spectralLimitations } from './spectral.js';
+import { spaceGate, curvedLimitations } from './curved.js';
+import { scatteringComputed } from './Analyzer.js';
+import { spacesOf } from '../../components/descriptors.js';
 import { rgbPreviewWarnings } from './rgbPreview.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
+import { PIXEL_MODELS } from '../../components/pixel/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
-import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTracking, mediumMayScatter, mediumScatters, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole } from '../types.js';
+import { isGlslExpression, isHeterogeneousMedium, isValueParam, sceneRoutesToTracking, mediumMayScatter, mediumIsDeflecting, isEmissiveMedium, hasConstantNonzeroEmission, isMeshObject, isInstancedObject, isPrimitiveObject, RESERVED_PARAM_PATHS, RESERVED_PARAM_PREFIXES, SETTING_ROLES, mediumSettingRole, BUMP_KEYS } from '../types.js';
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, MATERIAL_META_KEYS, hostDerivedFieldFedBy, modelTransmitsWithoutCrossing } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
-import { AMBIENT_SPACES } from '../../components/ambient/index.js';
+import { samplableEmitterObjects, sampledEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights, marchedObjectCount, LIGHT_BACKING_MODEL } from '../plan/dataTenants.js';
+import { AMBIENT_SPACES, curvedGeometryOf } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { AOVS } from '../../components/aov/index.js';
-import { ENV_CHARTS } from '../../components/env/index.js';
-import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../../components/env/index.js';
+import { PRIMITIVES, marchBoundTypes, marchBoundIn, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
@@ -28,9 +32,12 @@ import { nodeTexelBound } from '../../components/data/ledger.js';
 import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
-import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
-import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain, isFiniteVec3 } from './propertyValidation.js';
+import { blackbodyTemperatureRange } from '../../components/color/spectra/blackbody/blackbody.js';
+import { isMediumModelSupported, phaseModelOf, VOLUME_SCATTERING_MODELS } from '../../components/volume_scattering/index.js';
+import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, rowViolations, slotDomain, isFiniteVec3 } from './propertyValidation.js';
+import { unknownKeysProblem } from '../../components/param.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
+import { validateQuotient } from './quotient.js';
 
 /** HG anisotropy margin: |g| = 1 exactly is NaN in hg_sample/hg_eval. */
 const MAX_PHASE_G = 0.99;
@@ -57,6 +64,31 @@ export function validate(
         bag.error('invalid-setting', `Ambient space '${features.ambientSpace}' not yet supported`)
             .add();
     }
+    // The space gate (analyze/curved.ts): every occupant the program runs must implement the
+    // program's space. Skipped for an unregistered space, which has its own error above.
+    const space = features.ambientSpace;
+    const spaceKnown = AMBIENT_SPACES[space] !== undefined;
+    const gateSpace = (where: string, occupant: string, implementedIn: readonly string[]): void => {
+        const reason = spaceKnown ? spaceGate(occupant, implementedIn, space) : null;
+        if (reason !== null) bag.error('invalid-setting', `${where}: ${reason}`).add();
+    };
+    if (spaceKnown) {
+        for (const reason of curvedLimitations(scene, strategy, features)) bag.error('invalid-setting', reason).add();
+    }
+    if (curvedGeometryOf(space) !== undefined) {
+        // A curved space has curvature ±1: lengths are in units of the curvature radius, and the
+        // shapes' sizes carry the scale.
+        if (scene.ambientSpace.parameters?.curvature !== undefined) {
+            bag.error('invalid-setting', `ambientSpace.parameters.curvature: the ${space} space has curvature fixed at magnitude 1; give the shapes' sizes in units of the curvature radius instead`).add();
+        }
+        // No default pose: the Euclidean one (position [0, 0, 8]) lies far outside a curved
+        // scene's working radius.
+        const cam = strategy.measurement.camera;
+        if (cam.position === undefined || cam.target === undefined) {
+            bag.error('invalid-setting', `measurement.camera: a ${space} scene needs an authored camera position and target`).add();
+        }
+    }
+    validateQuotient(scene, strategy, bag);
 
     // Batch instance lights count as lights ONLY under the tree (fable-light-bvh §7):
     // under 'power' they are path-found, so an otherwise-unlit scene truly has no NEE
@@ -84,6 +116,14 @@ export function validate(
                 `Light ${i}: unknown light kind '${light.kind}' (registered kinds: ${Object.keys(LIGHT_KINDS).join(', ')})`)
                 .add();
             continue;
+        }
+        // A hittable light kind runs together with the primitive and the material model backing
+        // it (the Planner's desugar), so all three must implement the space.
+        gateSpace(`Light ${i}`, `light kind '${light.kind}'`, spacesOf(d.glsl));
+        if (d.region !== undefined) {
+            const backing = PRIMITIVES[d.region.primitive];
+            if (backing !== undefined) gateSpace(`Light ${i}`, `its backing primitive '${d.region.primitive}'`, spacesOf(backing.glsl));
+            gateSpace(`Light ${i}`, `its backing material model '${LIGHT_BACKING_MODEL}'`, spacesOf(MATERIAL_MODELS[LIGHT_BACKING_MODEL]!.glsl));
         }
         // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
         // missing required / wrong shape error, then the row's declarative constraint
@@ -121,11 +161,8 @@ export function validate(
                 shapesOk = false;
                 continue;
             }
-            if (p.constraint !== undefined) {
-                const violation = constraintViolation(v as number | number[], p.constraint);
-                if (violation !== null) {
-                    bag.error('invalid-setting', `Light ${i} (${light.kind}): '${p.name}' ${violation}`).add();
-                }
+            for (const violation of rowViolations(v as number | number[], p, space)) {
+                bag.error('invalid-setting', `Light ${i} (${light.kind}): '${p.name}' ${violation}`).add();
             }
         }
         // emission (the one radiometric word) — required; a constant, a {param} (whose default
@@ -151,6 +188,11 @@ export function validate(
                 bag.error('invalid-setting', `Light ${i}: ${msg}`).add();
             }
         }
+        // The coupled rules the kind's body in the program's space adds.
+        const inSpace = d.validateAuthoredIn?.[space];
+        if (shapesOk && inSpace !== undefined) {
+            for (const msg of inSpace(authored)) bag.error('invalid-setting', `Light ${i} (${light.kind}): ${msg} in ${space} space`).add();
+        }
     }
 
     // --- Per-object GEOMETRY validation, ONE truth (validateGeometryObject): backend
@@ -162,7 +204,7 @@ export function validate(
     for (let i = 0; i < scene.objects.length; i++) {
         const obj = scene.objects[i];
         if (isInstancedObject(obj)) continue;   // prototype validated with its batch below
-        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag);
+        validateGeometryObject(obj, `Object ${i}`, [`objects[${i}]`], bag, space, gateSpace);
     }
 
     // --- Finiteness (audit C6): a NaN/Inf anywhere in the scene reaches the GLSL number
@@ -290,13 +332,25 @@ export function validate(
         }
     }
 
+    // An emissive object the program samples is a light too: its light kind must implement the
+    // space (the shape itself is gated with the object). Under pure path tracing nothing
+    // samples it and its light kind is not linked.
+    for (const emitter of sampledEmitterObjects(scene, strategy)) {
+        gateSpace(`Object ${emitter.index}`, `light kind '${emitter.kind}'`, spacesOf(LIGHT_KINDS[emitter.kind].glsl));
+    }
+
     // Model registration (the B1 treatment — model ids are strings, the registry + this
     // check gatekeep): unknown models are REJECTED with the registered set, never passed
     // through to emit calls on symbols no include defines. 'none' is structural
     // vocabulary (§3.6), not a registry key; 'emissive' keeps its migration message
     // (review C4: it used to fail at the GPU as an undeclared identifier).
     for (const [name, mat] of Object.entries(scene.materials)) {
-        if (mat.model === 'none' || MATERIAL_MODELS[mat.model] !== undefined) continue;
+        if (mat.model === 'none') continue;
+        const model = MATERIAL_MODELS[mat.model];
+        if (model !== undefined) {
+            gateSpace(`Material '${name}'`, `material model '${mat.model}'`, spacesOf(model.glsl));
+            continue;
+        }
         if (mat.model === 'emissive') {
             bag.error('invalid-setting',
                 `Material '${name}': model 'emissive' is not a model — use emission on a surface model (e.g. lambert with albedo 0), or model 'none' with a medium block for a pure volume region`)
@@ -304,6 +358,37 @@ export function validate(
         } else {
             bag.error('invalid-setting',
                 `Material '${name}': unknown material model '${mat.model}' (registered models: ${Object.keys(MATERIAL_MODELS).join(', ')}; 'none' = no optical surface)`)
+                .add();
+        }
+    }
+
+    // Bump (materials/README, "Shading-normal perturbation"): { height, step } on a surface model.
+    // The height is a float expression in p (a non-float or a uv reference fails at the shader
+    // compile: the generated height function has only p in scope). The step is required: it is
+    // a length in the scene's units, so no default would be right for every scene.
+    for (const [name, mat] of Object.entries(scene.materials)) {
+        const bump: unknown = mat.bump;
+        if (bump === undefined) continue;
+        const label = `Material '${name}': bump`;
+        if (mat.model === 'none') {
+            bag.error('invalid-setting', `${label} needs a surface to shade — model 'none' has no shading normal`).add();
+            continue;
+        }
+        if (bump === null || typeof bump !== 'object' || Array.isArray(bump)) {
+            bag.error('invalid-setting', `${label} must be { height: <GLSL expression in p>, step: <world length> }`).add();
+            continue;
+        }
+        const keys = unknownKeysProblem(bump, BUMP_KEYS);
+        if (keys !== null) bag.error('invalid-setting', `${label} has ${keys}`).add();
+        const { height, step } = bump as { height?: unknown; step?: unknown };
+        if (!isGlslExpression(height)) {
+            bag.error('invalid-setting', `${label}.height must be a GLSL expression { kind: 'glsl', source } — a float in the world point p`).add();
+        } else {
+            for (const message of valueProblems(height, { shape: 'scalar' }, `${label}.height`)) bag.error('invalid-setting', message).add();
+        }
+        if (typeof step !== 'number' || !Number.isFinite(step) || step <= 0) {
+            bag.error('invalid-setting',
+                `${label}.step must be a finite number > 0 (the finite-difference step, in world units; required — choose it small next to the relief's features and large next to |p|·2⁻²⁴, see the error law in materials/README)`)
                 .add();
         }
     }
@@ -365,6 +450,9 @@ export function validate(
                 bag.error('invalid-setting',
                     `Material '${name}': medium.model '${mat.medium.model}' is not a registered volume scattering model`)
                     .add();
+            } else if (scatteringComputed(features, strategy.measurement.scattering ?? 'full')) {
+                const phase = phaseModelOf(mat.medium);
+                gateSpace(`Material '${name}'`, `phase model '${phase}'`, spacesOf(VOLUME_SCATTERING_MODELS[phase].glsl));
             }
             // GRIN media matrix (impl-plan-grin-media — the Jul 22 batches lifted the v1
             // blanket rejections): a deflecting medium may EMIT (per-step collection with
@@ -457,6 +545,13 @@ export function validate(
             .add();
     }
 
+    const farClip = strategy.measurement.farClip;
+    if (farClip !== undefined && !(typeof farClip === 'number' && Number.isFinite(farClip) && farClip > 0)) {
+        bag.error('invalid-setting',
+            `measurement.farClip must be a finite number > 0 — the arc length past which a segment meets nothing (got ${String(farClip)})`)
+            .add();
+    }
+
     // Russian roulette's survival CEILING — a probability, same class of rule as
     // envSelectWeight. 1.0 is legal and means "never cap": survival is then the
     // throughput alone, which for a LOSSLESS path (clear glass) is 1 forever, so the
@@ -486,6 +581,12 @@ export function validate(
             `envSampler '${chart}' is not a registered environment chart (registered: ${Object.keys(ENV_CHARTS).join(', ')})`)
             .add();
     }
+    // A chart is linked only where a tabulated sky (image, procedural) is sampled as a light.
+    const resolvedChart = ENV_CHARTS[chart ?? DEFAULT_ENV_CHART];
+    if (resolvedChart !== undefined && features.environment.samplable && strategy.estimator.directLighting !== 'none'
+        && (scene.environment?.type === 'image' || scene.environment?.type === 'procedural')) {
+        gateSpace('estimator.envSampler', `environment chart '${resolvedChart.id}'`, spacesOf(resolvedChart.glsl));
+    }
 
     // T5: a compensated env table deliberately has pdf = 0 where L > 0 — unbiased ONLY when
     // BSDF sampling covers those directions with MIS weighting. NEE-only would lose energy.
@@ -499,9 +600,7 @@ export function validate(
     // volumeSampling rules held byte-identical private copies) — impl-plan-medium-
     // emission P5: a constant-ε SCATTERING medium routes to the tracking arms too,
     // under the computed measurement only.
-    const trackScattering = strategy.measurement.scattering ?? 'full';
-    const sceneNeedsTracking = Object.values(scene.materials).some((m) =>
-        m.medium !== undefined && mediumRoutesToTracking(m.medium, mediumScatters(m.medium, trackScattering)));
+    const sceneNeedsTracking = sceneRoutesToTracking(scene, strategy.measurement.scattering ?? 'full');
 
     // Equiangular medium NEE — v1 scope pins (impl-plan-equiangular §3).
     if (strategy.estimator.mediumLightSampling === 'equiangular') {
@@ -694,8 +793,7 @@ export function validate(
     // just stops. The default already picks 'table' past the threshold; this is for the
     // scene that asks anyway, so the failure arrives as a sentence instead of a hang.
     if (objectDispatch === 'unrolled') {
-        const marched = scene.objects.filter((o) => isPrimitiveObject(o)
-            && resolveBackend(o.type, o.backend) === 'sdf').length;
+        const marched = marchedObjectCount(scene);
         if (marched >= MARCHED_TABLE_THRESHOLD) {
             bag.warning('invalid-setting',
                 `estimator.objectDispatch 'unrolled' with ${marched} marched objects: the shader emits one march loop PER OBJECT and compile time grows superlinearly (128 objects did not finish compiling on an M1 Pro). 'table' compiles in constant time — drop the pin unless this arm is a deliberate reference.`)
@@ -759,6 +857,7 @@ export function validate(
             .suggest(`Registered cameras: ${Object.keys(CAMERA_MODELS).join(', ')}`)
             .add();
     } else {
+        gateSpace('measurement.camera', `camera '${cameraType}'`, spacesOf(cameraModelDesc.glsl));
         // The model's authored-field schema (D2): the validation the old typed union used
         // to do at compile time, now registry-declared — unknown-key / required / shape /
         // enum / constraint, the lights loop's grammar.
@@ -874,13 +973,24 @@ export function validate(
     // i.e. changed the integral, instead of failing).
     const measurementEnums: Array<[string, unknown, readonly string[]]> = [
         ['scattering', strategy.measurement.scattering, ['full', 'ignored']],
+        ['microfacet', strategy.measurement.microfacet, ['single-scattering', 'energy-compensated']],
         ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
         ['color', strategy.measurement.color, ['rgb', 'spectral']],
         ['response', strategy.measurement.response, ['radiance']],
+        ['pixel', strategy.measurement.pixel, Object.keys(PIXEL_MODELS)],
     ];
     for (const [field, value, legal] of measurementEnums) {
         if (value !== undefined && !legal.includes(value as string)) {
             bag.error('invalid-setting', `measurement.${field} must be one of ${legal.map((v) => `'${v}'`).join(' | ')} (got ${JSON.stringify(value)})`).add();
+        }
+    }
+    // Energy compensation covers every microfacet model in the scene or none: a model whose
+    // gain is not built would render single-scattering under a measurement that says otherwise.
+    if (strategy.measurement.microfacet === 'energy-compensated') {
+        for (const [name, mat] of Object.entries(scene.materials)) {
+            if (mat.model !== 'none' && MATERIAL_MODELS[mat.model]?.microfacet?.energy === 'not-built') {
+                bag.error('invalid-setting', `Material '${name}': model '${mat.model}' has no energy-compensation gain; measurement.microfacet 'energy-compensated' cannot render it (use 'single-scattering')`).add();
+            }
         }
     }
 
@@ -897,6 +1007,8 @@ export function validate(
                     bag.error('invalid-setting', `measurement.aovs: unknown AOV ${JSON.stringify(name)} — known: ${legal.map((v) => `'${v}'`).join(', ')}`).add();
                 } else if (aovs.indexOf(name) !== i) {
                     bag.error('invalid-setting', `measurement.aovs lists '${name}' twice`).add();
+                } else {
+                    gateSpace('measurement.aovs', `AOV '${name}'`, spacesOf(AOVS[name].glsl));
                 }
             });
             if (aovs.length > 0 && (strategy.measurement.color ?? 'rgb') !== 'rgb') {
@@ -917,6 +1029,15 @@ export function validate(
     const exposure = strategy.view?.tonemap?.exposure;
     if (exposure !== undefined && (typeof exposure !== 'number' || !Number.isFinite(exposure) || exposure <= 0)) {
         bag.error('invalid-setting', `view.tonemap.exposure must be a finite number > 0 (got ${String(exposure)})`).add();
+    }
+    // White balance becomes a constant matrix in the display shader, computed from the
+    // blackbody's color at that temperature.
+    const whiteBalance = strategy.view?.tonemap?.whiteBalance;
+    const [minKelvin, maxKelvin] = blackbodyTemperatureRange;
+    if (whiteBalance !== undefined && (typeof whiteBalance !== 'number' || !Number.isFinite(whiteBalance)
+        || whiteBalance < minKelvin || whiteBalance > maxKelvin)) {
+        bag.error('invalid-setting',
+            `view.tonemap.whiteBalance must be a temperature in kelvin in [${minKelvin}, ${maxKelvin}] (got ${String(whiteBalance)})`).add();
     }
 
     // Procedural environment: the bake program has no uniforms (v1 pin — a live uniform would
@@ -1141,7 +1262,7 @@ export function validate(
             }
         }
         const proto = obj.prototype;
-        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag);
+        validateGeometryObject(proto, `Object ${i} prototype`, [`objects[${i}]`, 'prototype'], bag, space, gateSpace);
         // (A closed mesh PROTOTYPE was rejected here until instanced containment landed —
         // impl-plan-instanced-containment. Solid instances now claim an interior through
         // the same three-tier query their un-instanced siblings use, so `closed: true`
@@ -1218,12 +1339,18 @@ export function validate(
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
-                // Rows feeding a DERIVED field (ggx roughness → alpha) are CPU-derived once
-                // per material — a per-instance input would need per-instance derived slots
-                // (precompute-and-ship an extra table column). Deferred; reject-not-degrade.
-                const derived = MATERIAL_MODELS[model]?.derived?.find((d) => d.inputs.includes(key));
+                // A row feeding a derived field computed only on the host (plastic coat_eta →
+                // coat_fdr) is read once per material; a per-instance value would need a
+                // per-instance derived column, which the table does not have. A field with a
+                // per-hit form (ggx roughness → alpha) is computed from the attribute itself.
+                if (row.role === 'optical') {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} cannot vary per instance — an optical constant takes a constant, a scalar {param} or a named spectrum kind`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    continue;
+                }
+                const derived = hostDerivedFieldFedBy(model, key);
                 if (derived !== undefined) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}' — per-instance derived rows are deferred (the derived value is computed once per material)`)
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}', which is computed once per material on the host`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
@@ -1308,6 +1435,18 @@ export function validate(
         if (MATERIAL_MODELS[scene.materials[matName]?.model ?? '']?.capabilities.transmission) {
             bag.warning('invalid-setting', `Object ${i}: a transmissive material on ${thinCase} has no interior region — it will refract as η = 1`)
                 .withOriginal('scene', [`objects[${i}]`, 'material']).add();
+        }
+    }
+
+    // A model that transmits without crossing the interface (a thin sheet) and a medium anywhere
+    // in the scene: the walk would take the sheet's own region as the medium behind it after a
+    // front-face transmission through a zero-thickness surface (modelTransmitsWithoutCrossing).
+    if (features.media.hasMedia) {
+        for (const [name, mat] of Object.entries(scene.materials)) {
+            if (!modelTransmitsWithoutCrossing(mat.model)) continue;
+            bag.error('invalid-setting',
+                `Material '${name}': model '${mat.model}' passes light through its surface without changing region, which the walk cannot track through media: on a zero-thickness surface it would lose the medium behind it. Remove the media, or model the glass as a closed dielectric solid`)
+                .add();
         }
     }
 
@@ -1399,9 +1538,13 @@ export function validate(
  * buffer would silently texelFetch garbage vertices on the GPU).
  *
  * `label` prefixes messages (`Object 3`, `Object 3 prototype`); `path` prefixes
- * diagnostic origins (`objects[3]` / `objects[3].prototype`).
+ * diagnostic origins (`objects[3]` / `objects[3].prototype`). `space` is the program's ambient
+ * space, whose rows' further domains (SpaceConstraints) apply.
  */
-function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag): void {
+function validateGeometryObject(
+    obj: PrimitiveObject | MeshObject, label: string, path: string[], bag: DiagnosticBag, space: string,
+    gateSpace: (where: string, occupant: string, implementedIn: readonly string[]) => void,
+): void {
     if ('kind' in obj) {
         const vertexCount = obj.positions.length / 3;
         // Finite as well as well-shaped: the scene-wide finiteness sweep skips typed arrays,
@@ -1470,7 +1613,8 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     // Coupled degeneracy rules come from the DESCRIPTOR (C5: the last primitive
     // name-branch died here — quad's parallel-edges rule lives on quad.ts, ONE
     // formula with the quad light's). Runs only over well-shaped required rows.
-    if (desc?.validateValues !== undefined) {
+    const valuesInSpace = desc?.validateValuesIn?.[space];
+    if (desc !== undefined && (desc.validateValues !== undefined || valuesInSpace !== undefined)) {
         const rowsOk = desc.params.every((s) => {
             const v = obj.parameters[s.name];
             if (v === undefined) return !s.required;
@@ -1480,8 +1624,15 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
             // RESOLVED values (fable-sdf-contract §3's pin): a rule reading an
             // optional row (menger's iterations, apollonian's morph) must see the
             // default, not undefined — the same contract every descriptor function has.
-            for (const msg of desc.validateValues(resolvePrimitiveValues(desc, obj.parameters))) {
+            const resolved = resolvePrimitiveValues(desc, obj.parameters);
+            for (const msg of desc.validateValues?.(resolved) ?? []) {
                 bag.error('invalid-setting', `${label} (${type}): ${msg}`)
+                    .withOriginal('scene', path)
+                    .add();
+            }
+            // The coupled rules the shape's body in the program's space adds.
+            for (const msg of valuesInSpace?.(resolved) ?? []) {
+                bag.error('invalid-setting', `${label} (${type}): ${msg} in ${space} space`)
                     .withOriginal('scene', path)
                     .add();
             }
@@ -1489,7 +1640,33 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     }
     // Parameter schema (C7). Unimplemented types / unhonorable pins skip it — those
     // carry their own diagnostics.
-    if (!desc || resolveBackend(type, obj.backend) === undefined) return;
+    const backend = desc !== undefined ? resolveBackend(type, obj.backend) : undefined;
+    if (!desc || backend === undefined) return;
+    // The shape's body, and for a marched shape the primitives bounding its march (the chain
+    // the intersection generator links).
+    gateSpace(label, `primitive '${type}'`, spacesOf(desc.glsl));
+    if (backend === 'sdf') {
+        for (const boundType of marchBoundTypes(type, space)) {
+            const boundDesc = PRIMITIVES[boundType];
+            if (boundDesc !== undefined) gateSpace(label, `the primitive bounding its march, '${boundType}'`, spacesOf(boundDesc.glsl));
+        }
+        // In a curved space the bound is built in the object's frame from its intrinsic rows: it
+        // must sit at the object's origin (its point rows zero), with values valid in the space.
+        const mb = marchBoundIn(desc, space);
+        const boundDesc = typeof mb === 'object' ? PRIMITIVES[mb.type] : undefined;
+        if (curvedGeometryOf(space) !== undefined && typeof mb === 'object' && boundDesc !== undefined && rowsWellFormedFor(desc.params, obj.parameters)) {
+            const values = resolvePrimitiveValues(boundDesc, mb.values(resolvePrimitiveValues(desc, obj.parameters)));
+            for (const row of boundDesc.params) {
+                const v = values[row.name];
+                if (v === undefined) continue;
+                if (row.kind === 'point' && Array.isArray(v) && v.some((c) => c !== 0)) {
+                    bag.error('invalid-setting', `${label} (${type}): the '${mb.type}' bounding its march has ${row.name} [${v.join(', ')}]; in ${space} space a march bound must sit at the object's origin (place the object instead)`).add();
+                } else {
+                    validatePrimitiveConstraint(row, v, `${label} (${type}): the '${mb.type}' bounding its march: parameter '${row.name}'`, space, bag);
+                }
+            }
+        }
+    }
     const params = (obj.parameters ?? {}) as Record<string, unknown>;
     const schema = desc.params;
     const known = new Map(schema.map((s) => [s.name, s]));
@@ -1518,7 +1695,7 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
                 `${label} (${type}): parameter '${s.name}' must be a ${s.shape === 'number' ? 'finite number' : 'vec3 of finite numbers'}`)
                 .add();
         } else {
-            validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, bag);
+            validatePrimitiveConstraint(s, v, `${label} (${type}): parameter '${s.name}'`, space, bag);
         }
     }
 
@@ -1529,12 +1706,9 @@ function validateGeometryObject(obj: PrimitiveObject | MeshObject, label: string
     // bound that clips is a compile error here, never silently chopped geometry on
     // the GPU. ~26³ twin evaluations per local object per compile: milliseconds, and
     // only for defineSDF shapes.
-    if (desc.local === true && desc.fieldTwin !== undefined) {
-        const rowsWellFormed = schema.every((s) => {
-            const v = params[s.name];
-            if (v === undefined) return !s.required;
-            return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isFiniteVec3(v);
-        });
+    // The twin is the Euclidean field (curved bodies are not sampled at compile time).
+    if (desc.local === true && desc.fieldTwin !== undefined && curvedGeometryOf(space) === undefined) {
+        const rowsWellFormed = rowsWellFormedFor(schema, obj.parameters);
         const mb = desc.marchBound;
         if (rowsWellFormed && mb !== undefined && mb !== 'self' && mb !== 'unbounded') {
             const resolved = resolvePrimitiveValues(desc, obj.parameters);
@@ -1715,18 +1889,27 @@ function validatePrimitiveConstraint(
     schema: PrimitiveParamSpec,
     value: unknown,
     label: string,
+    space: string,
     bag: DiagnosticBag,
 ): void {
     // The shared D1 interpreter — one message voice for every family's rows.
-    if (schema.constraint === undefined) return;
-    const violation = constraintViolation(value as number | number[], schema.constraint);
-    if (violation !== null) bag.error('invalid-setting', `${label} ${violation}`).add();
+    for (const violation of rowViolations(value as number | number[], schema, space)) bag.error('invalid-setting', `${label} ${violation}`).add();
 }
 
 // ============================================================================
 // Helpers (audit-hardening H1)
 // ============================================================================
 
+
+/** Every row of `schema` is present (or optional) and of its declared shape in `parameters`. */
+function rowsWellFormedFor(schema: PrimitiveParamSpec[], parameters: unknown): boolean {
+    const params = (parameters ?? {}) as Record<string, unknown>;
+    return schema.every((s) => {
+        const v = params[s.name];
+        if (v === undefined) return !s.required;
+        return s.shape === 'number' ? typeof v === 'number' && Number.isFinite(v) : isFiniteVec3(v);
+    });
+}
 
 /**
  * Recursive sweep over GLSL expressions with declared params. Each parameter is a slider of a

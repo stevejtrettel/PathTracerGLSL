@@ -17,9 +17,10 @@ export interface PlannedTexture {
     /** Resource reference, e.g. 'extern:env_map' (resolved by the engine registry). */
     source: string;
     /** Sampler declaration type. Default sampler2D; 'usampler2D' = an INTEGER texture
-     *  (RGBA32UI — the cwbvh node channel, fable-accel-cwbvh §6). Integer samplers
-     *  have no default precision in ES 3.00, so the builder declares them highp. */
-    samplerType?: 'usampler2D';
+     *  (RGBA32UI — the cwbvh node channel, fable-accel-cwbvh §6); 'sampler2DArray' = a 2D-array
+     *  texture (the material images). Neither has a default precision in ES 3.00, so the builder
+     *  declares both highp. */
+    samplerType?: 'usampler2D' | 'sampler2DArray';
     /** Precision of sampled values; numerical tables can require float32 reads. */
     precision?: 'highp';
 }

@@ -31,6 +31,7 @@ import {
     type Similarity,
 } from '../components/geometry/similarity.js';
 import type { PackedPlacements } from '../compiler/types.js';
+import { AMBIENT_SPACES } from '../components/ambient/index.js';
 
 export interface GroupNode {
     kind: 'group';
@@ -57,24 +58,39 @@ export type SceneNode = ObjectDescription | GroupNode;
  *
  * Depth-0 leaves with no composition and no path to stamp are returned BY REFERENCE
  * (flattening an already-flat scene is the identity).
+ *
+ * `space` is the scene's ambient space (`ambientSpace.type`). The composition here is that of
+ * Euclidean similarities; a curved space places objects by isometries, which compose
+ * differently (two transvections compose to a transvection and a rotation), so in a curved space
+ * a group with a non-identity transform is an error.
  */
-export function flattenGroups(nodes: SceneNode[]): ObjectDescription[] {
+export function flattenGroups(nodes: SceneNode[], space: string): ObjectDescription[] {
+    const ambient = AMBIENT_SPACES[space];
+    if (ambient === undefined) throw new Error(`flattenGroups: unknown ambient space '${space}'`);
     const out: ObjectDescription[] = [];
-    walk(nodes, IDENTITY_SIMILARITY, [], out);
+    walk(nodes, IDENTITY_SIMILARITY, [], out, ambient.curved !== undefined ? space : null);
     return out;
 }
 
-function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: ObjectDescription[]): void {
+/** `curvedSpace` names the scene's space when it is curved, else null. */
+function walk(nodes: SceneNode[], parent: Similarity, path: string[], out: ObjectDescription[], curvedSpace: string | null): void {
     nodes.forEach((node, i) => {
         if ('kind' in node && node.kind === 'group') {
             const label = [...path, node.name ?? `#${i}`];
+            if (curvedSpace !== null && node.transform !== undefined
+                && (isDrivenTransform(node.transform) || classifySimilarity(similarityFromTransform(node.transform)) !== 'identity')) {
+                throw new Error(
+                    `flattenGroups: group '${label.join('/')}' has a transform in ${curvedSpace} space — `
+                    + `groups compose as Euclidean similarities here, and composing isometries of a curved `
+                    + `space is not implemented; place each object by its own transform`);
+            }
             if (isDrivenTransform(node.transform)) {
                 throw new Error(
                     `flattenGroups: group '${label.join('/')}' has a {param}-driven transform field — `
                     + `static flattening composes constants only (fable-transforms §4); driving a GROUP `
                     + `is the runtime graph's job (unbuilt)`);
             }
-            walk(node.children, similarityCompose(parent, similarityFromTransform(node.transform)), label, out);
+            walk(node.children, similarityCompose(parent, similarityFromTransform(node.transform)), label, out, curvedSpace);
             return;
         }
 

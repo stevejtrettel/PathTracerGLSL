@@ -40,7 +40,7 @@ export const bottleDescriptor: PrimitiveDescriptor = {
         { name: 'smoothJoin', kind: 'length', shape: 'number', required: false, default: 0.3, constraint: { kind: 'positive' } },
         { name: 'punt', kind: 'length', shape: 'number', required: false, default: 0, constraint: { kind: 'nonnegative' } },
     ],
-    glsl: bottleGLSL,
+    glsl: { euclidean: { origin: 'components/geometry/bottle/bottle.glsl', source: bottleGLSL } },
     provides: { sdf: true, analytic: false },
     // A cylinder about the shape's own axis: the body IS one, so the bound is tight
     // where it matters and loose only over the neck (a cheap, mostly-empty slab).

@@ -4,9 +4,11 @@
 // THE CAMERA IS THE MEASURING DEVICE (measurement.camera), NOT part of the scene — so every
 // NUMERIC camera control is ALWAYS a live uniform, never baked. You can adjust the instrument
 // (pose, fov, aperture, focus) on any scene without a recompile; the constant-vs-driven Model B
-// split that governs scene values does NOT apply here. The one thing that IS structural is the
-// projection TYPE (pinhole vs a fisheye sub-projection) — changing it changes the integral, so
-// it recompiles (fisheye's FISHEYE_THETA function-selector define, NOT a value).
+// split that governs scene values does NOT apply here. What IS structural is the projection
+// TYPE (pinhole vs a fisheye sub-projection) and the pupil's shape (the thin lens's blade count
+// and orientation) — changing either changes the integral, so it recompiles (the descriptors'
+// `defines`: fisheye's FISHEYE_THETA function selector, the thin lens's LENS_BLADES and
+// LENS_BLADE_ROTATION).
 //
 // This feature owns the SHARED camera uniforms — the CPU-computed look-at frame (basis.ts),
 // image size, aspect, and the perspective u_tanFov = tan(fov/2). Every OTHER model-unique
@@ -22,7 +24,11 @@ import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { cameraModel, type CameraControl, type CameraDerived } from '../../../components/camera/index.js';
-import { cameraBasis } from '../../../components/camera/basis.js';
+import { cameraBasis, curvedCameraBasis, type CurvedCameraBasis } from '../../../components/camera/basis.js';
+import { curvedGeometryOf } from '../../../components/ambient/index.js';
+import type { CurvedGeometry } from '../../../components/ambient/isometry.js';
+import { QUOTIENTS } from '../../../components/quotient/index.js';
+import { bodyFor } from '../../../components/descriptors.js';
 import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
 
 /** Mint a control's slider (and, for a pass-through, its raw uniform). No derivation. */
@@ -83,16 +89,32 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // to feed these closures). u_cameraPosition survives as the perspective/ortho origin.
     // ONE basis computation shared by the three closures (they fire together each frame):
     // memoized on the pose values so a frame runs cameraBasis once, not once per vector.
+    // In a curved space the frame is curvedCameraBasis's (the target-centered up rule) and all
+    // four vectors are vec4: the camera point exp_o(position) and a tangent frame there.
+    // In a quotient whose walk needs every ray to start in D (Seifert–Weber), the pose is then
+    // moved into D by the group, its frame carried along (the occupant's reduceCamera).
+    const geom = curvedGeometryOf(plan.program.measurement.ambient);
+    const quotient = plan.program.measurement.quotient;
+    const reduce = quotient !== undefined ? QUOTIENTS[quotient.kind]?.reduceCamera : undefined;
+    const curvedFrame = (g: CurvedGeometry, position: Vec3Tuple, target: Vec3Tuple): CurvedCameraBasis => {
+        const b = curvedCameraBasis(g, position, target);
+        if (reduce === undefined) return b;
+        const r = reduce(b.position, [b.forward, b.right, b.up]);
+        return { position: r.point, forward: r.vectors[0], right: r.vectors[1], up: r.vectors[2] };
+    };
+    const frameOf = (position: Vec3Tuple, target: Vec3Tuple): Record<'position' | 'forward' | 'right' | 'up', number[]> =>
+        geom !== undefined ? curvedFrame(geom, position, target) : { position, ...cameraBasis(position, target) };
     let memoKey = '';
-    let memoBasis = cameraBasis(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
+    let memoBasis = frameOf(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
     const basisFor = (position: Vec3Tuple, target: Vec3Tuple) => {
         const key = `${position.join(',')}|${target.join(',')}`;
-        if (key !== memoKey) { memoKey = key; memoBasis = cameraBasis(position, target); }
+        if (key !== memoKey) { memoKey = key; memoBasis = frameOf(position, target); }
         return memoBasis;
     };
-    const basisUniform = (name: string, pick: (b: ReturnType<typeof cameraBasis>) => Vec3Tuple) => ({
+    const vecType = geom !== undefined ? 'vec4' as const : 'vec3' as const;
+    const basisUniform = (name: string, pick: (b: ReturnType<typeof frameOf>) => number[]) => ({
         name,
-        type: 'vec3' as const,
+        type: vecType,
         parameterPath: 'camera.position',
         parameterPaths: ['camera.position', 'camera.target'],
         default: pick(basisFor(pose.position as Vec3Tuple, pose.target as Vec3Tuple)),
@@ -105,11 +127,13 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     const contribution: FeatureContribution = {
         ...emptyContribution('camera'),
         provides: [{ name: 'camera_generateRay', signature: 'Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl)' }],
-        // Origin DERIVED from the registry key (D2: the materials way — the path
-        // convention is the one truth; no hand-written origin to drift).
-        blocks: [{ origin: `components/camera/${model.type}/${model.type}.glsl`, source: model.glsl }],
+        // The model's body for the program's space (its origin travels with it).
+        blocks: [bodyFor(model.glsl, plan.program.measurement.ambient, `camera '${model.type}'`)],
         uniforms: [
-            { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
+            // The Euclidean camera point is camera.position itself; a curved one is exp_o of it.
+            geom !== undefined
+                ? basisUniform('u_cameraPosition', (b) => b.position)
+                : { name: 'u_cameraPosition', type: 'vec3', parameterPath: 'camera.position', default: pose.position },
             basisUniform('u_cameraForward', (b) => b.forward),
             basisUniform('u_cameraRight', (b) => b.right),
             basisUniform('u_cameraUp', (b) => b.up),

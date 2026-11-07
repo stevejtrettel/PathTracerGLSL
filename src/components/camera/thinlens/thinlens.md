@@ -14,7 +14,7 @@ The construction reuses the pinhole look-at frame (CPU-computed uniforms) and `u
 - **Focus point:** the primary ray crosses the focus plane at
   `t = u_focusDistance / dot(dir, forward)` (the plane is perpendicular to `forward` at
   `u_focusDistance`), so `focus_point = position + dir·t`.
-- **Lens sample:** `concentric_disk(xiLens)·u_aperture` — the equal-area Shirley map of
+- **Lens sample:** `concentric_disk(xiLens)·u_aperture` (or the n-gon below) — the equal-area Shirley map of
   the second sub-sample onto the lens disk (`xiLens` comes from the film sample stream, so
   QMC stratifies the aperture just like the pixel). `u_aperture` is the lens radius.
 - **Final ray:** origin moves to the sampled lens point
@@ -25,9 +25,38 @@ The construction reuses the pinhole look-at frame (CPU-computed uniforms) and `u
 is the correctness witness (a thin-lens render at aperture 0 must match pinhole).
 
 `concentric_disk` is the shared core-math helper (`glsl/core/math.glsl`), also used by the
-disk and soft-beam lights. `aperture` and `focusDistance` are live sliders that trigger
-accumulation reset — they change what the render converges to.
+disk and soft-beam lights.
+
+`aperture` and `focusDistance` are live sliders that trigger accumulation reset — they change
+what the render converges to.
+
+**Bladed pupil.** With `blades: n` (an integer ≥ 3) the pupil is the regular n-gon of
+circumradius `u_aperture`, the shape a stopped-down iris of n straight blades makes, so
+out-of-focus highlights become n-gons. Its vertices lie at `bladeRotation + 2πk/n` radians,
+measured from camera right toward camera up (`bladeRotation` defaults to 0, a vertex on camera
+right; a disk is unchanged by it). Both are compile-time defines (`LENS_BLADES`,
+`LENS_BLADE_ROTATION`): the pupil's shape is part of the integral, like fisheye's projection.
+`aperture_polygon` samples the n-gon uniformly: `ξ.x` picks one of the n equal-area triangles
+(center, vertex k−1, vertex k) and is reused inside it, where the barycentrics
+`(1 − √ξ, √ξ·ξ.y)` on the two outer vertices are uniform. It transcribes Cycles'
+`regular_polygon_sample`, whose rotation places vertices at `rot ± π/n`, with `rot = rotation − π/n`.
+The weight stays 1 (the camera measures radiance, as pbrt's perspective camera does), so the
+blade count changes only the shape of the defocus, not the brightness, and `aperture = 0` is
+still the pinhole. `aperture` is the circumradius, so an n-gon pupil is slightly smaller than the
+disk of the same `aperture` (a hexagon has 83% of its area) and gives very slightly deeper focus
+than the nominal f-number from `thinLensFromPhoto`.
+
+Checks: the twin χ² of the warp against exact cell areas (tests/components/aperturePolygon.test.ts),
+the `bokeh-edge` witness (the fraction of the disk, a hexagon and a rotated triangle beyond a
+defocused edge, exact values), and the `thinlens-zero` six-blade arm (aperture 0 ≡ pinhole).
 
 Randomness note (the camera A/B split, see `../README.md`): thin-lens consumes exactly the
 Category-A dimensions — the `film` footprint (pixel/) + `xiLens`. Motion blur (shutter time) and spectral
 sensor response (wavelength) are Category-B seed fields, not `generateRay` arguments.
+
+**From a photographic lens.** `thinLensFromPhoto` (src/authoring/photoLens.ts) converts a focal
+length f, an f-number N, a focus distance F and a sensor height h into these fields:
+`aperture = f/2N` (the entrance-pupil radius), `fov = 2 atan(h/2v)` with the image distance
+`v = F f/(F − f)`, and `focusDistance = F`. With that aperture, a point at depth z blurs over the
+angle `(f/2N)|1/z − 1/F|`, exactly as through the real thin lens, so the depth of field matches
+the photograph's.

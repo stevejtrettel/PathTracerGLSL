@@ -1,8 +1,6 @@
 import type { GaussianValue, Vec3 } from '../../../../compiler/types.js';
 import type { SpectrumKind } from '../spectrumKind.js';
-import { cie1931Curves } from '../../../sensor/cie1931/curves.js';
-import { d65Curve } from '../../spectral/d65.js';
-import { spectralData } from '../../spectral/data.js';
+import { d65StandIn } from '../standIn.js';
 import { formatFloat } from '../../../glsl-format.js';
 
 export function isGaussian(value: unknown): value is GaussianValue {
@@ -16,31 +14,10 @@ export function gaussianReflectance(v: GaussianValue, lambda: number): number {
     return floor + (peak - floor) * Math.exp(-0.5 * d * d);
 }
 
-/** The RGB stand-in: daylight (D65) reflected by the band, in linear sRGB, divided channel by
- *  channel by the same projection of a perfect white reflector:
- *  s_c = ∫ g · D65 · (M x̄)_c dλ / ∫ D65 · (M x̄)_c dλ.
- *  The color-matching functions and D65 are the tabulated samples, linear between 5 nm knots;
- *  Simpson's rule at 0.5 nm within each interval. A saturated band can fall outside [0, 1]. */
+/** The RGB stand-in: the band's daylight projection (d65StandIn). A saturated band can fall
+ *  outside [0, 1]. */
 export function gaussianStandIn(v: GaussianValue): Vec3 {
-    const num = [0, 0, 0], den = [0, 0, 0];
-    const M = spectralData.xyzToRGB;
-    for (let interval = 0; interval < cie1931Curves.length - 1; interval++) {
-        for (let sample = 0; sample <= 10; sample++) {
-            const fraction = sample / 10;
-            const lambda = 360 + 5 * (interval + fraction);
-            const weight = 0.5 / 3 * (sample === 0 || sample === 10 ? 1 : sample % 2 ? 4 : 2);
-            const lerp = (a: number, b: number) => a * (1 - fraction) + b * fraction;
-            const cmf = [0, 1, 2].map(j => lerp(cie1931Curves[interval][j], cie1931Curves[interval + 1][j]));
-            const light = weight * lerp(d65Curve[interval], d65Curve[interval + 1]);
-            const g = gaussianReflectance(v, lambda);
-            for (let c = 0; c < 3; c++) {
-                const response = M[c][0] * cmf[0] + M[c][1] * cmf[1] + M[c][2] * cmf[2];
-                num[c] += g * light * response;
-                den[c] += light * response;
-            }
-        }
-    }
-    return [num[0] / den[0], num[1] / den[1], num[2] / den[2]];
+    return d65StandIn(lambda => gaussianReflectance(v, lambda));
 }
 
 /** `{ gaussian: { center, width, peak, floor? } }`: a reflectance band in nm (spec §2 of

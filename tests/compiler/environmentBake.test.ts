@@ -38,4 +38,9 @@ describe('procedural-env bake shaders (compileEnvironmentBake)', () => {
     it('non-procedural environments compile no bake renderer', () => {
         expect(compileEnvironmentBake({ ...scene, environment: { type: 'constant', color: [1, 1, 1] } })).toBeNull();
     });
+
+    it('a procedural sky that is not sampled as a light compiles no bake renderer (nothing reads a table)', () => {
+        const env = scene.environment as Extract<SceneDescription['environment'], { type: 'procedural' }>;
+        expect(compileEnvironmentBake({ ...scene, environment: { ...env, sampleAsLight: false } })).toBeNull();
+    });
 });

@@ -23,9 +23,11 @@ a triangle engine over data-texture geometry, gated by `intersection.backends.me
 
 The family REGISTRY (`index.ts` — held since founding, opened by the audit batch) holds
 the genuine one-of-N axes: `MESH_TRAVERSALS` (`estimator.meshTraversal`: brute | bvh) and
-`INSTANCE_ACCELS` (`estimator.instanceAccel`: linear | tlas). **A new traversal engine =
+`INSTANCE_ACCELS` (`estimator.instanceAccel`: linear | tlas | cwbvh), and
+`OBJECT_DISPATCHES` (`estimator.objectDispatch`: unrolled | table). **A new traversal engine =
 one descriptor + one registry line** (the Validator's membership check and the feature's
-extern/define gating both read the registry). Geometry BACKENDS deliberately have NO
+extern/define gating both read the registry). Their code is emitted from TypeScript, so each
+descriptor lists the ambient `spaces` it is implemented in (ambient/README.md). Geometry BACKENDS deliberately have NO
 registry — they are scene-derived capabilities that compose (`intersection.backends`),
 and a fourth geometry class is a design event, not an occupant drop.
 

@@ -4,6 +4,1213 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Integration: measured metals and sheen, then curved spaces (H³, S³)
+
+`integrate` merges photo-materials at 8a52887 and sw at 861f175 (curved H³/S³ joined with the
+cube 3-torus).
+
+- **Material models in curved spaces.** A material descriptor's GLSL is keyed by ambient space.
+  `plastic`, `thin_dielectric`, `sheen`, `conductor` and `rough_conductor` have a Euclidean body
+  only, so the space gate rejects them in H³ and S³ by name (lambert stays the one curved-space
+  surface model). The support table (components/ambient/support.md) lists them.
+- **Bump mapping** is a new limitation row (Euclidean only): its height is a GLSL expression in
+  the world point, like the material expressions the uv/expression row already gates. Image
+  textures are lowered to expressions before validation, so that row covers them.
+- `unitLuminanceStandIn` also returns the normalized XYZ, which white balance reads through
+  `blackbodyColor` (same arithmetic as before).
+- tests/compiler/spaceGate.test.ts checks the five material models and bump mapping.
+- Snapshots (generated GLSL, program descriptions, scene data) regenerated after the merge.
+- Measured after the merge: tsc clean; vitest 159 files, 5397 tests pass (glslang included);
+  targeted witnesses conductor-gold, conductor-perfect, veach-metals, spectral-colorchecker-d65,
+  spectral-measured-lamps, h3-disk-light and s3-long-arc: 26 of 26 exact checks pass.
+
+## 2026-11-07 — Photographs: fixes from a review of the six pictures
+
+- **Bugs and wrong text.** `photo-window`'s 3 cm table edge reused the top's `wood` material, so
+  its uv squashed the map about 60:1 and turned the planks 90° (striped planks, a stray seam); it
+  now has its own `wood_edge` (edge2 along x, uvScale [0.015, 0.8]). Corrected: `photo-glass`'s
+  `exercises`/`expected` (they described the earlier bright-field set), `photo-sponge`'s (the wood
+  is lambert, not coated), the table/paving quads' "normal +y" comments (edge1 × edge2 points −y;
+  harmless, quads are two-sided), `kleinBottle`'s extent (it spans y ∈ [0, 4.21], measured on a
+  2001 × 721 grid), the plaza knot's resting height (now computed from the sampled curve minimum,
+  −0.692, so it sinks the stated 3 cm; it sank 4.2), and the pavilion's size (the gasket's
+  half-extent measured with its twin is 2.306, not the descriptor's slack bound 2.595: 4.6 m
+  across, sunk 0.26 m; the picture is unchanged).
+- **Studio:** key softbox moved to 0.75 m (emission 10), HDRI fill 0.4 → 0.12: the paper now falls
+  off 1 to 1.8 stops from front to back (measured luminance 0.97 → 0.27 at the left edge,
+  0.58 → 0.29 at the right), where it fell about 0.4 stop (1.10 → 0.86). Orange
+  peel on the plastic coat (Perlin bump, wavelength 0.25 mm, slope about 0.01) softens the
+  softbox's reflected edges; faint mottle and tooth on the paper.
+- **Sponge:** bulbs 7 → 9 mm with radiance scale 60 → 2.8 (about a thirteenth of the power),
+  ±25% brightness per bulb: the bokeh discs' centers measure linear red 0.75–1.10 (was 10.1–11.7),
+  which AgX shows amber-peach rather than cream. A white
+  bounce card out of frame fills the shadow side. The orange speckle on the dark face and the
+  sparkle fringe on its silhouette are gone at 4096 spp (seen in zoomed crops).
+- **Plaza:** the plinth is a rounded box (a scene-local `defineSDF`, 12 mm radius) with a
+  stronger, larger-scale mottle; a stone curb ends the quay; the camera moved back (10.8 m) so
+  the whole plinth is in frame. Loading the scene registers `roundedBox`, so the glslang kitchen
+  sink (tests/compiler/glsl-compile.test.ts) now compiles it too, from a sample with a positive
+  half-size (the generic vec3 has a zero component).
+- **Window:** an 8 cm apron under the table top (no lit plaster below the table any more); the
+  wall moved back to 1.1 m behind the objects and the lens opened to f/4, so the plaster blurs
+  (about 8 px against 3 px); sub-pixel relief on the apples' wax spreads the window's reflection
+  into a sheen.
+- **Glass:** a dim panel with an expression emission, hung just below eye level far behind the
+  set under a black flag, reflects in the acrylic as a glow that brightens toward its horizon.
+  Rendered at 32768 spp for the frosted ball's grain: relative pixel noise at its center 0.20 →
+  0.08 (measured against a 3 × 3 local mean; the glow also brightens the ball by a quarter). Widening the strip boxes did not reduce that
+  grain (measured: relative noise 0.65 at 1024 spp, against 0.54 expected from the old render), so
+  they are unchanged.
+- **Pavilion:** a park bench (three boxes) for scale; `expected` now says the light is soft (the
+  sun gives about a sixth of the ground irradiance in this HDRI). Fewer gasket iterations did not
+  help the foam-like bumps (4 looks the same as 5; 3 is lumpier), so it stays at 5.
+- Not addressed: the paving's 3 m repeat (a texture value cannot be multiplied by an expression),
+  normal maps, lens effects (vignetting, bloom), the Menger sponge's sharp edges, and a sunnier
+  HDRI for the pavilion (not downloaded).
+- All six re-rendered on the Apple M2 (`npm run shoot`, 1280 × 853, salt 1) into renders/photo/:
+  sponge 4096 spp 274 s, plaza 4096 spp 250 s, pavilion 4096 spp 396 s, studio 4096 spp 649 s,
+  window 4096 spp 817 s, glass 32768 spp 1106 s. Each new picture was compared with the old one,
+  whole and in zoomed crops, and replaced it.
+
+## 2026-11-07 — Photographs: six scenes composed to look like photographs
+
+- A **Photographs** gallery section (demos/photo/): `photo-studio` (a red plastic trefoil on a
+  paper sweep, key softbox + studio HDRI fill, 100 mm f/8), `photo-sponge` (a ceramic level-4
+  Menger sponge on a wood table by a window, string lights behind as heptagonal bokeh, 100 mm
+  f/2.8), `photo-plaza` (a polished black granite trefoil on a Venice quay at sunset, the sun in
+  frame, 85 mm f/2.8), `photo-window` (Poly Haven vase, brass vase, bowl and apples on a plank
+  table against plaster, one window, 85 mm f/5.6), `photo-glass` (dark-field glass: a thin-sheet
+  Klein bottle, a solid glass ring, a frosted ball on black acrylic, 90 mm f/11) and
+  `photo-pavilion` (an Apollonian gasket as a 5 m concrete pavilion in a meadow, 24 mm f/8).
+- Shared recipe (demos/photo/camera.ts): `thinLensFromPhoto` on a 36 × 24 mm sensor, blades,
+  Gaussian pixel filter, energy-compensated microfacets, MIS, AgX. Mesh builders
+  (demos/photo/geometry.ts): parametric grids with normals from central differences of the map, a paper sweep,
+  a rotation-minimizing tube around a closed curve, the Klein bottle "bottle" immersion.
+- All six are async entries (registry-iterating tests and snapshots skip them); five read
+  public/trial/. `large_grey_tiles` (Poly Haven, CC0) joins tools/trial-assets.json.
+- The brass vase uses its asset's glTF metal model (GGX, Schlick F0 = base-color map) as a
+  stand-in for a complex-index conductor; this is stated in the scene.
+- Measured on the Apple M2 (`npm run shoot`, 1280 × 853, salt 1): glass 8192 spp 251 s; studio
+  4096 spp 575 s; sponge 244 s; plaza 240 s; pavilion 330 s; window 997 s. Pictures in the
+  gitignored renders/photo/.
+
+## 2026-11-07 — Seifert–Weber GPU witnesses, a walk counter and a demo (quotients plan Q2.6)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Q2.6 witnesses 1–3. The first renders of a
+Seifert–Weber program.
+
+**What was built:**
+- `seifert-weber-windows` (tests/witnesses/scenes/seifertWeberWitness.ts): three emissive spheres
+  of different colors at generic positions in D, pt, maxBounces 0, farClip 6, fov 0.5. Eleven pixel
+  windows are certified by a float64 twin (tests/helpers/seifertWeberTwin.ts) with a one-pixel
+  margin as seeing one sphere through 0, 1, 2 or 3 face crossings, or nothing within the far clip.
+  The twin builds Γ from the closed forms itself, lists the cells that can meet each window's view
+  cone by a breadth-first search over face-adjacent cells, and intersects every pixel ray with every
+  sphere image in them (brute force over the cover, not the walk); it also walks each certified ray
+  in float64 and requires the walk's cell to be the image's. tests/witnesses/seifertWeberWindows.test.ts
+  re-derives every window from the scene as authored.
+- `seifert-weber-lights`: a disk light 0.62 along face 0's direction facing the face (so D is lit
+  mostly by its copies across the faces; the copy across face 1 shines in through face 1) and three
+  lambert balls; pt = pt-nee = pt-mis, maxBounces 3, farClip 8, 256 spp.
+- The runner's `walk-counter` check (tools/witness.mjs `renderWalkCounter`, report only): the
+  strategy's own program with counters added at fixed anchors of the generated Seifert–Weber walk
+  (the render fails if an anchor is missing): capped segments, the most faces one segment crossed,
+  the largest constraint drift after a crossing.
+- Demo `seifert-weber-room` in the gallery's "Curved spaces" section: beads in D's 20 corners and at
+  its 30 edge midpoints, set as close to the faces as the Validator allows, so around every vertex of
+  the tiling 20 corner beads meet in a node and around every edge 5 beads close into a ring; a
+  two-sided lamp at the center (two disk lights back to back) and two small balls; pt-mis and pt,
+  farClip 6.
+- `pixelWindowRegion` (tests/witnesses/types.ts): the runner region of a pixel window, now shared by
+  the torus fog windows and these.
+
+**Measured (SwiftShader, WITNESS_PORT 3208):**
+- `seifert-weber-windows`: 11 of 11 windows exact (each reads its sphere's emission to 4 digits, or
+  0). With TWIST = π/5 in place of 3π/5, 6 of 11 fail: the five crossing windows the twin predicts
+  and one miss window. The two crossing windows that still pass both cross faces 1, 8, 10: the two
+  twists differ by a 1/5 turn, a symmetry of D, and along that face path the inserted symmetries
+  compose to the identity (the wrong walk meets the same sphere at the same arc length to 1e-14 in
+  the twin). The plan's sentence "moves every image beyond 2r_in" was corrected accordingly.
+- `seifert-weber-lights`: pt-nee ≡ pt-mis Δmean 0.00%, χ²ᵣ 0.01; pt tripwire Δmean 0.00%, rmse
+  20.6% (gate 25%); σ/µ pt-mis 18.1%, pt 19.7%. With the image index off by one (`first_face` for
+  `1 + first_face` in quotient_image_index) the frame means differ by 2.58% and both
+  equality checks fail. Under the pinned salt pt-nee and pt-mis draw the same numbers, so their χ²
+  stays near 0 (0.03) even under that bug: the 1% mean gate is what catches it. An earlier light
+  (radius 0.22, normal mostly along the face) let the same bug through (Δmean 0.08%) and failed the
+  pt tripwire on noise (rmse 33%); that is why the light faces the face.
+- Walk counter: windows (160×120×16 camera rays, cap 56): 0 capped segments, at most 11 faces in a
+  segment, drift ≤ 9.5e-6; lights (160×120×256 pt-mis paths with bounce and shadow segments, cap 64):
+  0 capped, at most 17 faces, drift ≤ 1.14e-5. With the cap set to 6 it counted 24,880 capped camera
+  segments (at most 7 faces), so it counts.
+- Non-quotient output: no program source changed (the only file under src/ touched is the
+  seifert-weber.md note). `npm run digest` on HEAD (exported tree) against this tree: 295 of 295
+  existing scenes identical in every part; the three new scenes are the only additions. Frames were
+  not recorded: no code a frame case compiles changed.
+- Vitest (full suite, load average 22–30): 4,714 passed, 5 timed out (5 s limit; no assertion
+  failed) in 4 files, which pass with --testTimeout=300000 (1,188 of 1,188); 9 snapshots written,
+  all additions for the three new scenes. tsc clean. The new seifertWeberWindows.test.ts: 19 of 19.
+
+**Open:** neither scene has been in a full sweep. The M2 GPU's builtins and FMA contraction are
+still not measured (the counter runs only on SwiftShader here). The demo was composed on
+SwiftShader renders at 320×240 and up to 96 spp only.
+
+## 2026-11-07 — The Seifert–Weber space: group data, walk, image-aware NEE (quotients plan Q2 core)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q2: Q2.1–Q2.3, Q2.5 and vitest
+1–3 of Q2.6. The GPU witnesses (Q2.6 witnesses 1–3) are not built yet.
+
+**What was built:**
+- **The locked `Hit` gains `int image` and `Direction arrival`** (decision 1, at the plan's
+  recommendation, provisionally). The dispatcher sets `image = 0` and `arrival =
+  ambient_flow(ray, t).direction` (its side test reads it there); a quotient walk sets `image`
+  once more. The transport's `wo` is `−hit.arrival`. In the 3-torus the walk reports
+  `quotient_image_index(k)` of the cell it reached, and the rounding formula `quotient_image`
+  is gone, so the field has one meaning in every program; image-aware NEE/MIS are written over
+  two occupant maps (`quotient_image_query`, `quotient_image_direction`), the identity on
+  directions in the torus. docs/trace-loop-contract.md describes both fields and the quotient
+  walk.
+- **`components/quotient/seifert-weber/`**: the group in float64 from closed forms (inradius
+  0.99638, circumradius 1.90285, 12 face normals, pairings T(−2r_in·u)·R(u, 3π/5) and their
+  inverses), emitted once as float32 const arrays `FACE_N[12]`, `PAIRING[12]`; the exit face
+  and the renormalized crossing (static GLSL); the 13-image table (0: the light in D, 1 + f: its
+  copy across face f, seen from `PAIRING[f]·x`, directions carried back by `PAIRING[f xor 1]`)
+  and the crossing-count image index; the camera pose reduced into D on the CPU (`swReduce`).
+  Image-aware MIS moves only the query, not the departure direction the plan's Q2.3 first
+  listed (`PAIRING[f]·wi`): the cover's pdf reads the light point and `wo` at the emitter (the
+  reversed `hit.arrival`), both already in D's chart. The plan line now says so.
+- **The generated walk** (intersection.ts): the cell query clipped at the exit face, then the
+  crossing; `hit.t` summed, `hit.image` from the crossings (0, 1 + first face, or −1);
+  `QUOTIENT_MAX_CROSSINGS = ⌈4·farClip⌉ + 32`, a miss for `scene_intersect` and occluded for
+  `scene_intersect_any`, so the cap only removes light.
+- **Validator** (Q2.5): every object's and light's bounding ball inside D by `EPS_INTERFACE`
+  (a new `ballBound` fact on the sphere and disk descriptors; the placement isometry is one
+  function shared with the Planner, `curvedConstantPlacement`), no unbounded or driven objects,
+  no media (`ambientFog: false`), no sky or delta lights, `farClip ≥ 2R_c + 2r_in = 5.80`.
+
+**Measured:**
+- Vitest (tests first; each new check shown failing): the group data (SO⁺(3,1) to 1e-12,
+  face i → face i xor 1, 6 edge cycles of 5 with product I, one vertex class, a free action, each
+  of 20,000 points of the ball of radius 3 in exactly one cell; a twist of 1/10 turn fails the
+  edge cycles and the free action), Kac's mean 0.9571 against 0.9599 over 198,000 segments; the
+  float32 walk (drift ≤ 1.4e-5, zero-length runs ≤ 6, at most 15/18/28 crossings in windows of
+  6/8/16 against caps 56/64/96; without renormalizing, all 2,000 rays stick); the partition-MIS
+  twin at 120,000 paths per estimator: pt 0.5422 ± 0.0047, pt-nee 0.5326 ± 0.0043, pt-mis 0.5412
+  ± 0.0043, W1 −93σ, the membership control (MIS counting only 0-crossing hits) +13.8σ (60,000
+  paths gave only +9.9σ, so the budget was doubled), and a wrong direction map fails pt-nee and
+  pt-mis by 17σ and 14σ.
+- SwiftShader runs the step over the emitted tables (4,096 rays × 100 crossings, 4,096 aimed at
+  vertices and edges × 30) with drift ≤ 1.4e-5, no stuck ray, zero-length runs ≤ 6; its `atanh`
+  is within 2.4e-7 on [0, tanh 2R_c] and `inversesqrt` within 9e-8 relative, so they need no
+  replacement (unlike S³'s sin and cos).
+- Gates for the `Hit` change: `npm run digest` (295 scenes) differs only by the lines named
+  above — the two Hit fields with their comments, `hit.image = 0;`, the stored arrival and its
+  side test, and `wo = −hit.arrival` in all 554 main programs; in the 13 torus programs also the
+  occupant's maps, the walk's image line and the wrappers; source-map line numbers otherwise.
+  `npm run frames -- compare`: 30 of 30 pictures bit-identical. The five torus witnesses, before and
+  after: 15 of 15 checks pass with identical numbers, and the 27 rendered pictures they cache (frames, means and variances) are bit-identical, compared by hash (pinned salt). `h3-disk-light` passes (4 of 4). The
+  Seifert–Weber parts add nothing to any existing program (digest: 295 of 295 scenes identical
+  between the two commits).
+
+**Open:** the plan's GPU witnesses for Seifert–Weber (patch-unrolling first-hit windows,
+estimator equality, the cap counter) are the next step; no SW program has been rendered yet.
+The M2 GPU's builtins and FMA contraction are not measured.
+
+## 2026-11-07 — Curved spaces and the cube 3-torus in one tree
+
+The H³/S³ work and the 3-torus work, built side by side from the same commit, merged. Where
+they met:
+
+- **The far clip is one descriptor field in every space.** Each ambient descriptor declares
+  `farClip` (Euclidean 1000, H³ 10, S³ 2π), and core.ts emits it as the one `#define MAX_DIST`
+  before the occupant's block, or the authored `measurement.farClip`. The H³ and S³ occupants no
+  longer define MAX_DIST themselves (tests/compiler/farClip.test.ts checks one define per program
+  in each space). In S³ the emitted literal is 6.283185307179586 instead of `TWO_PI`; both round
+  to the same float32.
+- **Image-aware MIS takes the curved `lighting_pdf(q, wo, …)` signature.** In a quotient program
+  `lighting_pdf` passes `-wo` (the departure direction at q.p, which in E³ is the ray's
+  direction bit for bit) to `quotient_image` and `wo` to the cover's pdf; the cover's
+  sampler and pdf keep their private names and take the curved branch's `curved` flag.
+- The Validator runs the space gate and the curved checks, then the quotient rules; a
+  quotient on H³ or S³ is still an error (the only kind, `torus`, acts on Euclidean space).
+- The gallery has both sections, "Curved spaces" and "Closed manifolds".
+
+Checked: every compiled part of every suite scene that both parents compile equals the 3-way
+merge of the two parents' outputs (2,337 parts: shader text, uniforms and closures, parameters,
+source-map origins, scene data, warnings). The H³/S³ programs differ from the curved branch only
+in where MAX_DIST is defined, and the torus programs differ from the quotient branch only by the
+curved branch's changes to Euclidean programs (the `wo` signatures, `ambient_distance`, the
+phase functions' event point). The 14 frame cases are bit-identical to the curved branch's.
+Witnesses: the 11 h3-*/s3-* scenes (29 checks, no cache) and the 5 torus-* scenes (15 checks)
+pass.
+
+## 2026-11-07 — Fog in the cube 3-torus (quotients plan Q1b)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1b.
+
+**What was built:**
+- A homogeneous `ambientMedium` is allowed in a quotient (absorbing, scattering, emitting;
+  constant or `{param}` coefficients). Heterogeneous or GRIN ambient media, and media inside
+  objects, remain Validator errors.
+- In quotient programs with media, the transport loop reduces each medium event point into the
+  fundamental domain (`quotient_reduce`) before NEE, the phase sample and the next segment, and
+  looks up the camera's starting region at its reduced point. Nothing else changed: the medium
+  arms read constants, and the media shadow walker runs through the walk unchanged.
+- The declared bound (quotient README, `measurement.farClip`): with fog of extinction σ the far
+  clip changes a pixel by at most (N+1)²·e^{−σR}·Le_max per channel, Le_max including the fog's
+  glow ε/σ. The plan derives the bound for a fog that does not glow; the glow term is derived in
+  the quotient README (thought through, not checked numerically).
+- Equiangular medium light sampling is a Validator error in a quotient: it places the vertex by
+  the light's position in D and samples none of its images. (It also needs delta lights, which a
+  quotient rejects; the rule states its own reason so that relaxing either cannot bias silently.)
+- Witnesses: `torus-fog` (an emitting absorbing fog with a black sphere; eight windows certified
+  by a float64 twin as seeing one sphere image through 0–5 face crossings, or nothing within R),
+  `torus-crystal-fog` (≡ its unrolled crystal in the same fog) and `torus-lights-fog` (pt ≡ pt-nee ≡
+  pt-mis ≡ pt-mis with the light tree, in fog), registered at 1,024 spp.
+
+**Measured:** non-quotient programs unchanged: digest 278 of 278 existing scenes identical in
+every part, and `npm run frames -- compare` (the plan's gate, Q1.6 vitest 5) bit-exact, 30 of
+30 pictures, between 0c6a425 and 2f88c4d (recorded by the reviewer with WITNESS_PORT=3205;
+the comparison rerun here) and again after the review fixes. `torus-fog` 8/8 windows equal to
+the twin to 4 digits; with the walk's distance sum broken, the five windows seen across faces
+fail (e.g. 0.1746 against 0.4768). Crystal twin in fog: Δmean 0.00%, rmse 0.63%.
+`torus-lights-fog`: Δmean 0.94%, χ²ᵣ 1.27 at 256 spp, and 0.33%, χ²ᵣ 1.45 at 1,024 spp. The
+mean gap shrinks with samples; the slight χ² rise is recorded and its cause is untested.
+
+**Open:** no check catches a missing `quotient_reduce` at medium event points. With that line
+removed, `torus-lights-fog` still passed (Δmean 0.28%, χ²ᵣ 1.37). `torus-crystal-fog` (pt only)
+and `torus-fog` (no scattering) cannot catch it by construction.
+
+## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q1a (vacuum); its evidence and
+twins are in docs/claude-2026-11-review/quotients/ (both committed on this branch). Fog in the
+quotient (Q1b) is not built.
+
+**What was built:**
+- `measurement.farClip` (a truncation field) over the ambient descriptor's default `farClip`;
+  `MAX_DIST` is emitted from it. Non-quotient programs are unchanged (digest: only the define
+  moved; frames: 30 of 30 pictures identical).
+- `ambientSpace.quotient: { kind: 'torus', size }` and the new component family
+  `components/quotient/` (torus occupant: static lattice math; no locked-type change, no `Hit`
+  field — the MIS side recovers the hit image by rounding).
+- In quotient programs only: the generated cell walk (`scene_intersect` / `scene_intersect_any`
+  over `scene_intersect_cell`), image-aware NEE and MIS (27 images, partition MIS: an image
+  outside the table has NEE density 0, so its BSDF hit keeps weight 1), the pt-nee emitter rule.
+- Validator rules (compiler/analyze/quotient.ts): far clip ≥ 2·diam(D), no delta lights, no sky,
+  no media, no unbounded or driven geometry, everything inside D by EPS_INTERFACE except
+  unrotated boxes spanning whole periods; emitters strictly inside.
+- Witnesses `torus-crystal` (≡ the unrolled crystal `torus-crystal-ref`: Δmean 0.01%, rmse
+  1.8%) and `torus-lights` (pt ≡ pt-nee ≡ pt-mis ≡ pt-mis with the light tree: Δmean 0.38%,
+  χ²ᵣ 1.19); the latter fails as required with a W1-like (Δ 10.2%) and a W2-like (Δ 7.5%) error.
+- vitest twins: the float32 walk (tests/components/quotient/torusWalk.test.ts) and the float64
+  partition-MIS twin with its W1/W2 controls (torusMis.test.ts).
+- Demo `torus-room`: a jungle-gym room repeating in every direction.
+- Review fixes: the plan and its evidence committed beside the code; the plan's float32-twin
+  sentence corrected (the cell sequence matched float64 on 3,993 of 4,000 rays; the 7 others
+  are edge or vertex passages); the far clip computed once in core.ts; the quotient family's
+  taxonomy is `scene` in both its README and registry; the demo text says farClip 16.
+
+**Measured along the way, cause untested:** with the glossy ball at GGX roughness 0.15,
+`torus-lights` pt-nee read 2.8% low against pt ≡ pt-mis ≡ pt-mis with the light tree (256 spp,
+χ²ᵣ 145). A matte-ball variant and a roughness-0.45 variant agree (0.06%, 0.52%). In a variant
+without beams the deficit shrank with samples (7.6% at 128 spp, 4.7% at 1,024), and the
+per-block pt-nee/pt-mis map was mostly negative with rare +46% and +84% blocks. That fits
+heavy-tailed NEE samples (27 images × a sharp lobe), but it is not shown: pt-mis cannot confirm
+the NEE side, because MIS gives NEE samples little weight exactly where the BSDF pdf is high,
+and an estimator bias in pt-nee at sharp lobes is not ruled out. The witness was moved to
+roughness 0.45, so it does not test that regime. **Decisive check (not run):** the
+roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the samples
+(4,096 and 16,384 spp) under independent salts: heavy tails predict a deficit that keeps
+shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
+deficit that stays near 2.8%.
+
+## 2026-11-07 — Curved box, cylinder, quad and quad light (H³ and S³)
+
+[Plan](docs/claude-2026-11-review/curved/next-shapes-plan.md) (reviewed once; design §2.5).
+
+- **Box** in both curved spaces: the region bounded by three pairs of totally geodesic planes at
+  geodesic distances halfSize from the center (a Euclidean box in the Klein / gnomonic chart; its
+  dihedral angles are not right angles). **Cylinder**: the tube of geodesic radius r about a
+  geodesic, capped by the planes perpendicular to it at ±halfHeight (in S³ a Clifford-type solid
+  torus, not convex: a geodesic can cross it in two arcs). **Quad**: the rectangle centered at
+  corner + (edge1 + edge2)/2 with half-widths |edgeᵢ|/2 in the plane the edges span — the
+  Euclidean quad exactly when the edges are orthogonal (required in curved spaces). Torus: not built
+  (no closed-form intersection; the curved march does not exist).
+- **Roots**: every half-space is linear in X = e^{2t} (H³) or in T = tan(t − φ) on the ray's arc in
+  x_w > 0 (S³), so box and cylinder intersect as intervals (`hyperbolic_halfspace`,
+  `spherical_halfspace`, `spherical_crossing` in the occupants) and the hit is the first boundary
+  crossing ahead. The H³ tube discriminant uses the cancellation-free D = S²(S² − (|P|² − |V|²)) −
+  (P×V)²: float32 sign errors ≤ 0.03% of a ±2% grazing band at r = 0.01, distance 3 (naive form
+  2.1%; curved/primitive-bodies/f32_tube.ts).
+- **Quad light** in both spaces: uniform sampling in the plane's Klein / gnomonic chart with the
+  exact area density 1/(4·T(a)·T(b)·w³), w = the sample's 4th coordinate in the light's frame (not
+  uniform in area, but exact); the normal is the 4D cross product of the world edges and center;
+  the S³ body takes the disk light's arc rule.
+- **Wiring** (curved-only; every Euclidean scene's digest is identical): `curvedAnchor` (the quad's
+  center is its placement anchor), vector rows as tangent vectors (`Direction`) in curved structs,
+  no derived fields in curved structs, `PlannedLight.world` for a curved light's mapped rows (the
+  selection power reads the authored `values`), `validateValuesIn` / `validateAuthoredIn` (coupled
+  rules per space: bounded H³ box Σ tanh² h < 1 and quad sinh a·sinh b < 1, orthogonal curved quad
+  edges, S³ quad edges < π), `SPHERICAL_HALF_EXTENT` = (0, π/2) on the S³ box half-sizes and
+  cylinder radius and half-height. sceneWorldRadius skips curved objects (their parameters are in
+  their own frame). The 13 existing curved programs change only by the occupants' new helpers.
+- **Verification**: fp64 transcriptions (tests/witnesses/scenes/curvedShapeTwins.ts) checked
+  against marched membership from chart coordinates and axis distances (|Δt| < 1e-8, S³ two-arc
+  geodesics included), normals against finite differences and outwardness, the quad light's
+  density against the Gauss–Bonnet area (tests/components/curvedShapes.test.ts; four mutations of
+  the transcriptions each fail it). Witnesses `h3-shapes`, `s3-shapes` (point light, windows on a
+  box face, tube, cap, quad, and in S³ a face lit only through the long arc) and `h3-quad-light`,
+  `s3-quad-light` (pt = pt-nee = pt-mis = quadrature): 17 of 17 exact checks pass, e.g. H³ quad
+  light pt-nee 0.1750 / pt-mis 0.1750 / pt 0.1767 vs 0.1749918, S³ 0.3238 / 0.3238 / 0.3241 vs
+  0.3237615. Mutations: w³ → w² in the quad-light pdf gives pt-nee 0.1606 (H³) and 0.3864 (S³),
+  the values the twin predicts, and fails 5 checks; the tube normal's y-part sign flipped fails the
+  tube windows (H³ 0.0913 vs 0.1083, S³ 0.2362 vs 0.2120; predicted 0.0913, 0.2360). Dropping the tube normal's C/s factors renders identically:
+  ambient_frame projects every vector of that plane onto the same tangent line.
+
+## 2026-11-07 — Marched fields in H³ and S³
+
+[Plan](docs/claude-2026-11-review/curved/sdf-plan.md) (reviewed once; the review's S³ blocker is fixed).
+
+- **The march along geodesics.** In a curved space the generated `<type>_sdf_intersect` evaluates
+  its field at `ambient_geodesic(ray.origin, ray.direction, t)` (re-flowed from the seed each step);
+  the generated normal `<type>_sdf_normal(Ray at, S s)` takes four taps at arc length
+  NORMAL_EPSILON along tetrahedral combinations of `ambient_frame` of the arrival direction and is
+  mapped to world by `isometry_direction`. The Planner plans a curved `sdf`-backend object as
+  marched; its arm moves the ray by G⁻¹, marches the bound's interval, spawns at MARCH_CLEARANCE;
+  containment reads the field at G⁻¹p. Euclidean output is unchanged (digest: all 274 Euclidean
+  scenes identical; the 13 existing curved scenes differ by the new helpers).
+- **The vocabulary** for curved fields: `sdf_point`, `sdf_ball` and the smooth union /
+  intersection / subtraction in components/ambient/sdf.glsl (over the seam, one source for both
+  spaces), `sdf_plane` and `sdf_tube` in each occupant (H³: asinh of ⟨p⊥,p⊥⟩^½, precise near the
+  axis; S³: an atan form). The plane bodies call the occupants' new `<space>_plane_vector` /
+  `<space>_plane_distance`.
+- **`sphere_interval`** in both curved sphere bodies (the bound of a marched ball and of any field
+  bounded by a sphere). In S³ an origin inside the ball searches the whole period: a geodesic leaves
+  and comes back around, and a shape smaller than its bound can be met on the second visit.
+- **`defineSDF`** takes bodies keyed by space (`glsl: { hyperbolic, spherical }`, over a point of the
+  model); the twin gates stay Euclidean. `kleinChart: true` serves a Euclidean field to H³ in the
+  Klein chart (the chart never stretches distance, so no scale factor; it marches unbounded). The
+  Validator requires a curved march bound centered at the object's origin and valid in the space.
+  The 'marched objects' limitation lists both curved spaces; registry fractals, torus, box and
+  cylinder still have no curved body.
+- **Twins**: tests/components/curvedSdf.test.ts (fp64 march against closed-form and brute-force
+  roots, normals, the 1-Lipschitz property, the Klein bound), each check seen failing under one
+  mutation.
+- **Witnesses** (tests/witnesses/scenes/curvedSdfWitness.ts), all passing at first run, measured:
+  h3-sdf-ball 0.2028 vs closed form 0.2027 (twin with the closed-form ball: Δmean 0.03%, rmse
+  0.09%); s3-sdf-ball 0.1435 vs 0.1435 (Δmean 0.02%, rmse 0.07%; the window is lit through both
+  arcs); h3-klein-ball 0.2027 vs 0.2027; h3-sdf-furnace and s3-sdf-furnace 3.9514 = Σ_{k≤6} 0.8^k;
+  h3-sdf-blend 0.1861 vs twin 0.1859; s3-sdf-blend 0.2353 vs 0.2353 (tolerance 0.002 for the balls,
+  0.0008 for the sculptures). h3-furnace, s3-furnace and s3-long-arc-blocker still pass after the plane
+  and sphere bodies changed. Each witness fails under one mutation: the curved normal without
+  isometry_direction (h3-sdf-ball 0.1494), a curved step budget of 4 (s3-sdf-furnace 1.0000), the Klein
+  chart without the division by p.w (h3-klein-ball 0.2597), the sculpture's blend width doubled in
+  the GLSL (0.1890 and 0.2342 — this one passed at the first tolerance of 0.002, which is why the
+  sculptures' is 0.0008).
+- **Final review fix:** S³ `sphere_interval` tests "inside" before the discriminant — a bound of
+  radius above π/2 contains whole great circles, whose discriminant is negative (no witness or demo
+  had such a bound).
+- The Euclidean kitchen-sink compile test skips primitives with no Euclidean body (the curved-only
+  scene-local fields, compiled by the curved scenes that use them).
+- **Demos** `hyperbolic-sculpture` and `spherical-sculpture`: a jack and a pierced ball, one GLSL
+  body each for both spaces.
+
+## 2026-11-07 — H²×R, the first product geometry
+
+[Plan](docs/claude-2026-11-review/curved/h2xr-plan.md) (reviewed once; findings in its §10).
+
+- **The occupant** `components/ambient/h2xr/`: a point is (x, y, z, w) with the height y and
+  (x, z, w) on the hyperboloid of R^{2,1}; the tangent metric is the Minkowski form of R^{3,1} (as
+  H³). Geodesic flow with the H² part at speed s and the height linear, written with t·sinhc(st)
+  (no 1/s: vertical rays are exact); distance √(D_H² + Δy²); direction-to by asinhc of the H² log
+  direction; MAX_DIST 10; the sky key (sin β·ξ, cos β) from the ideal point ξ of the H² part and the
+  angle β from the vertical. sinhc/asinhc/atanhc are Taylor polynomials below 0.05: SwiftShader's
+  sinh, asinh and atanh have an absolute error near 0 (measured, h2xr.md).
+- **The area density** J = d²·sinh(D_H)/D_H (the Jacobi fields at angle β from the vertical grow
+  as sinh(t sin β)/sin β and t) replaces d² in the point light (E = I·cos θ/J) and the disk light's
+  pdf (J/(A·cos_l)); it depends on direction, not only on d.
+- **Placements**: an H²×R isometry is affine on the 4-vector, so its mat4 is an encoding (m[3][1]
+  the height shift). New occupant functions `isometry_point`/`isometry_tangent` apply a placement
+  (the generated arm and region query call them; H³ and S³ define them as the matrix product, so
+  their programs change in text only); `CurvedGeometry` gains compose/apply/applyTangent/rotation/
+  tangent (`linearIsometries` for H³ and S³: the same arithmetic, closures unchanged by the digest).
+  Rotations about the vertical only (a limitation row for any other).
+- **Shapes**: horizontal and vertical planes (the totally geodesic surfaces; a plane normal must be
+  vertical or horizontal, a new row constraint), horizontal disks, the capped vertical cylinder
+  (|x(τ)|² = sinh²R on the flow's x and z, a quadratic in e^{2st} that needs no tangency, met with
+  the slab), the metric ball by convex Newton on the
+  squared distance (no closed form; f is convex because H²×R is CAT(0)). lambert, pinhole,
+  fisheye, power/uniform selection and unrolled dispatch list h2xr; the environment row lists it
+  (BSDF lookup at the key). No media, no other materials, lights or cameras (support.md).
+- **Far from o** (beyond the working radius, about 3): float32 hyperboloid coordinates carry
+  relative error ε·w². The metric and frame go through the transported basis (E1, e_y, E2), a sum of
+  squares that cannot go negative (the plain form did, past about 4 from o: NaN directions in 2–14%
+  of a demo's pixels under NEE, measured); roots computed from ray origins far out can still be
+  garbage, so the demo's floor is a disk of radius 3.2, not a plane (with a plane, 11 NaN pixels in
+  307200 after 120 s; with the disk, 0).
+- **Witnesses** `h2xr-furnace`, `h2xr-disk-light`, `h2xr-point-light`, `h2xr-sky`
+  (tests/witnesses/scenes/h2xrWitness.ts) with the fp64 twin h2xrTwins.ts; occupant twins in
+  tests/components/h2xr.test.ts (RK4, finite differences of exp, Monte Carlo ray hits, sphere
+  tracing); compiler/Validator tests in tests/compiler/h2xr.test.ts. Demo `h2xr` (a colonnade) in
+  the gallery's "Curved spaces".
+
+Verification (SwiftShader, targeted witnesses, final commit 1a4d96c; 23 of 23 exact checks):
+- h2xr-furnace 3.9514 pinhole and fisheye (exact 3.951424).
+- h2xr-disk-light window vs 0.4991630: pt-nee 0.4982, pt-mis 0.4987, pt 0.5004; nee ≡ mis Δ 0.07%,
+  χ²ᵣ 0.27.
+- h2xr-point-light (power nee / mis / uniform nee): disk 0.2256 / 0.2256 / 0.2251 vs 0.2252589;
+  wall 0.0917 / 0.0917 / 0.0915 vs 0.0916891; ball 0.2727 / 0.2727 / 0.2711 vs 0.2726837;
+  column 0.1274 / 0.1274 / 0.1291 vs 0.1287049; cap 0.1001 / 0.1001 / 0.0998 vs 0.0998508.
+- h2xr-sky frame means (0.2873, 0.3689, 0.2100) vs (0.2870, 0.3682, 0.2098) pinhole and
+  (0.6585, 0.7002, 0.6265) vs (0.6586, 0.7001, 0.6264) fisheye.
+- h3-sky-ball and s3-furnace pass through the new isometry_point/_tangent seam.
+- The witnesses can fail (one mutation each, reverted; measured on f8f70a1, whose mutated lines
+  are the final ones, and on 1a4d96c for the column): point light J := d² — all 15 point-light
+  checks fail (wall 0.1273 vs 0.0917, the twin predicts 0.1274); the Euclidean disk-radius map
+  r = ρ√u — pt-nee 0.5093, pt-mis 0.5034 (twin 0.5106; pt unaffected, as it should be); the view
+  direction as sky key — 0.1029 vs 0.2870 (twin 0.1027); H³'s plane-root condition |P| < |W| (no
+  s) — furnace 3.9457 / 3.9421; isometry_point ignoring the height shift — sky 0.3026 (twin
+  0.3023); the column's τ not divided by s — disk, column and cap windows fail (column 0.1652).
+  isometry_direction without stripping the shift is caught only weakly (1 of 15 checks, ball
+  uniform 0.2703 vs 0.2727): the transported-basis frame drops most of the error. A departure-
+  instead-of-arrival emitter cosine is no bug for a horizontal disk (the vertical component of the
+  velocity is constant along a geodesic), so it was not used.
+- The first targeted run failed h2xr-furnace (3.9413 / 3.9333): the column's root assumed a
+  tangent direction (fixed in 1a4d96c, see Shapes).
+- Digest against the plan commit: 274 of 292 scenes identical (every Euclidean scene); the 13
+  H³/S³ programs differ only in the isometry_point/_tangent lines, their definitions and source-map
+  lines (uniform closures, parameters and scene data identical); 5 new H²×R scenes.
+- vitest: the H²×R files (h2xr component, twin and compiler tests: 38) and the gate, support-table
+  and snapshot files pass; the full run (under the machine's load average of 21) had 6 timeouts in
+  unrelated Euclidean/spectral/H³ files that pass when rerun alone, and the h2xr demo's
+  program-description snapshot, updated in f7321f0.
+- Demo: lab renders (SwiftShader, 640×480, pt-mis) checked by eye and for NaN (0 of 307200).
+## 2026-11-07 — Curved spaces: the other materials and the sphere light (H³ and S³)
+
+[Plan](docs/claude-2026-11-review/curved/next-materials-plan.md) (reviewed once; provisional
+choices P1–P4 in its §4).
+
+- **mirror, dielectric, ggx, rough_dielectric run in H³ and S³.** Their GLSL already went through
+  the seam; each file is now listed under `hyperbolic` and `spherical`. Read in the generated GLSL of
+  one H³ and one S³ program holding all four: every raw `dot`/`normalize`/`reflect` acts on local
+  frame coordinates. checker stays Euclidean only (no curved uv chart).
+- **The sphere light in H³ and S³** (`lights/sphere/sphere_hyperbolic.glsl`, `_spherical.glsl`):
+  the visible cone, sin α = sinh R/sinh d (H³) or sin R/sin d (S³), its distance from the sphere
+  body's root, now one function `sphere_root` both call. In S³ the ball is seen in the forward cone
+  and its negation (geodesics through −p), and in every direction when −p lies in it (the forward
+  cone clamped to the hemisphere); one forward-cone sample and the S³ arc rule pick ω or −ω.
+- **`ray_spawn` carries the direction to the spawned origin** (`ambient_parallel_transport`, the
+  identity in E³: frames compare 30 of 30 pictures identical). Keeping wi, tangent at hit.p and not at
+  the moved origin, left an error of about eps·cos that a specular chain passes on; after two internal
+  reflections in a glass ball the curved sphere root put the hit beyond eps and the next spawn landed
+  outside (paths with two internal reflections never arrived in H³: 0.9982 at maxBounces 4, twin
+  0.9999; E³ arrived). Found by bounce-budget renders and an fp64 emulation of the curved path.
+- **Twelve witnesses** (tests/witnesses/scenes/curvedMaterialWitness.ts, twins in
+  curvedMaterialTwins.ts, checked by curvedMaterialTwins.test.ts), measured on SwiftShader:
+  - `h3-specular`/`s3-specular` (mirror and glass balls in a box of six colored walls, exact per-ray
+    twin): H³ mirror (0.7760, 0.2206, 0.0344) vs (0.7760, 0.2205, 0.0345), glass (0.3021, 0.9528,
+    0.9722) vs (0.3013, 0.9534, 0.9724); S³ mirror (0.7472, 0.2413, 0.0377) vs (0.7471, 0.2414,
+    0.0377), glass (0.3070, 0.9463, 0.9865) vs (0.3067, 0.9465, 0.9871); `e3-specular`, the E³
+    control, glass (0.3050, 0.9502, 0.9790) vs (0.3044, 0.9502, 0.9798).
+  - `h3-ggx`/`s3-ggx` (ggx receiver, light in its mirror direction; S³ through the long arc): H³
+    pt-nee/pt-mis/pt 0.2934/0.2934/0.2928 vs 0.2936; S³ 0.6374/0.6379/0.6366 vs 0.6378.
+  - `h3-rough-glass`/`s3-rough-glass` (roughness 0.6, 1024 spp; S³ with a sphere light under the ½
+    rule): nee ≡ mis Δmean 0.18%/0.23%, χ²ᵣ 0.51/0.96. At roughness 0.3 the check failed in E³ too
+    (firefly-dominated).
+  - `h3-sphere-light` 0.1136/0.1136/0.1140 vs 0.1136; `s3-sphere-light` (backward cone only)
+    0.2127/0.2127/0.2141 vs 0.2127; `h3-sphere-light-blocker` and `s3-sphere-light-blocker` (an opaque
+    ball crossed just before the light, and on the backward cone) 0 under all three;
+    `s3-sphere-light-antipodal` 0.5000 (albedo·Le) under all three.
+  - The existing H³/S³ witnesses pass after the change. Each new witness fails under one deliberate
+    mutation: wo taken as the departure direction (specular glass, both spaces), swapped η (E³
+    control), Euclidean `dot` in microfacet_to_local (h3-ggx), no 1/cos_o in ggx_eval (s3-ggx), η²
+    dropped in rough_dielectric_eval (rough glass, Δmean 16%/45%), a Euclidean-style cone (H³ sphere,
+    0.159), no flip (S³ sphere, 0), the near root along −ω (S³ blocker, 0.213), the H³ light distance
+    halved (H³ blocker, 0.114; h3-sphere-light does not see it), no clamp (antipodal, NaN). Dropping (1 − F) in rough_dielectric_pdf alone moved nee against mis by only 0.2%/1.1%.
+- Euclidean output unchanged: digest 280 of 297 scenes identical (the rest are the curved programs
+  with spheres, by the `sphere_root` refactor, and the new scenes), frames compare identical after the
+  ray_spawn change.
+- Emissive spheres are still not light-sampled in curved spaces (design choice 5): a curved emitter's
+  center lives in its isometry, which may be {param}-driven.
+
+## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
+
+Review of the S³ step (curved-space design §2.4).
+
+- **`light_query_surface(int mat, Hit hit)` again, in every space.** The face-forwarding the S³
+  step added (n turned toward `wo` in curved programs) never ran: `scene_intersect` already turns
+  `hit.frame` and `hit.ng` toward `region_from` when the arrival direction leaves along the normal,
+  and the walk's `wo` is the same expression negated, so `ambient_dot(wo, hit.frame.n) ≥ 0` on
+  every hit (in a curved program every object is a primitive, where ng = frame.n). The `wo`
+  argument, the turn and the `curved` transport flag are gone; the arc rule reads `q.n =
+  hit.frame.n` directly. Generated programs differ only in that signature, its two calls and
+  comments; the 34 H³/S³ programs also lose the dead turn (digest: 539 programs, 23 line kinds,
+  nothing else).
+- **S³ radius domains are checked.** A row may declare `constraintIn`, a further domain its body
+  in one space requires (`SpaceConstraints`, components/descriptors.ts). The sphere, disk and
+  disk-light radius rows declare `SPHERICAL_RADIUS` = (0, π) for S³ (π is the diameter of the
+  space; the disk light's radius map and area assume ρ < π), so a radius ≥ π is a Validator
+  error there and still accepted in H³ and E³.
+
+## 2026-11-07 — Spherical space S³ (curved-space step 3)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.4 and Part 1.
+
+- **The occupant** `components/ambient/spherical/`: the unit sphere in R⁴ (Point and Direction are
+  vec4), MAX_DIST = 2π (exact: every geodesic closes), no sky, the chord-form distance
+  2·atan(|a − b|, |a + b|), the longest-axis tangent frame, `isometry_direction` = v·G⁻¹, and an
+  arc-aware `ambient_aim`: a shadow ray on the long arc leaves along −u with 2π − d left, so an
+  occluder on the far part of a long arc is tested. CPU geometry (exp_o, log_o, the rotation
+  transvection, g⁻¹ = gᵀ); `mat4Transpose` is now shared with H³.
+- **Bodies:** sphere (one atan pair, entry/exit by the inside test, mod 2π), plane (great sphere,
+  first of two roots per period), disk (the first of the two antipodal crossings inside it); point
+  light (I/sin²d per arc) and disk light (area 4π sin²(ρ/2), sin(r/2) = √u·sin(ρ/2)). lambert,
+  pinhole, fisheye and hg are listed under spherical (same files); power and uniform selection and
+  unrolled dispatch list spherical.
+- **Two arcs.** The S³ light bodies choose the arc before the emitter's back-face test
+  (`spherical_light_arc`): a one-sided surface receiver takes the arc leaving into its upper
+  hemisphere with probability 1; a two-sided receiver or a medium event takes each with
+  probability ½ (one extra `random()`). The pdf carries that probability.
+- **Curved light-body signatures:** `<kind>_light_sample(l, LightQuery q, xi)` and
+  `<kind>_light_pdf(l, q, light_p, wo)`, in H³ too. The MIS seam is now
+  `lighting_pdf(q, wo, light_id, light_hit)` with `wo` the arrival direction reversed at the
+  emitter hit, passed by `combiner_w_emitter(s, hit, wo)`; Euclidean arms pass `-wo`, which in E³
+  is the old `s.ray.direction` bit for bit. `light_query_surface(mat, hit, wo)`: in a curved
+  program n faces the side the receiver is seen from.
+- **Trigonometry on the GPU.** SwiftShader's sin and cos are off by up to 1.9e-4 (atan 2e-7, asin
+  7e-5; measured). With them, S³ hit points sat up to 1e-4 off the surface their root names, past
+  the 3e-5 spawn offset, and in `s3-medium` a quarter of the paths through the ball re-spawned on the
+  wrong side and carried the medium outside it (NEE 17% above pt). Every S³ position and body now
+  uses the occupant's `spherical_cos_sin` (|error| ≤ 7e-8) and `spherical_asin` (through atan).
+- **Witnesses** `s3-furnace`, `s3-long-arc`, `s3-long-arc-blocker`, `s3-point-light`,
+  `s3-medium` (tests/witnesses/scenes/s3Witness.ts) with the fp64 twin s3Twins.ts; the
+  space-free twin parts moved to curvedTwins.ts. Demo `spherical` (gallery section "Curved
+  spaces").
+
+## 2026-11-07 — H³ review fixes: witnesses that can fail, groups, procedural skies
+
+Review of the H³ step (curved-space design §2.3).
+
+- **h3-medium** now keeps its light out of frame: a disk light of radius 1.5 above and behind
+  the camera. Before, the light's 598 visible pixels carried 91.5% of the frame mean, so the
+  whole-frame gates could not see a bias of about 20% in the ball or floor. A phase sample from
+  the ball now reaches the light with probability 0.12 to 0.26, so MIS differs from NEE: the
+  largest per-pixel difference is 0.074 at the same salt (0.0016 before).
+- **h3-disk-light** uses a light of geodesic radius 1.2, up from 0.6. A Euclidean inverse-CDF
+  radius now raises E by 4.8% on axis (0.44% at radius 0.6), about 7× the 0.002 tolerance.
+- **New witnesses:** `h3-sky` (the sky 1 + key read at each camera ray's ideal endpoint, through
+  a pinhole and a fisheye placed away from o) and `h3-sky-ball` (a lambert ball under a constant
+  sky reads ρ·L; its placement is the {param}-driven mat4 uniform). `h3-furnace` also renders
+  through a fisheye. `h3-point-light` has two lights, under power and uniform selection. Every
+  key listed under hyperbolic is now rendered (support.md), the sky through constant and
+  procedural skies.
+- **Procedural skies in H³ crashed the App.** It baked the sampling table of every procedural
+  sky, but no chart has a hyperbolic body. `compileEnvironmentBake` now returns null for a sky
+  that is not sampled as a light, since no program reads its table.
+  `environmentSampledAsLight` (Analyzer.ts) is the one rule, shared with the Analyzer.
+- **`flattenGroups(nodes, space)`** takes the ambient space. In a curved space a group with a
+  transform is an error, because the function composes Euclidean similarities.
+- The H³ plane and disk bodies share the occupant's `hyperbolic_plane_root` and call
+  `hyperbolic_form` directly. Before, they called `ambient_dot` on a point.
+
+## 2026-11-07 — Hyperbolic space H³ (curved-space step 2)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.3 and Part 1, after three reviews.
+
+- **The occupant** `components/ambient/hyperbolic/`: the hyperboloid model (Point and Direction
+  are vec4), MAX_DIST = 10 arc length, fp_uncertainty = REL·w, the chord-form distance, the
+  longest-axis tangent frame, the ideal-point sky key, and `isometry_direction` for normals; its
+  CPU geometry (exp_o, log_o, transvection, exact inverse) behind `CurvedGeometry`
+  (components/ambient/isometry.ts). `ambient_distance` joins the contract in every space.
+- **Bodies in H³:** sphere, plane and disk shapes; point and disk lights (sinh² r area density,
+  the uniform-area geodesic disk sampler); lambert, pinhole, fisheye and hg as the same files
+  listed under both spaces (hg now builds its basis with `ambient_frame`, which changes the
+  sampled directions of Euclidean HG media but not their distribution).
+- **Placement:** every curved object has one inverse isometry (a baked `const mat4`, or a mat4
+  uniform when {param}-driven); point rows fold in as a pre-translation; lights read the isometry
+  of their backing region (compiler/plan/curved.ts). The camera ships four vec4 uniforms from
+  the target-centered frame (`curvedCameraBasis`).
+- **Validator:** curvature parameter and a missing camera pose are errors in curved spaces; new
+  limitation rows for marched objects and uv-reading or GLSL-expression materials; skies are
+  supported in H³ as lookups by BSDF rays.
+- **Witnesses** `h3-furnace`, `h3-disk-light`, `h3-point-light`, `h3-medium`, with fp64 twins
+  (tests/witnesses/scenes/h3Twins.ts); demo `hyperbolic` in the gallery's new "Curved spaces"
+  section.
+
+## 2026-11-07 — Bladed thin-lens pupil and white balance
+
+Integration step 13 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+camera-film plan parts B and C with the review's must-fix items). B is measurement (it changes
+the camera functional W_j); C is view (a fixed linear map of each converged pixel).
+
+**What changed:**
+- Thin lens `blades: n` (an integer ≥ 3) and `bladeRotation` (radians, 0 when not authored): the
+  pupil becomes the regular n-gon of circumradius `aperture`, with a vertex at `bladeRotation`
+  from camera right toward up. Both are compile-time defines (`LENS_BLADES`,
+  `LENS_BLADE_ROTATION`); there is no live rotation control (cut in the integration).
+  `aperture_polygon` transcribes Cycles' `regular_polygon_sample` with its rotation shifted by
+  π/n. Weight 1, so brightness does not depend on the blade count; `aperture = 0` is still the
+  pinhole.
+- `view.tonemap.whiteBalance: <kelvin>` (1000–40000): the Bradford adaptation (pbrt-v4
+  `WhiteBalance`) from the white of a Planck source at that temperature to D65, as one constant
+  matrix on linear sRGB (components/tonemap/whiteBalance.ts), so `blackbody(T)` light renders
+  neutral at `whiteBalance: T`. The display pass folds exposure into it and applies
+  `safe_color(DISPLAY_VIEW * x)`, before the clamp, since the matrix has negative entries. It
+  applies to every tonemap-view picture; on the variance picture it is for looking only. The
+  probe path (`none`) and HDR exports are unbalanced. `blackbodyColor` now also returns the XYZ
+  it integrates, which the matrix reads (one integration).
+- New witness `bokeh-edge` (disk, hexagon, triangle at 0.4 rad); `thinlens-zero` gains a
+  six-blade arm.
+- The `hearth` demo gains a third renderer, `pt-nee-wb` (key 3: key 1 with `whiteBalance: 2900`,
+  the lamp's default temperature), and the glslang test compiles every tonemap's display shader
+  with white balance, so CI parses the `DISPLAY_VIEW` path.
+
+**Measured:**
+- Twin χ² of the polygon warp against exact cell areas (n = 3, 5, 6, 6, 9, assorted rotations,
+  10⁶ samples each) passes, with no sample outside; dropping the √ or shifting the sector angle
+  fails it. White balance: M·rgb_bb(T) = (1, 1, 1) to 1e-5 for T from 1000 to 40000 K; M equals
+  an independent transcription of pbrt's formula through xy chromaticities; a test reads the
+  emitted `DISPLAY_VIEW` back column-major (a transposed matrix fails it).
+- Digest: 273 of 276 scenes identical. `cornell` and `thinlens-zero` differ in their thin-lens
+  programs' text only (the new `#ifdef LENS_BLADES` blocks in thinlens.glsl, and source-map
+  lines); glslang's preprocessor output for both is identical to before. `thinlens-zero` gains
+  the blade renderer; `bokeh-edge` is new.
+- Witnesses (targeted): `bokeh-edge` columns 79–80 read 0.1967 (disk; exact 0.1957), 0.1674
+  (hexagon; exact 0.1670) and 0.0996 (triangle; exact 0.0994), tol 0.006; `thinlens-zero` both
+  arms Δmean 0.00%, rmse 0.00%.
+- Screenshot (SwiftShader, `hearth`, ~40 s each): key 1 reads orange (wall sRGB mean 46/36/23,
+  floor 173/137/92); key 3 reads as under white light (wall 39/37/36, floor 144/144/145).
+
+## 2026-11-07 — Review fixes for the Gaussian pixel filter
+
+- `docs/fable-imagery.md` P3 rewritten to match the code: Gaussian only, untruncated
+  (Box–Muller, weight 1), no tent, verified by the twin χ² and the `filter-edge` witness; a flat
+  field cannot see the kernel, so the furnace's gaussian arm is a smoke test. The stale
+  pixel-filter entry in `docs/claude-improvements-2026-09.md` (2.8) says the same.
+- `pixelFilters.test.ts`: the edge-column test now draws 10⁶ samples from the Gaussian twin and
+  checks the tail fractions past 0.5 and 1.5 px against 1 − Φ(d/σ) (4 binomial σ). With the
+  warp's σ changed to 0.45 it fails (0.1334 vs 0.1587).
+- `filter-edge` gains two report-only noise checks (gaussian RGB and spectral, columns 79 and
+  80), which measure the noise the tolerance rests on: per-pixel σ/µ 7.23% / 1.35% (RGB, the
+  Bernoulli value) and 7.70% / 1.73% (spectral), so the spectral column mean's σ is at most
+  0.0013 and tol 0.006 is 4.5 σ.
+- Digest: 275 of 275 scenes identical. Witnesses (targeted): `filter-edge` 9 of 9,
+  `furnace` and `spectral-furnace` 6 of 6.
+
+## 2026-11-07 — Gaussian pixel filter and a photographic-lens helper
+
+Integration step 2 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+plan and review in photoreal/camera-film/). Owner's provisional answer P1/Q5: untruncated
+Gaussian as `measurement.pixel`, always stamped.
+
+**What changed:**
+- `measurement.pixel: 'box' | 'gaussian'` (a components/pixel registry key; default `'box'`).
+  The Validator rejects other values; the pixel feature links the chosen occupant's file. The
+  resolved value is always recorded in `ProgramDescription.measurement`, so every export stamp
+  now states `pixel`.
+- New occupant `pixel/gaussian`: σ = 0.5 px, untruncated, drawn exactly by Box–Muller (pbrt-v4
+  `SampleTwoNormal`), weight 1. The only cutoff is the 24-bit sample stream's, at 2.884 px.
+  `tent` was not built (cut in the integration).
+- `thinLensFromPhoto` (src/authoring/photoLens.ts): focal length, f-number, focus distance (scene
+  units), sensor height and meters per unit, all required, to `{ type: 'thinlens', fov,
+  aperture, focusDistance }` with `aperture = f/2N` and `fov = 2 atan(h/2v)`, v = Ff/(F − f).
+- New witness `filter-edge` (box, gaussian, gaussian spectral, tiled gaussian); `furnace` gains
+  a gaussian smoke arm.
+
+**Measured:**
+- Digest: 273 of 275 scenes identical. `furnace` differs only by its new gaussian renderer
+  (whose main shader differs from the box one only in the pixel block); `filter-edge` is new.
+- Program-description snapshot: 505 programs gain exactly one line, `"pixel": "box"`.
+- Twin χ² (4·10⁶ Box–Muller offsets, 32×32 cells plus outside, against Φ products) passes; the
+  same test with σ = 0.45 fails. Lens helper: object-space blur equals the real lens's at every
+  tested depth to 1e-10 relative; 50 mm f/1.8 at 2 m on 24 mm gives fov 0.459728, aperture
+  0.013889 m.
+- Witnesses (targeted): `filter-edge` column 79 / 80 read 0 / 1 (box), 0.1572 / 0.8422
+  (gaussian; exact 0.1587 / 0.8413) and 0.1573 / 0.8413–0.8433 (spectral), tiled HDR and PNG
+  bit-identical; `furnace` 0.4000 on all three arms; `spectral-furnace` and `cornell-area`
+  (including its tiled check) pass.
+
+## 2026-11-07 — Trial asset pipeline: Poly Haven textures and glTF models
+
+Photographic scenes need real texture sets and models. Owner decision 20: models are converted
+offline (glTF → OBJ + textures).
+
+- **`tools/trial-assets.json`** gains four 2k JPG texture sets (albedo, roughness and OpenGL normal
+  map each): `wood_floor`, `marble_01`, `worn_plaster_wall`, `fabric_pattern_07`; and four models:
+  `ceramic_vase_01`, `brass_vase_03`, `wooden_bowl_02`, `food_apple_01`. Every map and model
+  texture is 2048 × 2048 (measured), so any of them can share a scene (one array layer size).
+  `rough_linen` was dropped for being 2048 × 2052.
+- **`tools/fetch-trial-assets.mjs`** fetches textures (one file per listed map) into
+  `public/trial/textures/<id>/` and models (the .gltf, its .bin and textures, at the paths the
+  .gltf names) into `public/trial/models/<id>/`, MD5-checked, then converts each model to
+  `<id>.obj`.
+- **`tools/gltf-to-obj.mjs`**: triangle primitives of the default scene, node transforms baked
+  (T·R·S, parent · child; normals by the inverse transpose; winding swapped under a mirroring
+  transform), TEXCOORD_0 written as `vt = (u, 1 − v)` (glTF's uv origin is the image's upper-left
+  corner, OBJ's and the renderer's the lower-left), texture file names in the OBJ header. Required
+  extensions, non-triangle modes, skins, morph targets, sparse or non-float attributes, embedded
+  buffers, texCoord ≠ 0, KHR_texture_transform, more than one material, primitives with and
+  without a material, and a primitive without TEXCOORD_0 when another primitive has it or the
+  material has textures (parseOBJ would give its corners uv (0, 0)) are errors.
+- **Demo `trial-still-life`** (async, needs the fetched files): the converted apple with its
+  diffuse map on a wood-floor quad.
+
+Verified: `tests/authoring/gltfToObj.test.ts` (17 tests). Mutations of the converter that fail it:
+no v flip, normals by M or by N transposed, no mirror swap, byteStride ignored, parent transform
+ignored, the sign of any one of the six w terms of the quaternion matrix (a node rotates by
+q = (1, 2, 3, 4)/√30, so all four components are nonzero; expected corners from Rodrigues' formula),
+and a `matrix` node ignored or read transposed. The fetched models exercise none of the transform
+code (each is one node with only `mesh`). Converter → parseOBJ → compileScene lists the image and
+reads it in the resolver. The real assets: all four models convert (2,616 to 10,296 triangles, uvs inside [0, 1], normals
+present). On the GPU (Chromium, ANGLE Metal, 1,361 samples) the apple renders with its skin wrapped
+seamlessly. The same render with the v flip removed shows black gaps across the apple, which
+confirms the flip. Digest before and after: 280 of 280 scenes identical.
+
+## 2026-11-07 — Image textures for color rows
+
+Photorealism integration step 9 (docs/claude-2026-11-review/photoreal/image-textures/plan.md, with
+its review's must-fix items). Color rows only: `channel` float rows (roughness maps) wait for
+derived rows computed per hit (integration step 6), which this branch does not have.
+
+- **Authoring**: `scene.textures[name] = { url, colorspace: 'srgb' | 'linear' }` (colorspace
+  required) and the row value `{ texture: name, uvScale? }` in reflectance rows (albedo, f0,
+  transmittance, checker colors).
+- **One value form downstream** (review must-fix 4): `compiler/analyze/imageTextures.ts` checks
+  every texture value and declaration before Analyze, assigns layers in first-use order, and
+  lowers each value to the RGB expression `image_texture(layer, uv, srgb).rgb`. Validate, Plan and
+  the spectrum kinds see an ordinary expression (lifted after the filter in spectral programs; the
+  uv charts turn on). Errors: undeclared names, unknown keys, a bad `uvScale`, emission / index /
+  float rows, keys that are not rows of the model, bad declarations, and a textured material used
+  by a sphere (decision P1 Q4; review must-fix 1).
+- **`src/glsl/shared/image_texture.glsl`**: pbrt-v4's field at zero footprint (t = 1 − v, texel
+  centers at half-integers, decode before the bilinear blend, repeat wrap) with four `texelFetch`es
+  on `u_material_textures` (`highp sampler2DArray`), no mipmaps. Linkage:
+  `program.materials.images` (present only when true) and `SceneDataPlan.images` (present only
+  when non-empty).
+- **Engine** (decision P1 Q8, an engine API addition): the texture registry keeps each texture's
+  bind target, the executor binds with it, and `registerImageArray` builds an RGBA8 2D array
+  (`texStorage3D`, one level). **App** (`app/images.ts`): fetch, reject a PNG whose bit depth is not
+  8, decode with no color-space conversion or premultiplication, require one size; uploaded with
+  the scene data (so also on recompile and context restore).
+- **Sampler budget**: `samplerRoster` counts `sampler2DArray` with `sampler2D`/`usampler2D`.
+- **Tests**: `tests/glsl/imageTexture.test.ts` (twin: texel centers, seams, period mean, exact
+  quadrant means, decode-after-blend fails; the witness PNG encoder), `tests/compiler/imageTextures.test.ts`
+  (checks, lowering, layer order, exact linkage, lift after the filter, glslang, the budget),
+  `tests/app/images.test.ts`, `tests/engine/externTextures.test.ts` (bind targets).
+- **Witnesses**: `image-texture` (an sRGB RGB 4×4 image on an orthographic quad under a unit sky,
+  pt / pt-nee / pt-mis, four quadrants per channel), `image-texture-linear`,
+  `image-texture-spectral` (gray image). The image's columns differ as much as its rows and its
+  channels are arranged differently (review must-fix 2). GPU mutations each fail every quadrant
+  check at the twin's predicted values: no v flip, no half-texel offset, a u mirror, decode after
+  the blend.
+- **Digest**: every existing scene identical; the three witnesses are new.
+
+## 2026-11-07 — Procedural bump mapping
+
+Photorealism integration step 5 (docs/claude-2026-11-review/photoreal/integration.md): Stage A of
+the normal-mapping plan, with its review's must-fix items. Stage B (normal-map images, which need
+a tangent on `Hit`) is deferred, to be planned with anisotropic GGX after image textures.
+
+- **Authoring**: the material meta-key `bump: { height, step }`. `height` is a float GLSL
+  expression in the world point `p` (sliders and the Perlin functions allowed); `step` is the
+  central-difference step in world units and is required (review must-fix 3: a world-length
+  default is a guess about scene scale). Validator errors: bump on model 'none', a non-expression
+  height, a missing or non-positive step, unknown keys.
+- **`src/glsl/core/shading_normal.glsl`**: the surface gradient by central differences along
+  geodesics (`ambient_geodesic`, so no uv chart and no Euclidean assumption), the perturbed frame
+  n − σ∇_S h with σ from `region_to == region_owner`, the Schüssler/Mitsuba flip, and the mask
+  (wi·ng)(wi·n'') > 0 in eval, pdf and sample.
+- **Linkage**: `program.materials.perturbed` (bumped ids, present only when non-empty). The walk
+  swaps `hit.frame` for `material_shading_frame(mat, hit, wo)` before the guides, NEE, the light
+  query and sampling; bumped ids get masked interaction arms; the Perlin library is included for
+  a bump height too.
+- **Tests**: `tests/glsl/shadingNormal.test.ts` (twin: flip guarantee, χ² of the masked sampler
+  with a rejected cell, the triple, albedo ≤ 1, BSDF/NEE/MIS agreement on the tilted plane with
+  radiance below the surface, and the values a missing mask or flip reads there, σ,
+  and the float32 finite-difference error law), `tests/compiler/bump.test.ts` (Validator rules,
+  linkage, glslang).
+- **Witnesses**: `bump-tilt` (the lune ρ(1+cos 45°)/2 = 0.341421 in flipped and unflipped rows,
+  with a non-samplable emitter of radiance 2 under the plane, so a missing mask reads 0.458579 and
+  a missing flip 0.682843 in the far rows; review must-fix 1, and the review of the build: a black
+  occluder there hid a missing mask) and
+  `bump-sides` (σ and the gradient sign, with light 2 chosen so the correct value is ρ, not 0;
+  review must-fix 2).
+- **Digest**: every existing scene identical; `bump-tilt` and `bump-sides` are new.
+
+## 2026-11-07 — Perlin noise for material expressions
+
+Photorealism integration step 4 (docs/claude-2026-11-review/photoreal/integration.md): Part A
+of the procedural-textures plan, with its review's must-fix items. Part B (the object-space
+point `q`) is deferred to its own plan.
+
+- **`src/glsl/core/perlin.glsl`**: `perlin_noise`, `perlin_fbm`, `perlin_turbulence`, a
+  transcription of pbrt-v4 `noise.cpp` at zero ray-differential footprint. That includes
+  Turbulence's `+0.2·ωⁿ` residual for the octaves pbrt leaves out (review F3). No octave
+  clamp: the octave count is part of the authored scene.
+- **Linkage**: included when some material row is a GLSL expression
+  (`materials.noise`, from `materialHasExpression`, which `materialReadsUv` now calls).
+  Medium expressions do not include it.
+- **Tests**: `tests/glsl/perlinTwin.ts` (fp32 twin, table parsed from the GLSL) matches pbrt's
+  compiled `noise.cpp` **bit for bit** on 300 points × 5 functions
+  (`tools/perlin-golden` → `tests/fixtures/perlin-pbrt-golden.json`); the table equals pbrt's
+  `NoisePerm`; the stated bounds hold on 10⁵ samples. `perlinLinkage.test.ts` checks
+  inclusion, absence and a glslang compile.
+- **GPU probe** `npm run witness:textures`: SwiftShader matches the twin exactly (max error 0)
+  at 4096 points, and an expression row read back through the generated resolver matches to
+  3.6e-8. A cubic fade (error 0.18) and a residual-free turbulence (error 0.16) are rejected.
+- **Demo** `procedural-textures`: marble on a Menger sponge, wood on a torus, stone on a sphere.
+- **Digest**: 267 of 275 scenes identical. The 7 scenes with material expressions differ by
+  exactly the perlin block and its source-map lines. `procedural-textures` is new.
+
+## 2026-11-07 — Measured colors: ColorChecker reflectances and CIE illuminants
+
+The photorealism step "measured-colors": the `measured` kind now also covers the reflectance and
+emission roles, so scenes can use real measured surface colors and real light spectra.
+
+**What:**
+- `unitLuminanceStandIn(g)` (color/spectra/standIn.ts): blackbody's projection of an emission
+  spectrum at unit reference Y, now shared (separate refactor commit; digest identical).
+- 24 ColorChecker Classic reflectances (BabelColor average, 380–730 nm at 10 nm) and five CIE
+  illuminants (A and D65 every 5 nm over 360–830 nm, FL2, FL11 and LED-B3 at 5 nm over 380–780 nm)
+  in color/spectra/measured/colors.ts, written by tools/spectral/measured-colors.mjs from the
+  downloaded source files (source URLs in the file; each illuminant checked against
+  colour-science's copy).
+- The measured value is spelled `{ measured: { table, scale? } }` (was `{ measured: 'name' }`),
+  like every other named kind. Each table has its own role (metal → optical, patch → reflectance,
+  illuminant → emission); another role, an unknown table or a `scale` on a non-emission table is
+  an error. An illuminant is normalized to unit reference CIE Y and multiplied by `scale` (a
+  constant or a slider), the blackbody convention; D65 at scale 1 is RGB white.
+- A table not reaching 360 or 830 nm holds its end values (pbrt-v4's FromInterleaved).
+- RGB stand-ins: a patch's D65 projection (within 0.0020 of colour-science for all 24); an
+  illuminant's unit-luminance RGB times scale (D65 (1, 1, 1); A matches Planck at 2856 K).
+- Light tree: a measured illuminant on a light-table row keeps its table index and
+  scale × normalization in the row header (packed code 2); the reader chooses among the
+  program's illuminants.
+- Kind contract: a `fields` entry may be a name (a string); `validate` is given the slot's role;
+  `packed.read` is given the kind's values in the program and is null when none can sit in a
+  light row. `SpectrumValue` (light emission, sky color) takes any named kind.
+
+**Verified:** tests/components/measured.test.ts (patches against colour-science 0.4.4 within
+0.0025, measured worst 0.0020; normalizations against an independent quadrature, 1e-6; D65 white
+to 1e-5; A against Planck, 1e-4; search twin; linkage; light-table rows; validation),
+tests/compiler/measuredColors.test.ts, new spectrumDiagnostics cases. Digest: the 288 existing
+synchronous scenes identical; two witness scenes added. Witnesses `spectral-colorchecker-d65`
+(orange patch under a measured D65 sky, exact) and `spectral-measured-lamps` (A and FL11 quad
+lamps, power vs tree, NEE vs MIS).
+
+## 2026-11-07 — Measured metals: `conductor`, `rough_conductor`, the `optical` role, the `measured` kind
+
+Integration step 12 of the photorealism batch (conductor plan and review; owner decision P1/Q3,
+provisional). Single scattering only.
+
+**What:**
+- `d65StandIn(g)` (color/spectra/standIn.ts): the Gaussian kind's daylight projection, now shared
+  (separate refactor commit; digest identical).
+- Spectrum role `optical`: a metal's η or κ, a Spectrum per wavelength lane, never
+  hero-collapsed; lifts like a coefficient (identity in RGB, exact for gray values in spectral
+  programs). An optical slot takes a constant, a scalar `{param}` (a float slider on a vec3
+  uniform) or a named kind; not an expression, a vec3 slider or a per-instance attribute. In a
+  spectral program an RGB triple there is an error (the spectral model's third limitation).
+- Spectrum kind `measured`: `{ measured: 'metal-Au-eta' }` and the other nine pbrt-v4 tables
+  (Ag, Al, Au, Cu, CuZn; eta and k), copied verbatim with source URL, commit and line numbers;
+  Apache-2.0 text at public/licenses/pbrt-v4.txt. Spectral programs evaluate a table per lane
+  (binary search over const arrays, linear interpolation); RGB programs use its d65StandIn.
+  The kind contract's `glsl` became a function of the values in use, so a program links one
+  helper per table it names; `ProgramDescription.spectrumKinds` records each kind with its
+  values.
+- `conductor_fresnel` in glsl/core/math.glsl (Mitsuba 3's real form, one clamped root; reference
+  implementations §7c), TS twin materials/conductor/fresnel.ts.
+- Materials `conductor` (delta, weight F) and `rough_conductor` (the shared F-free GGX lobe times
+  F(|ωₒ·h|)), rows `eta` (default 0) and `k` (default 1, > 0): the defaults are a perfect mirror.
+  `rough_conductor` declares `microfacet: { energy: 'not-built' }`;
+  `measurement.microfacet: 'energy-compensated'` rejects it.
+- The GGX lobe twin and the §11.3 harness moved from ggx.test.ts to
+  materials/microfacetTwin.ts, so ggx and rough_conductor tests share one copy.
+
+**Measured:** rough_conductor.test.ts: twin vs pbrt's complex FrComplex ≤ 1e-12 (five metals,
+360–830 nm), float32 within 4e-6 of double, limits, 0 ≤ F ≤ 1, χ²/triple/pdf for gold (450 and
+650 nm), aluminium and F ≡ 1. Witnesses (SwiftShader, 14/14): `conductor-gold` spectral reads
+(1.0219, 0.7822, 0.3435) at 0° and (0.9939, 0.8056, 0.4358) at 70° against (1.0218, 0.7823,
+0.3435) and (0.9939, 0.8056, 0.4359); RGB (0.9747, 0.8034, 0.3560) and (0.9713, 0.8171, 0.4449),
+exact; `conductor-perfect` ⇄ `-ref` Δmean 0.00%, rmse 0.00% on pt-mis, pt-nee and pt;
+`veach-metals` mis ≡ nee Δmean 1.10% (RGB), 0.52% (spectral), pt tripwire 1.25%. Reruns,
+15/15: `mirror`, `veach-mis`, `furnace`, `eta`, `spectral-mirror`, `spectral-materials`,
+`spectral-gaussian-plane`; `npm run witness:color` 17 cases pass, 5 defects rejected. Digest: every
+synchronous suite scene's shader text differs only by math.glsl's new function and two comment
+pointers (microfacet.glsl, ggx.glsl), and the rest only by source-map line numbers; closures,
+uniforms, parameters, scene data and warnings identical. RGB gold is slightly worse than
+Schlick with the right f0 (worst 0.047 against 0.029); aluminium much better (0.002 against
+0.118).
+
+**Not built:** the energy gain for rough_conductor (F_avg per lane), expression or per-instance
+η/κ, correction for the outside medium's index.
+
+## 2026-11-07 — The F-free GGX reflection lobe in microfacet.glsl (refactor)
+
+Integration step 11 of the photorealism batch (conductor review, item 2): the prerequisite for
+`rough_conductor`, so that it and `ggx` differ only in their Fresnel line instead of copying the
+lobe.
+
+**What:** `glsl/core/microfacet.glsl` gains `microfacet_reflect_eval` (f/F, with the Fresnel
+argument |ωₒ·h| and the energy-gain argument |cos θₒ| as out parameters; 0 across the surface),
+`microfacet_reflect_pdf`, and `microfacet_reflect_sample` (returning `MicrofacetReflectSample`:
+wi, the F-free weight G₁(ωᵢ), pdf, cos_h, cos_o; a dead sample has weight 0 and pdf 0).
+`ggx.glsl` now multiplies Schlick's F and the conductor energy gain into these and does nothing
+else. The TS twin in ggx.test.ts has the same split, plus tests that the lobe's sample and eval
+report the same cos_h and cos_o for the drawn direction and that ggx.glsl reaches D, G₁ and VNDF
+sampling only through the lobe. Frame cases `rough-furnace` and `mirror` added to
+`npm run frames` (separate commit).
+
+**Measured:** `npm run frames -- compare` before/after: 26 of 26 pictures bit-identical (12
+cases, including `ggx` = veach-mis under MIS, `rough-furnace`, `mirror`, `spectral`). Digest:
+the 28 scenes that link microfacet.glsl differ, and in them only the shader text and source
+maps; removing the old and new texts of microfacet.glsl and ggx.glsl leaves all 67 differing
+shaders identical. `ms-furnace` (energy-compensated ggx and rough glass, pt / pt-nee / pt-mis /
+spectral): 34 of 34 checks pass.
+
+## 2026-11-07 — Sheen: fuzz over a Lambertian base (`sheen`)
+
+Integration step 10 of the photorealism batch (small-materials plan, sheen section), with the
+review's must-fix items applied.
+
+**What:** a new material model `sheen`: OpenPBR's fuzz layer over a Lambertian base, the fuzz
+lobe being Zeltner, Burley and Chiang's linearly transformed cosine (transcribed from MaterialX
+`mx_microfacet_sheen.glsl`). With p = W·E(μ_o), f = c·p·D/μ_i + (1 − p)·ρ/π. Rows: `albedo` (ρ),
+`sheen_color` (c), `sheen_weight` (W, in [0, 1]) and `sheen_roughness` (in [0, 1]); the fits read
+the derived `sheen_r` = roughness clamped to [0.01, 1], which has a per-hit form, so the
+roughness may vary over the surface. The sampler mixes the LTC lobe (probability p) and the
+cosine lobe, with the exact mixture pdf; the weight (c·p·g + ρ(1 − p))/(p·g + 1 − p) is ρ when
+c = ρ. D depends only on the azimuth relative to ω_o, so no tangent field is needed (works on
+SDFs). Not reciprocal (E depends on μ_o); every unidirectional technique evaluates f(·|ω_o), so
+the estimators agree. Same in RGB and spectral programs.
+- The descriptor fact `microfacet: { energy }` gains `'none'`: sheen reads only the frame maps
+  of glsl/core/microfacet.glsl and calls no energy gain, so a sheen-only program links that
+  library and nothing of microfacet_energy under either `measurement.microfacet`.
+- sheen.md (model, sampling, energy identity, non-reciprocity), sheen.test.ts (TS twin),
+  tests/compiler/sheen.test.ts, one registry line, README occupant list, microfacet.glsl header
+  comment (names sheen as a present occupant).
+- Witnesses `sheen-furnace` (furnace-sky's sphere, c = ρ = 0.4: reads 0.4 over the sphere,
+  grazing rim included) and `sheen-fuzz` (fuzz alone, ρ = 0, orthographic camera over a convex
+  roof at μ_o = 0.2 and 0.5, four bands reading W·c·E(μ_o, r)); keys pt-nee, pt-mis, pt and
+  spectral pt-mis.
+
+**Measured:**
+- TS twin: E clamped into [0, 1] (raw minimum −2e-5, maximum 0.745); GLSL constants equal
+  MaterialX's; the LTC sampler's density equals D to 1e-9; ∫D = 1 to 1e-3; χ² of the mixture
+  sampler passes at μ_o ∈ {1, 0.5 (wo below the frame), 0.1} × r ∈ {0.05, 0.3, 0.5, 1} ×
+  W ∈ {0.3, 1}, and fails when the azimuth turn or the sign of b⁻¹ is broken; triple and pdf
+  agreement < 1e-12; frame rotation invariance < 1e-9; energy identity by quadrature (1e-3) and
+  by mean sample weight (3σ); c = ρ weights equal ρ to 1e-14; W = 0 is Lambert.
+- Witness `sheen-furnace` (384 spp, tolerance 0.006): sphere 0.3997, 0.4000, 0.4000 on keys 1–3,
+  (0.3998, 0.3998, 0.4000) spectral; sky 1.0000 (spectral 0.9996–1.0000).
+- Witness `sheen-fuzz` (256 spp, tolerance 0.006), expected 0.4295 / (0.3216, 0.1608, 0.0804) /
+  0.4957 / 0.3071: pt-nee 0.4282 / (0.3220, 0.1610, 0.0805) / 0.4951 / 0.3069; pt-mis 0.4292 /
+  (0.3217, 0.1609, 0.0804) / 0.4956 / 0.3071; pt 0.4296 / (0.3217, 0.1608, 0.0804) / 0.4958 /
+  0.3071; spectral pt-mis (gray bands) 0.4291–0.4292 / 0.4957–0.4960 / 0.3069–0.3072.
+- Digest: no existing scene's output changes except the microfacet.glsl comment text (26
+  scenes with a microfacet model, shader text and source map only; with that comment
+  reverted, 282 of 282 existing scenes are identical); the two new scenes are added.
+
+## 2026-11-07 — Fix: a uv-reading material on a driven SDF object crashed the compiler
+
+`keepsLocalFrame` (compiler/plan/dataTenants.ts) lowered the object's transform as a constant
+similarity, and the SDF branch of `planScene` asks it for every object, driven or not. A
+`checker` (or any expression material) on a driven, rotated SDF shape with a uv chart threw
+"driven transform reached the constant lowering". The predicate now answers false for a driven
+transform: a driven object is never folded, and its arm already follows its rigid frame (the
+analytic branch and the table adapter test `isDrivenTransform` first and were unaffected).
+Found when the registry kitchen-sink compile (glsl-compile.test.ts) assigned `checker` to a
+driven SDF object after a new material model shifted its material rotation. Tests: the
+predicate for a driven sphere, and a checker on a driven SDF sphere compiles. No suite scene
+used the combination, so no compiled output changes.
+
+## 2026-11-07 — Thin glass sheets (`thin_dielectric`)
+
+Integration step 8 of the photorealism batch (small-materials plan, thin dielectric section),
+with the review's must-fix items applied and the index named `sheet_eta` (owner decision P1,
+Q6; Q7 accepts a zero-thickness sheet).
+
+**What:** a new material model `thin_dielectric` (pbrt-v4 `ThinDielectricBxDF`): an infinitely
+thin slab of relative index `sheet_eta` (default 1.5, positive; a plain number, so a Cauchy or
+Sellmeier value is rejected by the existing role check). Two delta lobes, both of weight 1:
+mirror reflection with probability R_tot = 2R/(1 + R), the closed sum of the internal bounces,
+and straight-through transmission (ω_i = −ω_o) with T_tot = 1 − R_tot. Capabilities: pure delta,
+support 'sphere', transmission false (no index change, no region-table row, no thin-surface
+warning). Windows, display cases and picture glass can now be single quads; a `dielectric` quad
+still refracts into its own index from the front.
+- The Validator rejects the model in a scene with any medium (the Analyzer's `hasMedia`): on a
+  zero-thickness owner's front hit `region_to` is the owner, and the walk would take it as the
+  medium behind the pane. The rule reads the declared pair "support 'sphere', transmission
+  false" through `modelTransmitsWithoutCrossing` (materials/index.ts), not the model name.
+- The registry kitchen-sink compile (glsl-compile.test.ts) holds every model that can share a
+  scene with media; thin_dielectric is compiled by the per-model AOV case.
+- The materials README occupant list gains rough_dielectric, checker and thin_dielectric; the
+  bias ledger's opaque-shadow entry names thin sheets.
+- New witness `thin-pane`: an orthographic camera over an emitter (albedo 0) with three panes
+  in horizontal bands (facing the camera, seen from the back, tilted to cos 0.5 so its mirror
+  rays miss the emitter), under pt-nee, pt-mis, pt and spectral pt-mis.
+
+**Measured:**
+- TS twin: 2R/(1 + R) equals R + T²R/(1 − R²) and the explicit series (η 1.0001, 1.33, 1.5,
+  2.4; cos in [0, 1]); the Stokes identity F(cos_t; η) = F(cos_i; 1/η) to 1e-12; reflection
+  frequency within 5σ over 10⁶ draws; T_tot(1) = 0.923077 and T_tot(0.5) = 0.836232 for η 1.5,
+  0 for the inverted η at cos 0.5.
+- Witness `thin-pane` (256 spp, tolerance 0.005): emitter 1.0000 on every key; facing pane
+  0.9226, back face 0.9227, tilted 0.8363 on keys 1–3 (expected 0.923077 / 0.836232); spectral
+  key 0.9223–0.9240 and 0.8367–0.8372. A single interface would read 0.96, an inverted η 0.
+- Digest: 281 of 282 scenes identical; the one difference is the new scene.
+- `npx vitest run`: 4442 passed.
+
+## 2026-11-07 — Microfacet energy compensation (`measurement.microfacet`)
+
+Integration step 7 of the photorealism batch (owner decision P1, Q2), with the review's
+must-fix items applied.
+
+**What:** a new measurement truncation `measurement.microfacet: 'single-scattering' |
+'energy-compensated'`, default `'single-scattering'` (existing images unchanged; always
+recorded in the program description and the export stamp). Compensated, `ggx` and
+`rough_dielectric` multiply eval and the sample weight by a gain on ωₒ (Turquin 2019, as
+Blender Cycles ships it): 1 + F_ms(1 − E)/E for the conductor (F_avg = f0 + (1 − f0)/21 for
+Schlick), 1/A on both lobes for glass. Sampling and pdfs are unchanged. The gains read one
+built-in table, `ggx-smith-energy-v1` (RGBA32F, 32 × 32·32, 512 KiB: the energy albedo over
+√μ, √α and the index coordinate z, both sides of the interface, and E_avg), built by
+`tools/microfacet-energy/generate.ts` from `components/materials/microfacet_energy/build.ts`
+and uploaded by the App with a hash check like the spectral tables. Under
+`'single-scattering'` the compiler emits each present gain as the constant 1.
+- The descriptor fact `usesMicrofacet: true` became `microfacet: { energy: 'conductor' |
+  'dielectric' }`: the include gate and the gain in one fact. The integration's third value,
+  `'none'` (a microfacet model with no gain, for sheen), is left to the sheen step, since
+  nothing declares it yet; adding it means `core.ts`'s gain list must skip it.
+- The roughness rows of `ggx` and `rough_dielectric` are constrained to [0, 1] (the table's
+  range), and `ggx`'s f0 to [0, 1] (it keeps the conductor gain's bounce series convergent),
+  through the existing row constraint, in every program. No suite scene authors values
+  outside. Known gap: a `{param}` slider authored without `min` or `max` passes, and
+  `setParam` can move it past 1, where the lookup extrapolates and the gain is wrong
+  (negative by roughness 1.5); the panel's slider stays in [0, 1]. The plan's Validator test
+  for this case was not written (microfacet_energy.md "Limits").
+- New witnesses: `ms-furnace` (white conductors at roughness 0.3 / 0.6 / 1, clear glass at
+  ior 1.5 and roughness 0.3 / 0.6 / 1, ior 1.33 at 1 and ior 2.0 at 0.6, in a samplable white
+  sky, under pt, pt-nee, pt-mis and spectral pt-mis) and `ms-furnace-control` (one white
+  conductor at roughness 1: single scattering reads 1 − ln 2 at the center, compensated 1).
+  Two `npm run frames` cases (`ggx`: veach-mis MIS, `rough-glass`: rough-mis MIS).
+
+**Measured:**
+- `frames compare` before/after: 22 of 22 pictures bit-identical, including the new `ggx` and
+  `rough-glass` cases and `spectral` (spectral-materials).
+- Digest: 255 of 279 existing scenes identical; the 24 scenes with `ggx` or
+  `rough_dielectric` differ only in the gain lines (the multiply by the gain, the generated
+  gain-of-1 functions, `ggx_fresnel_average`), comments and source-map line numbers; uniforms,
+  closures, parameters and scene data are identical. 2 new scenes.
+- TS: the table reproduces from `build.ts` bit for bit; furnace error through the lookup
+  (150 random conductor points, 70 per glass side): within the plan's bounds (max < 5e-3 /
+  8e-3, mean < 5e-4 / 1e-3); a colored conductor never exceeds 1 + 1e-3; the compensated
+  twins' mean sample weights in the furnace are 1 within 1.5%. Whether the GLSL eval and
+  sample apply the same gain is checked only by the `ms-furnace` witness (a TS twin applies
+  one gain to both).
+- Witnesses (SwiftShader, 512 spp): every `ms-furnace` sphere reads 1 within 0.5% under pt,
+  pt-mis and spectral pt-mis (tolerance 0.01) and within 1.2% under pt-nee (roughness ≥ 0.6,
+  tolerance 0.05); sky 1.0000. With eval's gain removed by hand, pt-nee read 0.36 (conductor,
+  roughness 1) and pt-mis 0.72: the witness checks the eval side. `ms-furnace-control`: 0.3052
+  (single scattering, expected 0.3069 ± 0.005) and 0.9999. Unchanged: `rough-furnace`
+  (1.0000; 0.9999 / 0.9978 / 0.9021), `veach-mis`, `rough-mis` (nee vs mis 0.23%, pt rmse
+  39.76%), `spectral-materials` (NEE vs MIS 0.23%).
+- The largest suite program binds 8 samplers; a compensated program adds 1.
+- Not used in the witness: glass at ior 2.4 and roughness 1. The gain makes sample weights
+  exceed 1, and inside strongly trapping glass the result is heavy-tailed (it read 2% low at
+  1024 spp under three of four estimators). A TS random walk inside that sphere (build.ts's
+  sampling and lookup, energy weights, 4 × 10⁷ paths over the witness region) reads 0.999
+  (four runs of 10⁷: 0.989 to 1.007); its batches of 4.6 × 10⁵ paths, the region's count at
+  1024 spp, range from 0.954 to 1.084. The same walk for the witness's glass spheres reads 1
+  within 0.07% (2 × 10⁶ paths each); the 64-bounce truncation's share is 4 × 10⁻⁵ at ior 1.5
+  and roughness 0.3 and no path at the others.
+
+## 2026-11-07 — Derived material fields computed per hit when their input varies
+
+Integration step 6 of the photorealism batch (owner decision P1, Q1; the image-textures
+review's must-fix 5).
+
+**What:** a derived material field (`MaterialDerivedSpec`) may declare a per-hit form `glsl`
+beside its host form `fn`. When every input is a constant or a `{param}`, nothing changes: the
+host computes it (a literal or a compute-closure uniform). When an input varies over the
+surface (a GLSL expression or a per-instance attribute), the material lookup computes it per
+hit from the inputs' struct fields, after assigning them:
+`props.alpha = max(1e-3, props.roughness * props.roughness);`. The microfacet α is declared
+once (`components/materials/microfacet.ts`) and used by `ggx` and `rough_dielectric`. A field
+without a per-hit form (plastic's `coat_fdr`, a quadrature) keeps the rule that its input is a
+constant or a `{param}`, now also for per-instance attributes. So an expression or per-instance
+roughness compiles; a Cauchy or blackbody value on a roughness row gets the row's own message
+("Cauchy is an index form"). This reverses the recorded rule "GLSL never recomputes a pure
+function of its own rows" for spatial inputs only.
+
+**Witnesses added:** `rough-furnace-expr` (twin of `rough-furnace` with each roughness written
+as a formula for its constant) and `veach-mis-varying` (one GGX material on the four plates,
+roughness 0.05 → 0.6 along x; pt-mis, pt-nee and pt agree).
+
+**Measured:**
+- Digest: of the 277 existing suite scenes, 255 are identical. The other 22 (every scene with
+  `ggx` or `rough_dielectric`) differ only in GLSL comment text: rewritten comments in
+  `ggx.glsl`, `rough_dielectric.glsl` and `microfacet.glsl`, with the same line count. A script
+  compared the kept text with `//` comments removed and found 0 differences in 98 differing
+  parts. Code-only changes, before the comments were edited, gave 277 of 277 identical. There
+  are 2 new scenes.
+- Contract test: the per-hit form of α, evaluated as JavaScript, equals `fn` exactly on an
+  11-point grid. A compiler test checks the emitted lines (literal, uniform, per-hit for
+  expression and per-instance roughness, in RGB and spectral) and runs glslang on them.
+- Witnesses (SwiftShader): `rough-furnace-expr` against `rough-furnace` Δmean 0.00%, rmse
+  0.00%. `veach-mis-varying`: mis vs nee Δmean 0.04% (χ²ᵣ 0.01), pt Δmean 0.32% (rmse 84% ≤
+  120%). These existing witnesses pass unchanged: `veach-mis`, `rough-smooth-limit` (0.5543),
+  `rough-furnace` (background 1.0000; 0.9999 / 0.9978 / 0.9021), and `rough-mis` (nee vs mis
+  0.23%; the pt tripwire rmse 39.76% against its 40% gate, rerun alone after the first run
+  timed out under load).
+
+## 2026-11-07 — `plastic`: a smooth clear coat over a Lambertian base
+
+Integration step 3 of the photorealism batch
+(docs/claude-2026-11-review/photoreal/coated/plan.md, with its review's must-fix items).
+
+**What:** a new material occupant, `src/components/materials/plastic/` (Mitsuba 3 `plastic`,
+`nonlinear = true`): a delta coat lobe F(μ_o) and the base seen through the coat,
+R/(1 − R·K)·(1 − F_i)(1 − F_o)/(π η²). The coat's internal diffuse reflectance K is a
+host-derived field (`coat_fdr`) computed by exact quadrature, not Mitsuba's fit. Settings:
+`albedo` (confined to [0, 1] in both color models, because R/(1 − R·K) has a pole at R = 1/K)
+and `coat_eta` (the coat's index relative to the outside medium; a constant or `{param}` only,
+since it feeds K). No compiler, engine, transport or core GLSL change; one registry line.
+
+**Witnesses added:** `plastic-furnace` (R = 1: every pixel reads 1, center and whole frame),
+`plastic-chroma` (base (0.8, 0.5, 0.2): center A(1) = (0.632833, 0.316071, 0.127997)) under
+pt-nee, pt-mis and pt; `spectral-plastic` (gray 0.5, frame mean 0.316313).
+
+**Measured:**
+- TS twin (plastic.test.ts): the Fresnel identity to 1e-12; χ² with the delta lobe as a cell
+  passes at p = 0.001 in 9 configurations (η 1.5 and 0.8, grazing included); the triple and
+  pdf agreement to 1e-12; reciprocity; A(μ) against eval quadrature to 1e-9 and against the
+  mean sample weight within 3σ.
+- Witnesses (SwiftShader): `plastic-furnace` center (1.0029, 0.9995, 1.0002) and whole frame
+  (0.9998, 0.9999, 1.0000) for keys pt-nee, pt-mis, pt; `plastic-chroma` red/green/blue on the
+  three keys within 0.0014 of A(1); `spectral-plastic` 0.3168 vs 0.316313; `furnace-sky`
+  unchanged and passing. At 96 spp the pt-nee arm read +1.5% (as did furnace-sky's Lambert
+  sphere on the same stream); the two plastic entries use 384 spp, like `fog-sky`.
+- Digest: the 274 existing suite scenes are identical; 3 new scenes.
+
+## 2026-11-07 — `npm run shoot`: finished pictures on the real GPU
+
+- `tools/shoot.mjs` (`npm run shoot -- <scene-id...> [--spp N] [--size WxH] [--out dir]
+  [--format png|hdr|both] [--salt S] [--renderer K] [--tile PX] [--swiftshader]`) opens each
+  gallery scene in headless Chromium with ANGLE's Metal backend, renders it with the App's
+  production render (or its tiled render, with `--tile` or above 4K UHD) and saves through
+  the App's writers, so files carry the export stamp. It prints the GL renderer string and
+  refuses a software renderer unless `--swiftshader` asks for one.
+- The dev-server start/reuse/stop code moved from `tools/witness.mjs` to `tools/devServer.mjs`,
+  shared by both tools; the witness runner behaves as before (furnace witness passes).
+- Measured on the Apple M2: `sky` and `sdf-shapes` at 1280×853 × 1024 spp took 18–21 s each;
+  the 60 Hz animation-frame clock (one sample per frame) sets a floor of spp/60 s. A tiled
+  GPU render equals a one-piece render bit for bit (`sdf-shapes`, 640×427, 256 px tiles).
+- GPU against SwiftShader at the same salt (320×213 × 64 spp): `sdf-shapes` agrees to a
+  relative mean difference of 2·10⁻⁶ (98.6% of pixels identical). `sky` under NEE or MIS reads
+  0.23% darker on the GPU at three salts (red 0.35%, blue 0.10%; lit surfaces only, the sky seen
+  directly is identical); under pure path tracing the two agree to 0.05%. The cause is not
+  found (one trial, declaring the environment CDF samplers `highp`, gave the same numbers).
+
 ## 2026-10-04 — Withdrawn App rewrite removed
 
 At the owner's instruction, removed the uncommitted App lifecycle rewrite and subsequent

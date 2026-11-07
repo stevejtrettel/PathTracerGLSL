@@ -7,6 +7,8 @@
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import quadGLSL from './quad.glsl?raw';
+import quadHyperbolicGLSL from './quad_hyperbolic.glsl?raw';
+import quadSphericalGLSL from './quad_spherical.glsl?raw';
 
 /** cross(edge1, edge2) — the one formula behind BOTH the quad's normal and its area
  *  (the quad light's |cross| weighting shares it; one source, no near-duplicate). */
@@ -27,6 +29,25 @@ export function quadNormal(edge1: number[], edge2: number[]): [number, number, n
     return [cx / len, cy / len, cz / len];
 }
 
+/** The rules a curved space adds to a quad's edges (the shape's and the quad light's, one
+ *  formula): the curved quad is the rectangle centered at corner + (edge1 + edge2)/2 with
+ *  half-widths a = |edge1|/2 and b = |edge2|/2, so the edges must be orthogonal; in H³ its corners
+ *  exist only when sinh a·sinh b < 1, and in S³ each half-width lies below π/2 (the rectangle stays
+ *  in the hemisphere about its center). */
+export function curvedQuadProblems(space: 'hyperbolic' | 'spherical', edge1: number[], edge2: number[]): string[] {
+    const l1 = Math.hypot(edge1[0], edge1[1], edge1[2]), l2 = Math.hypot(edge2[0], edge2[1], edge2[2]);
+    const out: string[] = [];
+    const cosine = (edge1[0] * edge2[0] + edge1[1] * edge2[1] + edge1[2] * edge2[2]) / (l1 * l2);
+    if (Math.abs(cosine) > 1e-9) out.push(`edge1 and edge2 must be orthogonal (the quad is the rectangle centered at corner + (edge1 + edge2)/2; cos of their angle = ${+cosine.toFixed(9)})`);
+    if (space === 'hyperbolic') {
+        const k = Math.sinh(l1 / 2) * Math.sinh(l2 / 2);
+        if (k >= 1) out.push(`sinh(|edge1|/2)·sinh(|edge2|/2) = ${+k.toFixed(6)} must be < 1 (otherwise the rectangle's corners lie at or beyond the sphere at infinity)`);
+    } else if (l1 >= Math.PI || l2 >= Math.PI) {
+        out.push(`|edge1| and |edge2| (${+l1.toFixed(6)}, ${+l2.toFixed(6)}) must be < π (each half-width below π/2)`);
+    }
+    return out;
+}
+
 export const quadDescriptor: PrimitiveDescriptor = {
     type: 'quad',
     params: [
@@ -34,7 +55,20 @@ export const quadDescriptor: PrimitiveDescriptor = {
         { name: 'edge1', kind: 'vector', shape: 'vec3', required: true },
         { name: 'edge2', kind: 'vector', shape: 'vec3', required: true },
     ],
-    glsl: quadGLSL,
+    glsl: {
+        euclidean: { origin: 'components/geometry/quad/quad.glsl', source: quadGLSL },
+        hyperbolic: { origin: 'components/geometry/quad/quad_hyperbolic.glsl', source: quadHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/quad/quad_spherical.glsl', source: quadSphericalGLSL },
+    },
+    // In a curved space the quad is centered at the Euclidean quad's center (its curved bodies).
+    curvedAnchor(v) {
+        const c = v.corner as number[], e1 = v.edge1 as number[], e2 = v.edge2 as number[];
+        return [c[0] + 0.5 * (e1[0] + e2[0]), c[1] + 0.5 * (e1[1] + e2[1]), c[2] + 0.5 * (e1[2] + e2[2])];
+    },
+    validateValuesIn: {
+        hyperbolic: (v) => curvedQuadProblems('hyperbolic', v.edge1 as number[], v.edge2 as number[]),
+        spherical: (v) => curvedQuadProblems('spherical', v.edge1 as number[], v.edge2 as number[]),
+    },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the edge vector rows
     uvChart: true,            // natural [0,1]² along the edges — quad_uv (fable-imagery P1)

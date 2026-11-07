@@ -6,8 +6,9 @@ import { Compiler } from '../compiler/Compiler.js';
 import { compileEnvironmentBake, envTableSize, DEFAULT_ENV_TABLE_SIZE } from '../compiler/EnvironmentBake.js';
 import { envVariantSuffix } from '../compiler/generate/features/environment.js';
 import { resampleEquirectToOctahedral } from '../components/env/octahedral/octahedral.js';
-import { ENV_EXTERN_NAMES } from '../components/env/index.js';
+import { ENV_EXTERN_NAMES, DEFAULT_ENV_CHART } from '../components/env/index.js';
 import { packSceneData } from './sceneData.js';
+import { uploadImages } from './images.js';
 import type { PackedChannel } from '../components/data/pack.js';
 import { channelExtern, NODESQ_EXTERN, type DataChannel } from '../components/data/channels.js';
 import type { RenderStrategy, PictureFormat } from '../compiler/types.js';
@@ -296,9 +297,11 @@ export class App {
 
     /**
      * Build and register the shared scene-data textures the loaded renderers were compiled
-     * against, by executing the compiler's scene-data plan. Must run before the first frame.
+     * against, by executing the compiler's scene-data plan: the packed data channels and the
+     * material image array. Must run before the first frame.
      */
     private async _uploadSceneGeometry(plan: SceneDataPlan): Promise<void> {
+        if (plan.images !== undefined) await uploadImages(plan.images, this.engine);
         const packed = await packSceneData(plan);
         if (packed === null) return;
         for (const [c, channel] of Object.entries(packed.channels) as Array<[DataChannel, PackedChannel]>) {
@@ -955,11 +958,11 @@ export class App {
 function envVariants(strategies: RenderStrategy[] | undefined): Array<{ chart: string; compensation: boolean }> {
     const seen = new Map<string, { chart: string; compensation: boolean }>();
     for (const st of strategies ?? []) {
-        const chart = st.estimator.envSampler ?? 'equirect';
+        const chart = st.estimator.envSampler ?? DEFAULT_ENV_CHART;
         const compensation = st.estimator.envCompensation ?? false;
         seen.set(`${chart}|${compensation}`, { chart, compensation });
     }
-    if (seen.size === 0) seen.set('equirect|false', { chart: 'equirect', compensation: false });
+    if (seen.size === 0) seen.set(`${DEFAULT_ENV_CHART}|false`, { chart: DEFAULT_ENV_CHART, compensation: false });
     return [...seen.values()];
 }
 

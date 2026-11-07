@@ -110,13 +110,16 @@ How a program is assembled:
   `tests/compiler/compileOrder.test.ts` checks that strategy order changes nothing.
 - **Spectrum values have kinds** (components/color/spectra/, whose README is the contract):
   plain RGB (numbers, triples, `{param}`, expressions, per-instance attributes), blackbody,
-  Cauchy and Sellmeier. A kind answers every question the compiler asks about its values
+  Cauchy, Sellmeier, Gaussian and measured tables (metal η and κ, ColorChecker reflectances, CIE
+  illuminants). A kind answers every question the compiler asks about its values
   (allowed roles, live sliders, its own checks, RGB stand-in, GLSL). Outside that folder nothing
   tests for a particular kind (tests/components/spectrumKinds.test.ts). The slot's role
-  (reflectance, coefficient, emission, index) sets the domain, checked the same way in RGB and
-  spectral programs; the spectral model adds only reflectance ≤ 1 and the media ceilings.
+  (reflectance, coefficient, emission, index, optical) sets the domain, checked the same way in
+  RGB and spectral programs; the spectral model adds only reflectance ≤ 1, the media ceilings
+  and no RGB triple in an optical slot (a metal's η, κ).
   Temperature and brightness are decoupled: `kelvin` sets a blackbody's color, `scale` its
-  brightness.
+  brightness. An emission table, like a blackbody, is normalized to unit reference CIE Y, so
+  `scale` is its luminance.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in
   dataTenants.ts (with the authored `lights` it forms `lightRosterOf`). Use it; don't
   re-derive it.
@@ -134,8 +137,11 @@ How a program is assembled:
   shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB color.
   `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
   each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
-  (1000, glsl/core/math.glsl) is an absolute far clip: the environment and the directional
-  light are found there, by both BSDF rays and NEE.
+  is the far clip: `measurement.farClip` when authored (required in a quotient, where it is a
+  real truncation, bounded per pixel only with fog), else the ambient space's default
+  (`farClipOf` in components/ambient: 1000 in Euclidean space, an absolute length; arc length
+  10 in H³; 2π in S³, where it is exact). The environment and the directional light are found
+  there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
   seed; `scene_intersect` fills a `Hit`; dot products go through `ambient_dot` (the
   curved-space seam).
@@ -236,8 +242,11 @@ How a program is assembled:
 - Media: homogeneous (closed form, per-channel MIS), heterogeneous (delta tracking;
   expression coefficients under a declared majorant), volume emission, HG and Rayleigh phase
   functions, null interfaces, variable-index (GRIN) media.
-- Cameras: pinhole, thin lens, orthographic, equirect, fisheye, cylindrical. Box pixel
-  filter; accumulators average (with an optional variance statistic) / oneshot; seven tonemaps.
+- Cameras: pinhole, thin lens (disk or regular n-gon pupil, `blades`; `thinLensFromPhoto` sets
+  it from a photographic lens), orthographic, equirect, fisheye, cylindrical. Pixel filters box
+  (default) and untruncated Gaussian (`measurement.pixel`); accumulators average (with an
+  optional variance statistic) / oneshot; seven tonemaps, with exposure and an optional white
+  balance (`view.tonemap.whiteBalance`, kelvin).
 - Pictures: radiance plus an optional variance statistic and first-hit albedo/normal guides
   (`measurement.aovs`, RGB only; a guide is its surface value × the path weight on arrival,
   so it converges to value × camera-ray transmittance), switched on screen live (`m`) and
@@ -254,18 +263,47 @@ How a program is assembled:
   (PT/NEE for tracking, with a documented numerical field domain). Surface RGB expressions
   use the same reflectance/emission domains. GRIN supports wavelength-independent index
   fields, absorbing/emitting fields and constant-coefficient scattering. Planck blackbody emission supports
-  constants/live controls and packed emitters in both modes. Surface dispersion uses
+  constants/live controls and packed emitters in both modes, as do the measured CIE illuminants
+  (A, D65, FL2, FL11, LED-B3); the 24 measured ColorChecker reflectances go in reflectance
+  slots. Surface dispersion uses
   one-time hero collapse; other index/spectrum forms and spatially dispersive GRIN remain gated. See
   src/components/color/spectral/README.md.
+- Curved spaces (components/ambient/hyperbolic, spherical, h2xr; docs/claude-2026-11-review/
+  curved-spaces-design.md): H³ (hyperboloid model), S³ (unit sphere in R⁴) and H²×R. In H³ and S³:
+  sphere, plane, disk, box (geodesic planes), cylinder (a tube about a geodesic) and quad shapes;
+  marched fields along geodesics (`defineSDF` with curved bodies; in H³ also Euclidean fields in the
+  Klein chart); point, disk, quad and sphere lights (two arcs per light in S³); lambert, mirror,
+  dielectric, ggx and rough_dielectric; pinhole and fisheye cameras; HG media; in H³ skies looked up
+  at ideal endpoints. In H²×R: horizontal/vertical planes, horizontal disks, capped vertical
+  cylinders, the metric ball (convex Newton), point and disk lights with the falloff
+  d²·sinh(D_H)/D_H, lambert. Objects are placed by isometries. What each occupant supports in each
+  space is gated (`curvedLimitations`, the space gate in compiler/analyze/curved.ts; the table is
+  components/ambient/support.md).
+- Closed manifolds (components/quotient/): the Seifert–Weber space (H³, a dodecahedral cell
+  with twisted face pairings, 13-image NEE, `Hit.image` and `Hit.arrival`) and the cube 3-torus
+  E³/(Lx·Z × Ly·Z × Lz·Z), in vacuum
+  or filled with a homogeneous ambient fog (`ambientSpace.quotient`, required
+  `measurement.farClip`): a generated cell walk, NEE over a 27-image table with partition MIS,
+  medium event points reduced into the fundamental domain. Validator rules: no sky, delta
+  lights, unbounded or driven geometry, or media other than a homogeneous ambient fog; objects
+  inside the fundamental domain except period-spanning unrotated boxes; no equiangular medium
+  sampling. With fog the far clip's error is bounded per pixel by (N+1)²·e^{−σR}·Le_max
+  (docs/claude-2026-11-review/quotients-plan.md, Part 1, for a fog that does not glow;
+  components/quotient/README.md extends it to a glowing fog, with ε/σ in Le_max; thought through,
+  not checked numerically).
 - Tooling: the witness runner, shader dumps, CI.
 
-**Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
-registered); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
+**Not built / deferred:** other curved spaces (Nil, black-hole metrics) and the other
+occupants in curved spaces (the gate lists them; meshes, the torus, textures and expressions among
+them); quotients of S³ and general hyperbolic manifolds; heterogeneous fog, GRIN and media inside
+objects in a quotient (fog in Seifert–Weber too); general spectral bindings/media, other index forms and spatially dispersive GRIN; transparent shadow rays
 through glass; MIS with delta tracking; equiangular sampling of area lights; spherical-
 rectangle quad sampling; two-sided quad lights; driven light geometry; multi-material
 meshes.
 
-**Known open defects**: 221 of the 265 synchronous suite scenes warn that the transport
+**Known open defects**: in the 3-torus, with a GGX ball at roughness 0.15, pt-nee read 2.8% low
+against pt and pt-mis (cause untested; the `torus-lights` witness uses roughness 0.45, and
+CHANGELOG 2026-11-07 names the check that would decide it). 221 of the 265 synchronous suite scenes warn that the transport
 feature provides `light_query_medium` with nothing requiring it (dead generated code; an
 exact-linkage gap, not yet investigated). Float-sampler precision outside the two spectral tables still needs
 a portability audit (many declarations use GLSL's default lowp; SwiftShader does not expose

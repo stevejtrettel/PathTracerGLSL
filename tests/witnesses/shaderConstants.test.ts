@@ -1,7 +1,8 @@
-// The witness expected values that depend on shader constants read those constants from the
-// GLSL (shaderConstants.ts). These pins record the values they had when the constants were
+// The witness expected values that depend on shader constants read those constants where they
+// are defined (shaderConstants.ts). These pins record the values they had when the constants were
 // still copied into the fixtures, so the move is shown to change nothing — and a change to
-// MAX_DIST or SHADOW_BACKOFF in math.glsl shows up here as a changed expectation.
+// MAX_DIST (the Euclidean descriptor's farClip, components/ambient/index.ts) or SHADOW_BACKOFF (math.glsl) shows up
+// here as a changed expectation.
 
 import { describe, it, expect } from 'vitest';
 import { MAX_DIST, SHADOW_BACKOFF } from './scenes/shaderConstants.js';
@@ -9,7 +10,7 @@ import { SUN_HAZE_CENTER } from './scenes/precisionWitness.js';
 import { FOG_SKY_SIGMA } from './scenes/estimatorAgreementWitness.js';
 
 describe('shader constants in witness expectations', () => {
-    it('are read from math.glsl', () => {
+    it('are read from where they are defined', () => {
         expect(MAX_DIST).toBe(1000);
         expect(SHADOW_BACKOFF).toBe(0.002);
     });

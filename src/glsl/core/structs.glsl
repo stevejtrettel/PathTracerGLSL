@@ -1,8 +1,7 @@
 // Core struct definitions
 // Provides: Ray, Hit, Frame, LightSample, MaterialProperties
-
-#define Point vec3
-#define Direction vec3
+// Depends on: Point/Direction (the ambient occupant's types.glsl), Spectrum/Wavelengths (the
+//             color model's types.glsl).
 
 // A geodesic seed: a position + unit direction (a point of the unit tangent bundle). No search
 // interval — the far bound is the QUERY's concern, not the ray's: nearest-hit shrinks hit.t;
@@ -55,6 +54,17 @@ struct Hit {
                         // marched commits.
                         // ray_spawn's escape offset is the ONE reader. The dispatcher seeds
                         // the conservative default so a missed arm degrades, never garbage.
+    int image;          // which image of the scene the ray hit, relative to the chart of the
+                        // ray's origin, as an index into the program's NEE image table
+                        // (components/quotient); −1 when it is not in the table; 0 in programs
+                        // without a quotient. Set by the dispatcher (0) and once more by a
+                        // quotient walk. Read by the image-aware MIS pdf and pt-nee's emitter
+                        // weight.
+    Direction arrival;  // the ray's unit velocity at p, in p's chart: the arrival direction
+                        // (the transport's wo is −arrival). The dispatcher sets it to
+                        // ambient_flow(ray, t).direction for the ray it was given; a quotient
+                        // walk gives it the current cell's ray, in D's chart, where the flow of
+                        // the original ray would be in the wrong chart.
 };
 
 // Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF
@@ -79,7 +89,9 @@ const uint LIGHT_DELTA = 1u;
 // nothing arriving from below n", which is what LICENSES the light tree's
 // below-horizon cull; true = sphere support (rough glass), so the cull disarms and the
 // importance shapes on |n·d| instead. Orthogonal to n = 0: a medium event has neither
-// orientation nor sidedness.
+// orientation nor sidedness. At a surface n is hit.frame.n, which faces region_from, the side the
+// ray arrived from (§4.1): the S³ light bodies take the arc leaving into that hemisphere for a
+// one-sided receiver.
 struct LightQuery {
     Point p;
     Direction n;

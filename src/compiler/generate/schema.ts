@@ -5,7 +5,7 @@
 // handful of models), never with library size; a single-model scene's struct IS that
 // model's struct (module-anatomy §1's degeneracy, where the numeric witnesses live).
 
-import { isRadiometric, type PropertySchema, type ParamKind, type RadiometricRole } from '../../components/descriptors.js';
+import { isLaneSpectrum, isRadiometric, type PropertySchema, type ParamKind, type RadiometricRole } from '../../components/descriptors.js';
 import { emitSpectrum, type SpectrumSite } from './color.js';
 import { formatFloat } from '../../components/glsl-format.js';
 
@@ -41,17 +41,17 @@ export function structFromRows(structName: string, rows: StructRow[]): string {
     ].join('\n');
 }
 
-/** The row's default at the site's wavelengths: a gray spectrum for a radiometric row, the
- *  number itself otherwise. */
+/** The row's default at the site's wavelengths: a gray spectrum for a per-lane Spectrum row
+ *  (radiometric or optical), the number itself otherwise. */
 export function defaultExpr(f: PropertySchema<string>, site: SpectrumSite): string {
-    return isRadiometric(f.role) ? emitSpectrum(f.default, f.role, site) : formatFloat(f.default);
+    return isLaneSpectrum(f.role) ? emitSpectrum(f.default, f.role, site) : formatFloat(f.default);
 }
 
 /**
  * Union of 'field'-storage schemas across the models present, deduped by name in
- * first-appearance order. Same name + same glslType share one field (deliberate —
- * GGX and rough-dielectric will share `roughness`); same name + different type is a
- * bug the Validator catches — this throw is the unreachable backstop.
+ * first-appearance order. Same name + same glslType share one field (GGX and
+ * rough-dielectric share `roughness`). A row name has one glslType across each whole
+ * registry (tests/components/materialsContract.test.ts), so the throw is a backstop.
  */
 export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][]): PropertySchema<S>[] {
     const byName = new Map<string, PropertySchema<S>>();
@@ -62,7 +62,7 @@ export function unionFields<S extends string>(schemaSets: PropertySchema<S>[][])
             if (prior === undefined) {
                 byName.set(s.name, s);
             } else if (prior.glslType !== s.glslType) {
-                throw new Error(`schema: field '${s.name}' declared as ${prior.glslType} and ${s.glslType} (Validator should have rejected)`);
+                throw new Error(`schema: field '${s.name}' declared as ${prior.glslType} and ${s.glslType} (a row name has one glslType per registry)`);
             }
         }
     }

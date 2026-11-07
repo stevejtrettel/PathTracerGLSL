@@ -2,7 +2,7 @@
 // Fields read: mp.albedo, mp.emission. Reflection-only, non-delta.
 // Provides: lambert_eval(), lambert_sample(), lambert_pdf(), lambert_emission().
 // Depends on: MaterialProperties, Hit/Frame, InteractionSample, LOBE_REFLECTION,
-//             PI, TWO_PI, SPECTRUM_ZERO.
+//             PI, TWO_PI, SPECTRUM_ZERO, ambient_dot/ambient_normalize.
 
 Spectrum lambert_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     // bare f (§2.2): NO cosine here. Reflection side only (transmission is illegal for Lambert).
@@ -20,7 +20,7 @@ InteractionSample lambert_sample(Direction wo, Hit hit, MaterialProperties mp, f
     float phi = TWO_PI * u.x;
 
     InteractionSample s;
-    s.wi     = normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta);
+    s.wi     = ambient_normalize(f.t * (sin_theta * cos(phi)) + f.b * (sin_theta * sin(phi)) + n * cos_theta, hit.p);
     s.weight = mp.albedo;                       // (albedo/π)·cos / (cos/π) — exact cancellation (§2.1)
     s.pdf    = cos_theta * (1.0 / PI);
     s.flags  = LOBE_REFLECTION;

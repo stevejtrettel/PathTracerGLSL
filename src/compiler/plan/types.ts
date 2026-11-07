@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription, PictureView, PictureFormat } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription, PictureView, PictureFormat, QuotientDescription } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -37,10 +37,11 @@ import type { AABB } from '../../components/accel/bvh/bvh.js';
  * structural snapshot test).
  */
 export interface ProgramDescription {
-    /** Ids of the named spectrum kinds this program evaluates at wavelengths, in registry
-     *  order: a radiometric kind (blackbody) in a spectral program, a dispersive index formula.
-     *  Their GLSL helpers are linked, and packed light rows may carry them in their headers. */
-    spectrumKinds: string[];
+    /** The named spectrum kinds this program evaluates at wavelengths, in registry order, each
+     *  with the distinct values it evaluates: a kind in a radiometric or optical setting of a
+     *  spectral program, a dispersive index formula. Each kind's GLSL helpers for those values
+     *  are linked, and packed light rows may carry the kind in their headers. */
+    spectrumKinds: { id: string; values: unknown[] }[];
     /** Index consumers and real interior regions requiring the one-time hero collapse. */
     dispersion: { indexMaterials: number[]; regions: number[] } | null;
     /** Defines the integral (taxonomy §2): camera = W_j; the rest are truncations
@@ -54,13 +55,23 @@ export interface ProgramDescription {
         maxBounces: number;
         maxNullCrossings: number;
         scattering: 'full' | 'ignored';
+        microfacet: 'single-scattering' | 'energy-compensated';
         shadows: 'opaque-dielectrics';
         color: 'rgb' | 'spectral';
         sensor: string;
+        /** The pixel filter (components/pixel key). Always present: the kernel is part of
+         *  the integral, so stamps state it even at its default. */
+        pixel: string;
         colorModelVersion?: string;
         /** The first-hit pictures kept beside the main picture (components/aov keys, authored
          *  order). PRESENT only when non-empty, so programs without AOVs are unchanged. */
         aovs?: string[];
+        /** The authored far clip (MeasurementDescription.farClip). PRESENT only when authored;
+         *  absent = the ambient occupant's default (farClipOf). */
+        farClip?: number;
+        /** The quotient group of the ambient space (SceneDescription.ambientSpace.quotient).
+         *  PRESENT only in quotient programs. */
+        quotient?: QuotientDescription;
     };
     /** Defines the computation (taxonomy §3): no field here may change the converged
      *  image — §11.2 cross-strategy convergence is the enforcement. */
@@ -246,6 +257,18 @@ export interface MaterialsDesc {
     /** The `material_albedo` dispatch exists: some listed AOV requires it (its descriptor's
      *  `requires`). PRESENT only when true, so programs without it are unchanged. */
     albedo?: true;
+    /** The Perlin noise library (glsl/core/perlin.glsl) is included: some material row or bump
+     *  height is a GLSL expression, and expressions may call it. PRESENT only when true, so programs
+     *  without material expressions are unchanged. */
+    noise?: true;
+    /** Ids of the materials whose shading normal is perturbed (a bump), ascending. The walk
+     *  replaces the hit's frame through material_shading_frame and these ids get masked
+     *  interaction arms. PRESENT only when non-empty, so programs without one are unchanged. */
+    perturbed?: number[];
+    /** The image lookup (glsl/shared/image_texture.glsl) and the material image array are
+     *  declared: some material row reads an image texture. PRESENT only when true, so programs
+     *  without one are unchanged. */
+    images?: true;
 }
 
 export type LightingDesc =
@@ -360,6 +383,9 @@ export interface PlannedPrimitiveObject {
      *  rotation residual a non-closed shape cannot absorb. Plain constant placements fold
      *  entirely into `parameters` and this stays undefined. */
     placement?: PlannedPlacement;
+    /** A curved space's placement (H³): every object has one, `placement` is then absent, and
+     *  `parameters` hold only the shape's intrinsic rows (its point row is folded in). */
+    isometry?: IsometryPlacement;
     /** This object has a scene-table record (fable-object-tables): under 'table' dispatch
      *  it leaves the unrolled arms (intersect via the TLAS leaf, containment via the
      *  record loop). Constant + bounded, per the adapter's ONE eligibility predicate. */
@@ -516,6 +542,9 @@ export interface PlannedMaterial {
     model: MaterialModel;
     values: Record<string, ResolvedProperty>;
     medium: PlannedMedium | null;                               // interior medium (§3.5); null = no medium block
+    /** The authored bump (materials/README, "Shading-normal perturbation"). PRESENT only on
+     *  bumped materials. */
+    bump?: { height: GlslExpression; step: number };
 }
 
 /**
@@ -539,6 +568,11 @@ export interface PlannedLight {
      *  is CPU-recomputed on change (`resolveLightValues` → `computeSelectPdf`). Geometry rows
      *  stay constant in v1 (driven light geometry = Stage B). Mirrors PlannedMedium.values. */
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
+    /** In a curved space: the rows that name a point or a tangent vector (point, direction and
+     *  vector kinds) as world 4-vectors, the isometry of the light's backing region applied
+     *  (compiler/plan/curved.ts curvedLightWorld). The struct is built from these; `values` keeps
+     *  the authored rows, which the selection power reads. */
+    world?: Record<string, number[]>;
     /** The emitter's region id (quad/sphere/mesh) — feeds the generated light_of table. */
     regionId?: number;
     /** Planner-stamped scene context for `power(values, ctx)` (impl-plan-directional-beam
@@ -593,6 +627,24 @@ export interface DrivenPlacement {
     /** Slider metadata for the authored `{param}` fields, keyed by param path. */
     parameters: Record<string, ParameterMetadata>;
 }
+
+/**
+ * An object's placement in a curved space: the INVERSE of its isometry g (world → object frame)
+ * as a column-major mat4 — baked as a `const mat4` when constant, a mat4 uniform recomputed in
+ * fp64 from the parameter map when {param}-driven. The object's shape sits canonically at the
+ * origin of its own frame; the generated arm moves the ray into that frame (G⁻¹·x) and maps the
+ * normal back (isometry_direction).
+ */
+export type IsometryPlacement =
+    | { kind: 'constant'; inverse: number[] }
+    | {
+          kind: 'driven';
+          /** The mat4 uniform's name. */
+          uniform: string;
+          uniforms: [PlannedUniform];
+          /** Slider metadata for the authored `{param}` fields, keyed by param path. */
+          parameters: Record<string, ParameterMetadata>;
+      };
 
 /** A leaf's placement: a constant similarity (folds/wrapper tiers) or a live one. */
 export type PlannedPlacement = Similarity | DrivenPlacement;

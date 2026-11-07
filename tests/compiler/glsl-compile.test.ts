@@ -8,7 +8,7 @@ import { isAsyncSceneEntry, type SceneSuiteEntry } from '../witnesses/types.js';
 import { minimalScene, minimalStrategy } from '../witnesses/scenes/minimalScene.js';
 import type { MeshObject } from '../../src/compiler/types.js';
 import { PRIMITIVES } from '../../src/components/geometry/index.js';
-import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
+import { MATERIAL_MODELS, modelTransmitsWithoutCrossing } from '../../src/components/materials/index.js';
 import { VOLUME_SCATTERING_MODELS } from '../../src/components/volume_scattering/index.js';
 import { LIGHT_KINDS } from '../../src/components/lights/index.js';
 import type { SceneDescription, RenderStrategy, ObjectDescription, LightDescription, MaterialDescription, MaterialModel } from '../../src/compiler/types.js';
@@ -132,13 +132,26 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
                     if (shaderId.endsWith('-display')) check(prog.fragment, 'frag', `${shaderId} [display ${type}]`);
                 }
             });
+            // White balance turns the display scale into the matrix DISPLAY_VIEW; the raw
+            // probe path 'none' applies no display glue, so it has no matrix to parse.
+            if (type === 'none') continue;
+            it(`tonemap ${type} + whiteBalance`, () => {
+                const strategy = { ...base.strategies[0], id: `tonemap-${type}-wb`, view: { tonemap: { type, whiteBalance: 3200 } } } as typeof base.strategies[0];
+                const renderer = compiler.compile(base.scene, strategy);
+                const display = [...renderer.shaders].filter(([id]) => id.endsWith('-display'));
+                if (display.length === 0) throw new Error(`tonemap ${type}: no display shader`);
+                for (const [shaderId, prog] of display) {
+                    if (!prog.fragment.includes('const mat3 DISPLAY_VIEW')) throw new Error(`${shaderId}: whiteBalance emitted no DISPLAY_VIEW`);
+                    check(prog.fragment, 'frag', `${shaderId} [display ${type} + whiteBalance]`);
+                }
+            });
         }
     });
 
     // ============================================================================
-    // Registry kitchen sink (A4): a scene SYNTHESIZED from the registries themselves —
-    // every primitive (constant AND driven placement), every material model, every
-    // phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
+    // Registry kitchen sink: a scene SYNTHESIZED from the registries themselves —
+    // every primitive (constant AND driven placement), every material model that can share
+    // a scene with media, every phase model, every light kind — compiled under pt-mis. Presence-gated inclusion
     // means a new occupant's GLSL is otherwise invisible to glslang until some suite
     // scene uses it (the cylinder lesson); this test closes that gap the moment the
     // registry line lands. Light kinds need a sample authored form (input language is
@@ -150,7 +163,11 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
     describe('registry kitchen sink compiles (every occupant, glslang static check)', () => {
         it('synthesized all-occupant scene + pt-mis', () => {
             const materials: Record<string, MaterialDescription> = {};
-            const surfaceModels = Object.keys(MATERIAL_MODELS) as MaterialModel[];
+            // A model that transmits without crossing the interface (a thin sheet) cannot share a
+            // scene with media (the Validator rejects the pair); the per-model AOV cases below
+            // compile it in a media-free program.
+            const surfaceModels = (Object.keys(MATERIAL_MODELS) as MaterialModel[])
+                .filter((id) => !modelTransmitsWithoutCrossing(id));
             for (const id of surfaceModels) {
                 materials[`mat_${id}`] = { model: id };
             }
@@ -179,8 +196,15 @@ describe.each([['rgb', COLOR_MODELS.rgb], ['rg-canary', rgCanary]] as const)('%s
                 bottle: { baseRadius: 0.6, baseHeight: 0.8, neckRadius: 0.2, neckHeight: 0.4 },
                 menger: { size: 0.6, iterations: 3 },
                 apollonian: { size: 0.5, morph: 1.2, iterations: 6 },
+                // Scene-local fields registered by the suite's scenes are in PRIMITIVES too.
+                // photo-plaza's rounded box needs every half-size component positive (the
+                // generic vec3 has a zero) and the radius below the smallest of them.
+                roundedBox: { halfSize: [0.4, 0.3, 0.3], radius: 0.05 },
             };
             for (const d of Object.values(PRIMITIVES)) {
+                // The scene is Euclidean: a primitive with no Euclidean body (a curved-only
+                // scene-local field) is compiled by the curved suite scenes that use it.
+                if (d.glsl.euclidean === undefined) continue;
                 const parameters = Object.fromEntries(d.params.map((p, i) =>
                     [p.name, sampleParameters[d.type]?.[p.name] ?? p.default ?? rowValue(p.shape, i)]));
                 const coupled = d.validateValues?.(

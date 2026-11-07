@@ -8,14 +8,17 @@ The walk, per segment (as many as the path's remaining null-crossing budget allo
 
 - current medium from `scene_region_at(origin)` — the §4.4 containment oracle, so the
   walker is self-contained from surface points and medium event points alike;
-- `scene_intersect` to the next boundary (or the light, whichever is nearer);
+- `scene_intersect` to the next boundary (or the light, whichever is nearer); the distance
+  to the light is the arc length `ambient_aim` returns from the segment's origin, re-derived
+  from the fixed light point at every segment;
 - if the current region has a medium: `T *= medium_transmittance(med_mat, ray,
   seg_len)` — the generated seam-2 dispatch into the volume bodies; spectral, so
   chromatic media cast chromatic shadows;
 - at the boundary: **null interfaces pass** (medium handoff, `ray_spawn` re-spawn to
-  the far side, then the direction re-aimed at the light point with `ambient_direction_to` —
-  kept, it would run parallel to the segment it should test, one spawn offset off per
-  crossing, and meet the light's own surface at a slant); EVERYTHING else — opaque and dielectric alike — returns ZERO (the
+  the far side along the arrival direction there (`ambient_flow`), then the direction
+  re-aimed at the light point with `ambient_aim` — kept, it would run parallel to the
+  segment it should test, one spawn offset off per crossing, and meet the light's own
+  surface at a slant); EVERYTHING else — opaque and dielectric alike — returns ZERO (the
   `opaque-dielectrics` truncation, same ledger entry as the opaque form);
 - **crossing budget**: the shadow ray is the last segment of a path, and
   `measurement.maxNullCrossings` limits the null crossings of the whole path. The caller passes

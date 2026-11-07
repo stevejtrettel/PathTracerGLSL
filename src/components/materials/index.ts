@@ -5,13 +5,18 @@
 // this registry + the Validator's unknown-model rejection gatekeep).
 
 import type { MaterialModel } from '../../compiler/types.js';
-import type { MaterialModelDescriptor, PropertySchema } from '../descriptors.js';
+import type { MaterialDerivedSpec, MaterialModelDescriptor, PropertySchema } from '../descriptors.js';
 import { lambertDescriptor } from './lambert/lambert.js';
 import { dielectricDescriptor } from './dielectric/dielectric.js';
 import { ggxDescriptor } from './ggx/ggx.js';
 import { roughDielectricDescriptor } from './rough_dielectric/rough_dielectric.js';
 import { mirrorDescriptor } from './mirror/mirror.js';
 import { checkerDescriptor } from './checker/checker.js';
+import { plasticDescriptor } from './plastic/plastic.js';
+import { thinDielectricDescriptor } from './thin_dielectric/thin_dielectric.js';
+import { sheenDescriptor } from './sheen/sheen.js';
+import { conductorDescriptor } from './conductor/conductor.js';
+import { roughConductorDescriptor } from './rough_conductor/rough_conductor.js';
 
 export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescriptor>> = {
     lambert: lambertDescriptor,
@@ -20,9 +25,14 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     ggx: ggxDescriptor,
     mirror: mirrorDescriptor,
     checker: checkerDescriptor,
+    plastic: plasticDescriptor,
+    thin_dielectric: thinDielectricDescriptor,
+    sheen: sheenDescriptor,
+    conductor: conductorDescriptor,
+    rough_conductor: roughConductorDescriptor,
 };
 
-/** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —
+/** The model's STRUCT surface: its rows plus its derived fields as pseudo-rows —
  *  ONE list for the struct union, the lookup's default lines, and the resolver, so a
  *  derived field can never drift from the fields the occupant reads. Derived pseudo-rows
  *  carry the declared colour role, with default 0 outside the model's own arms. */
@@ -39,6 +49,20 @@ export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] 
     ];
 }
 
+/** The derived field without a per-hit form (computed only on the host by `fn`) that the
+ *  model's row `source` feeds, if any. Such a value is computed once per material from the
+ *  row's numbers, so the row takes only a constant or a {param}, and cannot vary per
+ *  instance. A row feeding a field with a per-hit form (`glsl`) takes any value its own
+ *  checks allow. */
+export function hostDerivedFieldFedBy(id: MaterialModel, source: string): MaterialDerivedSpec | undefined {
+    return MATERIAL_MODELS[id]?.derived?.find((d) => d.inputs.includes(source) && !hasPerHitForm(d));
+}
+
+/** The derived field can be computed per hit in GLSL (MaterialDerivedSpec.glsl). */
+export function hasPerHitForm(d: MaterialDerivedSpec): d is MaterialDerivedSpec & { glsl(fields: Record<string, string>): string } {
+    return d.glslType === 'float' && d.glsl !== undefined;
+}
+
 /** Lookup that throws on unregistered models — the Validator rejects them upstream
  *  (reject-not-remove), so this is an unreachable backstop, not a diagnostic. */
 export function materialModel(id: MaterialModel): MaterialModelDescriptor {
@@ -51,6 +75,16 @@ export function materialModel(id: MaterialModel): MaterialModelDescriptor {
  *  and unregistered models — both transmit nothing. */
 export function modelTransmission(id: MaterialModel): boolean {
     return id !== 'none' && (MATERIAL_MODELS[id]?.capabilities.transmission ?? false);
+}
+
+/** The model passes light to the far side of its surface without crossing the interface: its
+ *  support is the sphere but it changes no index (a thin sheet). The walk takes hit.region_to
+ *  as the medium behind any transmission, and on a zero-thickness owner's front hit the
+ *  dispatcher reports region_to = the owner itself, so in a scene with media such a model
+ *  would lose the medium behind the surface for one segment. The Validator rejects the pair. */
+export function modelTransmitsWithoutCrossing(id: MaterialModel): boolean {
+    const d = id === 'none' ? undefined : MATERIAL_MODELS[id];
+    return d !== undefined && d.capabilities.support === 'sphere' && !d.capabilities.transmission;
 }
 
 /** THE two-sided-shading predicate (fable-rough-dielectric §3.1) — the one place the
@@ -77,7 +111,7 @@ export const EMISSION_KEY = 'emission';
 
 /** The keys a material carries besides its model's rows, on every model. No row source may
  *  use one (tests/components/materialsContract.test.ts). */
-export const MATERIAL_META_KEYS = ['model', 'medium', 'sampleAsLight'] as const;
+export const MATERIAL_META_KEYS = ['model', 'medium', 'sampleAsLight', 'bump'] as const;
 
 /** The schema declares which surface models consume the adjacent regions' index. */
 export function modelIndexRow(id: MaterialModel): PropertySchema | undefined {

@@ -5,7 +5,7 @@
 // TAN_FOV; the r(θ) forms + what each preserves are in fisheye.md). Ignores xiLens.
 // Requires: u_imageSize, u_cameraPosition, u_cameraForward/Right/Up,
 //           u_fisheyeK (projection-specific radial constant, CPU-precomputed from fov),
-//           FISHEYE_THETA (aliased by the compiler to one of the four below).
+//           FISHEYE_THETA (aliased by the compiler to one of the four below), ambient_normalize.
 
 // theta(rho, K), where K folds the frame-constant transcendental of theta_max on the CPU
 // (fisheye.ts) so the map takes NONE per ray. The sin-based maps clamp their asin argument
@@ -26,14 +26,14 @@ Ray camera_generateRay(vec2 film, vec2 xiLens, Wavelengths wl) {
 
     // Look-at frame precomputed on the CPU (components/camera/basis.ts), shipped as
     // uniforms — no per-ray normalize/cross (the up-reference guard lives there).
-    vec3 forward = u_cameraForward;
-    vec3 right = u_cameraRight;
-    vec3 up = u_cameraUp;
+    Direction forward = u_cameraForward;
+    Direction right = u_cameraRight;
+    Direction up = u_cameraUp;
 
     if (rho < 1e-6) return make_ray(u_cameraPosition, forward, wl);   // center pixel: on axis
 
     float theta = FISHEYE_THETA(rho, u_fisheyeK);   // radial map (aliased per projection)
     vec2 t = c / rho;                          // unit azimuth direction in the image plane
-    vec3 dir = cos(theta) * forward + sin(theta) * (t.x * right + t.y * up);
-    return make_ray(u_cameraPosition, normalize(dir), wl);
+    Direction dir = cos(theta) * forward + sin(theta) * (t.x * right + t.y * up);
+    return make_ray(u_cameraPosition, ambient_normalize(dir, u_cameraPosition), wl);
 }

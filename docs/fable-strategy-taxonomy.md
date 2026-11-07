@@ -86,7 +86,8 @@ place listing every way the image differs from ground truth, each with its named
 | `maxBounces: N` | N → ∞ |
 | `maxNullCrossings: K` (default 32): paths crossing at most K null interfaces, counted along the whole path including its shadow rays, so every technique drops the same paths | K → ∞ |
 | `scattering: 'ignored'`: scattering media rendered absorbing-only | `'full'` |
-| `shadows: 'opaque-dielectrics'`: shadow rays treat dielectric interfaces (and GRIN regions) as opaque | transparent/spectral shadow refinement |
+| `microfacet: 'single-scattering'` (the default): rough microfacet surfaces keep one bounce between facets and lose the rest (a white conductor at roughness 1 reflects 1 − ln 2 ≈ 0.31 at normal incidence); `'energy-compensated'` restores the lost energy with a gain on ωₒ, exact in total for white conductors and lossless dielectrics up to its table's error, approximate in angular shape and color (components/materials/microfacet_energy) | multiple scattering on the Smith microsurface (Heitz 2016; not built) |
+| `shadows: 'opaque-dielectrics'`: shadow rays treat dielectric interfaces (including thin sheets) and GRIN regions as opaque | transparent/spectral shadow refinement |
 | `color: 'rgb'`: RGB transport is a biased surrogate of spectral (projection does not commute with multiplication) | `'spectral'` (§8; reserved, Validator-rejected) |
 | path-class restrictions (future: one-shot, Whitted-style delta-only continuation) | the unrestricted path space |
 | firefly/radiance clamping (future) | clamp → ∞ |

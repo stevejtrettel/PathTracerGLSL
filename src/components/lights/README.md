@@ -18,6 +18,27 @@ the descriptor rows). Type-first symbols; the `_light_` infix is deliberate:
   the MIS density, which MUST mirror the sampler (§6.1). The mirror is now two
   ADJACENT functions over one struct in one file — never TS strings.
 
+**Curved bodies** (`<kind>_<space>.glsl`) take the query and, for the pdf, the transport's
+`wo` at the emitter hit (the arrival direction reversed):
+`<kind>_light_sample(<Kind>Light l, LightQuery q, vec2 xi)` and
+`<kind>_light_pdf(<Kind>Light l, LightQuery q, Point light_p, Direction wo)`. In S³ two
+geodesics join the shading point to a light point, the short arc (length d) and the long arc
+(length 2π − d), leaving and arriving in opposite directions with the same area density sin² d;
+the body chooses the arc before the emitter's back-face test (`spherical_light_arc`, the S³
+occupant): a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; `q.n` is `hit.frame.n`, which
+`scene_intersect` has already turned toward the side the ray arrived from) takes the arc leaving
+into its upper hemisphere with probability 1, anything else (a two-sided receiver, a medium event)
+each arc with probability ½, drawing one `random()`. The pdf
+carries that probability; the emitter cosine is taken against the arrival direction of the arc
+the ray travelled, which `wo` gives at a hit. The generated arms pass `q.p` and `-wo` (= the
+departure direction in E³) to Euclidean bodies, `q` and `wo` to curved ones. The sphere light's curved
+bodies sample the visible cone (sin α = sinh R / sinh d in H³, sin R / sin d in S³) and take the
+distance from the sphere body's `sphere_root`, so it is the root rays find. In S³ every geodesic from
+p also passes −p: the ball is seen in the forward cone and in its negation (geodesics that reach the
+ball's far side the other way round), and when −p lies in the ball (d ≥ π − R) in every direction (the
+forward cone clamped to the hemisphere); one ω is drawn in the forward cone and the arc rule chooses
+ω or −ω.
+
 Conventions (§6.1): **delta-position kinds** (point, spot) fold 1/d² — and any
 angular falloff — into `radiance`, set `LIGHT_DELTA`, pdf 1 — never BSDF-hittable,
 MIS weight 1 (§6.4). **Delta-direction kinds** (directional, beam —
@@ -37,9 +58,22 @@ emitting-side normal is ONE compile-time formula shared with the backing geometr
 (quad: `quadNormal`; disk: `unitVec3` through the primitive's `canonicalize`) — hit
 side and sample side agree bit-exactly by construction.
 
-**Descriptor** (`<kind>.ts`): `kind`, `glsl`, `delta`, `authoredParams` (the kind's
+**Descriptor** (`<kind>.ts`): `kind`, `glsl` (the file per ambient space it is implemented
+in; ambient/README.md — a hittable kind is gated together with the primitive and the
+material model backing it, `LIGHT_BACKING_MODEL` in compiler/plan/dataTenants.ts; in a curved
+space the point row is the backing region's isometry applied to o (the region's anchor: the quad
+light's `corner` row holds the quad's center) and the direction and vector rows the same isometry
+applied to them at o, 4-vectors in `PlannedLight.world` (`values` keeps the authored rows, which the
+selection power reads; a curved struct has no derived fields) — compiler/plan/curved.ts; the H³ bodies,
+`<kind>_hyperbolic.glsl`, use the area density sinh² r in place of r², the S³ bodies,
+`<kind>_spherical.glsl`, sin² r and the arc rule above, the H²×R bodies, `<kind>_h2xr.glsl`, the
+direction-dependent d²·sinh(D_H)/D_H, `h2xr_area_density`, D_H the H² distance), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
-loop derives unknown-key/required/shape checks from it and runs `validateAuthored`
+loop derives unknown-key/required/shape/constraint checks from it, including a row's
+`constraintIn` (the further domain a space's body requires: the S³ disk light's radius lies
+in (0, π), `SPHERICAL_RADIUS`; the H²×R disk light's normal is vertical, `H2XR_VERTICAL`), and runs
+`validateAuthored` and `validateAuthoredIn` (the coupled rules a space's body adds: the curved quad
+light's orthogonal edges and bounded rectangle)
 only on well-shaped input; the desugar-totality contract test keeps it honest
 against the desugar functions in both drift directions), `params` (rows = generated
 struct fields = ctor order; radiometric rows are `Spectrum`; geometric rows carry a
@@ -72,8 +106,9 @@ branch anywhere).
 sampler dispatcher, the MIS pdf query, and the equiangular delta query), the
 compile-time power/uniform selection CDF (+ `cdf_rescale` — never reuse the
 selection random, pitfall 4), the two-stage env wrapper, `light_of` (region → light
-id; identity lives on REGIONS), `lighting_pdf` (mis only — arms are one-line
-compositions `select × <kind>_light_pdf(light_i, …)`), and `lighting_query_delta`.
+id; identity lives on REGIONS), `lighting_pdf(q, wo, light_id, light_hit)` (mis only —
+arms are one-line compositions `select × <kind>_light_pdf(light_i, …)`; `wo` is the
+arrival direction reversed at the emitter hit), and `lighting_query_delta`.
 Explicit area lights DESUGAR in the Planner through the descriptor's `region` fact
 to synthesized emissive regions (`__light_n`), so every hittable light is real
 geometry.
@@ -85,11 +120,18 @@ records channel, the tree rides nodes — `accel/light_tree` builds) and replace
 CDF with the generated pick/trail-pmf walk pair. Kinds opt into the tree via the
 `treeBounds` descriptor fact (mesh lights use its `'data'` form: the App supplies the box
 from the BLAS root); kinds without it (directional, beam) are Validator-rejected under 'bvh'.
+Each selection occupant lists the ambient `spaces` it is implemented in (ambient/README.md).
 
 ## Invariants & witnesses
 
-pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2); a shadow ray is aimed
-at the sampled light point and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
+pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2), and in curved spaces on the
+h3-* and s3-* witnesses (h3-quad-light, s3-quad-light: the curved quad light, sampled uniformly in
+the plane's Klein / gnomonic chart with the exact area density 1/(4·T(a)·T(b)·w³);
+s3-long-arc: a light reached only through the long arc; s3-medium: the ½
+rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc; h3-sphere-light
+and its -blocker variant, s3-sphere-light and its -blocker and -antipodal variants: the curved sphere
+light); a shadow ray is aimed
+at the sampled light point (`ambient_aim`) and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
 surface does not block it (shadow-aim-march, shadow-aim-far). Deferred: spherical-rectangle quads (Ureña), two-sided quads,
 inside-sphere fallback, p-independent area arms (equiangular's area exit),
 `Value<T>` light params (the generated struct + hoisted const are the ready ABI).

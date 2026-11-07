@@ -14,7 +14,7 @@ import lightSpotGLSL from './spot.glsl?raw';
 
 export const spotLightDescriptor: LightKindDescriptor = {
     kind: 'spot',
-    glsl: lightSpotGLSL,
+    glsl: { euclidean: { origin: 'components/lights/spot/spot.glsl', source: lightSpotGLSL } },
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
     authoredParams: [
         { name: 'position', shape: 'vec3', required: true, kind: 'point' },

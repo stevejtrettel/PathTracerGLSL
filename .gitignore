@@ -33,3 +33,9 @@ test-data/
 
 # Trial assets (tools/fetch-trial-assets.mjs) — downloaded, never committed
 public/trial/
+
+# Pictures rendered by npm run shoot
+shots/
+
+# Finished renders of the gallery scenes (npm run shoot -- … --out renders/…).
+renders/

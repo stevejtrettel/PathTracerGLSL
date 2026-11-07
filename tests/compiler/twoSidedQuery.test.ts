@@ -19,12 +19,12 @@ import type { MaterialModelDescriptor } from '../../src/components/descriptors.j
 import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.js';
 import { glslangCheck } from '../helpers/glslangCheck.js';
 
-const twosidedGLSL = ggxDescriptor.glsl.replace(/ggx_/g, 'twosided_');
+const twosidedGLSL = ggxDescriptor.glsl.euclidean!.source.replace(/ggx_/g, 'twosided_');
 
 const twosidedDescriptor: MaterialModelDescriptor = {
     ...ggxDescriptor,
     id: 'twosided',
-    glsl: twosidedGLSL,
+    glsl: { euclidean: { origin: 'components/materials/twosided/twosided.glsl', source: twosidedGLSL } },
     capabilities: { ...ggxDescriptor.capabilities, support: 'sphere', nonDeltaLobes: true },
 };
 
@@ -73,7 +73,7 @@ describe('two-sided light query: the door opens off ONE declared fact', () => {
         // The RUNTIME arm — not the folded constant (the scene also has lambert).
         expect(frag).toContain('return LightQuery(hit.p, hit.frame.n, material_two_sided(mat));');
         // The medium/camera queries stay one-sided-irrelevant (n = 0 says it already).
-        expect(frag).toContain('LightQuery(p, vec3(0.0), false)');
+        expect(frag).toContain('LightQuery(p, Direction(0.0), false)');
     });
 
     it('a hemisphere-only scene carries NEITHER the predicate NOR a runtime bit', () => {

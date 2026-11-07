@@ -3,9 +3,12 @@
 import type { MaterialModelDescriptor } from '../../descriptors.js';
 import dielectricGLSL from './dielectric.glsl?raw';
 
+const body = { origin: 'components/materials/dielectric/dielectric.glsl', source: dielectricGLSL };
+
 export const dielectricDescriptor: MaterialModelDescriptor = {
     id: 'dielectric',
-    glsl: dielectricGLSL,
+    // One file, checked in every space: it is written against the ambient seam alone.
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Fields read (matches dielectric.glsl's header): transmittance at the shading point;
     // ior is region-indexed (read for the FAR side of the boundary via ior_of — the
     // reason the region-table storage kind exists).

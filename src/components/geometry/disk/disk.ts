@@ -9,7 +9,12 @@
 // agree bit-exactly (the one-sided pin, quadNormal's precedent).
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
+import { SPHERICAL_RADIUS } from '../../ambient/spherical/spherical.js';
 import diskGLSL from './disk.glsl?raw';
+import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
+import diskSphericalGLSL from './disk_spherical.glsl?raw';
+import diskH2xrGLSL from './disk_h2xr.glsl?raw';
+import { H2XR_VERTICAL } from '../../ambient/h2xr/h2xr.js';
 
 /** The shared unit-vector formula (invLen multiply, canonicalPlane's op pattern) —
  *  compile-time, one source: geometry canonicalize AND the disk light's desugar. */
@@ -22,12 +27,17 @@ export const diskDescriptor: PrimitiveDescriptor = {
     type: 'disk',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },   // bounds() below reads center+radius
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_RADIUS } },   // bounds() below reads center+radius
         // A flat (+Y) disk is a sensible disk — normal defaults rather than requires
         // (plane's normal stays required: it IS the plane's identity).
-        { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 } },
+        { name: 'normal', kind: 'direction', shape: 'vec3', required: false, default: [0, 1, 0], constraint: { kind: 'min-length', value: 1e-8 }, constraintIn: { h2xr: H2XR_VERTICAL } },
     ],
-    glsl: diskGLSL,
+    glsl: {
+        euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL },
+        hyperbolic: { origin: 'components/geometry/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/disk/disk_spherical.glsl', source: diskSphericalGLSL },
+        h2xr: { origin: 'components/geometry/disk/disk_h2xr.glsl', source: diskH2xrGLSL },
+    },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry
     uvChart: true,            // polar (r/R, θ/2π) — disk_uv (fable-imagery P1)
@@ -43,4 +53,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
         const r = v.radius as number;
         return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
     },
+    // Every point of the disk is within its radius of its center (a geodesic disk in a curved
+    // space: the points of its plane within geodesic distance radius of the center).
+    ballBound: (v) => v.radius as number,
 };

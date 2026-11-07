@@ -42,6 +42,107 @@ loss/substitution, discarded packed RGB and conversion errors must compile and f
 These probes use test-only observable evaluations, not a physical spectral colour model.
 They share the standalone float-framebuffer runner with `witness:color` and run in GPU CI.
 
+## Curved-space witnesses (H³)
+
+`scenes/h3Witness.ts`: `h3-furnace` (six emissive planes, every path Σ_{k≤6} 0.8^k, pinhole and
+fisheye), `h3-disk-light` (a lambert disk receiver under a disk light of geodesic radius 1.2, large
+enough that a Euclidean inverse-CDF radius would be off by about 4.5%) and `h3-point-light` (the
+same receiver under two point lights, power and uniform selection), against closed forms integrated
+over the readout window; `h3-medium` (a scattering ball and a floor, pt = pt-nee = pt-mis, with the
+light out of frame so the frame mean is the ball and the floor); `h3-sky` (the sky 1 + key read at
+each camera ray's ideal endpoint, pinhole and fisheye); `h3-sky-ball` (a lambert ball under a
+constant sky reads ρ·L; its {param}-driven placement must put it where the frame mean says). The
+expected values are computed by the fp64 twin `scenes/h3Twins.ts`; `h3Twins.test.ts` recomputes
+them and checks the twin against the on-axis closed form, an independent Monte Carlo estimate, the
+limit that defines the sky key and a marched ball test. Not yet in a full sweep.
+
+## Curved-space witnesses (S³)
+
+`scenes/s3Witness.ts`: `s3-furnace` (six emissive great spheres, every path Σ_{k≤6} 0.8^k, pinhole
+and fisheye), `s3-long-arc` (a lambert disk receiver lit only through the long arc by a disk light of
+geodesic radius 1.2 facing away from it; a Euclidean radius map would be off by about 3%) and
+`s3-point-light` (the same receiver under point lights above and below it, power and uniform
+selection), against closed forms integrated over the readout window; `s3-long-arc-blocker` (an
+opaque ball about −o on every long arc from the window, beyond the short-arc distance: 0 under every
+estimator; a shadow ray searched only to d reads 0.451 under pt-nee); `s3-medium` (a scattering ball
+lit by two disk lights out of frame, one reachable only through the long arc: pt = pt-nee = pt-mis;
+applying the one-sided arc rule at medium events moves pt-nee 67% away from pt). The expected values
+are computed by the fp64 twin `scenes/s3Twins.ts` (space-free parts in `scenes/curvedTwins.ts`);
+`s3Twins.test.ts` recomputes them and checks the twin against the on-axis closed form, an
+independent Monte Carlo estimate, the blocker's position on every long arc and the lights' absence
+from every camera ray's geodesic. Not yet in a full sweep.
+
+## Curved-space witnesses (box, cylinder, quad, quad light)
+
+`scenes/curvedShapesWitness.ts`: `h3-shapes` and `s3-shapes` (a rotated lambert box, a tilted
+cylinder and a quad under a point light, pt-nee; readout windows inside single lit faces — a box
+face, the tube, a cap, the quad, and in S³ a box face lit only through the long arc — against
+(ρ/π)·Σ_arcs I·max(0, cos θ)·visibility/S(d)² at the first hit, within 0.5%), `h3-quad-light` and
+`s3-quad-light` (the H³/S³ direct-lighting receiver under a quad light, in S³ facing away so only
+the long arc lights it; pt-nee, pt-mis and pt against the window mean of the quadrature over the
+quad). The expected values are computed by the fp64 twin `scenes/curvedShapeTwins.ts`;
+`curvedShapesTwins.test.ts` recomputes them, checks each window lies inside its one lit face, and
+checks the quad quadrature against an independent cosine-sampled estimate; the twin's intersectors
+and normals are checked against marched membership by tests/components/curvedShapes.test.ts. A
+shapes window does not see a normal's sign (the hit fill turns the normal toward the arriving ray).
+Not yet in a full sweep.
+
+## Curved-space witnesses (H²×R)
+
+`scenes/h2xrWitness.ts`: `h2xr-furnace` (a box of four vertical and two horizontal planes holding an
+emissive ball and column, every path Σ_{k≤6} 0.8^k, pinhole and fisheye; it checks bookkeeping, not
+where a surface is hit), `h2xr-disk-light` (a lambert disk receiver under a horizontal disk light of
+radius 1.2 off to the side, pt = pt-nee = pt-mis against the closed form; the d² density would read
+0.547, sinh² d 0.336 and the Euclidean radius map 0.511 against 0.499), `h2xr-point-light` (two
+oblique point lights on five windows: the disk, a vertical wall, a ball placed with a height and a
+rotated offset center, a column's wall and top cap; the d² density moves every window by 0.014 to
+0.036), `h2xr-sky` (black shapes under the sky 1 + key from a camera 1.2 from o: every silhouette, the
+{param}-driven ball placement and the key; the view direction as key reads 0.10 in red against 0.29,
+the ball without its height shift 0.302). The expected values are computed by the fp64 twin
+`scenes/h2xrTwins.ts`; `h2xrTwins.test.ts` recomputes them, checks the windows (covered, unshadowed)
+and the wrong models' values; `tests/components/h2xr.test.ts` checks the twin's formulas against an
+ODE integration, finite differences of exp, Monte Carlo ray hits and sphere tracing. Not yet in a
+full sweep.
+
+## Closed-manifold witnesses (Seifert–Weber)
+
+`scenes/seifertWeberWitness.ts`: `seifert-weber-windows` (three emissive spheres of different
+colors in the dodecahedral domain, pt, maxBounces 0, farClip 6; eleven pixel windows that the
+float64 twin `tests/helpers/seifertWeberTwin.ts` certifies, by brute force over the sphere images in
+the cover with a one-pixel margin, as seeing one sphere through 0, 1, 2 or 3 face crossings, or
+nothing within the far clip, so each reads that sphere's emission exactly, or 0) and
+`seifert-weber-lights` (a disk light near face 0 facing the face, so D is lit mostly by its copies
+across the faces, and three lambert balls; pt = pt-nee = pt-mis, maxBounces 3, farClip 8).
+`seifertWeberWindows.test.ts` re-derives every window from the scene as authored. Each can fail:
+with a twist of 1/10 turn in place of 3/10, 6 of the 11 windows read wrong (the twin predicts the
+five crossing windows; the other two crossing windows lie on a face path along which the two twists
+agree, since they differ by a symmetry of D); with the image index off by one (`first_face` for
+`1 + first_face`) the frame means differ by 2.6%. Under the pinned salt pt-nee and pt-mis
+draw the same numbers, so their χ² stays near 0 even then; the mean gate is what catches it.
+
+Both scenes carry a `walk-counter` row (report only): the runner adds counters to the program's
+own Seifert–Weber walk (`renderWalkCounter` in tools/witness.mjs, at fixed anchors in the generated
+text, failing if one is missing) and reports the segments that reached the crossing cap, the most
+faces one segment crossed, and the largest constraint drift after a crossing. With the cap set to
+6 it counts 24,880 capped camera segments, so it can count.
+
+## Curved-space witnesses: the other materials and the sphere light (H³ and S³)
+
+`scenes/curvedMaterialWitness.ts` (one construction per space; plan in
+docs/claude-2026-11-review/curved/next-materials-plan.md): `h3-specular`/`s3-specular` (a mirror ball,
+f0 0.9/0.5/0.05 per channel, and a glass ball, ior 1.5, in a closed box of six walls emitting six
+colors; pt, maxBounces 6; RGB window means over each ball against an exact per-ray sum over the delta
+choices) with `e3-specular`, the same scene and twin in E³ as the control; `h3-ggx`/`s3-ggx` (a ggx
+receiver under a disk light in its mirror direction, in S³ reached only through the long arc; pt,
+pt-nee, pt-mis against the twin's quadrature); `h3-rough-glass`/`s3-rough-glass` (a rough glass ball,
+roughness 0.6, lit from out of frame, in S³ by a disk and a sphere light: pt = pt-nee = pt-mis at
+1024 spp — at roughness 0.3 the same layout fails nee ≡ mis on χ² in E³ too, firefly-dominated);
+`h3-sphere-light`/`s3-sphere-light` (a lambert receiver under a sphere light; in S³ below it, lit only
+by the backward cone), `h3-sphere-light-blocker` and `s3-sphere-light-blocker` (0) and
+`s3-sphere-light-antipodal` (albedo·Le exactly). The expected values are computed by the fp64 twins `scenes/curvedMaterialTwins.ts`;
+`curvedMaterialTwins.test.ts` recomputes them and checks the twins against independent estimates.
+Not yet in a full sweep.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):
@@ -60,7 +161,9 @@ sweep: `tiny-sphere`, `tiny-sphere-light`, `sun-haze`, `fog-area-ignored`, `inst
 shadow rays aimed at the light point) had targeted runs only, and these witnesses were added with
 them: `mesh-light-smooth`, `mesh-slab-albedo`, `mesh-scale-twin`, `null-budget-view`,
 `null-budget`, `grin-long`, `shadow-aim-march`, `shadow-aim-far`, `shadow-aim-fog`,
-`emit-sat-budget`.
+`emit-sat-budget`. Also added after it, with targeted runs only: `filter-edge` and the
+gaussian arm of `furnace` (the pixel filter); `bokeh-edge` and the six-blade arm of
+`thinlens-zero` (the bladed pupil).
 
 **`cube-cloud` (updated Sep 25).** Since the lab page stopped starting its own render loop
 under the runner, the runner takes control immediately; the failure is now the RENDER not
@@ -91,6 +194,15 @@ lossless region whose index is 1 at both ends. Measured over 1704 deterministic 
 +0.293%. Expected cause, not yet measured: the interior (n_in/n_out)² factor takes n_out from |T| at
 the last drift, inside the wall rather than at it (grin.glsl, grin_finish); the floor's deeper
 entry point had partly cancelled that.
+
+**`torus-lights-fog` (open items, Nov 7 2026).** Registered at 1,024 spp: at 256 spp the
+nee/mis/mis-bvh mean gap read 0.94% against the 1% gate, a margin that any change in how many
+random numbers the program draws could cross; at 1,024 spp it reads 0.33%. Its χ²ᵣ rose from
+1.27 (256 spp) to 1.45 (1,024 spp); whether the excess is fireflies or a small bias is untested
+(compare the open roughness-0.15 pt-nee deficit in the 3-torus, CLAUDE.md). This witness does
+not catch a missing `quotient_reduce` at medium event points: with the reduction removed from
+the generated loop it still passed (Δmean 0.28%, χ²ᵣ 1.37, pt rmse 11.20%). No check catches
+that error yet.
 
 **Thin dielectrics are one-sided (open defect, no witness yet).** On a FRONT-face hit of a
 zero-thickness surface the dispatcher reports `region_to` = the surface's own region, which

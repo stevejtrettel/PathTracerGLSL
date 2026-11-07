@@ -8,6 +8,10 @@
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import { similarityApplyDirection } from '../similarity.js';
 import planeGLSL from './plane.glsl?raw';
+import planeHyperbolicGLSL from './plane_hyperbolic.glsl?raw';
+import planeSphericalGLSL from './plane_spherical.glsl?raw';
+import planeH2xrGLSL from './plane_h2xr.glsl?raw';
+import { H2XR_VERTICAL_OR_HORIZONTAL } from '../../ambient/h2xr/h2xr.js';
 
 /** Canonical unit-normal form of dot(p,n)+offset=0. Dividing both terms by |n|
  *  preserves the plane and makes the expression a true signed-distance bound. */
@@ -22,10 +26,15 @@ export function canonicalPlane(normal: number[], offset = 0): { normal: [number,
 export const planeDescriptor: PrimitiveDescriptor = {
     type: 'plane',
     params: [
-        { name: 'normal', kind: 'direction', shape: 'vec3', required: true, constraint: { kind: 'min-length', value: 1e-8 } },
+        { name: 'normal', kind: 'direction', shape: 'vec3', required: true, constraint: { kind: 'min-length', value: 1e-8 }, constraintIn: { h2xr: H2XR_VERTICAL_OR_HORIZONTAL } },
         { name: 'offset', kind: 'length', shape: 'number', required: false, default: 0.0 },
     ],
-    glsl: planeGLSL,
+    glsl: {
+        euclidean: { origin: 'components/geometry/plane/plane.glsl', source: planeGLSL },
+        hyperbolic: { origin: 'components/geometry/plane/plane_hyperbolic.glsl', source: planeHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/plane/plane_spherical.glsl', source: planeSphericalGLSL },
+        h2xr: { origin: 'components/geometry/plane/plane_h2xr.glsl', source: planeH2xrGLSL },
+    },
     provides: { sdf: true, analytic: true },
     // THE unbounded shape (impl-plan-sdf-as-shape §2.3): a plane has no finite bound to
     // declare, so a marched plane is always visited and marches the open interval. This

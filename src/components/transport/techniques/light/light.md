@@ -10,7 +10,8 @@ scores at the same vertex, locally. No carried state.
   eval is zero, the shadow march would be wasted);
 - `ray_spawn(hit, ls.wi)` escapes the surface (the origin moves `hit.eps` along the
   geometric normal), then the ray is re-aimed from there at the light point
-  (`ambient_direction_to(origin, light_p)`). Kept parallel to `ls.wi`, it would pass beside
+  (`ambient_aim(origin, ls.wi, light_p, …)`, which takes the arc `ls.wi` starts on). Kept
+  parallel to `ls.wi`, it would pass beside
   the light point, `hit.eps` away, and at a slant it would meet the light's own surface
   first. The search stops `SHADOW_BACKOFF` (math.glsl) short of the light point, which
   covers the rounding error of the light's surface there. Only visibility uses the aimed
@@ -22,9 +23,11 @@ scores at the same vertex, locally. No carried state.
   heuristic against `interaction_surface_pdf` under MIS).
 
 **Medium site** (`light_sample_direct_medium`): the same flow from a scattering
-vertex with the pinned surface/medium asymmetry — phase EVAL (`hg_eval`) and **NO
-cosine** (§2.2: the cosine is a surface Jacobian), weight from
-`combiner_w_light_medium` (balances against `hg_pdf` under MIS). Replaced wholesale
+vertex with the pinned surface/medium asymmetry — phase EVAL at the event point
+(`interaction_medium_eval(ls.wi, wo_med, p_evt, m_evt)`, the generated dispatch over the registered
+phase models) and **NO cosine** (§2.2: the cosine is a surface Jacobian), weight from
+`combiner_w_light_medium` (1 under plain NEE; the power heuristic against
+`interaction_medium_pdf` under MIS). Replaced wholesale
 by `../equiangular/` under `mediumLightSampling: 'equiangular'` — one placement per
 program.
 

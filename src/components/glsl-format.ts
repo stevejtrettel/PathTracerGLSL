@@ -34,6 +34,14 @@ export function formatMat3(m: number[]): string {
     return `mat3(${m.map(formatFloat).join(', ')})`;
 }
 
+/** Column-major mat4 literal (GLSL constructor order) from 16 numbers. */
+export function formatMat4(m: number[]): string {
+    if (m.length !== 16) {
+        throw new Error(`GLSL format: mat4 needs 16 numbers, got ${m.length}`);
+    }
+    return `mat4(${m.map(formatFloat).join(', ')})`;
+}
+
 /** Uniform name from a parameter path (§2.8): 'clay.albedo' → 'u_clay_albedo'. */
 export function paramToUniform(path: string): string {
     return 'u_' + path.replace(/\./g, '_');

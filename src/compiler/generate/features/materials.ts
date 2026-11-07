@@ -6,17 +6,17 @@
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
 import { emitSpectrum, emitIndex, glslValue, type SpectrumSite } from '../color.js';
-import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression, type IndexProperty } from '../../types.js';
-import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
+import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isGlslExpression, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression, type IndexProperty } from '../../types.js';
+import { isAttributeValue, type RenderPlan, type PlannedMaterial, type PlannedMedium, type PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
-import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
-import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
-import { isRadiometric } from '../../../components/descriptors.js';
+import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, hasPerHitForm, EMISSION_KEY } from '../../../components/materials/index.js';
+import { bodyFor, type MaterialDerivedSpec } from '../../../components/descriptors.js';
+import { isLaneSpectrum, isRadiometric } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
 import { unionFields, defaultExpr } from '../schema.js';
 import type { PropertySchema } from '../../../components/descriptors.js';
@@ -24,6 +24,7 @@ import mediumEmissionGLSL from '../../../components/transport/volume/analytic/em
 import mediumAnalyticGLSL from '../../../components/transport/volume/analytic/analytic.glsl?raw';
 import mediumDeltaTrackingGLSL from '../../../components/transport/volume/delta_tracking/delta_tracking.glsl?raw';
 import mediumGrinGLSL from '../../../components/transport/volume/grin/grin.glsl?raw';
+import shadingNormalGLSL from '../../../glsl/core/shading_normal.glsl?raw';
 
 /** Capability lookup over the descriptor registry (R1a — replaces the inline
  *  MODEL_HAS_NONDELTA_LOBES map). 'none' is a boundary classification, not a model:
@@ -58,8 +59,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             return d !== undefined ? modelStructFields(d) : [];
         }),
     );
-    // DERIVED material fields (D4): per-material expressions — a baked literal for
-    // constant inputs, a `u_<name>_<id>` compute-closure uniform for driven ones.
+    // DERIVED material fields: per-material expressions — a baked literal for constant
+    // inputs, a `u_<name>_<id>` compute-closure uniform for driven ones, the per-hit form
+    // over the struct fields when an input varies over the surface.
     const site: SpectrumSite = { wl: 'wl', color: plan.program.measurement.color };
     const derivedByMat = new Map<number, DerivedExpr[]>();
     for (const mat of plan.materials) {
@@ -72,14 +74,25 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 
     // Model includes from the registry (R1a): one line per model PRESENT, no per-model ifs.
     for (const model of plan.program.materials.models) {
-        blocks.push({ origin: `components/materials/${model}/${model}.glsl`, source: materialModel(model).glsl });
+        blocks.push(bodyFor(materialModel(model).glsl, plan.program.measurement.ambient, `material model '${model}'`));
+    }
+
+    // Bump (materials/README, "Shading-normal perturbation"): the authored height fields, the
+    // static gradient / frame / mask functions that call them, and the per-material frame the
+    // walk swaps in. Ahead of the dispatch, whose bumped arms call the mask.
+    const perturbed = plan.program.materials.perturbed ?? [];
+    if (perturbed.length > 0) {
+        const bumped = perturbed.map((id) => plan.materials.find((m) => m.id === id)!);
+        blocks.push({ origin: 'generated:bump-height', source: generateBumpHeight(bumped) });
+        blocks.push({ origin: 'glsl/core/shading_normal.glsl', source: shadingNormalGLSL });
+        blocks.push({ origin: 'generated:shading-frame', source: generateShadingFrame(bumped) });
     }
 
     // The generated §3.3 dispatch, after the model libraries it calls. Ops are seam
     // decisions (impl-plan-exact-linkage): eval's only caller is the light technique,
     // pdf's the surface MIS weight — a dispatch nothing links is not emitted.
     const { surfaceEval, surfacePdf } = plan.program.materials;
-    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? []) });
+    blocks.push({ origin: 'generated:interaction-dispatch', source: generateInteractionDispatch(plan.materials, surfaceEval, surfacePdf, plan.program.materials.emissionCones ?? [], perturbed) });
     // The albedo guide's per-model fact (components/aov/albedo), only where an AOV calls it.
     if (plan.program.materials.albedo) {
         blocks.push({ origin: 'generated:albedo-dispatch', source: generateAlbedoDispatch(plan.materials) });
@@ -175,7 +188,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // mp.model (twin of the surface interaction dispatch; eval/pdf are seam
             // decisions like the surface ops).
             for (const m of plan.program.media.models) {
-                blocks.push({ origin: `components/volume_scattering/${m}/${m}.glsl`, source: VOLUME_SCATTERING_MODELS[m].glsl });
+                blocks.push(bodyFor(VOLUME_SCATTERING_MODELS[m].glsl, plan.program.measurement.ambient, `phase model '${m}'`));
             }
             blocks.push({ origin: 'generated:medium-dispatch', source: generateMediumDispatch(plan.program.media.models, media.mediumEval, media.mediumPdf) });
         }
@@ -216,6 +229,8 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
                 f.source === EMISSION_KEY, plan.program.measurement.color, f.role,
             );
         }
+        // A bump height's declared sliders (float uniforms read by bump_height).
+        if (mat.bump !== undefined) mintValueUniform(mat.bump.height, 'float', 'float', uniforms, parameters, seen);
         if (mat.medium !== null) {
             // E2: RTE coefficients are magnitudes (σ > 1 is routine) — HDR widgets.
             mintValueUniform(mat.medium.sigma_a, 'vec3', 'color', uniforms, parameters, seen, true);
@@ -244,13 +259,13 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // DERIVED σ̄ uniforms for {param}-driven tracking media (batch 2) — no parameter
     // metadata of their own: they ride the σ params' sliders through their closures.
     for (const m of majorants.values()) if (m.uniform) uniforms.push(m.uniform);
-    // DERIVED material-field uniforms (D4) — same discipline as the majorants.
+    // DERIVED material-field uniforms — same discipline as the majorants.
     for (const list of derivedByMat.values()) for (const e of list) if (e.uniform) uniforms.push(e.uniform);
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
     // Each entry mirrors its emission condition above — the interface header is truthful.
     const provides = [
-        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl)' },
+        { name: 'scene_material_properties', signature: 'MaterialProperties scene_material_properties(int id, Point p, vec2 uv, int element, Wavelengths wl)' },
         { name: 'interaction_surface_sample', signature: 'InteractionSample interaction_surface_sample(int mat, Direction wo, Hit hit, MaterialProperties mp, float uc, vec2 u)' },
         { name: 'interaction_surface_emission', signature: 'Spectrum interaction_surface_emission(int mat, Direction wo, Hit hit, MaterialProperties mp)' },
         { name: 'material_is_emissive', signature: 'bool material_is_emissive(int mat)' },
@@ -270,6 +285,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     if (plan.program.materials.albedo) {
         provides.push({ name: 'material_albedo', signature: 'Spectrum material_albedo(int mat, Hit hit, MaterialProperties mp)' });
     }
+    if (perturbed.length > 0) {
+        provides.push({ name: 'material_shading_frame', signature: 'Frame material_shading_frame(int mat, Hit hit, Direction wo)' });
+    }
     // Self-requires: the generated medium_sample/medium_transmittance bodies call the
     // properties lookup themselves — honest linkage for the seam-unused check.
     const requires: string[] = [];
@@ -277,7 +295,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
         requires.push('scene_medium_properties');
         provides.push(
             { name: 'material_has_medium', signature: 'bool material_has_medium(int mat)' },
-            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl)' },
+            { name: 'scene_medium_properties', signature: 'MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl)' },
             { name: 'medium_sample', signature: 'MediumSample medium_sample(int med, Ray ray, float t_max, vec2 xi)' },
         );
         if (media.deflecting) {
@@ -296,13 +314,13 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             // The dispatch is the public seam (transport calls it); the per-model funcs
             // (hg_*/rayleigh_*) are internal, called only by the dispatch in this feature.
             provides.push(
-                { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi)' },
+                { name: 'interaction_medium_sample', signature: 'InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi)' },
             );
             if (media.mediumEval) {
-                provides.push({ name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp)' });
+                provides.push({ name: 'interaction_medium_eval', signature: 'Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp)' });
             }
             if (media.mediumPdf) {
-                provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp)' });
+                provides.push({ name: 'interaction_medium_pdf', signature: 'float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp)' });
             }
             if (media.weightedAbsorptionArms) {
                 // Exists ONLY where a weighted arm leaves a survival owed — an all-tracked
@@ -329,7 +347,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 // Generated material lookup (per-scene codegen)
 // ============================================================================
 
-/** A D4 derived field's emitted form for ONE material: the expression the lookup arm
+/** A derived field's emitted form for ONE material: the expression the lookup arm
  *  assigns, plus the uniform when any input is driven (the majorantSpec pattern). */
 type DerivedExpr = { name: string; expr: string; uniform?: PlannedUniform };
 
@@ -347,6 +365,18 @@ function resolveDerivedInputs(mat: PlannedMaterial, inputs: string[], params: Re
 }
 
 function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec, site: SpectrumSite): DerivedExpr {
+    // An input that varies over the surface (an expression or a per-instance attribute) has no
+    // host value: the field is computed per hit from the struct fields its inputs were just
+    // assigned to. Only a field with a per-hit form takes such inputs (Validator).
+    const varies = s.inputs.some((src) => isGlslExpression(mat.values[src]) || isAttributeValue(mat.values[src]));
+    if (varies) {
+        if (!hasPerHitForm(s)) {
+            throw new Error(`derived field '${s.name}' of material ${mat.id} has an input that varies over the surface and no per-hit form (Validator should have rejected it)`);
+        }
+        const rows = materialModel(mat.model as MaterialModel).properties;
+        const fields = Object.fromEntries(s.inputs.map((src) => [src, `props.${rows.find((r) => r.source === src)!.name}`]));
+        return { name: s.name, expr: s.glsl(fields) };
+    }
     // A Spectrum field is emitted by its value's kind: the CPU constant itself, or the derived
     // uniform, a number computed outside the kind (the expression binding).
     const spectrum = (v: ParamValue) => s.glslType === 'Spectrum' ? emitSpectrum(v, s.role, site) : null;
@@ -375,7 +405,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
     lines.push('// a material sets exactly the fields its model reads, nothing else. `p` (shading point)');
     lines.push('// and `uv` (surface chart, fable-imagery P2) are the coordinates an expression row may');
     lines.push('// reference; `element` = Hit.element (the owner\'s sub-element) — read only by ATTRIBUTE rows.');
-    lines.push('MaterialProperties scene_material_properties(int id, vec3 p, vec2 uv, int element, Wavelengths wl) {');
+    lines.push('MaterialProperties scene_material_properties(int id, Point p, vec2 uv, int element, Wavelengths wl) {');
     lines.push('    MaterialProperties props;');
     lines.push('    props.wl = wl;');
     // Defaults from the union schemas — the GLSL expression DERIVED from the row's
@@ -397,12 +427,12 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
             if (f.name === 'emission' && !emissionMayBeNonzero(raw)) continue;
             const fmt = (f.glslType === 'Spectrum' ? formatVec3 : formatFloat) as (x: never) => string;
             // `element` is Hit.element, the instance index a per-instance value is read at.
-            const resolved = isRadiometric(f.role)
+            const resolved = isLaneSpectrum(f.role)
                 ? emitSpectrum(raw as ParamValue, f.role, { ...site, instance: 'element' })
                 : emitValue(raw as ParamValue, fmt, { instance: 'element' });
             body.push(`${target} = ${resolved};`);
         }
-        // DERIVED fields (D4): assigned after the rows they derive from.
+        // DERIVED fields: assigned after the rows they derive from (a per-hit form reads them).
         for (const e of derivedByMat.get(mat.id) ?? []) {
             body.push(`        props.${e.name} = ${e.expr};`);
         }
@@ -551,7 +581,7 @@ function generateMediumProperties(materials: PlannedMaterial[], models: string[]
     // union core.ts builds the struct from). An absorbing-only program has extinction
     // fields and nothing else.
     const lines: string[] = ['// Generated medium-properties lookup (§3.5; heterogeneous media read p)'];
-    lines.push('MediumProperties scene_medium_properties(int mat, vec3 p, Wavelengths wl) {');
+    lines.push('MediumProperties scene_medium_properties(int mat, Point p, Wavelengths wl) {');
     lines.push('    MediumProperties m;');
     lines.push('    m.wl = wl;');
     lines.push('    m.sigma_a = SPECTRUM_ZERO;');
@@ -628,17 +658,17 @@ function generateMediumDispatch(models: string[], wantsEval: boolean, wantsPdf: 
         return out;
     };
     const lines: string[] = ['// Generated volume-scattering dispatch (interaction_medium_* over mp.model)'];
-    lines.push('InteractionSample interaction_medium_sample(Direction wo, MediumProperties mp, vec2 xi) {');
-    lines.push(...arms((m) => `${m}_sample(wo, mp, xi)`));
+    lines.push('InteractionSample interaction_medium_sample(Direction wo, Point p, MediumProperties mp, vec2 xi) {');
+    lines.push(...arms((m) => `${m}_sample(wo, p, mp, xi)`));
     lines.push('}');
     if (wantsEval) {
-        lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, MediumProperties mp) {');
-        lines.push(...arms((m) => `${m}_eval(wi, wo, mp)`));
+        lines.push('Spectrum interaction_medium_eval(Direction wi, Direction wo, Point p, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_eval(wi, wo, p, mp)`));
         lines.push('}');
     }
     if (wantsPdf) {
-        lines.push('float interaction_medium_pdf(Direction wi, Direction wo, MediumProperties mp) {');
-        lines.push(...arms((m) => `${m}_pdf(wi, wo, mp)`));
+        lines.push('float interaction_medium_pdf(Direction wi, Direction wo, Point p, MediumProperties mp) {');
+        lines.push(...arms((m) => `${m}_pdf(wi, wo, p, mp)`));
         lines.push('}');
     }
     return lines.join('\n');
@@ -899,7 +929,7 @@ function generateAlbedoDispatch(materials: PlannedMaterial[]): string {
 // present. Lambert-only collapses to a passthrough; a second model (dielectric)
 // is additive — it just adds `if (mat == <ids>) return <model>_<op>(...)`.
 
-function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean, emissionCones: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>): string {
+function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: boolean, wantsPdf: boolean, emissionCones: Array<{ materialId: number; direction: [number, number, number]; cosDivergence: number }>, perturbed: number[]): string {
     // Group SURFACE material ids by model, preserving first-appearance order. 'none' materials
     // never reach this dispatch: transport's null-interface branch continues before any surface
     // op (§3.6), so they contribute no arm.
@@ -941,6 +971,20 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
                     lines.push(`    if (mat == ${cone.materialId}) return ${model}_emission(${op.args}) * step(${formatFloat(cone.cosDivergence)}, dot(wo, ${formatVec3(cone.direction)}));`);
                 }
             }
+            // Bumped materials (perturbed ids, grouped by model) get masked arms ahead of the
+            // model arms: eval and pdf are zero off the mask, a masked sample is killed. Emission
+            // reads no frame and takes the model arm.
+            if (op.name !== 'emission') {
+                for (const model of order) {
+                    const ids = idsByModel.get(model)!.filter((id) => perturbed.includes(id));
+                    if (ids.length === 0) continue;
+                    const cond = ids.map((id) => `mat == ${id}`).join(' || ');
+                    const call = `${model}_${op.name}(${op.args})`;
+                    lines.push(op.name === 'sample'
+                        ? `    if (${cond}) return shading_masked(${call}, hit);`
+                        : `    if (${cond}) return shading_side_consistent(hit, wi) ? ${call} : ${op.name === 'eval' ? 'SPECTRUM_ZERO' : '0.0'};`);
+                }
+            }
             for (const model of order) {
                 if (model === fallback) continue;
                 const cond = idsByModel.get(model)!.map((id) => `mat == ${id}`).join(' || ');
@@ -951,4 +995,33 @@ function generateInteractionDispatch(materials: PlannedMaterial[], wantsEval: bo
         lines.push('}');
     }
     return lines.join('\n');
+}
+
+// ============================================================================
+// Bump (materials/README, "Shading-normal perturbation")
+// ============================================================================
+
+/** The authored height fields, h(p) in world units, by material id. Only `p` (and the
+ *  expression's declared slider uniforms) is in scope. The last bumped material is the
+ *  default arm: shading_normal.glsl calls this only with a bumped id. */
+function generateBumpHeight(bumped: PlannedMaterial[]): string {
+    const lines = ['// Generated bump heights h(p), world units (materials/README, "Shading-normal perturbation")', 'float bump_height(int mat, Point p) {'];
+    bumped.forEach((m, i) => {
+        const h = `(${m.bump!.height.source})`;
+        lines.push(i < bumped.length - 1 ? `    if (mat == ${m.id}) return ${h};` : `    return ${h};`);
+    });
+    lines.push('}');
+    return lines.join('\n');
+}
+
+/** The shading frame of material `mat` at a hit seen from `wo`: perturbed for bumped ids (each
+ *  with its authored finite-difference step), the hit's own frame otherwise. */
+function generateShadingFrame(bumped: PlannedMaterial[]): string {
+    return [
+        '// Generated shading frame: bumped materials tilt the normal by their height field',
+        'Frame material_shading_frame(int mat, Hit hit, Direction wo) {',
+        ...bumped.map((m) => `    if (mat == ${m.id}) return shading_frame_perturbed(hit, wo, bump_surface_gradient(${m.id}, hit, ${formatFloat(m.bump!.step)}));`),
+        '    return hit.frame;',
+        '}',
+    ].join('\n');
 }

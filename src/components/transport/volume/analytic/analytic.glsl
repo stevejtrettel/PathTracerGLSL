@@ -26,10 +26,11 @@ MediumSample medium_sample_analytic(MediumProperties m, Ray ray, float t_max, ve
         ms.scattered = true;
         ms.t         = t;
         // The EVENT RAY (impl-plan-grin-media): every scattering arm reports its event's
-        // position + incident direction — this one trivially (straight flight), the GRIN
-        // arm because a bent event is not recomputable from (origin, dir, t).
-        ms.exit_p    = ambient_geodesic(ray.origin, ray.direction, t);
-        ms.exit_dir  = ray.direction;
+        // position + incident direction — this one by the geodesic flow (the ray's velocity
+        // at t), the GRIN arm because a bent event is not recomputable from (origin, dir, t).
+        Ray event    = ambient_flow(ray, t);
+        ms.exit_p    = event.origin;
+        ms.exit_dir  = event.direction;
         ms.weight    = m.sigma_s * tr / max(pdf, 1e-20);
     } else {
         // Survived to the boundary. pdf = P(t ≥ t_max) = (1/N) Σ_c e^{−σ_c t_max}.
