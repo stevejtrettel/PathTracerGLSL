@@ -1,0 +1,2747 @@
+Thank you for the introduction. My name is Chris Kulla and I
+will be presenting, with Alex, our latest take on physically
+based shading at Imageworks.
+A few corrections and hindsights will be highlighted in red in
+
+Revisiting Physically Based Shading at Imageworks
+
+the speaker notes.
+
+Christopher Kulla & Alejandro Conty
+SIGGRAPH 2017
+
+VANCOUVER, BC | CULVER CITY, CA
+
+1
+
+Outline
+
+So here is a quick overview of what we will be discussing
+today. We’ve tried to pack as much information as possible
+into this talk, so I’ll jump right in.
+
+• Motivation
+• Energy-Preserving BSDFs
+• Subsurface Scattering
+• Coatings
+• Putting it all Together
+• Future Directions
+
+VANCOUVER, BC | CULVER CITY, CA
+
+2
+
+First let me go over our basic motivations for this work.
+We have been using physically based shading models for quite
+a while now, and we participated in this course back in 2010,
+2012 and 2013. So what has changed since then?
+
+Motivation
+
+VANCOUVER, BC | CULVER CITY, CA
+
+3
+
+Motivation
+
+Our previous shader libraries were built around the idea of
+individual lobes. This gave artists lots of ﬂexibility, but also
+made it hard to hit some simple cases since many knobs
+needed to be turned “just right”.
+When looking at production data, we occasionally found cases
+where the artist had achieved a nice look using physically
+nonsensical values. For example, we saw a case where wood
+had an IOR over 100. The end result looked ﬁne because of
+how the lobes were scaled, but it suggested to us that the
+parameter space had grown too large.
+
+• Previous shader libraries presented a long list of lobes to users
+• Very ﬂexible but parameter space too large
+• Hard to dial simple cases correctly
+• Too easy to dial non-physical values (e.g. wood with IOR=100!)
+• Too easy to create energy, particularly at grazing angles
+
+What was more concerning, however, was that adding multiple
+independent lobes was leading to excess energy being
+created, particularly at grazing angles.
+VANCOUVER, BC | CULVER CITY, CA
+
+4
+
+Motivation
+
+Our biggest inspiration came from the Disney BRDF models.
+They encourage a more physical description of materials by
+cleanly separating dielectrics and conductors. They also
+distilled controls to a small set of intuitive parameters.
+
+• Inspired by Disney BRDF/BSDF
+
+We also wanted to ensure that our materials would always be
+energy conserving, even in layered cases, but also energy
+preserving by which I mean that materials that scatter all
+energy should have an albedo close to 1.
+
+• Encourage a more physical description of materials
+• Enforce energy conservation, even in layered cases
+• Energy preservation
+
+We had a few BRDFs that were non-reciprocal and wanted to
+ﬁnd alternatives to them where possible.
+
+• Enforce reciprocity
+• Unify SSS and volume rendering
+
+Finally, like some of the other presenters, we felt it was time to
+try and unify subsurface scattering and volume rendering.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+5
+
+I’ll begin by discussing energy preservation for the basic BSDFs
+that make up our shading model.
+
+Energy-Preserving BSDFs
+
+VANCOUVER, BC | CULVER CITY, CA
+
+6
+
+Microfacet Specular
+
+As you might expect, we picked the GGX distribution. This is
+slowly becoming an industry standard, so we deﬁnitely wanted
+to follow that trend.
+
+• GGX + height-correlated masking & shadowing
+
+The biggest problem with current microfacet models is that
+while they conserve energy (in other words: they don’t create
+any) they don’t preserve energy at high roughness. This is due
+to the single-scattering assumption they make.
+
+• Single-scattering assumption introduces darkening at high roughness
+• Close to 60% energy missing for rough = 1
+
+Here I’m showing an idealized metal where the microfacets
+have no Fresnel. It loses close to half the incoming energy at
+roughness 1.
+Errata: Missing energy is close to 60% not 50%.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+7
+
+Microfacet Energy Compensation - Previous Work
+
+We’re not the ﬁrst to notice this problem of course.
+Kelemen in 2001 published a very generic solution that relied
+
+• Kelemen et al., 2001: Generic solution via precomputed tables
+
+on precomputed tables. His paper only discusses plastics,
+
+• Did not address textured materials
+• No treatment of transmission
+
+even though the technique is more broadly applicable.
+However, the paper didn’t directly address varying BRDF
+parameters or transmission.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+8
+
+Microfacet Energy Compensation - Previous Work
+
+Wenzel Jakob and colleagues developed a very comprehensive
+solution that solves many cases and includes layering,
+however they do so within a very complex framework that is
+
+• Kelemen et al., 2001: Generic solution via precomputed tables
+
+still too heavy for textured materials.
+
+• Did not address textured materials
+• No treatment of transmission
+
+• Jakob et al., 2014: Similar solution in a more general framework
+• Framework is complex
+• Too heavy for textured materials
+
+VANCOUVER, BC | CULVER CITY, CA
+
+8
+
+Microfacet Energy Compensation - Previous Work
+
+Last year, Eric Heitz presented a ground-truth result for
+multiple scattering between microfacets. It requires no
+precomputation at all, but the model is stochastic, meaning
+
+• Kelemen et al., 2001: Generic solution via precomputed tables
+
+that random numbers are required to both sample and
+
+• Did not address textured materials
+• No treatment of transmission
+
+evaluate the BRDF. This was a poor ﬁt for our rendering
+architecture.
+
+• Jakob et al., 2014: Similar solution in a more general framework
+• Framework is complex
+• Too heavy for textured materials
+
+• Heitz et al., 2016: Found “ground truth” but only as a stochastic model
+• Requires many random numbers to sample and evaluate
+• Poor ﬁt for our rendering architecture
+
+VANCOUVER, BC | CULVER CITY, CA
+
+8
+
+Microfacet Energy Compensation
+
+We can measure energy loss by integrating the
+cosine-weighted BRDF.
+
+Energy reﬂected for a particular viewing direction:
+∫ 2π ∫ 1
+E(µo ) =
+f(µo , µi , ϕ)µi dµi dϕ
+0
+
+Notice that I’m using the Greek letter µ for the cos θ term here.
+This is just to avoid too much trigonometry in the slides and
+it’s closer to how the formulas are actually implemented.
+
+0
+
+This energy E is sometimes referred to as the directional
+albedo. It varies from 0 to 1 for a given viewing direction.
+
+Expect E(µo ) = 1 if microfacets are purely reﬂective
+
+It’s also sometimes called the “furnace test” because it’s
+equivalent to a lighting integral against a constant background.
+
+GGX Furnace Test
+VANCOUVER, BC | CULVER CITY, CA
+
+9
+
+Microfacet Energy Compensation - Technique
+
+The technique presented in the Kelemen paper can be
+distilled down to the following formula.
+We can create a new BRDF lobe out of the function E we just
+saw. When we add this lobe to our original BRDF, we’ll always
+get a perfectly energy-conserving result.
+
+We can compensate for missing energy using:
+(1 − E (µo )) (1 − E (µi ))
+fms (µo , µi ) =
+, Eavg = 2
+π (1 − Eavg )
+
+∫ 1
+E(µ) µ dµ
+0
+
+The denominator here is a normalization term that involves
+the cosine-weighted average of E. You can think of this as the
+average amount of energy loss for any possible viewing
+direction.
+Also notice that this BRDF is reciprocal. So exchanging the
+view and light direction cosines doesn’t change the result.
+
+GGX + Energy Compensation Furnace Test
+VANCOUVER, BC | CULVER CITY, CA
+
+10
+
+Microfacet Energy Compensation - Technique
+
+It’s worth spending a few minutes going through the math to
+understand why this works. This formula is stated without
+proof in the Kelemen paper.
+
+Why does this work? Let’s compute the directional albedo of fms :
+∫ 2π ∫ 1
+Ems (µo ) =
+fms (µo , µi , ϕ)µi dµi dϕ
+0
+0
+∫ 1
+(1 − E (µo )) (1 − E (µi ))
+= 2π
+µi dµi
+π (1 − Eavg )
+0
+∫
+1 − E(µo ) 1
+= 2
+(1 − E (µi )) µi dµi
+1 − Eavg 0
+1 − E(µo )
+=
+(1 − Eavg )
+1 − Eavg
+= 1 − E(µo )
+
+In fact the derivation is very straightforward. We are going to
+compute the directional albedo of the new BRDF we just
+introduced. Lots of terms can be pulled out of the integral
+right away.
+The integral that is leftover is in fact just the deﬁnition of Eavg ,
+which cancels out the denominator. We’re left with just 1 − E
+evaluated with the cosine of the viewing direction.
+In other words, the directional albedo of this new BRDF exactly
+accounts for the energy missing from the original BRDF. Also
+
+The directional albedo of fms exactly complements f!
+VANCOUVER, BC | CULVER CITY, CA
+
+notice that I haven’t made any particular assumption about
+11
+
+the BRDF. This method always works.
+
+Microfacet Energy Compensation - Technique
+
+Now the only catch as you have probably realized is that the
+function E we have been using is expressed as an integral. And
+unfortunately for the BRDFs we care about this integral doesn’t
+have a closed-form solution.
+
+• anisotropy
+
+Kelemen’s paper simply tabulated this function assuming all
+parameters stay constant. However, we want to be able to
+spatially vary roughness, anisotropy and IOR. In the case of
+metals, IOR is itself deﬁned by several parameters.
+
+• IOR
+
+So tabulating all possibilities doesn’t seem practical.
+
+Computing E requires integration. We want to be able to spatially vary:
+• roughness
+
+At ﬁrst glance, tabulating all possibilities seems prohibitive.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+12
+
+Microfacet Energy Compensation - Roughness
+
+Let’s try anyway. We can start with roughness since it’s the
+most important.
+
+Precompute 1 − E (µ) for µ ∈ [0, 1] and rough ∈ [0, 1]:
+
+Precomputing 1 − E for all possible viewing cosines and
+roughness values we get the following result. It looks very
+smooth, particularly at high roughness values where it’s most
+important.
+
+µ
+
+rough
+
+So how much resolution do we need for the method to work?
+
+How much resolution is required?
+VANCOUVER, BC | CULVER CITY, CA
+
+13
+
+Microfacet Energy Compensation - Roughness
+
+It turns out that 322 is sufﬁcient. Stored as ﬂoats this is just
+4Kb which is the approach we chose for simplicity. We also
+store a 1D table for Eavg with just 32 entries indexed by the
+roughness.
+
+It turns out a 322 table is sufﬁcient. This is “just” 4Kb if stored as ﬂoats.
+
+We did also ﬁnd analytical ﬁts, but they’re not quite as precise.
+See appendix.
+
+Analytical ﬁts are possible as well but less precise.
+
+Now our row of microfacet spheres with increasing roughness
+from before…
+
+Energy Comp OFF
+GGX only
+
+VANCOUVER, BC | CULVER CITY, CA
+
+14
+
+Microfacet Energy Compensation - Roughness
+
+…gives the expected result at high roughness. Notice how
+much energy is recovered even in the center of the roughness
+range.
+
+It turns out a 322 table is sufﬁcient. This is “just” 4Kb if stored as ﬂoats.
+Analytical ﬁts are possible as well but less precise.
+
+Energy Comp ON
+GGX + Energy Compensation
+
+VANCOUVER, BC | CULVER CITY, CA
+
+14
+
+Microfacet Energy Compensation - Fresnel
+
+So the next factor to discuss is the Fresnel term. Once we add
+this to our BRDF, we no longer expect an albedo of 1. Some of
+the energy must be absorbed.
+
+If the surface absorbs or transmits energy, E (µ) < 1. We drew inspiration
+from Jakob et al., 2014:
+
+The solution Jakob and colleagues found makes the following
+assumption: The multiply scattered energy is diffused, so we
+can roughly model it with the cosine-weighted average Fresnel
+as well as the energy loss Eavg we used before. In this context,
+Eavg corresponds to how much energy is accounted for by a
+single microfacet bounce.
+
+Multiply scattered energy is diffused, so make use of the average Fresnel:
+∫ 1
+Favg = 2
+F(µ)µdµ
+0
+
+We know the overall missing energy is 1 − Eavg so we can compute the
+response from successive bounces against the microfacets:
+∞
+∑
+Favg Eavg
+Favg Eavg
+Fkavg (1 − Eavg )k =
+1 − Favg (1 − Eavg )
+
+Turning that into a small geometric series, we get the following
+expression, which can just be multiplied against our energy
+compensation lobe.
+
+k=0
+
+This factor is a simple multiplier to fms computed earlier.
+VANCOUVER, BC | CULVER CITY, CA
+
+Errata: Second equation corrected (noticed by Emmanuel
+15
+
+Turquin). See appendix for a better approximation.
+
+Microfacet Energy Compensation - Fresnel
+
+Here are the results of the Fresnel compensation applied to a
+gold material. Without any compensation, the material
+becomes quite dull looking at high roughness.
+
+As in previous work, color is maintained across the roughness range, with
+a slight increase in saturation.
+
+Energy Comp OFF
+Energy Compensation: Off
+
+VANCOUVER, BC | CULVER CITY, CA
+
+16
+
+Microfacet Energy Compensation - Fresnel
+
+And with energy compensation, we maintain the color we
+expect, with a tiny bit of extra saturation caused by multiple
+scattering.
+
+As in previous work, color is maintained across the roughness range, with
+a slight increase in saturation.
+
+Energy Comp ON
+Energy Compensation: On
+
+VANCOUVER, BC | CULVER CITY, CA
+
+16
+
+Microfacet Energy Compensation - Fresnel
+
+Again, I’ve glossed over how we can compute this average
+Fresnel term. It’s deﬁned as yet another integral.
+Jakob’s paper suggested using Gaussian quadrature, which is
+actually a very reasonable choice. Even using just two points
+gives surprisingly good accuracy, because most Fresnel curves
+are very smooth.
+
+How can we compute Favg efﬁciently?
+• Jakob et al. suggested a Gaussian quadrature.
+
+But we can do a bit better by ﬁnding numerical ﬁts to the
+
+• Only two to four points are needed for good accuracy
+
+integral…
+
+• The following numerical ﬁts are a bit faster…
+
+VANCOUVER, BC | CULVER CITY, CA
+
+17
+
+Microfacet Energy Compensation - Fresnel
+
+I’m going to go through these quickly, but don’t worry: the
+slides will be posted online.
+
+Dielectric Fresnel*
+
+Dielectric Fresnel is the simplest because it just has one
+argument: the IOR.
+
+√
+
+η 2 + µ2 − 1
+(
+)2 (
+(
+)2 )
+1 g−µ
+µ (g + µ) − 1
+F (η, µ) =
+1+
+2 g+µ
+µ (g − µ) + 1
+g =
+
+These ﬁts have less than 1% error, which is sufﬁcient. They are
+also valid over a very wide range – probably more than
+necessary, but it could be helpful if you have legacy data with
+strange IOR values.
+
+η−1
+, 1 < η < 400
+4.08567 + 1.00071η
+Favg (η) ≈ 0.997118 + 0.1014η − 0.965241η 2 − 0.130607η 3 , 0 < η < 1
+Favg (η) ≈
+
+I’ve included the ﬁt for IORs less than 1 since we will need it
+for glass in a few slides.
+
+Max Error ∼ 0.65% and ∼ 0.29% respectively.
+*
+
+See Aronson, “Boundary conditions for diffusion of light”, 1995 for analytical solutions.
+VANCOUVER, BC | CULVER CITY, CA
+
+18
+
+Microfacet Energy Compensation - Fresnel
+
+Here is the result for dielectric Fresnel. In this case the Fresnel
+effect is very strong and the energy compensation tweak is
+very subtle.
+
+Dielectric Fresnel
+Energy Compensation: Off
+
+Energy Comp OFF
+
+VANCOUVER, BC | CULVER CITY, CA
+
+19
+
+Microfacet Energy Compensation - Fresnel
+
+You might not be able to see this tweak from the back, it’s
+mostly visible on the right at higher roughness values.
+
+Dielectric Fresnel
+Energy Compensation: On
+
+Energy Comp ON
+
+VANCOUVER, BC | CULVER CITY, CA
+
+19
+
+Microfacet Energy Compensation - Fresnel
+
+Here is the ﬁt for metallic Fresnel. I’ve used the artist-friendly
+parameterization by Ole Gulbrandsen, which is how we present
+the parameters to our users.
+
+Conductor Fresnel - Gulbrandsen, 2014 - r = reflectance, g = edgetint
+
+The max error is a bit higher in this case, but the average error
+is still below 1%.
+
+F (r, g, µ) = see paper…
+Favg (r, g) ≈ 0.087237 + 0.0230685g − 0.0864902g2 + 0.0774594g3
+
+I should say we haven’t observed any issues in practice from
+
++0.782654r − 0.136432r + 0.278708r
+
+these ﬁts compared to more precise Gaussian quadrature
+
++0.19744gr + 0.0360605g2 r − 0.2586gr2
+
+results. In fact as long as the ﬁts don’t go outside the range of
+
+2
+
+3
+
+0 to 1, no energy can be created.
+
+Max error: ∼ 2%
+Avg error: ∼ 0.25%
+VANCOUVER, BC | CULVER CITY, CA
+
+20
+
+Microfacet Energy Compensation - Fresnel
+
+Here are the results for gold that we saw before.
+
+Conductor Fresnel (Physical)
+
+VANCOUVER, BC | CULVER CITY, CA
+
+21
+
+Microfacet Energy Compensation - Fresnel
+
+And one more. This is an even more artist-friendly variant of
+metals that gives really precise control over the edge color as
+well as its falloff. The physical Fresnel always goes to 1 at the
+edge and the edge tint is really subtle.
+
+Artist Friendly - Schlick inspired - r = reflectance, g = edgetint, p = falloff
+F (r, g, p, µ) = r + (g − r) (1 − µ)
+2gp2 + r + 3pr
+Favg (r, g, p) =
+1 + 3p + 2p2
+
+There are actually lots of physical effects that aren’t really
+modeled by the real Fresnel equations. Car paints or anodized
+metals, for example. Rather than get into much fancier
+physics, we can just let the artists pick the colors they want.
+
+1
+p
+
+In this case the Fresnel formula is simple, so the average has
+an exact solution. If you have your own ﬂavor of this, chances
+
+Exact solution. Because the Favg integral is simple, many more creative
+options can easily be supported.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+are you can probably derive an average Fresnel curve for it as
+well.
+
+22
+
+Microfacet Energy Compensation - Fresnel
+
+Here is an example of the artistic mode with a green tint at the
+edges.
+I promise that our artists use this much better than me.
+
+Conductor Fresnel (Artistic)
+
+VANCOUVER, BC | CULVER CITY, CA
+
+23
+
+Microfacet Energy Compensation - Anisotropy
+
+The last parameter to talk about is anisotropy. We represent
+this with a single ﬂoat that increases the roughness in x while
+decreasing the roughness in y.
+
+Finally for anisotropy, we use:
+
+This is very similar to the Disney model, but this version can
+make perfectly sharp anisotropic highlights, which our artists
+found helpful.
+
+2
+
+αx = rough (1 + aniso)
+αy = rough2 (1 − aniso)
+
+Rather than try to introduce an extra dimension of tabulation,
+
+Using E driven by rough alone maintained energy conservation. Intuitively,
+we are increasing roughness in one direction and decreasing in the other,
+so the average result is similar.
+
+we decided to just ignore anisotropy and drive energy
+compensation just from the original roughness. It’s not
+perfect, but 95% conserving is still better than the 50% or so
+
+Only ∼ 95% preserving in the worst case, but better than nothing or
+building larger tables.
+VANCOUVER, BC | CULVER CITY, CA
+
+that we’d get by doing nothing.
+
+24
+
+Microfacet Energy Compensation - Anisotropy
+
+Here is a wedge of all possible roughness and anisotropy
+values, both parameters range from 0 to 1.
+
+Energy Comp OFF
+
+Energy Compensation: Off
+
+VANCOUVER, BC | CULVER CITY, CA
+
+25
+
+Microfacet Energy Compensation - Anisotropy
+
+Again the energy compensation term helps recover most of the
+missing energy.
+
+Energy Comp ON
+
+Energy Compensation: On
+
+VANCOUVER, BC | CULVER CITY, CA
+
+25
+
+Microfacet Specular Energy Preservation
+
+So just to recap, we now have a simple BRDF lobe that
+approximates the multiple-scattering effects missing from the
+microfacet lobe. We mostly followed the technique from
+Kelemen’s paper but we reduced tabulation requirements by:
+
+Our specular term approximates multiple scattering between microfacets
+to preserve energy as well as conserve it.
+
+Using a tiny table for roughness.
+Using analytical ﬁts for the average Fresnel.
+
+We reduced tabulation requirements by:
+
+And just ignoring anisotropy completely!
+
+• Roughness: small 4Kb table
+• Fresnel: ﬁnding analytical ﬁts to Favg
+• Anisotropy: using a parameterization that lets us ignore it!
+
+VANCOUVER, BC | CULVER CITY, CA
+
+26
+
+Microfacet Dielectrics - Diffuse Term
+
+That was specular, now let’s discuss the diffuse term. This is
+actually what Kelemen’s paper was originally about.
+Just adding a constant diffuse term can never be energy
+conserving because Fresnel goes to 1 at the edges.
+
+For dielectrics, we need a tinted diffuse term as a ﬁrst approximation to
+internal scattering. Simply adding a constant diffuse term is not energy
+conserving at grazing angles, where F = 1.
+
+But we can reuse the same technique that helped us get
+energy preservation on just the specular term to get energy
+conservation for the specular/diffuse combination.
+
+We follow the approach of Kelemen et al., 2001. This time we build another
+table for the missing energy after reﬂection by specular. In this case we
+need to account for both roughness and IOR, so we need a 3D table. We
+found that 163 was sufﬁcient.
+
+This time we need to record the directional albedo of the
+entire BRDF (f + fms ), so we need to tabulate both roughness
+and IOR. Together with the incoming angle cosine, this makes a
+3D table.
+The good news is that the energy loss function is even
+smoother than before. We found we could get away with 16
+
+VANCOUVER, BC | CULVER CITY, CA
+
+27
+
+entries for each dimension, which is 16Kb stored as ﬂoats.
+
+Microfacet Dielectrics - Diffuse Term
+
+Here are the results. Again, if we just naively add a microfacet
+specular model to a constant diffuse lobe, we get extra energy
+at grazing angles. This is more pronounced at low roughness
+but still happens at high roughness.
+NOTE: This set of images was generated without the energy
+conserving specular.
+
+Energy Conservation: Off
+Energy comp OFF
+VANCOUVER, BC | CULVER CITY, CA
+
+28
+
+Microfacet Dielectrics - Diffuse Term
+
+And when we modulate diffuse by the energy compensation
+curves, we get a perfectly energy conserving result.
+NOTE: This set of images was generated with the energy
+conserving specular.
+
+Energy comp ON
+Energy Conservation: On
+VANCOUVER, BC | CULVER CITY, CA
+
+28
+
+Microfacet Dielectrics - Transmission
+
+So now we arrive at the most complicated case, which is glass.
+This is also where the energy loss issue is most severe
+because it typically takes several bounces to leave the surface.
+Another complicating factor is the reciprocity condition.
+Exchange view and light directions when changing mediums
+requires scaling by the square of the IOR. This is all explained
+in Eric Veach’s thesis and needs to be accounted for properly
+when using bidirectional methods.
+
+For transmission, we need to take care to obey the reciprocity condition:
+
+Just like in the dielectric diffuse case, both roughness and IOR
+matter here. We again use 3D tables, but this time integrated
+over the whole sphere.
+
+f(ωo , ωi ) = η 2 f(ωi , ωo )
+We tabulate the energy loss E over the sphere for η ∈ [1, 3] and η ∈
+163 tables, for varying roughness values and incident angles.
+
+[1 ]
+, 1 in
+3
+
+Luckily 16 entries per dimension seem to work ﬁne here as
+well since the functions are very smooth.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+29
+
+Microfacet Dielectrics - Transmission
+
+I’m going to run through an example here to help build up the
+compensation lobes for reﬂection and transmission.
+We’ll start with a ray that enters a surface.
+
+Entering IOR 1 → η
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+The microfacets scatter light both above and below the
+surface.
+
+Microfacets scatter E (η, µo )
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+Some energy is lost because of the single-scattering
+assumption.
+We want to build an energy compensation term that will
+recover the missing energy into reﬂection and transmission in
+the right amounts.
+
+Missing energy is 1 − E (η, µo )
+
+The formulas are going to look really similar to the BRDF case,
+but I’ll introduce them term by term to explain what each one
+does.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+The ﬁrst is 1 − E evaluated with the viewing cosine. That
+represents the amount of energy we are trying to recover.
+
+fmsR =
+
+fmsT =
+
+Remember from the earlier slide that this is the term that was
+
+(1 − E (η, µo ))
+
+left after everything else cancels out.
+
+(1 − E (η, µo ))
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+Because we have reﬂection and transmission lobes now, we
+need to split the energy by some ratio, which I’ll deﬁne in a
+minute.
+
+fmsR = Ratio (η) (1 − E (η, µo ))
+
+fmsT = (1 − Ratio (η)) (1 − E (η, µo ))
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+And ﬁnally we add the remaining terms, which are designed to
+integrate to 1. The reﬂection term works just like before, but
+for transmission, notice that I am using the energy curve
+tabulated from the opposite side.
+
+fmsR = Ratio (η) (1 − E (η, µo )) (1 − E (η, µi )) / (π (1 − Eavg (η)))
+
+This convention comes from the reciprocity requirement.
+Exchanging directions also means inverting the IOR.
+
+)) ( (
+( )))
+(
+(
+fmsT = (1 − Ratio (η)) (1 − E (η, µo )) 1 − E η −1 , µi / π 1 − Eavg η −1
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+I’ll just quickly show the reverse case where a ray leaves the
+surface.
+
+Leaving IOR η → 1
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+Again the microfacet model scatters only a fraction of the
+available energy.
+
+(
+)
+Microfacets scatter E η −1 , µo
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+Notice that we are evaluating E with the inverse IOR now.
+
+(
+)
+Missing energy is 1 − E η −1 , µo
+
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Microfacet Dielectrics - Transmission
+
+The reﬂection and refraction terms are just like before, but
+with the IOR ﬂipped. The transmission term on the top is the
+
+(
+( )) (
+(
+))
+fmsT = 1 − Ratio η −1
+1 − E η −1 , µo (1 − E (η, µi )) / (π (1 − Eavg (η)))
+
+one that uses the E function from the IOR and its inverse.
+Errata: Denominator of fmsR corrected (noticed by Emmanuel
+Turquin).
+
+)) ( (
+( )))
+( )(
+(
+)) (
+(
+fmsR = Ratio η −1 1 − E η −1 , µo
+1 − E η −1 , µi / π 1 − Eavg η −1
+VANCOUVER, BC | CULVER CITY, CA
+
+30
+
+Glass Energy Conservation - Reciprocity
+
+I’ve given the overall form of the multiple-scattering lobes.
+Now we just need to ensure that they are truly reciprocal.
+The part of the formula that depends on the view and light
+cosines is reciprocal by design. So we just need to ensure that
+the overall scaling factors match.
+
+The BRDF lobes are already reciprocal.
+The BTDF lobes have reciprocal varying terms by design. Need to choose
+Ratio such that constant terms match:
+( )
+1 − Ratio η −1 2
+1 − Ratio (η)
+=
+η
+1 − Eavg (η −1 )
+1 − Eavg (η)
+( )
+One equation, two unknowns: Ratio (η) and Ratio η −1 .
+
+VANCOUVER, BC | CULVER CITY, CA
+
+I didn’t specify what the ratio was yet, so we’ll use that degree
+of freedom to ensure things are equal.
+But we just have one equation and two unknowns: the ratio
+when entering the surface and the ratio when leaving the
+surface.
+
+31
+
+Glass Energy Conservation - Reciprocity
+
+To reduce this a bit more, we make the guess that the ratio will
+be close to the average Fresnel. Then we can just solve for a
+small scaling factor x that equalizes both sides.
+That lets us deﬁne the ﬁnal ratio of reﬂection to transmission,
+
+Let’s make an educated guess that Ratio (η) ≈ Favg (η). Now we just need
+to solve for x that makes both sides match:
+( )
+1 − Favg η −1 2
+1 − Favg (η)
+x
+= (1 − x)
+η
+1 − Eavg (η −1 )
+1 − Eavg (η)
+
+which completes the model.
+
+This gives us the ﬁnal ratio between BRDF and BTDF lobes, completing the
+model.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+32
+
+Glass Energy Conservation - Result
+
+That was a lot of math, so let’s see if it was worth it.
+Here is the row of glass spheres without any energy
+preservation…
+
+Energy Preservation: Off
+Energy comp OFF
+
+VANCOUVER, BC | CULVER CITY, CA
+
+33
+
+Glass Energy Conservation - Result
+
+…and now adding our extra lobe.
+So just like before, this compensation makes a huge difference
+to the look – even for moderate roughness values.
+
+Energy Preservation: On
+Energy comp ON
+
+VANCOUVER, BC | CULVER CITY, CA
+
+33
+
+I’m now going to hand the talk to Alex who will describe the
+thin version of glass.
+We also have dielectric thin surface simulation.
+
+Thin Surface BSDF
+
+VANCOUVER, BC | CULVER CITY, CA
+
+34
+
+Thin Surface
+
+Thin surface lets us fake a fully modeled thin object using only
+a single surface. It is very useful for windows, leaves, or
+
+Thin surface is thought of as a double refraction event that happens at a
+surface that is actually modeled as a single surface. It serves as a cheap
+way of rendering windows in large buildings, leaves, or butterﬂy wings.
+
+butterﬂy wings. The kind of object that would give numerical
+problems if modeled with its two sides.
+
+Reﬂected
+
+Imaginary surface
+Real surface
+
+VANCOUVER, BC | CULVER CITY, CA
+
+Refracted
+
+35
+
+Thin reflect/refract exit summation
+
+We take into account the two refractions, the reﬂections,
+Fresnel terms and multiple bounces so all the energy is
+preserved. We just assume the surface is locally ﬂat.
+
+θo
+Thickness
+
+θi
+
+If sin θo = sin θi · η, then Fo = F(cos θo , η), Fi = F(cos θi , 1/η) are the required
+Fresnel terms and A = e−t σa / cos θi is the absorption from bounce to bounce
+inside the layer, where t is the thickness. All exits have to be summed up.
+VANCOUVER, BC | CULVER CITY, CA
+
+36
+
+Thin Surface
+
+We end up with two lobes, reﬂection and refraction, with
+weights coming from the series summation of the bounces
+and the associated absorption.
+
+At the macro level, and due to roughness we have two blurred lobes that
+Fi A2
+are a result of the geometric series summation, Fo + (1 − Fo )(1 − Fi ) 1−F
+2 A2
+i
+(
+)
+F2i A2
+for reﬂection and (1 − Fo )A(1 − Fi ) 1 + 1−F2 A2 for refraction, where Fo is
+i
+the Fresnel factor for the outside of the layer, Fi the inside Fresnel and A
+the absorption along the traveled distance within the layer.
+VANCOUVER, BC | CULVER CITY, CA
+
+37
+
+Thin roughness mismatch
+
+We use a mirrored reﬂection for the refraction lobe, but the
+roughness impact is different due to the distinct Jacobians of
+both transformations. We got hints as how this difference
+
+We are using a mirrored reﬂection to fake double refraction and the
+roughness behaves differently because reﬂection and refraction have
+different Jacobian transformations.
+
+applies by relating how the two Jacobians transform the ray
+PDF.
+
+We can either ﬁnd what roughness would give us the same peak PDF with
+the different Jacobians or assume Var(ωh ) ≃ r4 and scale it by the square
+derivative of the transformation, which is roughly the inverse Jacobian.
+We get to the same relationship either way!
+
+VANCOUVER, BC | CULVER CITY, CA
+
+38
+
+Roughness mapping (equal peak PDF method)
+
+We basically equate the maximum possible PDF parametrized
+by the roughness using the different Jacobians on each side
+
+For viewing, half, refracted and mirrored vectors ωo , ωh , ωr , ωm …
+
+and ﬁnd what the needed roughness scaling would be to
+satisfy the constraint. We get a similar result with a rough
+
+∂ωh
+∂ωh
+Dmax (r) =
+Dmax (rthin )
+∂ωr
+∂ωm
+|ωr · ωh | η 2
+1
+1
+1
+=
+2
+4
+((ωr · ωh )η + (ωo · ωh )) πr
+4(ωo · ωh ) πr4thin
+√
+η−1
+r = rthin (Assuming (ωr · ωh ) ≃ −(ωo · ωh ))
+2η
+
+estimation of the variance. And ﬁnally we manually adjusted
+to account for the fact that we have two refraction events
+
+But in the thick case we get two refraction events, so there is still a
+missing roughness scale factor S(η) that in practice is not a constant. We
+√
+found S(η) = 2η−1
+1.7 to work well.
+η
+VANCOUVER, BC | CULVER CITY, CA
+
+39
+
+Roughness mapping (final curve)
+
+So all this partially obscure math may be a bit lousy, but it gave
+a good starting curve that we could shape to our needs and
+has the expected behavior. And it’s giving us a good mapping.
+
+• We made a lot of assumptions to get here but…
+• The transformed roughness vanishes as η → 1 as expected
+• Converges to a ﬁnite value as η → ∞
+• The remaining scale due to double refraction is hard to predict and was
+found empirically going from η = 1 to a maximum of 2.6
+
+• The ﬁnal curve goes from 0× to 1.84× and is
+√
+3.7 (η − 1) (η − 0.5)2
+rthin = r
+η3
+
+VANCOUVER, BC | CULVER CITY, CA
+
+40
+
+Thin Surface
+
+This is a render with modeled thickness and our glass BSDF …
+
+Thick surface with glass shader (reference)
+
+VANCOUVER, BC | CULVER CITY, CA
+
+41
+
+Thin Surface
+
+…and this is a single surface using our thin layer. The
+roughness matches very well and the color from absorption is
+close enough. They normally don’t switch from one to the
+other, but we wanted to be as close as possible.
+
+Thin surface approximation
+We get a very close match to the roughness distribution, and color is
+approximately preserved. An exact match is not required, since thin and
+thick surfaces are rarely interchanged.
+VANCOUVER, BC | CULVER CITY, CA
+
+41
+
+That covers all of the surface scattering models. Now we can
+talk about subsurface scattering. I’ll hand it back to Chris.
+
+Subsurface Scattering
+
+VANCOUVER, BC | CULVER CITY, CA
+
+42
+
+Subsurface Scattering
+
+We describe subsurface scattering as a homogeneous medium
+of constant density that we reach through a dielectric
+boundary. In other words, it’s represented as a constant
+volume inside glass.
+
+We deﬁne the density of the medium by its mean free path:
+
+This morning, in the Production Volume Rendering Course, I
+explained how we allow surface shaders to deﬁne their own
+volumetric interior with a priority based system. Now I want to
+also describe how the artists control the appearance.
+
+σt =
+
+We deﬁne the overall density of particles by a mean free path
+or scattering radius, which lets us control the amount of bleed.
+
+α
+1
+, σs =
+mfp
+mfp
+
+VANCOUVER, BC | CULVER CITY, CA
+
+And then the color is deﬁned by the albedo α of each particle.
+
+43
+
+Subsurface Scattering - Color control
+
+Conceptually α has the same role diffuse color, but setting
+them to the same value produces very different results. Here
+the front row uses subsurface scattering while the back row is
+a diffuse set to the same color.
+
+Single-scattering albedo α predicts overall color poorly:
+
+This was already discussed in the previous talks, but I’ll just
+mention that we use the following formula, which comes from
+the astrophysics literature.
+This formula predicts what color C comes out for given values
+
+We adopted an approximation from van de Hulst, 1980* :
+√
+(1 − s) (1 − 0.139s)
+1−α
+C=
+,s =
+1 + 1.17s
+1 − αg
+
+of α and g (the phase function eccentricity). The assumptions
+this makes is that we have a semi-inﬁnite half space lit
+uniformly from all directions. This is never exactly what we
+have, but for typical scattering distances it works really well.
+
+*
+
+See d’Eon, A Hitchhiker’s Guide to Multiple Scattering, 2016 for more details
+VANCOUVER, BC | CULVER CITY, CA
+
+44
+
+Subsurface Scattering - Color control
+
+Of course in our case we want the inverse of this formula
+because we want to know what value of α to use to achieve a
+
+Single-scattering albedo α predicts overall color poorly:
+
+given color C.
+
+We actually need the inverse formula:
+√
+s = 4.09712 + 4.20863C − 9.59217 + 41.6808C + 17.7126C2
+1 − s2
+α =
+1 − gs2
+
+VANCOUVER, BC | CULVER CITY, CA
+
+44
+
+Subsurface Scattering - Color control
+
+And here is the result of this remapping.
+Obviously this makes the model a lot more user-friendly for
+
+Applying the correction makes SSS color track better with diffuse:
+
+artists.
+
+We actually need the inverse formula:
+√
+s = 4.09712 + 4.20863C − 9.59217 + 41.6808C + 17.7126C2
+1 − s2
+α =
+1 − gs2
+
+VANCOUVER, BC | CULVER CITY, CA
+
+44
+
+Subsurface Scattering - Albedo
+
+I just want to show a plot of the curve of the equation here, to
+give a sense of what it’s doing. I’m going to be changing g from
+backward scattering towards forward scattering…
+
+√
+s = 4.09712 + 4.20863C − 9.59217 + 41.6808C + 17.7126C2
+1 − s2
+α =
+1 − gs2
+α
+Mapping accounts for inﬂuence of g
+g = −0.9
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+…
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = −0.7
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+…
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = −0.5
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+…so the curve bends more and more…
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = −0.3
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = −0.1
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.0
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.1
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.3
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.5
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.7
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+This is because it takes a brighter albedo to reﬂect the light
+back towards the boundary.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+α
+Mapping accounts for inﬂuence of g
+g = 0.9
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+Once we get to a purely forward-scattering phase function, the
+curve becomes unstable.
+This makes sense, because the model assumes we have to get
+
+√
+s = 4.09712 + 4.20863C − 9.59217 + 41.6808C + 17.7126C2
+1 − s2
+α =
+1 − gs2
+α
+
+back to the entry point to return any color, which is more and
+more unlikely.
+
+Mapping becomes unstable as g → 1
+g = 0.99
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Albedo
+
+Of course in practice we don’t really need to go this far, so we
+clamp the range of g to avoid these extreme values.
+
+s = 4.09712 + 4.20863C −
+1 − s2
+α =
+1 − gs2
+α
+
+√
+9.59217 + 41.6808C + 17.7126C2
+
+Mapping becomes unstable as g → 1
+g = 0.999
+
+C
+VANCOUVER, BC | CULVER CITY, CA
+
+45
+
+Subsurface Scattering - Eccentricity
+
+Here is the result showing the inﬂuence of g changing from -1
+to 1 from left to right. Again I put a diffuse sphere in the back
+for comparison.
+Remapping the albedo but ignoring g causes an intensity
+change.
+This is mostly visible on the right where the material is
+forward scattering. It gets dimmer because most of the light is
+pushed away from the viewer.
+A bit more subtle, but on the left the spheres are brighter
+
+Albedo remapping with g = 0
+
+because backward scattering pushes light back out very
+quickly.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+46
+
+Subsurface Scattering - Eccentricity
+
+Using g in the mapping helps equalize the color across the
+whole range. Although the more forward-scattering cases are
+still a bit difﬁcult to match exactly.
+
+Albedo remapping using g
+
+VANCOUVER, BC | CULVER CITY, CA
+
+46
+
+Subsurface Scattering - Eccentricity
+
+However, it turns out that our artists didn’t always like this
+automatic remapping, so we leave it optional in our shaders.
+The quantities passed to the renderer are just the raw volume
+parameters, and we leave all the remapping logic in the
+shader. So it’s very easy to offer different parameterizations
+for different cases.
+It’s also worth pointing out that the fact that this remapping
+works at all motivates the ﬁeld of similarity theory. In many
+cases, there is a set of parameters with isotropic scattering
+
+Albedo remapping with g = 0
+
+that mimics the overall effect of a forward scattering material.
+
+Some artists preferred g to change the intensity!
+
+VANCOUVER, BC | CULVER CITY, CA
+
+46
+
+Subsurface Scattering
+
+Techniques for efﬁcient volume integration were discussed in
+detail this morning.
+I am now going to hand the talk to Alex who will discuss the
+important detail of how we approximate the inﬂuence of the
+boundary on subsurface scattering. In fact, this is more
+broadly related to how we approximate caustics in general in
+our path tracer.
+
+Efﬁcient techniques for volumetric scattering were discussed in the
+“Production Volume Rendering” course from this morning.
+To make brute-force SSS practical, caustics from the refractive boundary
+must be resolved somehow. We wanted SSS to rely on the same solution
+as other cases, to keep the renderer consistent and predictable.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+And then Alex will also talk about the remaining features of
+our shading model.
+
+47
+
+Caustic Path Avoidance
+
+VANCOUVER, BC | CULVER CITY, CA
+
+48
+
+The caustic issue in path tracing
+
+This is a typical caustic case, a sphere concentrating light
+coming from a point. Regular backwards path tracing will have
+a really hard time ﬁnding the light source by BSDF sampling,
+
+Backwards path tracing: Noise!
+v4
+
+and next event estimation is not possible since light is blocked
+by the glass. It produces a lot of noise.
+
+v0
+v1
+v2
+
+v3
+
+VANCOUVER, BC | CULVER CITY, CA
+
+49
+
+The caustic issue in path tracing
+
+Forward path tracing solves this problem. But most of the work
+we do doesn’t use these fancy integrators because of
+performance reasons. And most of the time we don’t care
+
+Forward tracing from light: Good!
+v4
+But 99% of our shots run without BDPT
+v1
+
+about fancy light shapes and lens effects; most of the time we
+just want light to go through a glass window.
+
+v0
+
+v2
+
+v3
+
+VANCOUVER, BC | CULVER CITY, CA
+
+49
+
+The caustic issue in path tracing
+
+Our solution: transparent shadows. Just pretend the glass is
+transparent and light doesn’t bend. Unless the glass is rough,
+in which case we could afford the real thing. But this means
+
+Fake caustics via transparent shadows
+v4
+
+we have to deal with a couple of issues.
+
+v0
+v1
+v2
+
+v3
+
+VANCOUVER, BC | CULVER CITY, CA
+
+49
+
+Making path tracing caustic noise resistant
+
+First we have to ensure that our indirect lighting doesn’t throw
+in noisy caustics. We do this by clamping the roughness. If you
+bounce off a diffuse surface all glass will appear rough for the
+
+1. Clamp roughness as we bounce off surfaces
+
+rest of the walk. Then we apply transparent shadows to ﬁll in
+
+• Roughness always grows along the path
+• Smooths out caustics, but also dissolves them
+• Solves the noise
+
+the missing energy from smooth glass. And ﬁnally, we have to
+deal with double lighting. Note that both indirect lighting and
+transparent shadows try to guess the same thing and they add
+
+2. Apply transparent shadows
+
+up.
+
+• Fills in missing energy from transparent geometry
+
+3. Solve double lighting
+• Path tracing and transparent shadows add up
+• We need to weight them to compensate
+
+VANCOUVER, BC | CULVER CITY, CA
+
+50
+
+BDPT-based weighting
+
+To avoid the double lighting we weight our two sources of light:
+transparent shadows and the indirect sampling, so their
+
+In a BDPT context, backwards path tracing is only one more sampling
+method, and for caustics it is outweighted by the forward tracing one.
+(
+)
+P(vn−1 ← vn−2 ) . . . P(v2 ← v1 )P(v1 ← v0 )
+PTweight = 1/ 1 +
+...
+P(vn−1 → vn−2 ) . . . P(v0 )
+
+weights add up to one. We got inspired by BDPT weighting,
+
+There are many other terms in the denominator, but usually one will
+become big to bring down PTweight. Assuming P(vi → vi+1 ) ≃ P(vi−1 ← vi ),
+P(v ←vi+1 )
+the size of the winning term will be related to P(vii →vi+1
+at the “caustic
+)
+connection”.
+
+scattering event and the next.
+
+where the method with the highest probability wins. We have
+to simplify it because we are missing a lot of information, but
+it all comes down to the roughness difference between one
+
+We cannot compute the exact BDPT weight because we are missing
+information, but we can use a heuristic based on subsequent bounces
+and their PDFs, which are directly related to the surface roughness.
+VANCOUVER, BC | CULVER CITY, CA
+
+51
+
+A roughness-based heuristic
+
+Long story short: if the surface is rough and the occluder is
+smooth, transparent shadows are the best approach and their
+weight will be high. Otherwise if the surface is smooth,
+whatever comes next is better treated by regular path tracing
+
+We have two subsequent path vertices A and B. B might be found by
+indirect ray sampling Bp , or as a transparent hit in a shadow ray Bt .
+Depending on the roughness, we will choose the weights w(Bp ) and w(Bt ).
+
+and transparent shadows are weighted down. We came up
+with this simple formula that has been giving us good results
+in production.
+
+• If rough(A) ≫ rough(B) → w(Bt ) ≫ w(Bp ) (favor transparent shadows)
+• If rough(A) ≤ rough(B) → w(Bt ) ≪ w(Bp ) (favor indirect lighting)
+• w(Bt ) = max{rough(A) − rough(B), 0}, w(Bp ) = 1 − w(Bt )
+2
+
+t)
+• Recalculate using power heuristic: w′ (Bt ) = w(Btw(B
+)2 +w(Bp )2
+
+VANCOUVER, BC | CULVER CITY, CA
+
+52
+
+Mixing in the transparent shadows
+
+And it’s very simple to apply. During path tracing or shadow
+tracing we look at the previous event and, comparing
+roughness, we compute the weights for the lighting. It is not
+perfect, and we have to be careful with internal bounces, but
+
+• When computing lighting through refraction, we look at the previous
+vertex roughness and scale by w(Bp )
+
+you’ll see it is looking very decent for its simplicity.
+
+• When tracing transparent hits in shadows, we scale the transparency
+by w(Bt )
+• The method is not perfect and the error becomes more visible with
+many bounces inside glass objects, so we scale down Total Internal
+Reﬂection with w(Bp ) too
+• Not a real loss since w(Bp ) is only low after rough bounces
+
+VANCOUVER, BC | CULVER CITY, CA
+
+53
+
+Caustic Avoidance
+
+This is BDPT, which we take as the ground-truth reference. A
+glass object with increasing roughness.
+
+Reference (BDPT)
+
+VANCOUVER, BC | CULVER CITY, CA
+
+54
+
+Caustic Avoidance
+
+This is path tracing combining roughness-clamped indirect
+with transparent shadows. Notice how the energy blows up
+because of the double lighting.
+
+Transparent Shadows
+
+VANCOUVER, BC | CULVER CITY, CA
+
+54
+
+Caustic Avoidance
+
+And this is path tracing with our special weighting for indirect
+and transparent shadows. It’s very close to the BDPT result but
+much cheaper.
+
+Transparent Shadow + Roughness Weighting
+
+VANCOUVER, BC | CULVER CITY, CA
+
+54
+
+Brute-force subsurface scattering
+
+With a rough interface, connections to the light at the exit
+point are trouble-free, so our weighting will favor this
+approach.
+
+For rough interfaces, we can afford a random walk looking for an exit and
+then connect to the light source. This is what our transparency/indirect
+weighting produces for these cases. But for a smooth interface, the result
+would be too noisy – even worse than surface caustics.
+VANCOUVER, BC | CULVER CITY, CA
+
+55
+
+Brute-force subsurface scattering
+
+For the smooth case, we resort to transparent shadows and
+weight down the lighting at the exit point, but the path will
+continue to get indirect lighting.
+
+If the interface is smooth, lighting at the exit point will be weighted down
+and replaced by lighting in the interior via transparent shadows. We still
+get indirect lighting from the environment after the exit point.
+VANCOUVER, BC | CULVER CITY, CA
+
+55
+
+Now I will go over how we put coatings or layers on top of our
+generic BSDFs.
+
+Coatings
+
+VANCOUVER, BC | CULVER CITY, CA
+
+56
+
+Coatings
+
+We have just a few handy coatings that can be combined over
+any BSDF. In fact, you could stack them indeﬁnitely one over
+the other, and you can see here what it looks like in OSL code.
+
+To create more complex layered looks, we support multiple coating types:
+• Clearcoat
+• Sheen
+• Thin Film
+For shader writers, coats are created in the OSL code on top of any closure
+combination. We could even put coats on top of other coats.
+Ci = coat(closure1(...) + closure2(...) ...);
+
+VANCOUVER, BC | CULVER CITY, CA
+
+57
+
+Coats and energy conservation
+
+Like Chris explained in the dielectric/diffuse energy
+compensation, we try to compose these coats in a way that
+
+Assuming we know the energy response for a particular coating E(µ), if we
+want to combine it over another arbitrary BSDF, we can do as the already
+seen technique:
+
+maintains the right albedo. But since the underlying BSDF can
+be anything – not just diffuse – we have no way to renormalize
+it. We can only scale it in a way that avoids energy gain while
+losing as little energy as possible.
+
+f′s = (1 − E(µo )) · (1 − E(µi )) · fs (µo , µi , ϕ),
+where fs is the underlying BSDF passed by the OSL shader. But in this case
+Eavg is unknown and we cannot renormalize to avoid the energy loss due
+to (1 − E(µi )), so to reduce this loss we instead scale fs as
+f′s = min{(1 − E(µo )), (1 − E(µi ))} · fs (µo , µi , ϕ),
+which is still reciprocal and less darkening.
+VANCOUVER, BC | CULVER CITY, CA
+
+58
+
+Clearcoat
+
+For instance, we can take this BSDF …
+
+Coating off
+
+VANCOUVER, BC | CULVER CITY, CA
+
+59
+
+Clearcoat
+
+…and add a clearcoat (like a varnish layer) without energy gain.
+
+Clearcoat is a dielectric layer that uses the same 3D table seen before to
+compute E(µ). It can simulate wet or varnish without incurring energy
+gain.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+59
+
+Clearcoat
+
+The clearcoat has an imaginary thickness and can produce
+nice coloring effects using absorption.
+
+Coating with varying thickness + tint. We can also deﬁne absorption on
+the clearcoat layer, so coloring appears as the artist increases the
+imaginary thickness. Grazing angles are more saturated as rays travel
+longer within the coat.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+59
+
+Clearcoat
+
+Finally, here are furnace tests, which are ideal with the coating
+off.
+
+Furnace test (Coating Off )
+VANCOUVER, BC | CULVER CITY, CA
+
+59
+
+Clearcoat
+
+And with the coating on, we have a little loss, but nothing that
+would get us any complaints from the artists.
+
+Furnace test (Coating On)
+VANCOUVER, BC | CULVER CITY, CA
+
+59
+
+Sheen
+
+We also have our own sheen model. We call it the “charlie”
+sheen. It is a microfacet model whose distribution is shown in
+the slide, and it’s inspired by normal-oriented microcylinders.
+We get to tweak the roughness to change its appearance, as
+you can see.
+
+Sheen with increasing roughness. Our sheen model is a microfacet
+reﬂection just like the clearcoat, except the microfacet density is
+(2 + 1/r) sin1/r θ
+D(m) =
+2π
+
+VANCOUVER, BC | CULVER CITY, CA
+
+60
+
+Sheen
+
+And it is composed just like the other coatings so we don’t
+gain energy, as you can see in this furnace test.
+
+Sheen energy conservation: we store the albedo of the sheen lobe in a
+16 × 16 2D table indexed by roughness and incident angle, since we don’t
+take Fresnel into account. With our min{(1 − E(µo )), (1 − E(µi ))} scaling we
+avoid energy gain and suffer only subtle energy loss.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+60
+
+Sheen Shadowing/Masking function
+
+Its shadowing/masking term cannot be derived analytically, so
+we did it numerically and then we found a very good ﬁt. So in
+
+We compute this numerically given the chosen distribution of microfacets.
+Instead of using a lookup table, we found a good ﬁt:
+
+eL(cos θ)
+if cos θ < 0.5
+Λ(θ) =
+e2 L(0.5)−L(1−cos θ) otherwise,
+
+the end, the whole model is physically plausible, and if you are
+interested there is more information in the supplementary
+material.
+
+where L(x) = a/(1 + bxc ) + dx + e, and the a, b, c, d, e values were found for
+roughness r = 0 and r = 1, then we interpolate using (1 − r)2 .
+r
+0.0
+1.0
+
+a
+25.3245
+21.5473
+
+b
+3.32435
+3.82987
+
+c
+0.16801
+0.19823
+
+d
+−1.27393
+−1.97760
+
+VANCOUVER, BC | CULVER CITY, CA
+
+e
+−4.85967
+−4.32054
+61
+
+Sheen Terminator softening
+
+As engineers we were very happy with the results, but the
+artists wanted an even softer terminator.
+
+Shadowing/masking term derived from microfacet distribution. Light
+terminator is abrupt.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+62
+
+Sheen Terminator softening
+
+So we had to go and creatively modify the shadowing function
+to make it softer, but you can see that it kills the highlights on
+the edges.
+
+Modiﬁed shadowing/masking term to smooth out the terminator. We
+8
+modify it so Λ′ (θ) = Λ(θ)1+2(1−cos θ) . Reciprocal but too dark.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+62
+
+Sheen Terminator softening
+
+We ended up applying this softening only for the shadowing
+part. This makes the model non-reciprocal, but hey, the
+customer is always right!
+
+Modiﬁed shadowing term to smooth out the terminator only in the light
+direction. Non-reciprocal but visually pleasing.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+62
+
+Thank you Alex. I just want to wrap things up by giving you a
+sense of how we turned all this into shaders for our artists.
+
+Putting it all together
+
+VANCOUVER, BC | CULVER CITY, CA
+
+63
+
+Putting it all together
+
+The system we deployed to production is based on the idea of
+parameter blending, again inspired by the Disney model. The
+shaders keep track of three basic lobes -– for metal, plastic
+and glass –- and do parameter blending within each lobe.
+
+We restructured shaders around parameter blending:
+
+This is just an implementation detail, but it helps to avoid
+confusing parameters when doing things like dirt over glass.
+We wouldn’t want the IOR set on the dirt to have any impact
+on the refraction of the glass.
+
+• Shaders track three “lobes” internally: Metal, Plastic, Glass
+• Parameter blending within each lobe
+• Avoids contamination in cases like dirt on glass
+• Implementation detail: artists have total freedom to mix anything
+
+Of course, as far as the artist is concerned, any material can be
+mixed with any other type.
+
+Generalized our previous PatternCreate tool into MaterialCombine.
+Materials can be textured, combined, tweaked or coated within a graphical
+interface.
+
+The tool we called Pattern Create – for texturing speciﬁc
+parameters -– evolved into Material Combine, where artists
+can blend entire materials together.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+64
+
+Material Combine
+
+This is a screen capture of a small material graph that’s
+blending between two existing materials. Of course those
+materials can themselves be graphs.
+This is a very simple example that just uses a fractal node to
+blend between two materials and also drive displacement.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+65
+
+Material Combine
+
+This is the result of that graph.
+The tool is embedded inside Katana, which is our lighting and
+lookdev tool. This means that we can do these kind of edits to
+material graphs at very late stages of the pipeline.
+For example, an artist can very easily add paint drops driven
+
+Easy to create new materials out of
+existing ones.
+Leverages Katana’s deferred scene
+processing to allow late edits to the
+material graph.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+by FX onto any material without needing to know how the base
+material was constructed.
+
+66
+
+Double Specular
+
+I want to mention another small but important detail of our
+shaders.
+It’s well known that the GGX distribution doesn’t ﬁt well to all
+measured data. Several researchers have proposed extending
+the distribution itself to give control over its tail. – for instance
+the GTR or STD distributions.
+
+GGX does not match all measured data.
+
+Unfortunately these make the masking and shadowing
+functions much more complicated and exact importance
+sampling more difﬁcult.
+
+Rough = 0.1
+VANCOUVER, BC | CULVER CITY, CA
+
+67
+
+Double Specular
+
+Instead we chose a much simpler solution, which is to just
+expose two roughness values and a blend amount.
+This is easy to implement and importance sample, and works
+
+GGX does not match all measured data.
+
+seamlessly with our energy compensation scheme because it
+just involves a linear combination of energy-preserving BRDFs.
+
+We expose two roughness values to
+help achieve the “hazy” look of a
+longer-tailed distribution, at low cost.
+
+Rough = 0.1 (50%), 0.5 (50%)
+VANCOUVER, BC | CULVER CITY, CA
+
+67
+
+Double Specular
+
+Here you can see how a roughness of 0.3 is very different to a
+50/50 blend of roughness 0.1 and 0.5.
+
+GGX does not match all measured data.
+We expose two roughness values to
+help achieve the “hazy” look of a
+longer-tailed distribution, at low cost.
+
+Rough = 0.3
+VANCOUVER, BC | CULVER CITY, CA
+
+67
+
+Double Specular
+
+Here you can see how a roughness of 0.3 is very different to a
+50/50 blend of roughness 0.1 and 0.5.
+
+GGX does not match all measured data.
+We expose two roughness values to
+help achieve the “hazy” look of a
+longer-tailed distribution, at low cost.
+
+Rough = 0.1 (50%), 0.5 (50%)
+VANCOUVER, BC | CULVER CITY, CA
+
+67
+
+Double Specular
+
+In fact, just this year Peter Vangorp and colleagues did a
+perceptual study that suggests there is some merit to this
+approach.
+
+GGX does not match all measured data.
+We expose two roughness values to
+help achieve the “hazy” look of a
+longer-tailed distribution, at low cost.
+Vangorp et al., “The perception of hazy
+gloss”, 2017
+Rough = 0.1 (50%), 0.5 (50%)
+VANCOUVER, BC | CULVER CITY, CA
+
+67
+
+I’ll now brieﬂy talk about some of the work we still would like
+to do going forward.
+
+Future Work
+
+VANCOUVER, BC | CULVER CITY, CA
+
+68
+
+Future Work - Diffuse
+
+Lambertian diffuse is assumed to be a reasonable stand-in for
+SSS. But is it really?
+
+Is Lambertian diffuse a good proxy for SSS?
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+Here I am rendering the mesh as a volume with shrinking
+mean free path.
+
+Mean Free Path = 1 / 4
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+Here I am rendering the mesh as a volume with shrinking
+mean free path.
+
+Mean Free Path = 1 / 16
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+Once the mean free path is small enough, the result looks like
+it can be expressed as a BRDF.
+
+Mean Free Path = 1 / 64
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+Once the mean free path is small enough, the result looks like
+it can be expressed as a BRDF.
+
+Mean Free Path = 1 / 256
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+In fact there is a closed-form solution to this exact problem
+that has been derived a long time ago. Here I am showing that
+this BRDF matches the volume simulation exactly.
+o )H(µi )
+The BRDF has the form: f (µi , µo ) = αH(µ
+4π(µi +µo ) . Approximations
+to the H function are described in d’Eon, A Hitchhiker’s Guide
+to Multiple Scattering, 2016.
+
+Chandrasekhar BRDF
+
+Also note that α is the single-scattering albedo, and therefore
+it is important to use the same albedo remapping techniques
+
+Matches volume scattering exactly
+
+VANCOUVER, BC | CULVER CITY, CA
+
+as discussed earlier for brute force subsurface scattering.
+
+69
+
+Future Work - Diffuse
+
+On the other hand, it doesn’t match the Lambertian result at
+all!
+Some other researchers have explored this. The Disney BSDF
+model in particular tries to get a seamless match between
+
+Diffuse BRDF is very different!
+
+subsurface and diffuse, but we feel there is more work to be
+done in this area.
+
+This has already been explored by previous work.
+Result should also depend on the microfacet
+roughness and IOR.
+Our diffuse term accounts for roughness and IOR
+but does not match the limit behavior of SSS.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+69
+
+Future Work - Diffuse
+
+I am just pointing out a few recent papers that have proposed
+improved diffuse models.
+However, none of them are trying to exactly match volume
+scattering results.
+
+Other interesting recent work:
+• Meneveaux et al., “Rendering Rough Opaque Materials with Interfaced
+Lambertian Microfacets”, 2017
+• Hammon Jr., PBR Diffuse Lighting for GGX+Smith Microsurfaces, 2017
+• Holzschuch et al., “A Two-Scale Microfacet Reﬂectance Model
+Combining Reﬂection and Diffraction”, 2017
+
+VANCOUVER, BC | CULVER CITY, CA
+
+70
+
+Future Work - Energy Preservation
+
+Finally, was all this focus on energy preservation worthwhile?
+We feel that it’s a very clear win for metals and glass. It works
+really well with the caustic avoidance scheme because making
+a material rougher doesn’t lead to less energy being
+transmitted.
+
+Was our focus on energy preservation worthwhile?
+• Helpful for glass and metals. Works well with caustic avoidance
+scheme and roughness clamping.
+
+But we’d like to do more comparisons to measured data.
+And of course for real-time applications, having formulas
+
+• Need to better understand how our construction differs from
+ground-truth and measured data.
+
+would be better than tabulating. We are very close for some of
+the 2D tables, but the 3D cases seem more challenging.
+
+• Analytical formulas would be preferable to tabulation for real-time
+applications.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+71
+
+Production Use (mixed with older shaders)
+
+I’ve kept these slides intentionally free of production examples
+so we could share all the slides online. But these are the
+productions that ﬁrst used some of this technology.
+For these shows, we just added new lobes to our old shaders.
+And we also introduced a new glass shader that got used a lot…
+
+VANCOUVER, BC | CULVER CITY, CA
+
+72
+
+Production Use (all new shaders)
+
+…and these are the ﬁrst few shows that used our new
+parameter blended shaders with volumetric subsurface.
+Of course everything in production going forward is using
+these brand new shaders as well.
+
+VANCOUVER, BC | CULVER CITY, CA
+
+73
+
+Acknowledgements
+
+Finally I just want to acknowledge the hard work of our
+Shading team, in particular Lee Kerley and Ole Gulbrandsen
+who were instrumental in working with us to assemble all of
+this into an artist-friendly package.
+
+• Shading Team
+• Lee Kerley
+• Ole Gulbrandsen
+
+I also want to thank all the lookdev artists who participated in
+
+• Lookdev Artists
+
+the early discussions and testing of these models.
+
+• Brian Kloc
+• Brian Steiner
+• Craig Feifarek
+• David Conlon
+• Kurt Judson
+• Maung Maung Hla Win
+• and many more …
+VANCOUVER, BC | CULVER CITY, CA
+
+74
+
+That concludes our talk.
+Thank you very much for your attention, and Alex and I will be
+happy to take any questions.
+
+Thank You! Questions?
+
+To hear more about our renderer please see:
+• Talk: “Importance Sampling of Many Lights With Adaptive Tree Splitting” - Monday 3:45PM, Room 402AB
+• Course: “Path Tracing in Production - Part 2: Making Movies”, Wednesday 2:00PM, Room 408AB
+
+References I
+Raphael Aronson. “Boundary conditions for diffusion of light”. In:
+Journal of the Optical Society of America A (1995).
+Eugene d’Eon. A Hitchhiker’s Guide to Multiple Scattering.
+http://www.eugenedeon.com/hitchhikers. 2016.
+Ole Gulbrandsen. “Artist Friendly Metallic Fresnel”. In: Journal of
+Computer Graphics Techniques (JCGT) (2014).
+Earl Hammon Jr. PBR Diffuse Lighting for GGX+Smith Microsurfaces.
+http://gdcvault.com/play/1024478/PBR-DiffuseLighting-for-GGX. 2017.
+
+References II
+Eric Heitz. A Simpler and Exact Sampling Routine for the GGX
+Distribution of Visible Normals. Research Report. Unity
+Technologies, Apr. 2017. url:
+https://hal.archives-ouvertes.fr/hal-01509746.
+Eric Heitz et al. “Multiple-scattering Microfacet BSDFs with the Smith
+Model”. In: ACM Transactions on Graphics (2016).
+Nicolas Holzschuch and Romain Pacanowski. “A Two-Scale
+Microfacet Reﬂectance Model Combining Reﬂection and Diffraction”.
+In: ACM Transactions on Graphics (2017).
+
+References III
+Wenzel Jakob et al. “A Comprehensive Framework for Rendering
+Layered Materials”. In: ACM Transactions on Graphics (2014).
+Csaba Kelemen and Laszlo Szirmay-Kalos. “A Microfacet Based
+Coupled Specular-Matte BRDF Model with Importance Sampling”. In:
+Eurographics - Short Presentations (2001).
+Daniel Meneveaux et al. “Rendering Rough Opaque Materials with
+Interfaced Lambertian Microfacets”. In: IEEE Transaction on
+Visualization and Computer Graphics (2017).
+Hendrik van de Hulst. Multiple Light Scattering. Academic Press,
+1980.
+
+References IV
+Peter Vangorp, Pascal Barla, and Roland W. Fleming. “The perception
+of hazy gloss”. In: Journal of Vision (2017).
+
+The following slides were added after the talk was given in
+response to feedback from Stephen Hill and others.
+
+Appendix
+
+Microfacet Energy Compensation - Fresnel
+
+In reviewing the logic behind the multiple scattering Fresnel
+correction, we realized that the summation should really start
+from k = 1. In addition, we should divide by 1 − Eavg to keep
+the term normalized.
+
+Comparison between our proposed fms compensated specular and Eric
+Heitz’ work suggests that our correction is too bright. Stephen Hill found
+the following tweak gives a much closer match:
+
+Compared to the result in the slides, this winds up being just
+
+∞
+∑
+F2avg Eavg
+1
+Favg Eavg
+Fkavg (1 − Eavg )k =
+1 − Eavg
+1 − Favg (1 − Eavg )
+
+conductors will be slightly darker at high roughness than at
+
+k=1
+
+an extra square on Favg in the numerator. This reduces the
+overall albedo of f + fms . This means the apparent color of
+low roughness. On the other hand, the original factor tends to
+keep the overall color constant at the expense of making
+rough materials slightly too bright and not as saturated as the
+reference. When applied to a dielectric specular, the original
+formulation could lead to a “dusty” look, while the correction
+above gives a much more natural response.
+
+Microfacet Energy Compensation - Numerical Fit
+
+The following ﬁt was found in Mathematica. We believe that a
+better ﬁt should be possible, but have not found one yet. You
+may observe slight energy gain and loss near grazing angles.
+
+The following numerical ﬁt provides an alternative implementation to the
+322 table suggested in the slides.
+√
+
+s (µ, r) = Sa µ + Sb r + Sc r2 + Sd r3 + Se r4
+t (µ, r) = Ta µ + Tb r + Tc r2 + Td r3 + Te r4
+s6 µ3/4
+1 − E (µ, r) = 6
+t + µ2
+Aa r3
+1 − Eavg (r) =
+1 + Ab r + Ac r2
+
+S
+T
+A
+
+a
+
+b
+
+c
+
+d
+
+e
+
+−0.170718
+0.0632331
+0.592665
+
+4.07985
+3.1434
+−1.47034
+
+−11.5295
+−7.47567
+1.47196
+
+18.4961
+13.0482
+
+−9.23618
+−7.0401
+
+For an efﬁcient implementation, importance sampling the
+multiple scattering term is important, particularly at low to
+medium roughness values where the response is concentrated
+on the grazing angles. Therefore we still favor the tabular
+representation over this ﬁt.
+
+

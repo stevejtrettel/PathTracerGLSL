@@ -1,0 +1,23 @@
+1 flip guarantee: 2e6 random (wo, gradient up to slope ~600): wo·n_f<=0 count=0; min (wo·n_f)/(wo·n) = 4.871e-6
+2 lune wo=0.00,0.00,1.00 flipped=false: bsdf=0.3415 nee=0.3402 mis=0.3413 exact ρ(1+cosθ)/2=0.3414
+2 lune wo=0.95,0.00,0.30 flipped=true: bsdf=0.3416 nee=0.3418 mis=0.3416 exact ρ(1+cosθ)/2=0.3414
+2 lune wo=-0.90,0.20,0.40 flipped=false: bsdf=0.3413 nee=0.3420 mis=0.3413 exact ρ(1+cosθ)/2=0.3414
+2 lune wo=0.69,-0.69,0.23 flipped=true: bsdf=0.3416 nee=0.3426 mis=0.3417 exact ρ(1+cosθ)/2=0.3414
+2 no-mask reference (sky below too, all light reaches): ρ = 0.4
+3 albedo: max over 300 random (wo, slope≤3, roughness) configs — lambert ρ=1: 1.0000, ggx f0=1: 1.0000 (4000 samples each)
+4 χ² lambert wo=0.31,0.10,0.94 slope=0.8: χ²=97.1 over 107 cells (crit 156.8), rejected 11.43% (expected 11.42%), max triple rel err 4.9e-14, max pdf rel err 4.9e-14
+4 χ² lambert wo=0.96,0.00,0.27 slope=1.5: χ²=82.0 over 96 cells (crit 143.4), rejected 22.44% (expected 22.43%), max triple rel err 3.1e-14, max pdf rel err 3.1e-14
+4 χ² ggx wo=0.31,0.10,0.94 slope=0.8: χ²=101.5 over 108 cells (crit 158.0), rejected 54.12% (expected 54.14%), max triple rel err 1.6e-12, max pdf rel err 2.7e-14
+4 χ² ggx wo=0.96,0.00,0.27 slope=1.5: χ²=83.3 over 96 cells (crit 143.4), rejected 1.68% (expected 1.69%), max triple rel err 4.2e-13, max pdf rel err 2.4e-13
+5 FD |p|≤1 step=0.01: worst |∇_S h error| / max|∇h| = 5.01e-2
+5 FD |p|≤1 step=0.003: worst |∇_S h error| / max|∇h| = 4.62e-3
+5 FD |p|≤1 step=0.001: worst |∇_S h error| / max|∇h| = 5.32e-4
+5 FD |p|≤1 step=0.0003: worst |∇_S h error| / max|∇h| = 2.48e-4
+5 FD |p|≤1 step=0.0001: worst |∇_S h error| / max|∇h| = 7.34e-4
+5 FD |p|≤1 step=0.00001: worst |∇_S h error| / max|∇h| = 7.69e-3
+5 FD |p|≤10 step=0.01: worst |∇_S h error| / max|∇h| = 5.04e-2
+5 FD |p|≤10 step=0.003: worst |∇_S h error| / max|∇h| = 4.70e-3
+5 FD |p|≤10 step=0.001: worst |∇_S h error| / max|∇h| = 1.16e-3
+5 FD |p|≤10 step=0.0003: worst |∇_S h error| / max|∇h| = 3.23e-3
+5 FD |p|≤10 step=0.0001: worst |∇_S h error| / max|∇h| = 8.14e-3
+5 FD |p|≤10 step=0.00001: worst |∇_S h error| / max|∇h| = 9.20e-2

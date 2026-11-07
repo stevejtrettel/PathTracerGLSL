@@ -1,0 +1,9 @@
+50mm f/1.8 @2m (meters): v=0.051282 fov=0.459728 rad (26.340 deg) aperture=0.013889
+z=0.5: object-space 2.083333e-2  real 2.083333e-2
+z=1: object-space 6.944444e-3  real 6.944444e-3
+z=1.5: object-space 2.314815e-3  real 2.314815e-3
+z=2.5: object-space 1.388889e-3  real 1.388889e-3
+z=4: object-space 3.472222e-3  real 3.472222e-3
+z=10: object-space 5.555556e-3  real 5.555556e-3
+z=100: object-space 6.805556e-3  real 6.805556e-3
+max relative difference 4.20e-14

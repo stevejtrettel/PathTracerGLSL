@@ -1,0 +1,3 @@
+16x16: furnace error max 1.48e-2 (mu=0.020 r=0.032) mean 7.52e-4  build 13282 ms
+32x32: furnace error max 3.73e-3 (mu=0.031 r=0.183) mean 2.23e-4  build 22334 ms
+64x32: furnace error max 3.12e-3 (mu=0.035 r=0.074) mean 1.95e-4  build 32668 ms

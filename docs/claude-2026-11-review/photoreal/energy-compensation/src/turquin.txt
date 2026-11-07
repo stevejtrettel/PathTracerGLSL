@@ -1,0 +1,374 @@
+              Practical multiple scattering compensation for microfacet models
+                                                                 Emmanuel Turquin∗
+                                                              Industrial Light & Magic
+
+
+
+
+Figure 1: Increasingly rough GGX conductor widgets. Top: single-scattering only. Bottom: with our multiple scattering compensation.
+Notice the boosted intensity and saturation as the surface becomes rougher, which offers a visually more satisfying and uniform gradation.
+
+
+Abstract                                                                      A particularly popular choice is the use of the GGX distribution as
+                                                                              D (and its associated term G; see [Heitz 2014] on how they should
+With the adoption by the game, animation and VFX industries of                relate), along with a conductor Fresnel term, to reproduce rough
+more physically grounded light transport methods and material rep-            metals (as in Figure 1, top row). Alternatively, adding a BTDF
+resentations, an effort has been put on energy conservation, to en-           combined with a dieletric F can replicate refractive materials such
+sure both numerical stability of the computations and realistic look-         as frosted glass.
+ing images. However, this effort has been much more focused on
+avoiding undue light emission than ensuring no energy is lost in
+the process. Microfacet models have become a standard building
+block of surface materials for representing specular components
+of varying roughness; and yet, while they possess many desirable
+properties in addition to producing convincing results, their very
+design neglects an important source of scattering, that can cause
+a significant loss of energy. Specifically, they only model single-
+scattering across the microfacets, and ignore the subsequent inter-
+actions, which get more important as roughness increases. From
+a user standpoint, this results in an unexpected darkening of rough
+specular lobes, which typically has to be accounted for in ad hoc             Figure 2: White furnace test on a microfacet BRDF with F = 1,
+ways. In this document, we present and compare different ap-                  and roughness going from 0 (left) to 1 (right). From top to bottom:
+proaches aiming to address this flaw and ensure energy preserva-              Beckmann, GGX, GTRγ=1 and STDγ=1.55 distributions. If multiple
+tion, including one that has been developed at ILM.                           scattering was properly accounted for, the albedo would be 1.
+
+Keywords: microfacets, multiple scattering, energy compensation
+                                                                              Unfortunately, this model also suffers from an important limitation:
+                                                                              it only simulates a single interaction of the incoming ray of light
+1     Introduction                                                            on the microfacets, after which the scattered ray is either visible or
+                                                                              not from ωi /ωo , as determined by G. The multiple scattering that
+Since its introduction by Cook and Torrance [1982], the microfacet            would occur when the ray is not visible (i.e., hits another micro-
+model has become an ubiquitous way of repesenting rough specular              facet, once or more) is not accounted for (see Section 3 of [Heitz
+reflections and refractions [Walter et al. 2007], both in real-time and       2014] for more details). As one would expect, there is no missing
+offline rendering. If we consider mirror-like reflecting facets, a mi-        energy when the roughness is zero, as this corresponds to a per-
+crofacet BRDF ρ can be expressed using the well known formula:                fectly flat surface with no possible occlusion. But the rougher the
+                                                                              surface (or the wider the spread of microfacet orientations is), the
+                         . F (ωo , h) G (ωo , ωi , h) D (h)                   more this lack of multiple scattering energy becomes noticeable.
+            ρ (ωo , ωi ) =                                          (1)
+                                  4|ωi · n||ωo · n|                           Looking back at Figure 1, top row, the right-most objects appear
+                                                                              overly dark and dull, in comparison to the shinier ones. As a matter
+with n being the geometric normal, h the microfacet normal, ωi                of fact, in the case of GGX and when ignoring Fresnel absorption,
+and ωo the incoming and outgoing directions, F the Fresnel term,              the loss of energy reaches about 60% for a roughness value α = 1.
+G the shadowing-masking function and D the microfacet distribu-               It gets even worst when using distributions with longer tails, such
+tion function. This formulation, amongst other advantages, offers             as GTR [Burley 2012] or STD [Ribardière et al. 2017], where it can
+a great modularity as all three terms F , G and D can be chosen               reach in excess of 90%, as illustrated by Figure 2. In a production
+between candidates with different characteristics.                            environment, this calls for an eye-balled, manual compensation of
+                                                                              the albedo, applied typically at the look development stage, and po-
+    ∗ e-mail: eturquin@ilm.com                                                tentially breaking energy conservation in other ways. Thankfully,
+                                                                              easier and sounder methods have been devised.
+
+
+
+                                                                          1
+2    Previous work                                                                 “If it turns out to be simple, then as a first approximation
+                                                                                   we could model it with an analytical function (e.g. as a
+The various ways of reinjecting the missing multiple scattering con-               single lobe).” (Q2)
+tribution range from heuristic and artistically controlled, to fully
+physically based and automated. They also vastly differ in terms of           About Fresnel, he suggests to precompute an average term Fss for
+complexity, practicality and speed.                                           one bounce and rescale Ems by it. If deemed not accurate enough,
+                                                                              “perhaps the average value Fms after multiple bounces could be
+Burley [2015] introduces a simple, physically justified, user-driven          precomputed as well”. Concluding with this promising observation:
+Sheen component using the Schlick Fresnel profile (1 − cos θo )5 ,
+that adds grazing forward reflection to better match observed ma-                  “Since multiple scattering tends to smooth out functions,
+terials, and complements the diffuse retro-reflection already pro-                 one can reasonably expect it to be efficiently represented
+posed in [Burley 2012]. The motivation for this term is to approx-                 and stored with simple analytical functions or small pre-
+imately compensate for the assumed missing “multiple-scattering                    computed look-up textures.” (Q3)
+effects between and through microsurface features”.                           In a subsequent effort, Heitz et al. [2016] follow up on the idea
+                                                                              expressed in Q1, and propose a full-on stochastic model to sim-
+                                                                              ulate multiple scattering, using the microflake theory for volumes
+                                                                              and random walks on the microsurface. The model is shown to be
+                                                                              extremely accurate, not only for conductor reflections but also di-
+Figure 3: Effect of Sheen, ranging from 0 to 1, as in [Burley 2015].          electric scattering, and would be ideal if not for its involved nature
+                                                                              that makes it not so straightforward to plug into an existing produc-
+Unfortunately, this qualitative compensation (illustrated in Fig-             tion rendering system (notably with the use of additional random
+ure 3) fails to take into account important factors, such as the effect       numbers), and more importantly computationally very expensive.
+of roughness variation, and thus needs to be readjusted whenever
+                                                                              An interesting and somewhat surprising take from this work (visible
+other attributes of the BSDF are edited. In Section 5.1 of those
+                                                                              in Figure 15 of their paper, and partially reproduced here in Figure 4
+same course notes, an emphasis is put on how much of a practi-
+                                                                              for convenience), is that secondary lobes do not look diffuse but
+cal issue it still is in production, while a more exact and automatic
+                                                                              rather like scaled-down versions of the primary one.
+method is mentioned as future work.
+In the Multiple Scattering sub-section of Section 7 of [Heitz 2014],
+a suggestion is made to “combine the knowledge of energy conser-
+vation and empirical observations”, and to consider a new BRDF
+model that would be expressed as:
+                          .
+             ρ (ωo , ωi ) = ρss (ωo , ωi ) + ρms (ωo , ωi )      (2)
+
+where ρss is the usual, single-scattering only term of Equation 1,
+and ρms a new multiple scattering term to be defined, that accounts
+for all secondary lobes. A first important constraint on ρms is natu-
+rally imposed by energy preservation. Let us introduce the albedo
+as:                        Z
+                         .
+                E (ωo ) =       ρ (ωo , ωi ) |ωi · n|dωi          (3)
+                            Ωi
+
+(similarly, Ess and Ems ). Then, if we momentarily ignore Fresnel
+(i.e. we consider that F = 1), the following equality must hold:
+
+               E (ωo ) = Ess (ωo ) + Ems (ωo ) = 1                 (4)        Figure 4: Resulting lobes from a simulated microsurface using the
+                                                                              Beckmann distribution, courtesy of Heitz et al. [2016].
+expressing the fact that without any absorption, all incoming energy
+is reflected back, after one or more bounce(s) on the microfacets.            In an effort concurrent to ours, Kulla and Conty [2017] exploit ob-
+Put differently:                                                              servations made in Q2 and Q3 and propose a significantly less accu-
+                                                                              rate, but much simpler and faster solution. They adapt the work of
+                      Ems (ωo ) = 1 − Ess (ωo )                    (5)        Kelemen and Szirmay-Kalos [2001] to the present problem, and use
+                                                                              their diffuse-looking matte component as multiple scattering lobe,
+Given that Ess is completely defined, we have different options to            which by construction respects Equation 5:
+(pre-)compute it, or Ems . Respecting Equation 5 prevents energy
+loss, and would naturally lead to a perfectly constant Figure 2, as                                 .     (1 − Ess (ωo ))(1 − Ess (ωi ))
+desired. Now, what remains to be explored is:                                        ρms (ωo , ωi ) = Fms                                         (6)
+                                                                                                                 π(1 − Eavg )
+    • The shape of ρms                                                        with the Fresnel term defined as:
+    • How to incorporate Fresnel absorption.                                                         .         Fss Eavg
+                                                                                                 Fms =                                            (7)
+While Heitz [2014] doesn’t offer a direct solution to either problem,                                     1 − Fss (1 − Eavg )
+he notes that:                                                                                    R1
+                                                                              and with Fss = 2 0 F (µ) µdµ computed assuming diffuse re-
+      “The shape of ρms could be investigated, for instance,                                          R1
+                                                                              flection and Eavg = 2 0 Ess (µ) µdµ. Note that they choose to
+      by computing Monte-Carlo simulations on rough sur-
+      face samples.” (Q1)                                                     remap F and Ess with µ = |ω · n| instead of ω, which is perfectly
+                                                                              fine as both terms are azimuthally invariant. The detailed deriva-
+adding right after:                                                           tion of the Fms term, obtained using a geometric series, is given
+
+
+
+                                                                          2
+in [Jakob et al. 2014], Section 5.6. The overall method relies on                  Beckmann              GGX               GTRγ=1            STDγ=1.55
+small 1D (α) and 2D (α, µ) look-up tables for the smoothly vary-
+ing Eavg and Ess (with dimensions of 32 and 32×32, respectively,
+in their implementation), which have to be precomputed for each
+given microfacet distribution. By design the lobe is also reciprocal
+(i.e. ρms (ωo , ωi ) = ρms (ωi , ωo )), which is crucial if used in a
+bi-directional setting.
+As an additional contribution, given that F also depends on its IOR             Figure 5: Ess for different microfacet √ models, quantized at 32×32.
+(two wavelength-dependent values for conductors), they offer sim-               Left to right: cos θo , and top to bottom: α ∈ [0, 1].
+ple analytical fits of Fss for various Fresnel formulations (Schlick
+approximation, conductor, artist-friendly conductor). They also                 3.1.2   Fresnel term
+support rough dielectric reflection and refraction, this time using
+a couple of tables, one for each type of interface (exterior towards            Before going any further, we have to acknowledge that the decision
+interior, and the other way around). In this case, Fresnel has to               to model multiple scattering with a single lobe, and to consider Fms
+be incorporated into the energy LUTs, as it now represents a ratio              as separable and directionally invariant, is a very coarse approxima-
+between reflected and refracted rays, thus adding a dimension to                tion. Within this design, we can only expect a partial match at best.
+tables of otherwise matching resolution.                                        However, a simple qualitative match will likely be good enough
+                                                                                for our production needs, and for a user it makes the behaviour of
+All in all, this method is very fast and robust, and can be added to
+                                                                                the compensation more easily predictable, with a saturation directly
+a renderer with relatively minor modifications to its BSDFs. How-
+                                                                                proportional to the amount of energy being added.
+ever, it elects to use a diffuse-looking ρms lobe, hence contradict-
+ing previous results from Heitz et al. [2016], which showed that the
+secondary lobes are rather similar in shape to the primary one.
+
+3     Our method
+Whereas Kulla and Conty’s main concern and design constraint
+was to preserve reciprocity, our method stems from this observed
+similarity of shapes between lobes, while also aiming at extreme
+minimalism (unless more complexity would prove beneficial to the
+                                                                                Figure 6: Comparison between no mult. scattering compensation,
+user). This brought us to simply try and use a scaled ρss as ρms :
+                                                                                compensation without and with Fms , on a rough GGX conductor.
+                 .                                                              Note the difference in color saturation when Fresnel is applied.
+    ρ (ωo , ωi ) = ρss (ωo , ωi ) + Fms kms (ωo ) ρss (ωo , ωi ) (8)
+with kms a factor to be defined, accounting for the missing energy.
+                                                                                A great option for Fms is to simply reuse the term defined in Eq. 7.
+In this section, we use a GGX BRDF, unless mentioned otherwise.                 This function goes from being exactly equal to Fss when α = 0
+                                                                                (or Eavg = 1), corresponding indeed to a case where there is only
+                                                                                                                      2
+3.1     Conductors                                                              single-scattering, to being close to Fss for α = 1 (or Eavg ≃ 0.4).
+                                                                                                                         2
+3.1.1   Energy term                                                             Looking at Figure 7 left1 , we see that Fss would give slightly more
+                                                                                saturation than even this formulation, which happens to be visually
+If we push aside the effect of Fresnel on the multiple scattering               a bit closer to ground truth results (more on that in Section 4).
+term, we can actually see ρ as a normalized version of ρss :
+                                                                                We use it with a minor alteration though, as ρss already incor-
+                                                    ρss (ωo , ωi )              porates a directional single-scattering Fresnel coefficient F (see
+    ρ (ωo , ωi ) = (1 + kms (ωo )) ρss (ωo , ωi ) =                   (9)       Equation 1), effectively replacing Fss at the numerator. We can
+                                                     Ess (ωo )
+                                                                                justify this as a way to give more directionality to our overall ef-
+Naturally giving us:                                                            fect, counter-balancing the diffuse assumption made in the original
+                                     1 − Ess (ωo )                              derivation.
+                       kms (ωo ) =                                   (10)                                .          Eavg
+                                       Ess (ωo )                                                    Fms =                                      (12)
+                                                                                                            1 − Fss (1 − Eavg )
+And by construction, such a BRDF verifies Equation 4:
+            Z                                                                   The function’s behaviour corroborates measurements made with the
+                 ρss (ωo , ωi )               Ess (ωo )
+  E (ωo ) =                     |ωi · n|dωi =            =1          (11)       Heitz [2016] model, showing that the average random walk depth
+              Ωi  E  ss (ω o )                E ss (ωo )                        (which can be seen as an exponent for Fss ) varies from 1 to almost
+Due to its smooth variation, we found like Kulla and Conty that                 2, when α goes from 0 to 1 (see Figure 7 right).
+Ess can be precomputed (again, with F = 1) and stored in a small                Exploiting these results, another (even simpler) suitable formula-
+LUT, parameterized by outgoing angle (or cosine) and roughness.                 tion for Fms would be:
+√ our implementation, we too use 32 × 32 tables with cos θo and
+In
+   α (see Figure 5). For distributions with an additional γ tail-length                                          . α√α
+                                                                                                             Fms = Fss                                  (13)
+parameter, such as GTR or STD, we extend the tables to 32 × 32 ×
+32 with a γ-mapping tailored to each distribution.
+                                                                                We can simplify the Fresnel term further still, by observing that, as
+But while the energy term is probably the most critical component               a multiplier of kms in Eq. 8, it makes more of an impact when the
+of the overall compensation, the Fresnel absorption happening at                kms value is high, which corresponds to large roughness values.
+each bounce on a microfacet is far from negligible, as shown in
+Figure 6. We still need to find a satisfying Fms term.                             1 A dynamic version of these curves is available online at [Turquin 2017].
+
+
+
+
+                                                                            3
+                                                                                                                      S
+                                                                              Given that Fresnel is included in the Ess  term, our LUT becomes
+                                                                              3D, with the IOR as an additional dimension. On the other hand,
+                                                                              this means that we do not need to worry about a separate multiple
+                                                                              scattering Fresnel term anymore. As Kulla and Conty [2017], we
+                                                                              compute tables separately for the two types of interface, leading
+                                                                              to two 32 × 32 × 32 tables (note that the tables would even be
+                                                                              4D if computed for a tail-length parametrized model), and use the
+                                                                              bounded F0 ∈ [0, 1], instead of η for the extra dimension.
+
+
+
+
+Figure 7: Left: Fms as defined in Eq. 7, for Eavg = 0.4 (i.e.
+                                                                 2
+α ≃ 1), as a function of Fss . We can see that it gets close to Fss .
+Right: In blue: Measured average random walk depth  √   for GGX,  as
+a function of α. In red: fitting the data with 1 + α α.
+
+
+Since the influence of Fms is most visible when α = 1, we can
+strip it down to the value it takes for such a roughness:
+                                    .
+                              Fms = Fss                   (14)
+We are not completely done yet: a last simplification can be ap-
+plied. Fss , as defined in [Kulla and Conty 2017], is expressed as            Figure 8: Comparison between rough (α = 0.5) GGX glass object
+a polynomial fit with wavelength-dependent parameters η and κ,                without (left) and with (right) multiple scattering compensation.
+or alternatively F0 and Fedge (F0 being the color at normal angle;
+see [Gulbrandsen 2014] for details on this parameterization). Its             As can be seen in Figure 8, the effect of this compensation is quite
+evaluation has a cost, especially if targetting real-time applications.       noticeable – maybe even more so than with conductors.
+In our tests, for strongly tinted, physically plausible conductors
+such as gold or copper, Fss and F0 values are so close that they              4    Comparison with other approaches
+can be interchangeably used with no visual difference in the re-
+sults. Note that this observation only holds when using a physical            The method presented in Section 3 has been implemented in
+Fresnel; if we pick a more artist-driven one where grazing values             Isotropix Clarisse, Pixar RenderMan’s RIS and the Mitsuba path
+can be arbitrarily colored, it is recommended to stick with Eq. 14.           tracer, but could easily be added to any other renderer (including
+                                                                              real-time rasterization engines).
+This leads us to the ultimate, bare-bones formula:
+                                   .                                          It is close to Kulla and Conty’s, essentially with a different choice
+                             Fms = F0                             (15)        of shape for ρms : the same lobe as ρss in our case, as opposed to
+and if we rewrite our BRDF defined in Eq. 8 more explicitly:                  a diffuse one in theirs. The former is closer to the ground truth (as
+                                                                              shown in [Heitz et al. 2016]), but not reciprocal, which could be
+                       `       1 − Ess (ωo ) ´                                a deal breaker when the resulting BSDF is used with bidirectional
+         ρ (ωo , ωi ) = 1 + F0                 ρss (ωo , ωi )     (16)        light transport. However, we believe that this lack of formal reci-
+                                 Ess (ωo )
+                                                                              procity is unlikely to produce any significant artefacts.
+This is the formulation that has been used to generate the results of
+Figure 1, bottom row. Interestingly, no matter what Fresnel term              Because our method depends only on ωo , rather than (ωo , ωi ), it is
+is chosen between 12, 13, 14 and 15, the results are visually very            even simpler to integrate into an existing renderer, as the compen-
+close, and they all achieve the saturated effect we were originally           sation can be applied as a gain to the closure, instead of having to
+looking for. It is likely that anything close to an F 2 shape towards         modify the closure itself. Being simpler, it is marginally faster too.
+high roughnesses would do the trick for our production needs.
+                                                                              Another beneficial side effect is that, as our result can be seen as
+                                                                              a scaling of ρss , it perfectly maintains its shape, meaning we can
+3.2   Dielectrics                                                             reuse the exact same sampling and evaluation routines, with the
+                                                                              same PDF. In contrast, Kulla and Conty’s lobe is a mixture of ρss
+For dielectrics, the approach is similar with few key differences. We         and an azimuthally invariant lobe, for which optimal analytical im-
+cannot neglect Fresnel when determining albedo normalization the              portance sampling cannot be achieved.
+way we did with conductors in Eq. 9, as it is indicative of the ratio
+                       R                     T                                Both methods, while theoretically less elegant or accurate, and far
+between reflected Ess    and transmitted Ess    energies, and not just
+reflected vs absorbed anymore. What can be normalized, however,               from representing the same step forward scientifically, are markedly
+              S       R     T                                                 easier to implement than Heitz et al. [2016], and much faster at run-
+is the sum Ess   = Ess   + Ess , each time an interface is hit.
+                                                                              time. In tests performed in Mitsuba using their original implemen-
+If we define our single-scattering dielectric BSDF as:                        tation, a 7× slowdown was observed on a simple conductor test,
+                           . R                                                and as high as 15× on a dielectric transmission test, while the vi-
+            ρS                                 T
+             ss (ωo , ωi ) = ρss (ωo , ωi ) + ρss (ωo , ωi )      (17)
+                                                                              sual difference appeared minimal (see results in Figure 9).
+and consider that the same reflection/transmission ratio applies to
+multiple scattering, we can obtain our energy preserving BSDF:                The most notable difference is the amount of saturation on con-
+                                                                              ductors, with the reference looking slightly more saturated at high
+                               R               T
+                          . ρ (ωo , ωi ) + ρss (ωo , ωi )                     roughnesses, even with us using Fms of Eq. 15, rather than the more
+            ρS (ωo , ωi ) = ss         S (ω )
+                                                                  (18)        justified one of Eq. 12, that saturates the result a bit less (Fig. 7 left).
+                                    Ess    o
+
+
+
+
+                                                                          4
+    Method              Shape of secondary lobes      Reciprocity        Optimal sampling   Plausibility   Simplicity   Speed   Flexibility
+    Heitz et al.        Similar to primary               Yes                   No               A+            C          C         B
+    Kulla and Conty     Azimuthally invariant            Yes                   No               B             A          A         A+
+    Ours                Same as primary                   No                   Yes              B+            A+         A+        A+
+                                      Table 1: Qualitative summary of the pros and cons of each method.
+
+In any case, we cannot expect a perfect match, given that Fms                 Acknowledgements
+should not be separated from ρms as we did, and would definitely
+vary directionally. We believe, however, that the results are close           Big thanks are in order to the ILM Rendering R&D team, Stephen
+enough to warrant keeping the approach as simple as it is.                    Hill and Naty Hoffman from Lucasfilm, Brent Burley and Matt
+                                                                              Chiang from Disney Animation, and Chris Kulla from Sony
+                                                                              Imageworks, for insightful discussions and feedback that greatly
+                                                                              helped shape this document and figure out its trickiest aspects.
+
+                                                                              References
+                                                                              B URLEY, B., 2012. Physically based shading at Disney. ACM SIG-
+                                                                                 GRAPH course notes, http://blog.selfshadow.com/
+                                                                                 publications/s2012-shading-course/.
+                                                                              B URLEY, B., 2015.      Extending the Disney BRDF to a
+                                                                                 BSDF with integrated subsurface scattering. ACM SIG-
+                                                                                 GRAPH course notes, http://blog.selfshadow.com/
+                                                                                 publications/s2015-shading-course/.
+Figure 9: Comparisons for rough GGX reflection and transmission.              C OOK , R. L., AND T ORRANCE , K. E. 1982. A reflectance model
+Left to right: no compensation, ours and [Heitz et al. 2016].                    for computer graphics. ACM Trans. Graph. 1, 1 (Jan.), 7–24.
+Top to bottom: medium, high and max roughness.
+                                                                              G ULBRANDSEN , O. 2014. Artist Friendly Metallic Fresnel. Jour-
+                                                                                 nal of Computer Graphics Techniques (JCGT) 3, 4 (December),
+Finally, both [Kulla and Conty 2017] and our method can accom-                   64–72.
+modate any sort of BSDF, as they only rely on the computation of              H EITZ , E., H ANIKA , J., D ’E ON , E., AND DACHSBACHER , C.
+the single-scattering albedo Ess , whereas [Heitz et al. 2016] im-               2016. Multiple-scattering microfacet BSDFs with the Smith
+poses considerably stronger constraints, making it even more diffi-              model. ACM Trans. Graph. 35, 4 (July), 58:1–58:14.
+cult to use for models other than Beckmann and GGX.
+                                                                              H EITZ , E. 2014. Understanding the masking-shadowing func-
+For a quick summary of all pros and cons, please refer to Table 1.               tion in microfacet-based BRDFs. Journal of Computer Graphics
+                                                                                 Techniques (JCGT) 3, 2 (June), 48–107.
+5    Conclusion and future work                                               JAKOB , W., D’E ON , E., JAKOB , O., AND M ARSCHNER , S.,
+                                                                                2014. A comprehensive framework for rendering layered materi-
+                                                                                als. Expanded technical report, http://www.cs.cornell.
+We have presented different approaches to compensate for the miss-
+                                                                                edu/projects/layered-sg14/.
+ing multiple scattering energy in rough reflections and transmis-
+sions. For a production use, the most suitable candidates appear              K ELEMEN , C., AND S ZIRMAY- KALOS , L., 2001. A Microfacet
+to be either [Kulla and Conty 2017] or the one introduced here,                  based coupled specular-matte BRDF model with importance
+depending on how critical reciprocity is for the renderer it is inte-            sampling. Short presentation, Eurographics.
+grated into. We are convinced that either one will be of great help
+to artists, and remove the need for more error-prone, ad hoc fixes.           K ULLA , C., AND C ONTY, A., 2017. Revisiting Physically Based
+                                                                                 Shading at Imageworks. ACM SIGGRAPH course notes,
+Comparisons in this report have been largely of a qualitative na-                http://blog.selfshadow.com/publications/
+ture. A more thorough and quantitative analysis of the differences               s2017-shading-course/.
+between the three main methods is left for future work.                       R IBARDI ÈRE , M., B RINGIER , B., M ENEVEAUX , D., AND S I -
+                                                                                 MONOT, L. 2017. STD: Student’s t-Distribution of slopes for
+Furthermore, it would be interesting to find good analytical fits for            microfacet based BSDFs. Computer Graphics Forum.
+all of the smooth look-up tables, which might be beneficial to a real-
+time implementation, by virtue of avoiding costly texture accesses.           T URQUIN , E., 2017. Multiple scattering Fresnel curves. https:
+                                                                                 //www.desmos.com/calculator/0mig1qjjvf.
+We could also consider not separating Fresnel for conductors any-
+more, and instead extend the LUT to 3D (or 4D if we really want               WALTER , B., M ARSCHNER , S. R., L I , H., AND T ORRANCE ,
+to take the imaginary part of the IOR into account), computing it              K. E. 2007. Microfacet models for refraction through rough
+with a reference algorithm such as [Heitz et al. 2016] (at least for           surfaces. In Proceedings of the 18th Eurographics Conference
+the Beckmann and GGX distributions).                                           on Rendering Techniques, EGSR’07, Eurographics, 195–206.
+
+Speaking of which, as a much more ambitious future endeavour,
+it would be fantastic to figure out a way to turn their method into
+something more production friendly – the critical element being
+speed here, with ease of use coming second.
+
+
+
+                                                                          5
+

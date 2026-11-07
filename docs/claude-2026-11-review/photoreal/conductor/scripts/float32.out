@@ -1,0 +1,9 @@
+Au                     max|float32 Mitsuba - f64| 8.92e-7   max|float32 pbrt complex - f64| 1.97e-5
+Cu                     max|float32 Mitsuba - f64| 6.15e-7   max|float32 pbrt complex - f64| 1.33e-5
+Ag                     max|float32 Mitsuba - f64| 1.07e-6   max|float32 pbrt complex - f64| 2.83e-5
+Al                     max|float32 Mitsuba - f64| 3.31e-7   max|float32 pbrt complex - f64| 6.59e-6
+CuZn                   max|float32 Mitsuba - f64| 3.71e-7   max|float32 pbrt complex - f64| 5.55e-6
+perfect (eta=0,k=1)    max|float32 Mitsuba - f64| 4.44e-16   max|float32 pbrt complex - f64| 2.38e-7   min Mitsuba32 F = 1
+eta=0,k=0.1            max|float32 Mitsuba - f64| 4.44e-16   max|float32 pbrt complex - f64| 2.38e-7
+eta=1.5,k=1e-4         max|float32 Mitsuba - f64| 1.44e-7   max|float32 pbrt complex - f64| 2.31e-7
+eta=0.05,k=8           max|float32 Mitsuba - f64| 3.28e-6   max|float32 pbrt complex - f64| 9.07e-5

@@ -1,0 +1,11 @@
+Schlick f0=0: numeric 0.0476190 closed 0.0476190
+Schlick f0=0.04: numeric 0.0857143 closed 0.0857143
+Schlick f0=0.5: numeric 0.5238095 closed 0.5238095
+Schlick f0=0.9: numeric 0.9047619 closed 0.9047619
+Schlick f0=1: numeric 1.0000000 closed 1.0000000
+gold~600nm: Favg=0.936473 GL8=0.936473 err=3.4e-8 F0=0.9385
+copper~650nm: Favg=0.922894 GL8=0.922894 err=1.1e-7 F0=0.9259
+aluminium: Favg=0.899180 GL8=0.899176 err=3.7e-6 F0=0.9108
+silver: Favg=0.956118 GL8=0.956118 err=5.7e-8 F0=0.9580
+iron: Favg=0.517307 GL8=0.517307 err=3.3e-7 F0=0.5209
+dielectric 1.5: Favg=0.091778 GL8=0.091778 err=6.0e-9 F0=0.0400

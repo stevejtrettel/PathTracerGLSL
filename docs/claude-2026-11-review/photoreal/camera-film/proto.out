@@ -1,0 +1,18 @@
+tent r=1: chi2=71.9 dof=63 crit=103.5
+gaussian σ=0.5 (Box–Muller): chi2=812.3 dof=881 crit=1016.5
+  max Box–Muller radius at 24-bit xi: 2.884 px; tail mass beyond it 5.96e-8
+polygon n=5 rot=0.3: chi2=1059.8 dof=1028 crit=1173.9 outside=0 (expected-count sum 3000000 of 3000000; quadrature of cell areas)
+polygon n=6 rot=0: chi2=1200.3 dof=1119 crit=1270.9 outside=0 (expected-count sum 3000000 of 3000000; quadrature of cell areas)
+polygon n=9 rot=1.1: chi2=1286.7 dof=1229 crit=1387.9 outside=0 (expected-count sum 3000000 of 3000000; quadrature of cell areas)
+filter-edge column d=-1.5: box 0.000000 tent(r=1) 0.000000 gaussian(σ=.5) 0.001350
+filter-edge column d=-0.5: box 0.000000 tent(r=1) 0.125000 gaussian(σ=.5) 0.158655
+filter-edge column d=0.5: box 1.000000 tent(r=1) 0.875000 gaussian(σ=.5) 0.841345
+filter-edge column d=1.5: box 1.000000 tent(r=1) 1.000000 gaussian(σ=.5) 0.998650
+bokeh-edge c=R/2: disk fraction 0.195501; hexagon (vertex on +x) exact 1/6 = 0.166667
+bokeh-edge MC (disk, columns 79-80, full pixel jitter): 0.1952 ± 0.0003
+bokeh-edge MC (hex, columns 79-80, full pixel jitter): 0.1672 ± 0.0003
+WB 2700K: blackbody rgb 1.9345,0.8036,0.1919 → 1.000003,0.999998,1.000000
+WB 3200K: blackbody rgb 1.6794,0.8660,0.3260 → 1.000003,0.999998,1.000000
+WB 5000K: blackbody rgb 1.2132,0.9605,0.7626 → 1.000003,0.999998,1.000000
+WB 6504K: blackbody rgb 1.0428,0.9836,1.0360 → 1.000003,0.999998,1.000000
+Bradford pair product max |I - P| = 5.35e-7
