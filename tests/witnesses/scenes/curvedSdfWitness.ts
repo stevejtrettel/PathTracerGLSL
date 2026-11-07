@@ -241,7 +241,9 @@ const blendEntry = (space: 'hyperbolic' | 'spherical', scene: SceneDescription):
     witness: {
         size: SDF_SIZE,
         spp: 64,
-        checks: [{ kind: 'mean', value: SDF_BLEND_WINDOW_MEAN[space], tol: 0.002, region: SDF_WINDOW, label: `${space} sculpture = fp64 twin` }],
+        // 0.0008: four times the largest measured deviation (2e-4); at 0.002 a doubled blend width
+        // in the GLSL (a 0.0011 change in S³) passed.
+        checks: [{ kind: 'mean', value: SDF_BLEND_WINDOW_MEAN[space], tol: 0.0008, region: SDF_WINDOW, label: `${space} sculpture = fp64 twin` }],
     },
 });
 

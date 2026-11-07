@@ -14,6 +14,8 @@ import {
 import type { V4 } from '../witnesses/scenes/curvedTwins.js';
 import { placementIsometry } from '../../src/components/ambient/isometry.js';
 import { quatFromAxisAngle } from '../../src/components/geometry/similarity.js';
+import { PRIMITIVES } from '../../src/components/geometry/index.js';
+import { kleinBall } from '../witnesses/scenes/curvedSdfWitness.js';
 
 function rng(seed: number): () => number {
     let s = seed >>> 0;
@@ -76,6 +78,26 @@ const minAbsAlong = (S: Space, f: Field, p: V4, v: V4, from: number, to: number)
     return m;
 };
 
+describe('S³ bounds larger than a hemisphere', () => {
+    it('a bound of radius above π/2 searches the whole period from inside, including whole great circles inside it', () => {
+        const S = S3, R = 1.8, B = 1.9;
+        const r = rng(41);
+        const f: Field = (p) => sdfBall(S, p, O, R);
+        const tally: Tally = { hits: 0, agreed: 0, graze: 0 };
+        let wholeCircles = 0;
+        for (let i = 0; i < 1500; i++) {
+            const { p, v } = randomRay(S, r, 3.0);
+            if (Math.abs(f(p)) < 2 * MARCH_CLEARANCE || sdfBall(S, p, O, B) >= 0) continue;
+            const c = [p[1] * v[2] - p[2] * v[1], p[2] * v[0] - p[0] * v[2], p[0] * v[1] - p[1] * v[0]];
+            if (Math.sin(B) ** 2 < c[0] ** 2 + c[1] ** 2 + c[2] ** 2) wholeCircles++;
+            compare(S, f, p, v, B, ballRoot(S, p, v, R), tally, minAbsAlong(S, f, p, v, 0, S.maxDist));
+        }
+        expect(wholeCircles).toBeGreaterThan(50);
+        expect(tally.hits).toBeGreaterThan(200);
+        expect(tally.agreed).toBeGreaterThan(tally.hits - 5);
+    });
+});
+
 describe.each([
     { S: H3, R: 0.6 },
     { S: S3, R: 0.5 },
@@ -130,6 +152,24 @@ describe.each([
             compare(S, f, p, v, 0.8, bruteRoot(S, f, p, v, MARCH_CLEARANCE, to, 2e-4), tally, minAbsAlong(S, f, p, v, 0, to));
         }
         expect(tally.hits).toBeGreaterThan(20);
+        expect(tally.agreed).toBeGreaterThan(tally.hits - 3);
+    });
+
+    it('an overestimating field (1.5× a ball\'s distance) is caught by the sign-tracked bisection, on the starting side', () => {
+        const r = rng(37);
+        const f: Field = (p) => 1.5 * sdfBall(S, p, O, R);
+        let bisected = 0;
+        for (let i = 0; i < 500; i++) {
+            const { p, v } = aimedRay(S, r, 1.5, 0.4);
+            if (sdfBall(S, p, O, R) < 0.01) continue;
+            const root = ballRoot(S, p, v, R);
+            const t = march(S, f, p, v, 0, S.maxDist);
+            if (root === null || t === null) continue;
+            expect(t).toBeLessThanOrEqual(root + 1e-9);
+            expect(root - t).toBeLessThan(1e-3);
+            if (f(S.flow(p, v, t).pos) > marchEpsilon(t)) bisected++;   // committed by the bisection, not by acceptance
+        }
+        expect(bisected).toBeGreaterThan(50);
     });
 
     it('a marched smooth-union sculpture finds the brute-force root from outside its bound and from its own surface', () => {
@@ -220,6 +260,12 @@ describe.each([
 });
 
 describe('the Klein chart of H³', () => {
+    it('the Klein door\'s hyperbolic body evaluates the Euclidean field at p.xyz / p.w', () => {
+        const body = PRIMITIVES[kleinBall].glsl.hyperbolic?.source ?? '';
+        expect(body).toContain(PRIMITIVES[kleinBall].glsl.euclidean!.source);
+        expect(body).toMatch(/float kleinBall_sdf\(Point p, KleinBall s\) \{\s*return kleinBall_sdf\(p\.xyz \/ p\.w, s\);/);
+    });
+
     it('never stretches distance: |k(p) − k(q)| ≤ d_H(p, q)', () => {
         const r = rng(29);
         let worst = 0;

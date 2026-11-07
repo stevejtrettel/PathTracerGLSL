@@ -47,16 +47,18 @@ Direction sphere_normal(Point p, Sphere sp) {
 // before returning to its origin, and a shape smaller than its bound can be met on that second
 // visit — a ray spawned off the shape's own surface is in exactly this case.
 bool sphere_interval(Ray ray, Sphere sp, out float t0, out float t1) {
-    vec3 c = cross(ray.origin.xyz, ray.direction.xyz);
-    float k = dot(c, c);
-    vec2 csr = spherical_cos_sin(sp.radius);
-    float disc = csr.y * csr.y - k;
-    if (disc < 0.0) return false;
+    // Inside first: a ball of radius above π/2 contains whole great circles, whose discriminant
+    // below is negative although every point of them is inside.
     if (atan(length(ray.origin.xyz), ray.origin.w) < sp.radius) {
         t0 = 0.0;
         t1 = MAX_DIST;
         return true;
     }
+    vec3 c = cross(ray.origin.xyz, ray.direction.xyz);
+    float k = dot(c, c);
+    vec2 csr = spherical_cos_sin(sp.radius);
+    float disc = csr.y * csr.y - k;
+    if (disc < 0.0) return false;
     float phi = atan(ray.direction.w, ray.origin.w);
     float alpha = atan(sqrt(disc), csr.x);
     t0 = mod(phi - alpha, TWO_PI);

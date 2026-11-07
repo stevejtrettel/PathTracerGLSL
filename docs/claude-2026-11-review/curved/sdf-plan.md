@@ -267,7 +267,7 @@ curved scenes' lighting, checked on a lab render.
 | P4 | Klein fields march unbounded in H³ | the bound is a chart fact; ray misses cost ~MAX_DIST/(1 − chart extent) steps | map a centered sphere bound by r → atanh r |
 | P5 | march_epsilon(t) unchanged (Euclidean footprint growth, cap 5e-4) | the cap bounds the difference; H³ footprints grow like sinh t, S³ shrink near 2π | a per-space footprint function in the occupant |
 | P6 | curved defineSDF bodies skip the compile-time twin gates | no geodesic sampler yet; the shipped helpers are twin-tested in vitest | a sampler over the bounding ball |
-| P7 | helper names `sdf_*` (not `ambient_*`): they are authoring vocabulary of the curved spaces, not part of the seam Euclidean space implements | Euclidean output unchanged | Euclidean implementations of the same names |
+| P7 | helper names `sdf_*` (not `ambient_*`): they are authoring vocabulary of the curved spaces, not part of the seam Euclidean space implements. They share the namespace of the Euclidean per-object wrappers `sdf_<authored name>`, which curved programs do not emit (an object named `ball` would collide if they ever did) | Euclidean output unchanged | Euclidean implementations of the same names; rename the helpers or reserve those object names |
 
 ## 4. Build order (small commits)
 
@@ -302,3 +302,23 @@ Deviation from §1.2(c) during the build: the light intensities and the H³ scul
 set so window means are 0.14–0.20 (the first choices gave 0.03 and an H³ window that missed the
 sculpture's edge in 10 points), and the S³ ball's light moved to the side so the window holds both
 arcs (641 short-arc and 4159 long-arc points of 4800).
+
+### Final review (on the commits)
+
+One fresh reviewer read the commits and ran mutations in its own worktree. Applied: S³
+`sphere_interval` now tests "inside" before the discriminant (a bound of radius above π/2 contains
+whole great circles, whose discriminant is negative: 573 of 2000 inside rays got no interval); a
+twin test with a bound of radius 1.9; a test that drives the sign-tracked bisection with an
+overestimating field (the reviewer's `return a + 0.05` mutation had passed every test); a check
+of the Klein door's generated body; the tube test counts agreements; `defineSDF` takes its spaces
+and the curved/Euclidean point type from the ambient registry; two bound comments argued
+correctly (the S³ cap-plane margin; the jack's pieces). Not changed: `sphere_interval` repeats
+`sphere_intersect`'s roots (as the Euclidean body does, deliberately) and the tetrahedral tap
+constants appear in both normal emitters.
+
+GPU mutation runs (one mutation, one scene each, reverted): the curved normal without
+`isometry_direction` — h3-sdf-ball 0.1494 vs 0.2027, FAIL (and the twin check, Δmean 13%); the
+curved step budget cut to 4 — s3-sdf-furnace 1.0000 vs 3.9514, FAIL; the Klein chart without the
+division by p.w — h3-klein-ball 0.2597 vs 0.2027, FAIL; the sculpture's second blend width doubled in
+the GLSL — s3-sdf-blend 0.2342 vs 0.2353, PASSED at tolerance 0.002. The sculpture tolerance is now
+0.0008 (four times the largest measured deviation, 2e-4), and that mutation is re-run below.

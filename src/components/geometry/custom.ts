@@ -22,6 +22,7 @@
 import type { PrimitiveDescriptor, PrimitiveParamSpec, PrimitiveValues } from '../descriptors.js';
 import { PRIMITIVES } from './index.js';
 import { BOUND_FIELDS } from './boundCheck.js';
+import { AMBIENT_SPACES, curvedGeometryOf } from '../ambient/index.js';
 
 export interface SceneSDFSpec {
     /** The type name — becomes the object `type`, the GLSL symbol prefix
@@ -38,7 +39,7 @@ export interface SceneSDFSpec {
      *  occupants' sdf_plane / sdf_tube), so one source can serve both curved spaces. A field
      *  supports exactly the spaces it has a body for. Marching/normal are GENERATED — defining
      *  them here is rejected. */
-    glsl: string | Partial<Record<SDFSpace, string>>;
+    glsl: string | Record<SDFSpace, string>;
     /** The Euclidean body also serves H³ through the Klein chart: the field is evaluated at
      *  k(p) = p.xyz/p.w of the object's frame, and the shape is the preimage of the Euclidean
      *  one (a chart radius r is a hyperbolic radius atanh r). Sound with no scale factor: the
@@ -74,12 +75,11 @@ export interface SceneSDFSpec {
 
 const IDENT = /^[a-z][a-zA-Z0-9]*$/;
 
-/** The spaces a scene-local field may have a body for. */
-export type SDFSpace = 'euclidean' | 'hyperbolic' | 'spherical';
-const SDF_SPACES: readonly SDFSpace[] = ['euclidean', 'hyperbolic', 'spherical'];
+/** A space a scene-local field may have a body for: a key of the ambient registry. */
+export type SDFSpace = string;
 
 /** The bodies of a spec, keyed by space (a string is the Euclidean body). */
-function bodiesOf(spec: SceneSDFSpec): Partial<Record<SDFSpace, string>> {
+function bodiesOf(spec: SceneSDFSpec): Record<SDFSpace, string> {
     return typeof spec.glsl === 'string' ? { euclidean: spec.glsl } : spec.glsl;
 }
 
@@ -143,12 +143,13 @@ export function defineSDF(spec: SceneSDFSpec): string {
     // --- glsl (the symbol contract, same regexes as the registry contract test) ---
     const bodies = bodiesOf(spec);
     const keys = Object.keys(bodies) as SDFSpace[];
-    if (keys.length === 0 || keys.some((k) => !SDF_SPACES.includes(k))) {
-        throw new Error(`defineSDF('${name}'): glsl must be a string (the Euclidean body) or a record of bodies keyed by ${SDF_SPACES.join(', ')}`);
+    if (keys.length === 0 || keys.some((k) => AMBIENT_SPACES[k] === undefined)) {
+        throw new Error(`defineSDF('${name}'): glsl must be a string (the Euclidean body) or a record of bodies keyed by ${Object.keys(AMBIENT_SPACES).join(', ')}`);
     }
     for (const space of keys) {
         const src = bodies[space]!;
-        const pointType = space === 'euclidean' ? 'vec3' : 'Point';
+        // A Euclidean point is a vec3; a curved space's is its Point (a vec4 of the model).
+        const pointType = curvedGeometryOf(space) === undefined ? 'vec3' : 'Point';
         if (src.includes('__')) {
             throw new Error(`defineSDF('${name}'): '__' is reserved in GLSL identifiers (ANGLE rejects it)`);
         }
@@ -162,7 +163,7 @@ export function defineSDF(spec: SceneSDFSpec): string {
         // only): a value/gradient field knows its exact ∇f, and the generated 4-tap is a worse
         // estimate of it. Defining it there suppresses the generated one. Curved normals are
         // always generated.
-        if (space !== 'euclidean' && new RegExp(`${name}_sdf_normal\\s*\\(`).test(src)) {
+        if (curvedGeometryOf(space) !== undefined && new RegExp(`${name}_sdf_normal\\s*\\(`).test(src)) {
             throw new Error(`defineSDF('${name}'): the ${space} body defines ${name}_sdf_normal; curved normals are generated`);
         }
     }

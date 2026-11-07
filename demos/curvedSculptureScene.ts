@@ -37,8 +37,9 @@ float jack_sdf(Point p, Jack s) {
 }
 `;
 
-/** The jack. Its solid lies within reach + tip + blend/2 of o (two smooth unions, each at most
- *  blend/4 outside min(pieces); the capped arms lie within reach + blend/4). */
+/** The jack. Its solid lies within reach + tip + blend/2 of o: two smooth unions put it inside
+ *  {min(pieces) ≤ blend/2}, and every piece of that set (core, capped arms, tips) lies within
+ *  reach + tip + blend/2 of o. */
 export const jack = defineSDF({
     name: 'jack',
     params: [length('core', 0.15), length('arm', 0.05), length('reach', 0.32), length('tip', 0.09), length('blend', 0.08)],

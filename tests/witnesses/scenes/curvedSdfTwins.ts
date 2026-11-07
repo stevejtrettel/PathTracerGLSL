@@ -177,10 +177,9 @@ export function ballInterval(S: Space, p: V4, v: V4, R: number): [number, number
         if (t1 <= 0) return null;
         return [Math.max(Math.log(amb / q), 0), t1];
     }
+    if (Math.atan2(len3(p), p[3]) < R) return [0, 2 * Math.PI];
     const disc = Math.sin(R) ** 2 - k;
     if (disc < 0) return null;
-    const inside = Math.atan2(len3(p), p[3]) < R;
-    if (inside) return [0, 2 * Math.PI];
     const phi = Math.atan2(v[3], p[3]);
     const alpha = Math.atan2(Math.sqrt(disc), Math.cos(R));
     const entry = ((phi - alpha) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
@@ -357,9 +356,12 @@ export function apply(m: number[], v: V4): V4 {
 export const SCULPTURE = { offset: 0.3, radius: 0.3, k1: 0.2, tube: 0.12, halfLength: 0.45, k2: 0.1, bound: 0 };
 
 /** The sculpture's march bound: a ball about o containing {min(pieces) ≤ K}, K = (k₁ + k₂)/4. A ball
- *  piece reaches offset + radius + K; a point of the capped tube's piece lies within tube + K of the
- *  axis and within halfLength + K of o along it, so within halfLength + tube + 2K of o (the triangle inequality
- *  through the foot of its perpendicular). */
+ *  piece reaches offset + radius + K. A point of the capped tube's piece has Fermi coordinates about
+ *  the axis — distance ρ ≤ tube + K from it, foot at s along it — with |s| at most halfLength plus a
+ *  little (the cap planes' distance is asinh(cosh ρ·sinh(|s| − h)) in H³, asin(cos ρ·sin(|s| − h)) in
+ *  S³, so |s| − h ≤ 0.077 here); its distance from o is given by cosh d = cosh s·cosh ρ (H³), cos d =
+ *  cos s·cos ρ (S³), at most 0.56 at these values. halfLength + tube + 2K exceeds that with margin;
+ *  twin test 4 checks the bound against brute force. */
 export function sculptureBound(v: { offset: number; radius: number; k1: number; tube: number; halfLength: number; k2: number }): number {
     const K = (v.k1 + v.k2) / 4;
     return Math.max(v.offset + v.radius + K, v.halfLength + v.tube + 2 * K);
