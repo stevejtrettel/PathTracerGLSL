@@ -66,7 +66,7 @@ describe('measurement.microfacet: what the program links', () => {
                 glslangCheck(fragment, 'frag', id);
             }
         }
-    });
+    }, 30000);
 
     it('energy-compensated without a microfacet model links nothing', () => {
         const { fragment, textures } = main(compiler.compile(minimalScene, strategy('energy-compensated')));

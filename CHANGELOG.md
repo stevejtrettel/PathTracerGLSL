@@ -21,11 +21,16 @@ built-in table, `ggx-smith-energy-v1` (RGBA32F, 32 × 32·32, 512 KiB: the energ
 and uploaded by the App with a hash check like the spectral tables. Under
 `'single-scattering'` the compiler emits each present gain as the constant 1.
 - The descriptor fact `usesMicrofacet: true` became `microfacet: { energy: 'conductor' |
-  'dielectric' }`: the include gate and the gain in one fact.
+  'dielectric' }`: the include gate and the gain in one fact. The integration's third value,
+  `'none'` (a microfacet model with no gain, for sheen), is left to the sheen step, since
+  nothing declares it yet; adding it means `core.ts`'s gain list must skip it.
 - The roughness rows of `ggx` and `rough_dielectric` are constrained to [0, 1] (the table's
   range), and `ggx`'s f0 to [0, 1] (it keeps the conductor gain's bounce series convergent),
   through the existing row constraint, in every program. No suite scene authors values
-  outside.
+  outside. Known gap: a `{param}` slider authored without `min` or `max` passes, and
+  `setParam` can move it past 1, where the lookup extrapolates and the gain is wrong
+  (negative by roughness 1.5); the panel's slider stays in [0, 1]. The plan's Validator test
+  for this case was not written (microfacet_energy.md "Limits").
 - New witnesses: `ms-furnace` (white conductors at roughness 0.3 / 0.6 / 1, clear glass at
   ior 1.5 and roughness 0.3 / 0.6 / 1, ior 1.33 at 1 and ior 2.0 at 0.6, in a samplable white
   sky, under pt, pt-nee, pt-mis and spectral pt-mis) and `ms-furnace-control` (one white
@@ -41,9 +46,10 @@ and uploaded by the App with a hash check like the spectral tables. Under
   closures, parameters and scene data are identical. 2 new scenes.
 - TS: the table reproduces from `build.ts` bit for bit; furnace error through the lookup
   (150 random conductor points, 70 per glass side): within the plan's bounds (max < 5e-3 /
-  8e-3, mean < 5e-4 / 1e-3); a colored conductor never exceeds 1 + 1e-3; the compensated twins
-  keep weight·pdf = eval·|cos| and pdf agreement on every lobe, and their mean sample weights
-  in the furnace are 1 within 1.5%.
+  8e-3, mean < 5e-4 / 1e-3); a colored conductor never exceeds 1 + 1e-3; the compensated
+  twins' mean sample weights in the furnace are 1 within 1.5%. Whether the GLSL eval and
+  sample apply the same gain is checked only by the `ms-furnace` witness (a TS twin applies
+  one gain to both).
 - Witnesses (SwiftShader, 512 spp): every `ms-furnace` sphere reads 1 within 0.5% under pt,
   pt-mis and spectral pt-mis (tolerance 0.01) and within 1.2% under pt-nee (roughness ≥ 0.6,
   tolerance 0.05); sky 1.0000. With eval's gain removed by hand, pt-nee read 0.36 (conductor,
@@ -54,7 +60,12 @@ and uploaded by the App with a hash check like the spectral tables. Under
 - The largest suite program binds 8 samplers; a compensated program adds 1.
 - Not used in the witness: glass at ior 2.4 and roughness 1. The gain makes sample weights
   exceed 1, and inside strongly trapping glass the result is heavy-tailed (it read 2% low at
-  1024 spp under three of four estimators).
+  1024 spp under three of four estimators). A TS random walk inside that sphere (build.ts's
+  sampling and lookup, energy weights, 4 × 10⁷ paths over the witness region) reads 0.999
+  (four runs of 10⁷: 0.989 to 1.007); its batches of 4.6 × 10⁵ paths, the region's count at
+  1024 spp, range from 0.954 to 1.084. The same walk for the witness's glass spheres reads 1
+  within 0.07% (2 × 10⁶ paths each); the 64-bounce truncation's share is 4 × 10⁻⁵ at ior 1.5
+  and roughness 0.3 and no path at the others.
 
 ## 2026-11-07 — Derived material fields computed per hit when their input varies
 

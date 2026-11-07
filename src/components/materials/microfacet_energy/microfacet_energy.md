@@ -76,12 +76,20 @@ witness checks the GLSL lookup under pt, pt-nee and pt-mis, in RGB and spectral.
 ## Limits
 
 - Not Heitz 2016's random walk; not Kulla–Conty's reciprocal lobe; no light-tracing adjoint.
-- Roughness above 1 lies outside the table; the roughness rows are constrained to [0, 1]
-  (a formula's values are the author's contract).
+- Roughness above 1 lies outside the table. The roughness rows (and ggx's f0) are
+  constrained to [0, 1], which the Validator checks for constants and for a slider's
+  `default`, `min` and `max`. Not checked, and the author's contract: a formula's values, and
+  a slider authored without `min` or `max`, whose value `setParam` can move anywhere (the
+  panel's own slider stays in [0, 1]). Past roughness 1 the lookup extrapolates linearly in
+  √α: at μ = 1 it reads E = 0.203 / 0.046 / −0.215 at roughness 1.1 / 1.25 / 1.5, where
+  the quadrature gives 0.220 / 0.132 / 0.057, so the gain is off at once and negative by 1.5.
 - The gain makes sample weights exceed 1, so inside strongly trapping glass (high index,
-  high roughness) a path's weight is a product of many factors around 1 and its variance
-  grows with the number of interior bounces: correct on average, heavy-tailed in practice
-  (the `ms-furnace` witness leaves ior 2.4 at roughness 1 out for this reason).
+  high roughness) a path's weight is a product of many gains and the estimate is
+  heavy-tailed. For a clear sphere at ior 2.4 and roughness 1 seen face-on, a TS random walk
+  (this folder's sampling and lookup, 4 × 10⁷ paths) reads 0.999 on average, but its batches
+  of 4.6 × 10⁵ paths range from 0.954 to 1.084 (each run's median batch 0.983 to 1.003),
+  so a single render of that size can read a few percent off; the `ms-furnace` witness
+  leaves that sphere out for this reason (on the GPU it read 2% low at 1024 spp).
 - A `transmittance` tint on rough glass scales the transmitted lobe as before; the gain does
   not model the tint's own multiple bounces.
 - A future complex-index conductor declares `microfacet: { energy: 'conductor' }` and passes

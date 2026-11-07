@@ -214,39 +214,22 @@ describe('GGX §11.3 pdf–histogram consistency (TS twin of ggx.glsl)', () => {
 // ── Energy compensation (measurement.microfacet 'energy-compensated') ──────────────────
 // ggx.glsl multiplies eval and the sample weight by microfacet_conductor_gain(μₒ, α, F_avg)
 // and leaves the pdf alone. The gain depends on ωₒ only, so the sampled distribution, and
-// with it the χ² above, is unchanged; what can break is eval and sample applying different
-// gains, which the triple and pdf agreement below would show.
+// with it the χ² above, is unchanged. Whether the GLSL eval and sample apply the same gain
+// is checked on the GPU by the ms-furnace witness (pt, pt-nee and pt-mis read eval and the
+// sample weight in different proportions); a TS twin multiplies both by one gainOf and
+// cannot see it. What the twin checks is the gain's value: the mean compensated weight of a
+// white conductor, by sampling, is 1.
 
 const table = energyTable(
     readFileSync(join(__dirname, '../microfacet_energy/data/energy.bin')),
     microfacetEnergyData.width, microfacetEnergyData.height);
 const gainOf = (wo: V3, roughness: number, f0: number) => conductorGain(table, Math.abs(wo[2]), alphaOf(roughness), schlickAverage(f0));
-const compensatedEval = (wi: V3, wo: V3, roughness: number, f0: number) => ggxEval(wi, wo, roughness, f0) * gainOf(wo, roughness, f0);
 function compensatedSample(wo: V3, roughness: number, f0: number, u1: number, u2: number): TwinSample {
     const s = ggxSample(wo, roughness, f0, u1, u2);
     return { ...s, weight: s.weight * gainOf(wo, roughness, f0) };
 }
 
 describe('GGX energy-compensated twin', () => {
-    for (const cosO of INCLINATIONS) {
-        for (const r of ROUGHNESSES) {
-            it(`cosθo=${cosO} roughness=${r}: triple + pdf agreement with the gain`, () => {
-                const wo = dirOf(cosO, 0);
-                const rand = lcg(7654321 + cosO * 1000 + r * 100);
-                let worstTriple = 0, worstPdfAgree = 0;
-                for (let i = 0; i < 4096; i++) {
-                    const s = compensatedSample(wo, r, F0, rand(), rand());
-                    if (s.rejected) continue;
-                    const ev = compensatedEval(s.wi, wo, r, F0) * Math.abs(s.wi[2]);
-                    worstTriple = Math.max(worstTriple, Math.abs(s.weight * s.pdf - ev) / Math.max(ev, 1e-12));
-                    worstPdfAgree = Math.max(worstPdfAgree, Math.abs(ggxPdf(s.wi, wo, r) - s.pdf) / Math.max(s.pdf, 1e-12));
-                }
-                expect(worstTriple).toBeLessThan(1e-4);
-                expect(worstPdfAgree).toBeLessThan(1e-3);
-            });
-        }
-    }
-
     it('white furnace by sampling: the mean compensated weight of an f0 = 1 conductor is 1', () => {
         for (const cosO of [0.9, 0.5, 0.1]) for (const r of [0.4, 1.0]) {
             const wo = dirOf(cosO, 0);

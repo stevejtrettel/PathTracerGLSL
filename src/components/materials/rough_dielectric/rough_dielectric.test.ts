@@ -444,46 +444,22 @@ describe('rough dielectric §11.3 pdf–histogram consistency (TS twin of rough_
 // ── Energy compensation (measurement.microfacet 'energy-compensated') ──────────────────
 // rough_dielectric.glsl multiplies both lobes of eval and of the sample weight by
 // microfacet_dielectric_gain(μₒ, α, η) and leaves the pdf alone. The sampled distribution
-// (and the χ² above) is unchanged; what can break is eval and sample applying different
-// gains, which the triple and pdf agreement on both lobes below would show.
+// (and the χ² above) is unchanged. Whether the GLSL eval and sample apply the same gain is
+// checked on the GPU by the ms-furnace witness (pt, pt-nee and pt-mis read eval and the
+// sample weight in different proportions); a TS twin multiplies both by one gainOf and
+// cannot see it. What the twin checks is the gain's value: by sampling, the mean
+// compensated energy weight of a lossless interface is 1 on both sides.
 
 const table = energyTable(
     readFileSync(join(__dirname, '../microfacet_energy/data/energy.bin')),
     microfacetEnergyData.width, microfacetEnergyData.height);
 const gainOf = (wo: V3, roughness: number, eta: number) => dielectricGain(table, wo[2], alphaOf(roughness), eta);
-const compensatedEval = (wi: V3, wo: V3, roughness: number, eta: number) => evalBsdf(wi, wo, roughness, eta) * gainOf(wo, roughness, eta);
 function compensatedSample(wo: V3, roughness: number, eta: number, uc: number, u1: number, u2: number): TwinSample {
     const s = sampleBsdf(wo, roughness, eta, uc, u1, u2);
     return { ...s, weight: s.weight * gainOf(wo, roughness, eta) };
 }
 
 describe('rough dielectric energy-compensated twin', () => {
-    for (const [etaName, eta] of ETAS) {
-        for (const cosO of INCLINATIONS) {
-            for (const r of ROUGHNESSES) {
-                it(`${etaName} cosθo=${cosO} roughness=${r}: triple + pdf agreement with the gain, both lobes`, () => {
-                    const wo = dirOf(cosO, 0);
-                    const rand = lcg(4242 + Math.round(cosO * 1000) + Math.round(r * 100) + Math.round(eta * 10));
-                    let worstTriple = 0, worstPdfAgree = 0, reflected = 0, transmitted = 0;
-                    for (let i = 0; i < 4096; i++) {
-                        const s = compensatedSample(wo, r, eta, rand(), rand(), rand());
-                        if (s.rejected) continue;
-                        if (s.wi[2] > 0) reflected++; else transmitted++;
-                        const ev = compensatedEval(s.wi, wo, r, eta) * Math.abs(s.wi[2]);
-                        worstTriple = Math.max(worstTriple, Math.abs(s.weight * s.pdf - ev) / Math.max(ev, 1e-12));
-                        worstPdfAgree = Math.max(worstPdfAgree, Math.abs(pdfBsdf(s.wi, wo, r, eta) - s.pdf) / Math.max(s.pdf, 1e-12));
-                    }
-                    expect(reflected).toBeGreaterThan(0);
-                    // Leaving glass near the normal, a smooth surface can be in total internal
-                    // reflection for every sample.
-                    if (etaName === 'enter') expect(transmitted).toBeGreaterThan(0);
-                    expect(worstTriple).toBeLessThan(1e-4);
-                    expect(worstPdfAgree).toBeLessThan(1e-3);
-                });
-            }
-        }
-    }
-
     it('lossless interface by sampling: the mean compensated energy weight is 1 on both sides', () => {
         // Energy weight = the sample weight with the transmitted lobe's η² radiance factor undone.
         for (const [etaName, eta] of ETAS) for (const cosO of [0.9, 0.5, 0.1]) for (const r of [0.4, 1.0]) {

@@ -6,8 +6,10 @@
 // ms-furnace: white rough conductors (ggx, f0 = 1) and clear rough glass. Compensated, each
 // interface loses no energy, so every path that leaves to the sky carries 1 and every pixel,
 // sphere or sky, reads 1 (up to the table's error, ≤ 0.6% per interface event, and the
-// 64-bounce truncation, which cuts a negligible tail: rough glass at these indices lets a
-// large fraction escape at each interior hit). Uncompensated, the same spheres read as low as
+// 64-bounce truncation). A TS random walk inside each glass sphere (build.ts's sampling and
+// lookup, energy weights, 2 × 10⁶ paths over the checked region) reads 1 within 0.07% and
+// puts the truncation's share at 4 × 10⁻⁵ for ior 1.5 at roughness 0.3 (23 paths had more
+// than 64 events) and at no path for the others. Uncompensated, the same spheres read as low as
 // 0.31. The spheres sit at roughness 0.3 / 0.6 / 1, where the gain reaches ~3: pt sees only
 // sample weights; pt-nee scores the sky through eval; pt-mis mixes both. With eval's gain
 // removed (checked once by hand), pt-nee reads 0.36 on the roughness-1 conductor and 0.47 on
@@ -17,8 +19,13 @@
 // 0.01 is ≥ 3.5σ for pt, pt-mis and spectral pt-mis on every sphere. pt-nee samples the sky
 // uniformly against a peaked lobe, so it is checked only where its job lies (the eval gain, at
 // roughness ≥ 0.6, where a missing gain reads ≤ 0.83) with tolerance 0.05 (≥ 4σ). Glass at
-// ior 2.4 and roughness 1 is not used: its internal paths multiply sample weights above 1
-// (the gain), and the heavy-tailed result read 2% low at 1024 spp.
+// ior 2.4 and roughness 1 is not used: inside it a path's weight is a product of many gains
+// above 1, and the estimate is too heavy-tailed for a 1% check (it read 2% low at 1024 spp).
+// A TS random walk inside such a sphere (build.ts's sampling and lookup, energy weights,
+// 4 × 10⁷ paths over the region) reads 0.999 overall (four runs of 10⁷: 0.989 to 1.007),
+// while its batches of 4.6 × 10⁵ paths, the region's count at 1024 spp, range from 0.954 to
+// 1.084, with each run's median batch between 0.983 and 1.003; no path had more than 64
+// events.
 //
 // ms-furnace-control: one white conductor at roughness 1, alone (convex: one bounce, nothing
 // to occlude it). Uncompensated, a pixel reads the single-scattering albedo E(μ, α = 1), which
@@ -61,7 +68,7 @@ export const msFurnaceScene: SceneDescription = {
     environment: SKY,
 };
 
-/** A square inside sphere i's image, half-side 0.65 R (camera cosines from 1 down to 0.53). */
+/** A square inside sphere i's image, half-side 0.65 R (camera cosines from 1 down to 0.76 at the edge midpoints and 0.39 at the corners). */
 function sphereRegion(i: number): WitnessRegion {
     const [x, y] = centerOf(i);
     const half = 0.65 * RADIUS;
@@ -118,7 +125,7 @@ const CONTROL_CENTER: WitnessRegion = {
     w: 0.07 / (CONTROL_SCALE * 160 / 120), h: 0.07 / CONTROL_SCALE,
 };
 
-/** A square inside the sphere's image, half-side 0.65 R (camera cosines from 1 down to 0.53). */
+/** A square inside the sphere's image, half-side 0.65 R (camera cosines from 1 down to 0.76 at the edge midpoints and 0.39 at the corners). */
 const CONTROL_DISK: WitnessRegion = {
     x: 0.5 - 0.65 / (2 * CONTROL_SCALE * 160 / 120), y: 0.5 - 0.65 / (2 * CONTROL_SCALE),
     w: 0.65 / (CONTROL_SCALE * 160 / 120), h: 0.65 / CONTROL_SCALE,
@@ -134,7 +141,7 @@ export const microfacetEnergySuite: Record<string, SceneSuiteEntry> = {
             + 'table lookup in GLSL at three roughnesses and three indices',
         expected:
             'every sphere and the sky read 1.0 on all four keys (top row: conductors at roughness 0.3 / 0.6 / 1 and glass '
-            + 'ior 2.4 at 1; bottom row: glass ior 1.5 at 0.3 / 0.6 / 1 and ior 1.33 at 1)',
+            + 'ior 2.0 at 0.6; bottom row: glass ior 1.5 at 0.3 / 0.6 / 1 and ior 1.33 at 1)',
         witness: {
             spp: 512,
             checks: msFurnaceStrategies.flatMap((strategy, key): WitnessCheck[] => [
