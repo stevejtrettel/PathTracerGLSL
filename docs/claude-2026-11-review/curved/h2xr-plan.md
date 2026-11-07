@@ -332,7 +332,7 @@ Planned mutations (step 3; each must fail its witness, then revert):
 | point light J := d² | h2xr-point-light (all windows) |
 | disk light J := sinh² d | h2xr-disk-light |
 | disk light sampler radius r = ρ√u (pdf unchanged) | h2xr-disk-light (pt-nee) |
-| disk light cos_l from the departure direction at p instead of the arrival at y | h2xr-disk-light (nee/mis) |
+| ~~disk light cos_l from the departure direction at p instead of the arrival at y~~ (no bug for a horizontal disk: a geodesic's vertical velocity is constant) | — |
 | vertical-plane root without the 1/s (t = atanh(−sP/W)) | h2xr-point-light wall window |
 | cylinder τ not divided by s | h2xr-point-light cylinder window, h2xr-sky |
 | sky key := view direction | h2xr-sky |
