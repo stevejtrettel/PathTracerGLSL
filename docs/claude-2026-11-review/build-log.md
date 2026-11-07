@@ -45,3 +45,27 @@ Open (untested): pt-nee read 2.8% low at GGX roughness 0.15 in torus-lights (the
 catches a dropped `quotient_reduce` at medium vertices (shown by a power check). The ε/σ glow term
 in the fog bound is derived in the quotient README, thought through, not checked numerically.
 Seifert–Weber (Q2) waits for H³.
+
+## 2026-11-07 — curved spaces: H³ and S³ (branch `curved`, worktree ../PTG-curved)
+
+Design: curved-spaces-design.md (revised after three reviews). Each step reviewed; fixes applied.
+
+| commits | what | evidence (measured) |
+|---|---|---|
+| 802c25d | frame cases covering every respelled file | 30/30 bit-identical on repeat |
+| 4935183, 6c92754 | Euclidean respelling of the ambient seam | digest: text only; frames 30/30 bit-identical |
+| 76da042, 3a5498f | phase functions take the event point | frames bit-identical |
+| e4f9bdd, c9f0a3d | space gate: GLSL keyed by space, `curvedLimitations`, support table | Validator tests |
+| 0371782, 56e4d61 | H³: hyperboloid occupant, sphere/plane/disk, point and disk lights, mat4 isometries, camera frame | 6 witnesses, 17/17 exact checks (furnace 3.951424 under pinhole and fisheye; disk light 0.3233549; point lights under power and uniform; sky key; driven isometry; medium nee ≡ mis ≡ pt) |
+| ec392a4, 6b6cd5e | S³: two-arc light sampling, long-arc shadows, radius domains (0, π) | 15/15 checks; blocker on the long arc reads exactly 0; two deliberate bugs caught |
+
+Intended Euclidean change: HG phase sampling builds its basis with `ambient_frame`, so the 8 frame
+pictures with HG media (medium, medium-mis, grin, rayleigh) are no longer bit-identical; their
+witnesses (furnace-scatter, grin-furnace, slab-albedo-aniso, fog-area, haze) pass.
+
+Measured finding: SwiftShader's sin/cos are off by up to 1.9e-4, which put S³ hits off the surface
+by more than the spawn offset; S³ uses its own `spherical_cos_sin` (error ≤ 7e-8).
+
+Open for the owner: `spherical_light_arc` (a light-sampling choice) lives in the S³ ambient
+occupant; a reviewer suggests a lights-family helper. Transformed groups are an error in curved
+spaces (flattenGroups does not compose isometries yet). App orbit/fly controls are not isometric.
