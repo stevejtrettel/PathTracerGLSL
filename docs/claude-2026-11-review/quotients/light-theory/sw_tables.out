@@ -1,0 +1,10 @@
+elements available: 9225 (complete up to d(o,go) <= 3.6)
+T_R, R = 0.0: |T| =   1; nearest image in T:  36.27% of (x,c); nearest image outside T: min 0.115, 5th pct 0.681, median 1.213
+T_R, R = 2.0: |T| =  13; nearest image in T:  72.43% of (x,c); nearest image outside T: min 0.260, 5th pct 0.920, median 1.481
+T_R, R = 3.0: |T| =  73; nearest image in T:  94.87% of (x,c); nearest image outside T: min 0.647, 5th pct 1.282, median 1.882
+T_R, R = 3.5: |T| = 193; nearest image in T:  99.40% of (x,c); nearest image outside T: min 0.647, 5th pct 1.571, median 2.172
+images of c within distance 1 of x: mean   0.45, max 2   (vol(B_s)/vol = 0.46)
+images of c within distance 2 of x: mean   6.52, max 12   (vol(B_s)/vol = 6.53)
+images of c within distance 3 of x: mean  54.89, max 74   (vol(B_s)/vol = 54.90)
+images of c within distance 4 of x: mean 393.00, max 443   (vol(B_s)/vol = 415.87)
+d(x, nearest image): mean 0.997, max 1.635 (covering radius of the orbit; <= circumradius 1.903)

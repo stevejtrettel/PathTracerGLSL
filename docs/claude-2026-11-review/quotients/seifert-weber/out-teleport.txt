@@ -1,0 +1,44 @@
+
+==================== float32 generator matrices ====================
+max SO(3,1) defect of float32-rounded generators: 6.323e-7  (float64: 3.553e-15 )
+float64 renorm=false 100 teleports × 2000 rays: max|<p,p>+1| 4.78e+2  max|<v,v>-1| 4.21e+65  max|<p,v>| 4.78e+2  max sinh(dist outside D) 2.84e-14  zero-length crossings 0 (longest run 0)  failures 851  mean length/teleport 0.1809
+float64 renorm=false 1000 teleports × 300 rays: max|<p,p>+1| NaN  max|<v,v>-1| NaN  max|<p,v>| NaN  max sinh(dist outside D) NaN  zero-length crossings 30838 (longest run 173)  failures 300  mean length/teleport 0.0181
+float64 renorm=true 100 teleports × 2000 rays: max|<p,p>+1| 2.84e-14  max|<v,v>-1| 1.60e-14  max|<p,v>| 1.51e-14  max sinh(dist outside D) 1.69e-14  zero-length crossings 0 (longest run 0)  failures 0  mean length/teleport 0.9570
+float64 renorm=true 1000 teleports × 300 rays: max|<p,p>+1| 3.20e-14  max|<v,v>-1| 1.60e-14  max|<p,v>| 1.60e-14  max sinh(dist outside D) 1.55e-14  zero-length crossings 0 (longest run 0)  failures 0  mean length/teleport 0.9601
+float32 renorm=false 100 teleports × 2000 rays: max|<p,p>+1| NaN  max|<v,v>-1| NaN  max|<p,v>| NaN  max sinh(dist outside D) NaN  zero-length crossings 20550 (longest run 23)  failures 2000  mean length/teleport 0.0829
+float32 renorm=false 1000 teleports × 300 rays: max|<p,p>+1| NaN  max|<v,v>-1| NaN  max|<p,v>| NaN  max sinh(dist outside D) NaN  zero-length crossings 3131 (longest run 22)  failures 300  mean length/teleport 0.0083
+float32 renorm=true 100 teleports × 2000 rays: max|<p,p>+1| 1.21e-5  max|<v,v>-1| 8.09e-6  max|<p,v>| 7.12e-6  max sinh(dist outside D) 1.11e-5  zero-length crossings 0 (longest run 0)  failures 0  mean length/teleport 0.9536
+float32 renorm=true 1000 teleports × 300 rays: max|<p,p>+1| 1.43e-5  max|<v,v>-1| 5.85e-6  max|<p,v>| 6.29e-6  max sinh(dist outside D) 1.08e-5  zero-length crossings 0 (longest run 0)  failures 0  mean length/teleport 0.9589
+
+==================== edge- and vertex-grazing rays (float32, renormalised) ====================
+4000 rays aimed at vertices/edge midpoints, 30 crossings each: zero-length crossings 6659/120000 (longest run 6), failures 0, max sinh(dist outside D) 2.23e-5
+
+==================== float32 vs float64 teleported rays, crossing by crossing (D frame), against the pixel footprint ====================
+T≈1 (n=2000): cross-track median 8.91e-7 p99 1.90e-5 max 9.69e-5 | along-track median 6.82e-7 max 2.07e-4 | pixel footprint 1.18e-3 | max cross / pixel 8.25e-2
+T≈2 (n=2000): cross-track median 3.32e-6 p99 4.74e-5 max 2.54e-4 | along-track median 2.28e-6 max 6.81e-4 | pixel footprint 3.63e-3 | max cross / pixel 7.02e-2
+T≈4 (n=2000): cross-track median 1.69e-5 p99 2.35e-4 max 7.74e-4 | along-track median 9.40e-6 max 1.49e-3 | pixel footprint 2.73e-2 | max cross / pixel 2.84e-2
+T≈6 (n=2000): cross-track median 1.16e-4 p99 1.75e-3 max 7.11e-3 | along-track median 5.66e-5 max 2.29e-2 | pixel footprint 2.02e-1 | max cross / pixel 3.53e-2
+T≈8 (n=1996): cross-track median 8.43e-4 p99 1.27e-2 max 4.00e-2 | along-track median 4.13e-4 max 6.47e-2 | pixel footprint 1.49e+0 | max cross / pixel 2.68e-2
+T≈10 (n=1979): cross-track median 6.23e-3 p99 9.31e-2 max 2.36e-1 | along-track median 3.25e-3 max 3.70e-1 | pixel footprint 1.10e+1 | max cross / pixel 2.14e-2
+T≈12 (n=1855): cross-track median 4.51e-2 p99 4.11e-1 max 7.63e-1 | along-track median 2.14e-2 max 9.37e-1 | pixel footprint 8.14e+1 | max cross / pixel 9.38e-3
+T≈14 (n=1150): cross-track median 2.14e-1 p99 1.46e+0 max 2.02e+0 | along-track median 8.99e-2 max 1.29e+0 | pixel footprint 6.01e+2 | max cross / pixel 3.35e-3
+face sequences diverged (different face chosen) in 850/2000 rays before T=14; arc length at divergence: median 14.53, min 8.61
+
+==================== float32 arc-length bookkeeping: per-segment error against float64 from the same float32 state ====================
+per-segment |t32 − t64|: median 1.87e-7 p99 3.29e-6 p99.99 2.32e-5 max 4.46e-5; same exit face 100000/100000
+summed over 100 segments (~96 length units): median 3.88e-5 max 1.13e-4
+
+==================== NEE aim to a precomputed float32 image matrix (no runtime products) ====================
+d(x,γy) 0–2: max aim angle error 1.28e-6 rad, max relative distance error 1.77e-6
+d(x,γy) 10–12: max aim angle error 3.58e-7 rad, max relative distance error 1.08e-8
+d(x,γy) 2–4: max aim angle error 1.46e-6 rad, max relative distance error 5.51e-7
+d(x,γy) 4–6: max aim angle error 1.81e-6 rad, max relative distance error 4.02e-7
+d(x,γy) 6–8: max aim angle error 7.33e-7 rad, max relative distance error 1.37e-7
+d(x,γy) 8–10: max aim angle error 6.27e-7 rad, max relative distance error 3.03e-8
+
+==================== accumulated products (a cellBoost) in float32 ====================
+word length 2 (d(o,γo) up to ~4): max relative entry error 1.60e-7, SO(3,1) defect/‖P‖² 2.46e-7, d(γo, γ̃o) 1.16e-6
+word length 5 (d(o,γo) up to ~10): max relative entry error 1.14e-6, SO(3,1) defect/‖P‖² 2.29e-6, d(γo, γ̃o) 2.90e-4
+word length 10 (d(o,γo) up to ~20): max relative entry error 3.88e-6, SO(3,1) defect/‖P‖² 1.12e-5, d(γo, γ̃o) 1.88e+0
+word length 20 (d(o,γo) up to ~40): max relative entry error 8.25e-6, SO(3,1) defect/‖P‖² 2.27e-5, d(γo, γ̃o) 2.90e+1
+word length 40 (d(o,γo) up to ~80): max relative entry error 7.57e-5, SO(3,1) defect/‖P‖² 1.98e-4, d(γo, γ̃o) 8.52e+1

@@ -1,0 +1,25 @@
+
+==================== image counts N(R) = #{γ : d(o, γo) ≤ R}, systole ====================
+enumerated 1026167 elements with d(o,γo) ≤ R + R_c = 7.903 in 529.0 s
+R=1: N(R) = 1   vol(B_R)/vol(M) = 0.5   ratio 2.191
+R=2: N(R) = 13   vol(B_R)/vol(M) = 6.5   ratio 1.990
+R=3: N(R) = 73   vol(B_R)/vol(M) = 54.9   ratio 1.330
+R=4: N(R) = 465   vol(B_R)/vol(M) = 415.9   ratio 1.118
+R=5: N(R) = 3045   vol(B_R)/vol(M) = 3086.7   ratio 0.987
+R=6: N(R) = 22977   vol(B_R)/vol(M) = 22824.8   ratio 1.007
+first orbit distances d(o,γo) with multiplicity: [
+  '1.992769×12',
+  '2.789001×60',
+  '3.421647×120',
+  '3.675826×120',
+  '3.805695×20',
+  '3.985538×132'
+]
+shortest translation lengths (complex length ℓ + iθ) among enumerated elements:
+  ℓ = 1.745779538  θ = 146.5538°  elements 5160  min d(o,γo) 2.7890
+  ℓ = 1.992768996  θ = 108.0000°  elements 4572  min d(o,γo) 1.9928
+  ℓ = 2.618669307  θ = 39.8307°  elements 3000  min d(o,γo) 3.4216
+  ℓ = 3.195680426  θ = 80.4840°  elements 5940  min d(o,γo) 3.4216
+  ℓ = 3.317576007  θ = 156.2946°  elements 4860  min d(o,γo) 3.6758
+  ℓ = 3.378025190  θ = 15.8910°  elements 3120  min d(o,γo) 4.2216
+certified: any γ with ℓ(γ) ≤ L has a conjugate with d(o,γo) ≤ L + 2R_c; the set reaches 7.903, so lengths ≤ 4.097 are complete.

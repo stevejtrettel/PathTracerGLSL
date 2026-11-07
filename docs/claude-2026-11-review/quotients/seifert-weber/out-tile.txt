@@ -1,0 +1,11 @@
+
+==================== 12 neighbours of D: disjoint, each across its own face ====================
+samples in D: 20000; violations: 0
+
+==================== Dirichlet domain and full tiling of a ball ====================
+enumerated 2565 elements with d(o,γo) ≤ 4.903 in 280 ms
+Dirichlet violations (3000 points): 0
+cells containing each of 20000 points within distance 3 of o (count → points): { '1': 20000 }
+
+==================== volume by Monte Carlo ====================
+vol(D) ≈ 11.1733 ± 0.0364 (Seifert–Weber volume 11.1990647 from memory)

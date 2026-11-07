@@ -1,0 +1,18 @@
+x = [-0.3  -0.4   0.25], n = [0. 1. 0.]   (400000 samples each)
+  pt                 mean 0.224278 +- 0.001279   z vs pt  +0.00   var/sample 6.5429e-01
+  uniform27-mis      mean 0.224835 +- 0.000936   z vs pt  +0.35   var/sample 3.5065e-01
+  uniform27-binary   mean 0.224854 +- 0.000939   z vs pt  +0.36   var/sample 3.5241e-01
+  nearest-mis        mean 0.224255 +- 0.001228   z vs pt  -0.01   var/sample 6.0339e-01
+  invd2-mis          mean 0.224415 +- 0.000913   z vs pt  +0.09   var/sample 3.3364e-01
+x = [ 0.35  0.5  -0.3 ], n = [-0.602 -0.501  0.622]   (400000 samples each)
+  pt                 mean 0.226689 +- 0.001285   z vs pt  +0.00   var/sample 6.6078e-01
+  uniform27-mis      mean 0.227196 +- 0.000965   z vs pt  +0.32   var/sample 3.7230e-01
+  uniform27-binary   mean 0.227223 +- 0.001056   z vs pt  +0.32   var/sample 4.4637e-01
+  nearest-mis        mean 0.227147 +- 0.001039   z vs pt  +0.28   var/sample 4.3152e-01
+  invd2-mis          mean 0.227669 +- 0.000851   z vs pt  +0.64   var/sample 2.8992e-01
+x = [ 0.45 -0.55  0.35], n = [ 0.302  0.302 -0.905]   (400000 samples each)
+  pt                 mean 0.176683 +- 0.001144   z vs pt  +0.00   var/sample 5.2385e-01
+  uniform27-mis      mean 0.177048 +- 0.000851   z vs pt  +0.26   var/sample 2.8942e-01
+  uniform27-binary   mean 0.177047 +- 0.000851   z vs pt  +0.25   var/sample 2.8998e-01
+  nearest-mis        mean 0.176683 +- 0.001144   z vs pt  +0.00   var/sample 5.2385e-01
+  invd2-mis          mean 0.177311 +- 0.000846   z vs pt  +0.44   var/sample 2.8628e-01

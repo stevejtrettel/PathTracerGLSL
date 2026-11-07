@@ -1,0 +1,8 @@
+C brute force          E = 0.08641   (images outside S(x): 0.00826 = 9.6%)
+A BSDF only            E = 0.08509 +- 0.00114  per-sample sd 0.510
+B  27 importance       E = 0.08646 +- 0.00048  per-sample sd (nee+bsdf pair) 0.216
+B1 nearest only        E = 0.08677 +- 0.00115  per-sample sd (nee+bsdf pair) 0.515
+B27u 27 uniform        E = 0.08709 +- 0.00053  per-sample sd (nee+bsdf pair) 0.237
+W1 drop outside S(x)   E = 0.07790 +- 0.00032   (wrong)
+W2 mismatched S        E = 0.08351 +- 0.00046   (wrong)
+N0 (nearest image) = [-1. -0. -1.]  | patch == block: False

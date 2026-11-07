@@ -1,0 +1,14 @@
+E3 check torus.ts check
+E3 paired torus.ts paired pt,crystal-pt Q0 30000 4242
+E3 job torus.ts job pt Q1 300000 9101
+E3 job torus.ts job U27-mis Q1 300000 9102
+E3 job torus.ts job U27-nee Q1 300000 9103
+E3 job torus.ts job WRONG-W1 Q1 200000 9104
+E3 job torus.ts job WRONG-W2 Q1 200000 9105
+SW firsthit sw_twin.ts firsthit 20000 3 9201
+SWD1 job sw_twin.ts job pt Q1 1200000 9301
+SWD1 job sw_twin.ts job S1-mis Q1 1200000 9302
+SWD1 job sw_twin.ts job S13-mis Q1 1200000 9303
+SWD1 job sw_twin.ts job WRONG-W2 Q1 1200000 9304
+SWD1 job sw_twin.ts job S13-nee Q1 1200000 9305
+SWD1 job sw_twin.ts job S1-nee Q1 1200000 9306
