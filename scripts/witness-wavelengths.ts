@@ -60,7 +60,7 @@ type Probe = { name: string; source: string; expected: number[]; tolerance?: num
 // Use the compiler's bindings with valid instrument and placement inputs.
 function uniformsFor(s: SceneDescription, strategy = minimalStrategy): Uniforms {
     const renderer = compiler.compile(s, strategy);
-    const params = { ...Object.fromEntries(Object.entries(renderer.parameters).map(([key, p]) => [key, p.default])),
+    const params = { ...Object.fromEntries(Object.entries(renderer.parameters ?? {}).map(([key, p]) => [key, p.default])),
         'engine.imageSize': [1, 1], 'engine.pixelOffset': [0, 0], 'engine.sampleCount': 0, 'engine.resetSalt': 0 };
     return Object.fromEntries(renderer.uniforms.map(u => [u.uniform, { type: u.type, value: u.compute(params) }]));
 }
@@ -122,6 +122,7 @@ const tree = structuredClone(minimalStrategy); tree.estimator.lightSelection = '
 const packed = await packSceneData(compiler.compileScene(scene, [tree]).sceneData);
 assert(packed);
 const records = packed.channels.records;
+assert(records);
 const row = add('packed light row conversion', program(scene, tree), `fragColor = vec4(point_light_row(0, ${wl}).intensity, 1.0);`, [...encoded.map(x => x + 60), 1]);
 row.textures = [{ uniform: 'u_data_records', width: records.width, height: records.height, data: Array.from(records.data) }];
 // Nonzero input tests both the authored radiance and its wavelength conversion.

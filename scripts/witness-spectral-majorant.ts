@@ -6,7 +6,7 @@ import { Compiler } from '../src/compiler/Compiler.js';
 import { spectralMediumBound } from '../src/components/color/spectral/majorant.js';
 import { spectralData } from '../src/components/color/spectral/data.js';
 import { mediaStrategy, spectralSlab } from '../tests/witnesses/scenes/spectralMedia.js';
-import { renderProbes } from '../tools/render-glsl-probes.mjs';
+import { renderProbes, type ProbeTexture, type ProbeUniform } from '../tools/render-glsl-probes.mjs';
 const read = (name: string) => {
     const b=readFileSync(new URL(`../src/components/color/spectral/data/${name}.bin`,import.meta.url));
     return new Float32Array(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength));
@@ -21,7 +21,7 @@ const assets = [
     { uniform:'u_spectralCurves',width:spectralData.curveWidth,height:spectralData.curveHeight,data:Array.from(curves) },
 ];
 const compiler=new Compiler(), width=1024;
-const probes: Array<{name:string;source:string;textures:object[];uniforms:object}> = [];
+const probes: Array<{name:string;source:string;textures:ProbeTexture[];uniforms:Record<string, ProbeUniform>}> = [];
 const ceilings=[2**-60,0.11772707849740982,1,1024,2**18];
 for (const ceiling of ceilings) {
     const scene=structuredClone(spectralSlab);

@@ -9,7 +9,7 @@ import { blackbodyFixture, blackbodySites } from '../tests/helpers/blackbodyFixt
 import { planckReference } from '../tests/helpers/planckReference.js';
 import { minimalStrategy } from '../tests/witnesses/scenes/minimalScene.js';
 import type { RenderStrategy, SceneDescription } from '../src/compiler/types.js';
-import { renderProbes } from '../tools/render-glsl-probes.mjs';
+import { renderProbes, type ProbeTexture, type ProbeUniform } from '../tools/render-glsl-probes.mjs';
 
 const compiler = new Compiler();
 const wavelengths = [360, 410, 555, 830];
@@ -21,7 +21,7 @@ const assets = ['coefficients', 'curves'].map((name, i) => {
         height: i === 0 ? spectralData.atlasHeight : spectralData.curveHeight,
         data: Array.from(new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength))) };
 });
-const probes: Array<{ name: string; source: string; textures: object[]; uniforms: object; expected: number[] }> = [];
+const probes: Array<{ name: string; source: string; textures: ProbeTexture[]; uniforms: Record<string, ProbeUniform>; expected: number[] }> = [];
 async function add(name: string, scene: SceneDescription, choice: RenderStrategy, body: string,
     expected: number[], params: Record<string, unknown> = {}) {
     const compiled = compiler.compileScene(scene, [choice]);

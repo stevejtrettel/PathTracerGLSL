@@ -9,7 +9,7 @@ import { spectralCurves } from '../src/components/color/spectral/lookup.js';
 import { dispersionSlab, dispersionStrategy } from '../tests/witnesses/scenes/spectralDispersion.js';
 import type { SceneDescription, RenderStrategy } from '../src/compiler/types.js';
 import { N_BK7 } from '../src/authoring/opticalGlass.js';
-import { renderProbes } from '../tools/render-glsl-probes.mjs';
+import { renderProbes, type ProbeTexture, type ProbeUniform } from '../tools/render-glsl-probes.mjs';
 const compiler = new Compiler();
 const assets = ['coefficients', 'curves'].map((name, i) => {
     const bytes = readFileSync(new URL(`../src/components/color/spectral/data/${name}.bin`, import.meta.url));
@@ -31,7 +31,7 @@ async function program(scene = dispersionSlab, strategy = dispersionStrategy) {
 }
 const wl = 'Wavelengths(vec4(400.0,500.0,600.0,700.0))';
 const ray = `make_ray(vec3(0,0,2), vec3(0,0,-1), ${wl})`;
-const fixed: Array<{ name: string; source: string; uniforms: object; textures: object[]; expected: number[] }> = [];
+const fixed: Array<{ name: string; source: string; uniforms: Record<string, ProbeUniform>; textures: ProbeTexture[]; expected: number[] }> = [];
 const base = await program();
 const add = (name: string, body: string, expected: number[], p = base) => {
     const probe = { ...p, name, source: p.source + `void main() { ${body} }`, expected };

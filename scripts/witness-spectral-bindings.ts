@@ -12,7 +12,7 @@ import { blackbodyFixture } from '../tests/helpers/blackbodyFixtures.js';
 import { spectralData } from '../src/components/color/spectral/data.js';
 import { spectralCoefficients, spectralCurves, evaluatePolynomial } from '../src/components/color/spectral/lookup.js';
 import { packedPositions, packedAlbedos, packedEmissions, packedStrategy, spectralPackedScene, spectralPackedReference } from '../tests/witnesses/scenes/spectralPacked.js';
-import { renderProbes } from '../tools/render-glsl-probes.mjs';
+import { renderProbes, type ProbeTexture } from '../tools/render-glsl-probes.mjs';
 
 function read(name: string): Float32Array {
     const bytes = readFileSync(new URL(`../src/components/color/spectral/data/${name}.bin`, import.meta.url));
@@ -34,7 +34,7 @@ function expected(rgb: Vec3, emission: boolean): number[] {
 }
 const width = 96;
 const compiler = new Compiler();
-const probes: Array<{ name: string; source: string; textures: object[]; expected: number[][]; tolerance?: number }> = [];
+const probes: Array<{ name: string; source: string; textures: ProbeTexture[]; expected: number[][]; tolerance?: number }> = [];
 async function add(name: string, scene: SceneDescription, body: string, values: number[][],
     uniforms: Record<string, { type: string; value: number | number[] }> = {},
     strategy: RenderStrategy = packedStrategy('mis', 'bvh')) {
@@ -44,7 +44,7 @@ async function add(name: string, scene: SceneDescription, body: string, values: 
     assert(main >= 0, 'generated accumulator entry point');
     const packed = await packSceneData(compiled.sceneData);
     assert(packed);
-    const textures: object[] = Object.entries(packed.channels).map(([channel, data]) => ({
+    const textures: ProbeTexture[] = Object.entries(packed.channels).map(([channel, data]) => ({
         uniform: `u_data_${channel}`, width: data.width, height: data.height, data: Array.from(data.data),
     }));
     const probe: typeof probes[number] & { uniforms: typeof uniforms } = { name, source: source.slice(0, main) + `void main() { ${body} }`, textures, uniforms, expected: values };
