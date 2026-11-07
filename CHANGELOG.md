@@ -4,6 +4,31 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-10-04 — Withdrawn App rewrite removed
+
+At the owner's instruction, removed the uncommitted App lifecycle rewrite and subsequent
+input-copying/HDR-recovery batch. Their practical value and architectural simplification
+were not adequately established. Restored their runtime code, existing tests, witness
+caller changes, and compiler–engine contract note to commit `8a101b6`; removed their three
+new test/browser-witness files. This also withdraws the behavior changes those batches
+introduced. The app's original behavior is restored, including its existing limitations.
+
+Preserved the owner's earlier CLAUDE.md and spectrum-document edits and the untracked
+outputs step-7 plan. Replaced the superseded app plan with current goals and withdrawal
+status. Recorded the owner's constraints in AGENTS.md and linked them from CLAUDE.md:
+no speculative machinery, discuss concrete architecture changes together, no scope
+expansion on the strength of broad approval, and no commits unless explicitly requested.
+
+A verified copy of all 40 pre-rollback modified/new files, the full tracked diff, and a
+hash manifest is at `/private/tmp/pathtracer-before-app-rollback-w081s938` (temporary local recovery storage).
+Earlier Oct 3 implementation/research entries were removed with the withdrawn work;
+their original text is in that backup. No commit was made.
+
+Verification after rollback: TypeScript passes; all 407 app/engine tests in 21 files
+pass. Source, tests, tools, and the compiler–engine contract match HEAD exactly.
+The two unrelated document files are byte-identical to the recovery copy, and the
+pre-existing CLAUDE.md content is preserved with only the new instruction link added.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

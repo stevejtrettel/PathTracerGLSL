@@ -232,7 +232,7 @@ other step says exactly what changes and how it is checked.
 | 2 | **Every spectrum setting goes through one path:** compute its numbers θ(x) (fixed, slider, formula, per instance, image), then evaluate K_r at the path's wavelengths. Fog settings and the sky get the same role declarations as materials. | refactor |
 | 3 | **A kind never asks whether the render is RGB or spectral.** RGB renders use its RGB stand-in K̄_r(θ). Numbers computed on the CPU, like a blackbody's brightness normalization, all arrive the same way. | small change: in RGB renders with a blackbody on a slider, shader text changes and values agree up to rounding; checked on the GPU |
 | 4 | **Each value is checked once:** against its role's allowed range, its kind's own rules and its slider's structure. | stricter checks (listed below) |
-| 5 | **Fog takes any spectrum.** | feature |
+| 5 | **A fog's glow takes any light spectrum;** absorption and scattering follow when a kind with the coefficient role exists ("Step 5 in full"). | feature |
 | 6 | **HSV colors.** | feature |
 
 **Step 2** removes the 11 places that convert RGB on their own, and the three places that read
@@ -256,7 +256,8 @@ stated fact of that color model. "Step 4 in full" (below) is the detailed plan. 
 chose to leave that limit where it is (decision B): reflectance above 1 stays allowed in RGB
 renders.
 
-**Step 5, the physics.** A fog's absorption, scattering and glow share one density d(x):
+**Step 5, the physics.** ("Step 5 in full", below, builds only the part needed now and defers
+the rest.) A fog's absorption, scattering and glow share one density d(x):
 
     σ_a(x, λ) = d(x)·K_a(λ),  σ_s(x, λ) = d(x)·K_s(λ),  ε(x, λ) = d(x)·K_ε(λ)
 
@@ -951,6 +952,166 @@ warnings before and after, and ran about 100 malformed inputs against both versi
 - The digest: 268 of 268 scenes identical, before and after the review fixes.
 - The full test run: 109 files, 4,095 tests, and `tsc` clean. One earlier run had a glslang
   static-compile test time out at 80 s; it passed alone and in a full rerun.
+
+## Step 5 in full: a fog's glow takes any light spectrum
+
+**Status:** plan for the owner's approval (Sep 29), revised after an independent review (its
+findings are at the end of this section). Nothing is built.
+
+### Why it is small
+
+Most of step 5 is already true. Step 2 sends every fog setting through its kind, and step 4
+checks every value against its setting's role. What remains is a light spectrum that isn't
+RGB, and today that means a blackbody, used as a fog's glow:
+- validation and the Planner reject it;
+- the fog's generated code handles only RGB numbers for the glow.
+
+The other fog settings wait for kinds that do not exist yet:
+- no kind has the coefficient role, so none can be an absorption or a scattering;
+- Cauchy and Sellmeier have the index role, but in a fog's index they would make spatially
+  dispersive GRIN, which stays gated (§6).
+
+### The rule after this step
+
+- **A fog's glow takes any light spectrum.** Today that is a blackbody, constant or on
+  sliders, in both color models.
+  - pbrt's homogeneous medium also reads its emitted radiance `Le` as any light spectrum
+    (pbrt/media.cpp:188–189).
+  - pbrt adds σ_a·Le along the ray (cpu/integrators.cpp:1000), where we add the glow ε
+    itself. The spectrum type is the same.
+- **Absorption, scattering and the GRIN index keep plain values** (constants, sliders,
+  formulas).
+  - The first kind with the coefficient role (a measured curve, say) must add its maximum
+    over wavelength, because the tracking bound needs it.
+  - It then opens absorption and scattering at these sites: the validation rule
+    (propertyValidation.ts:61–77), the Planner's backstop (Planner.ts:942–953), the clamp's
+    RGB locals (materials.ts:560–561), `derivedMajorant` (materials.ts:767–778), the ceiling
+    check `atMost` (analyze/spectral.ts:42–44) and `mediumBound`.
+- **The density clamp scales the glow.** In a formula medium the clamp multiplies the glow
+  by the same factor s as absorption and scattering (the owner's rule that a clamped region
+  keeps ε/σ_t).
+  - For a plain glow it still multiplies the RGB numbers before the lift, as today.
+  - For a named kind it multiplies the finished spectrum: ε = s·K(θ).
+  - The two agree, because the emission lift scales with its input (lift(s·c) = s·lift(c)
+    for s ≥ 0).
+  - Two code paths are unavoidable. A plain glow's numbers pass through the fog's formula
+    binding (a floor at 0 and a broadcast to three channels) before any kind sees them; a
+    named kind has no such numbers.
+
+### Deferred, and why
+
+The step list's "Step 5, the physics" named more pieces. None is needed until a kind needs
+it.
+- **One shared density, the new tracking bound and splitting `mediumBound`** (d(x), and the
+  bound ceil(d)·max_λ(K_a + K_s)): needed only when a non-RGB spectrum varies in space or sits
+  in absorption or scattering.
+- **A flame,** a glow whose brightness varies through space: needs that density, or a
+  blackbody whose brightness is a formula of the point. Either is its own small step.
+- **The transmittance kind and the subsurface helper's fix:** a separate feature.
+
+### Problem (read Sep 29, at commit c5b6ced)
+
+- **Validation** rejects every named kind in all four fog settings
+  (propertyValidation.ts:61–77).
+- **The Planner** throws on one (`noBB`, Planner.ts:942–953), and `PlannedMedium` types the
+  glow as RGB (plan/types.ts:468).
+- **Generation** builds the glow as an RGB local, clamps it and lifts it (materials.ts:563,
+  :585, :592). A named kind has no RGB local, and `mediumPropertyExpr` throws on one.
+- **Minting** (materials.ts:221) passes neither the color model nor the role.
+  - A slider-driven blackbody glow therefore throws, in both color models (measured by the
+    review).
+  - Passing only the role would be a silent trap: a spectral program would declare the RGB
+    stand-in uniform while reading the temperature uniform.
+- **Linking** (`spectrallyEvaluatedKinds`, Planner.ts:1006–1020) does not scan the fog, so
+  blackbody.glsl would not be linked for a blackbody glow.
+
+### What changes
+
+1. **Validation:** the glow gets the role check every other setting has. Absorption,
+   scattering and the GRIN index still reject a named kind, with a message that no longer says
+   "media take" plain values: "…a medium's absorption, scattering and index take a constant, a
+   {param} or an expression".
+2. **Planner:** `PlannedMedium.emission` may be a named kind. The absorption and scattering
+   backstop stays, and says why.
+3. **Generation:** a named glow is `m.emission = K(θ)`, times `sigma_scale` in a clamped
+   medium. A plain glow's code is unchanged, byte for byte.
+4. **Minting:** the fog's settings pass the color model and their role, as material rows do.
+5. **Linking:** `spectrallyEvaluatedKinds` includes the fog's glow.
+6. **Text that states the old behavior:**
+   - the comments at plan/types.ts:466–467, Planner.ts:940–941, propertyValidation.ts:61–62
+     and materials.ts:219–221 and :588;
+   - the spectral README (:288–291, :312–313), color/README.md:40 and the blackbody README
+     (:10–12, "rejected on … medium fields");
+   - Part 2's table row 5.
+
+### Expected differences
+
+- **No existing scene changes.** The digest is identical for all 268 synchronous scenes, since
+  plain glows keep their code and no suite scene has a named glow.
+- **The diagnostics snapshot** changes in six cases:
+  - "blackbody as medium emission" becomes valid;
+  - "cauchy as medium emission" gets the role message ("…: Cauchy is an index form");
+  - "blackbody as medium sigma_a", "gaussian as medium sigma_a", "cauchy as medium ior" and
+    "sellmeier as medium ior" get the reworded message.
+- **spectralEmission.test.ts:42,** which expects the rejection, becomes a check that the
+  value compiles.
+
+### Verification, written first
+
+1. **New witnesses,** beside `spectral-blackbody-direct` and with its orthographic camera.
+   Each is a box slab 1 unit thick, wider than the view, with the camera outside, and no other
+   object, light or sky. The glow is blackbody (1000 K, scale 0.2175…), the scale that gives
+   the plane its mean [1, 0.0087, −0.0196]. Each is run in both color models, and each fails
+   today, because the scene is rejected.
+   - **`spectral-blackbody-glow`:** no absorption or scattering, so the analytic arm gives
+     ε·d. Target: the plane's mean, tolerance 0.003.
+   - **`spectral-blackbody-glow-clamped`:** absorption is the formula 2 with ceiling 1, so the
+     clamp binds with s = 1/2 and σ = 1. The route is tracking, where the glow reaches the
+     clamp factor through the new code. Target: s·(1 − e^{−1}) = 0.316060 times the plane's
+     mean. Tolerance 0.006 at 1024 samples per pixel, as for the existing tracking glow
+     witnesses.
+   - **`spectral-blackbody-glow-live`:** fixture 1 with kelvin and scale on sliders whose
+     defaults are the constants. Same target. It checks the minting in both color models.
+
+   Each uses maxBounces 1. Nothing but the glow contributes, so any budget ≥ 0 gives the same
+   value.
+2. **Compile tests:** a blackbody glow compiles and passes glslang, constant and on sliders, in
+   a homogeneous medium, a clamped formula medium and a GRIN medium, in both color models.
+   The spectral slider case is the one that catches the minting trap (the review measured it).
+3. **The digest** is identical for all 268 synchronous scenes.
+4. **GPU:** the three new witnesses. No existing shader changes, so no existing witness needs
+   a rerun.
+5. **Static checks:** `npx tsc --noEmit` and the full `npx vitest run`.
+6. **An independent review** of the diff.
+
+### Not in this step
+
+- The deferred pieces above.
+- Named kinds in absorption, scattering or the GRIN index.
+- Any change to how a plain glow, or absorption and scattering, are clamped, or to the
+  tracking bound.
+
+### The independent review of this plan's first draft
+
+| Finding | Change |
+|---|---|
+| The first draft removed the plain glow's RGB local, for one uniform path. A formula glow needs its numbers floored and broadcast before any kind sees them, so a separate path for named kinds is needed anyway. Removing the local was then a refactor mixed into a feature, changing 21 scenes' text and needing 10 GPU reruns. | plain glows unchanged; only the named path is added; no existing scene changes |
+| The minting problem was misdescribed: today a slider blackbody glow throws; the silent trap is passing the role without the color model | corrected; the spectral slider compile is the check |
+| The rule said absorption and scattering take any kind with the role, while the Planner still throws for them | absorption and scattering keep plain values, and the sites the first coefficient kind opens are listed |
+| The clamp binds in only one of the three "clamped" suite scenes | moot: no existing scene changes |
+| Text that states the old behavior was not listed | listed in change 6 |
+| The witness needed its scene stated (no emitting plane, no sky, the slab wider than the view) and a check of the clamp's new code path | stated; the clamped and live fixtures added |
+| The GRIN index's message "media take …" becomes false | reworded |
+| pbrt's `Le` is multiplied by σ_a; "only blackbody fits" ignored index kinds in the GRIN index | both stated precisely |
+
+The reviewer confirmed:
+- every line citation;
+- that only those three lines read the glow's RGB local;
+- the two lifts: RGB is the identity, and the spectral lift scales with its input (lookup.glsl:51–60);
+- that every medium route reads the glow only through `m.emission`, so a blackbody glow cannot
+  break estimator equality: analytic, delta tracking and GRIN; shadow rays never read it, and
+  NEE never samples it;
+- the snapshot prediction.
 
 ---
 

@@ -8,6 +8,26 @@ spaces (H³, Nil, black-hole metrics). Correctness of the Monte Carlo estimators
 This file is orientation and rules. History is in [CHANGELOG.md](CHANGELOG.md); design
 rationale is in `docs/` (index: [docs/README.md](docs/README.md)).
 
+## How to work here (read first)
+
+Read [AGENTS.md](AGENTS.md) first. Its owner constraints take precedence over the older
+process rules below, particularly the rule about reviewed plans: the owner's latest
+instructions can withdraw or change any prior approval. Never use this file or an old
+plan to justify continuing work the owner has rejected.
+
+- **No code without a written plan the owner approved** (in `docs/claude-…`): the problem
+  with evidence, the change and its boundaries, and the verification written first. If
+  reality deviates from the plan, stop and ask.
+- **A reviewed plan is not overridden in chat.** When the owner questions a plan, explain it
+  as it stands, with its evidence. A new idea is labeled *untested*, is never recommended, and
+  is never used to edit or cast doubt on reviewed work; it needs its own research, plan and
+  independent review.
+- **Claims need evidence.** A reviewer's claim ("unavoidable", "nothing reads X") is checked
+  before it goes into a plan. Say which facts were read, measured or only expected. A
+  recommendation needs a measurement or a review, not minutes of reasoning.
+- **Simple first.** Prefer the plan with fewer moving parts, and read how pbrt-v4 and Mitsuba 3
+  solve the problem (their source, not memory) before designing.
+
 ## Commands
 
 ```bash
