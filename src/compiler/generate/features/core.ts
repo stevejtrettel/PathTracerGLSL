@@ -20,6 +20,7 @@ import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
 import { AMBIENT_SPACES, farClipOf } from '../../../components/ambient/index.js';
 import { formatFloat } from '../../../components/glsl-format.js';
+import { QUOTIENTS } from '../../../components/quotient/index.js';
 
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -110,6 +111,17 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ambient.functions,
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
+    // The quotient occupant's lattice math (components/quotient), included whole like the ambient
+    // occupant's block: the generated walks (intersection) and image-aware NEE/MIS (lighting)
+    // call it. Its constants are defines (the group's data and the walk's loop bound).
+    const defines: Record<string, string> = {};
+    const quotient = plan.program.measurement.quotient;
+    if (quotient !== undefined) {
+        const q = QUOTIENTS[quotient.kind];
+        if (q === undefined) throw new Error(`quotient '${quotient.kind}' has no occupant (Validator should have rejected it)`);
+        Object.assign(defines, q.defines(quotient, farClipOf(plan.program.measurement.ambient, plan.program.measurement.farClip)));
+        blocks.push({ origin: `components/quotient/${q.kind}/${q.kind}.glsl`, source: q.glsl });
+    }
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).
     for (const id of plan.program.spectrumKinds) {
         const helpers = kindById(id).glsl;
@@ -127,6 +139,7 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ...emptyContribution('core'),
         textures: color.textures ?? [],
         blocks,
+        defines,
         provides: [
             { name: 'wavelengths_sample', signature: 'WavelengthSample wavelengths_sample()', componentScoped: true },
             { name: 'color_to_pixel', signature: 'vec3 color_to_pixel(vec2 film, Direction ray_dir, Radiance L, WavelengthSample camera_sample)', componentScoped: true },

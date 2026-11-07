@@ -30,6 +30,7 @@ import { spectralFoundationSuite } from './scenes/spectralFoundation.js';
 import type { SceneSuiteEntry } from './types.js';
 import type { RenderStrategy, Vec3 } from '../../src/compiler/types.js';
 import { withPose } from '../../src/authoring/strategy.js';
+import { torusCrystal, torusCrystalRef, torusCrystalStrategy, torusLights, torusLightsStrategies } from './scenes/torusWitness.js';
 
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
 import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
@@ -2552,6 +2553,44 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: 0.98, tol: 0.06, region: { x: 0.18, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.05 throughput' },
                 { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
                 { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
+            ],
+        },
+    },
+    'torus-crystal': {
+        scene: torusCrystal,
+        strategies: [torusCrystalStrategy],
+        exercises:
+            'the cube 3-torus walk (components/quotient/torus): two matte balls, a glossy ball and an emissive '
+            + 'sphere in D, seen through the faces of D in every direction; pt, maxBounces 2, farClip 3.65',
+        expected:
+            'equals torus-crystal-ref (the same spheres unrolled into plain E³ out to (N+1)·R) up to float32 '
+            + 'rounding: a wrong face pairing, a wrong cell offset or a lost hit shows as a different picture',
+        witness: {
+            checks: [
+                { kind: 'twin', other: { scene: 'torus-crystal-ref' }, meanTol: 0.01, rmse: 0.05, label: 'teleporting walk ≡ unrolled crystal (pt, same salt)' },
+            ],
+        },
+    },
+    'torus-crystal-ref': {
+        scene: torusCrystalRef,
+        strategies: [torusCrystalStrategy],
+        exercises: 'the torus-crystal twin\'s other half: every lattice copy within (N+1)·R of the camera, as four instanced sphere batches in plain E³, with the same farClip',
+        expected: 'the twin target — see torus-crystal',
+    },
+    'torus-lights': {
+        scene: torusLights,
+        strategies: torusLightsStrategies,
+        exercises:
+            'partition MIS in the 3-torus (components/quotient): NEE samples one of 27 light images, MIS names the image a '
+            + 'BSDF ray hit (0 density outside the table); a sphere light near two faces and a disk light of 4× its power '
+            + 'deeper in D, a glossy ball, a jungle gym of spanning beams; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
+        expected: 'all four keys converge to the same image',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh): shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor (path-found light images) tripwire' },
+                { kind: 'noise', strategies: [2, 0], label: 'σ/µ report: pt-mis (27 images) against pt' },
             ],
         },
     },

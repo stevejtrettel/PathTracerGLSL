@@ -31,6 +31,9 @@ export function flags(p: ProgramDescription) {
          *  folding the constant `false`. A DECISION read from the link map, never
          *  re-derived here. */
         twoSided: p.materials.twoSidedShading,
+        /** The ambient space is a quotient (components/quotient): pt-nee's emitter weight is 1 for
+         *  an image NEE never samples. */
+        quotient: p.measurement.quotient !== undefined,
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
          *  env-only programs, where BOTH selection sides fold to the constant 1. */
