@@ -41,8 +41,11 @@ Euclidean space unpacks these to `o + t·d`, `dot`, `normalize`, `length(to − 
 direction itself — which is why components write the `ambient_*` names instead of the raw
 operations: every direction·direction product, every normalization of a world direction,
 every arrival direction (`ambient_flow(ray, t).direction`, not `ray.direction`), every
-shadow-ray aim and length, and every sky lookup goes through the seam. Points and tangent
-vectors are written as `Point` and `Direction`, never a literal `vec3`.
+shadow-ray aim and length, and every sky lookup goes through the seam. The seam's
+signatures and the generated signatures (`scene_region_at`, `scene_material_properties`,
+`scene_medium_properties`, `ior_of`, `sdf_<id>`, `environment_pdf`, the LightQuery
+constructors) write points and tangent vectors as `Point` and `Direction`; hand-written
+locals inside component bodies (the cameras' look-at frames, for one) still say `vec3`.
 
 ## Status & the honest caveat
 

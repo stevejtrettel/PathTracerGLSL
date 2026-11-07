@@ -114,7 +114,7 @@ How a program is assembled:
   shadow rays through dielectrics (`shadows: 'opaque-dielectrics'`), RGB color.
   `maxBounces: N` is Σ_{n≤N} TⁿE — at most N events (surface and medium scattering events;
   each traversal of a GRIN region also counts as one) — under every estimator. `MAX_DIST`
-  (1000, glsl/core/math.glsl) is an absolute far clip: the environment and the directional
+  (1000, components/ambient/euclidean/euclidean.glsl) is an absolute far clip: the environment and the directional
   light are found there, by both BSDF rays and NEE.
 - **The trace-loop contract** (docs/trace-loop-contract.md): `Ray` is a pure geodesic
   seed; `scene_intersect` fills a `Hit`; dot products go through `ambient_dot` (the
