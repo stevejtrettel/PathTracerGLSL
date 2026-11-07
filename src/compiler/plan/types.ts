@@ -1,6 +1,6 @@
 // compiler/plan/types.ts
 
-import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription, PictureView, PictureFormat } from '../types.js';
+import type { MaterialModel, Vec3, GlslExpression, FramebufferFormat, ValueParam, SpectrumValue, BlackbodyValue, NamedSpectrumValue, SpectralIndex, ParameterMetadata, CameraDescription, AccumulationDescription, DisplayDescription, PictureView, PictureFormat, QuotientDescription } from '../types.js';
 
 /** The RESOLVED environment (compiler-pass C2): defaults applied at plan time, so the
  *  record's own pin — "all fields RESOLVED, no optionals" — now holds for the env too
@@ -64,6 +64,9 @@ export interface ProgramDescription {
         /** The authored far clip (MeasurementDescription.farClip). PRESENT only when authored;
          *  absent = the ambient occupant's default (farClipOf). */
         farClip?: number;
+        /** The quotient group of the ambient space (SceneDescription.ambientSpace.quotient).
+         *  PRESENT only in quotient programs. */
+        quotient?: QuotientDescription;
     };
     /** Defines the computation (taxonomy §3): no field here may change the converged
      *  image — §11.2 cross-strategy convergence is the enforcement. */

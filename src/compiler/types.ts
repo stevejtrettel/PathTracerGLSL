@@ -43,7 +43,15 @@ export interface SceneDescription {
 export interface AmbientSpaceDescription {
     type: 'euclidean' | 'hyperbolic' | 'spherical';
     parameters?: { curvature?: number };
+    /** A closed manifold M = X/Γ: the scene is one copy inside a fundamental domain D, and a ray
+     *  leaving D through a face continues from the paired face (components/quotient/README.md).
+     *  `torus`: the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), D = [−L/2, L/2]³ around the origin, so
+     *  coordinates authored in D read as in plain E³. Euclidean only. */
+    quotient?: QuotientDescription;
 }
+
+/** The quotient group (components/quotient registry key `kind`) and its parameters. */
+export type QuotientDescription = { kind: 'torus'; size: Vec3 };
 
 // --- Environment (what a missed ray sees) ---
 //

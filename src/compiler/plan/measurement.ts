@@ -34,5 +34,6 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         // Present only when authored, so programs and stamps without them are unchanged; the
         // emitted far clip is farClipOf(ambient, farClip) (components/ambient).
         ...(m.farClip !== undefined ? { farClip: m.farClip } : {}),
+        ...(scene.ambientSpace?.quotient !== undefined ? { quotient: scene.ambientSpace.quotient } : {}),
     };
 }
