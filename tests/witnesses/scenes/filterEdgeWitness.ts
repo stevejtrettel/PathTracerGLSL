@@ -13,9 +13,12 @@
 //
 // Each region selects one column: the runner floors x0 and ceils x1, so x = (c + 0.5)/160 with
 // w = 0.25/160 reads column c over all rows. Column 79 separates the kernels by 0.16, which is
-// 25 tolerances. Noise: a column of 120 pixels at 1024 spp averages 122 880 samples, so the
-// Bernoulli σ at p = 0.16 is 0.001. The spectral arm adds the noise of the sampled wavelengths;
-// measured, its column means sat within 0.002 of the expected values. tol 0.006.
+// 25 tolerances. Noise: a column of 120 independent pixels at 1024 spp averages 122 880 samples,
+// so in RGB the column mean's σ is the Bernoulli √(p(1 − p)/122 880) = 0.0010 at p = 0.16 or
+// 0.84. The spectral arm adds the noise of the sampled wavelengths. The two report-only noise
+// checks below measure the per-pixel σ of both gaussian arms (RGB 7.2% / 1.35% of the mean in
+// columns 79 / 80, matching the Bernoulli value; spectral 7.7% / 1.73%), so the spectral column
+// mean's σ is 0.0011 / 0.0013. tol 0.006 is 4.5 times the largest of these σ.
 //
 // The tiled check renders the gaussian arm in 64-px tiles, whose samples cross tile seams: a
 // pixel's film point may land in a neighbor tile, and the image must still be identical.
@@ -85,6 +88,8 @@ export const filterEdgeSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', strategy: 2, region: column(79), value: gaussian79, tol, label: 'gaussian spectral: column 79 = 1 − Φ(1)' },
                 { kind: 'mean', strategy: 2, region: column(80), value: gaussian80, tol, label: 'gaussian spectral: column 80 = Φ(1)' },
                 { kind: 'tiled', strategy: 1, tileSize: 64, label: 'gaussian: tiled ≡ one piece (HDR and PNG)' },
+                { kind: 'noise', strategies: [1, 2], region: column(79), label: 'gaussian RGB / spectral: noise in column 79 (the basis of tol)' },
+                { kind: 'noise', strategies: [1, 2], region: column(80), label: 'gaussian RGB / spectral: noise in column 80 (the basis of tol)' },
             ],
         },
     },

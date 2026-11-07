@@ -4,6 +4,22 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Review fixes for the Gaussian pixel filter
+
+- `docs/fable-imagery.md` P3 rewritten to match the code: Gaussian only, untruncated
+  (Box–Muller, weight 1), no tent, verified by the twin χ² and the `filter-edge` witness; a flat
+  field cannot see the kernel, so the furnace's gaussian arm is a smoke test. The stale
+  pixel-filter entry in `docs/claude-improvements-2026-09.md` (2.8) says the same.
+- `pixelFilters.test.ts`: the edge-column test now draws 10⁶ samples from the Gaussian twin and
+  checks the tail fractions past 0.5 and 1.5 px against 1 − Φ(d/σ) (4 binomial σ). With the
+  warp's σ changed to 0.45 it fails (0.1334 vs 0.1587).
+- `filter-edge` gains two report-only noise checks (gaussian RGB and spectral, columns 79 and
+  80), which measure the noise the tolerance rests on: per-pixel σ/µ 7.23% / 1.35% (RGB, the
+  Bernoulli value) and 7.70% / 1.73% (spectral), so the spectral column mean's σ is at most
+  0.0013 and tol 0.006 is 4.5 σ.
+- Digest: 275 of 275 scenes identical. Witnesses (targeted): `filter-edge` 9 of 9,
+  `furnace` and `spectral-furnace` 6 of 6.
+
 ## 2026-11-07 — Gaussian pixel filter and a photographic-lens helper
 
 Integration step 2 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;

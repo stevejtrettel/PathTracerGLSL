@@ -113,9 +113,24 @@ describe('pixel filters: the kernel is the density of the warp', () => {
         for (const c of gaussianOffset([0, 0.3])) expect(Math.abs(c)).toBe(0);
     });
 
-    it('gaussian x-marginal at the filter-edge witness columns is Φ', () => {
-        // P(d + U > 0) for the pixel centers half a pixel and 1.5 pixels from an edge.
+    it('gaussian: the warp\'s x-marginal past the filter-edge witness offsets is 1 − Φ(d/σ)', () => {
+        // The filter-edge witness reads P(d + U > 0) for pixel centers d = −0.5 and −1.5 px from
+        // an edge, with U the warp's x-offset, and expects normalCdf(−|d|/σ). First the helper's
+        // values; then the warp's own tail fractions against them, each within 4 binomial σ.
         expect(normalCdf(-0.5 / SIGMA)).toBeCloseTo(0.158655, 6);
         expect(normalCdf(-1.5 / SIGMA)).toBeCloseTo(0.001350, 6);
+        const N = 1_000_000;
+        const next = stream(13);
+        let past05 = 0, past15 = 0;
+        for (let i = 0; i < N; i++) {
+            const [x] = gaussianOffset([next(), next()]);
+            if (x > 0.5) past05++;
+            if (x > 1.5) past15++;
+        }
+        for (const [count, d] of [[past05, 0.5], [past15, 1.5]] as const) {
+            const p = normalCdf(-d / SIGMA);
+            const tol = 4 * Math.sqrt(p * (1 - p) / N);
+            expect(Math.abs(count / N - p), `d = ${d}: ${count / N} vs ${p}`).toBeLessThan(tol);
+        }
     });
 });

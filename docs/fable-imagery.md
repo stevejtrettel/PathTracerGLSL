@@ -2,9 +2,10 @@
 
 **STATUS: owner-commissioned Jul 21 2026 — plan approved at menu level. P1 BUILT & GPU-verified
 Jul 21 (recorded design below — §7 forks 1–2 RESOLVED; the menu bullets became the concrete
-interface). P2–P5 pending.** Unlike the substrate batches, this pass is a MENU of small-to-medium
-items that compound into "images worth framing" — each its own gated mini-batch, one owner sweep
-at the end.
+interface). P3 BUILT Nov 2026 (Gaussian only). P2, P4 and P5 were pending on Jul 21; this line
+has not been re-checked for them since.** Unlike the substrate batches, this pass is a MENU of
+small-to-medium items that compound into "images worth framing" — each its own gated
+mini-batch, one owner sweep at the end.
 
 **Order: P1 → P2 → P3 → P4 → P5** (charts feed expressions: `uv` must exist before
 formulas can use it).
@@ -112,16 +113,25 @@ the fill site has `p` in scope; `mintValueUniform` mints expression params):
 - Witness: `expr-const-twin` — an expression that evaluates to a constant ≡ the
   constant material (identical-stream equality).
 
-## P3 — Pixel reconstruction filters (tent, gaussian)
+## P3 — Pixel reconstruction filter (gaussian) — BUILT Nov 2026
 
-The `pixel/` family (the reconstruction kernel h_j(u), carved in the camera batch) has
-one occupant: `box`. Add **tent** and **gaussian** — importance-sampled kernels
-(`pixel_sample(coord, xi)` returns the offset; sampling the kernel exactly makes the
-weight 1, no splatting). Gaussian: σ ≈ 0.5px, truncated at 2σ with renormalized
-inverse-CDF sampling (the truncation is the standard declared choice). One folder + one
-registry line each — the door test, again. Witness: filters are measurement-side
-(they change the pixel integral slightly) — a visual card + the furnace mean (flat
-fields are filter-invariant: furnace 0.4 must hold under every filter, a real gate).
+The `pixel/` family holds the reconstruction kernel h(u) of the pixel integral
+`∫ h(u) L(camera(c + u)) du`. Occupants: `box` (the default) and **gaussian**, selected by
+`measurement.pixel` and always recorded in the program's measurement, so export stamps state the
+kernel. Each occupant's `pixel_sample(coord, xi)` returns the film offset drawn exactly from its
+kernel, so every sample has weight 1 and nothing is splatted into neighboring pixels.
+
+- **Gaussian** (fork 3): σ = 0.5 px, untruncated, drawn by Box–Muller (pbrt-v4
+  `SampleTwoNormal`). The only cutoff is the 24-bit sample stream's, at 2.884 px (tail mass
+  6·10⁻⁸). The math and the comparison with pbrt-v4 and Mitsuba 3 are in
+  src/components/pixel/gaussian/gaussian.md.
+- **Tent**: not built. It would be one more folder and registry line.
+- **Verification.** `tests/components/pixelFilters.test.ts` checks by χ² that the warp's density
+  is the stated kernel (and that σ = 0.45 fails the same test). On the GPU, the `filter-edge`
+  witness reads the kernel's x-marginal across a straight emissive edge (box 0 / 1, gaussian
+  1 − Φ(1) / Φ(1) at the two columns beside it, RGB and spectral) and checks that a tiled render
+  equals the one-piece render. A flat field cannot see the kernel (every kernel integrates to 1),
+  so the `furnace` gaussian arm is a smoke test, not a gate on the filter.
 
 ## P4 — Fix PNG export (the dead `ldr` target)
 
