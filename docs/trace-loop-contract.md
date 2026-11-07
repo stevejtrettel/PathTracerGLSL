@@ -61,7 +61,7 @@ struct Ray { Point origin; Direction direction; Wavelengths wl; }; // no search 
   unit tangent bundle. The geodesic flow moves it: `ambient_flow(ray, t)` is the ray at arc length
   t — the point reached and the velocity there — and `ambient_geodesic(origin, direction, t)` is
   that point alone. Only the *space* changes (Euclidean → line, H³ → hyperbolic geodesic,
-  Schwarzschild → light path). Same `Ray`.
+  S³ → great circle, Schwarzschild → light path). Same `Ray`.
 - **`ray.direction` is the direction at the origin.** Anything that needs the direction where the
   ray ARRIVES — `wo` at a surface hit, the side test in `scene_intersect`, the continuation through
   a null interface, a medium event's incident direction — reads `ambient_flow(ray, t).direction`.
@@ -141,10 +141,12 @@ The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`)
 `fp_uncertainty` (components/ambient/README.md). A space states its geodesic formula once:
 `ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
 `environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
-is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t.
-`MAX_DIST` is an arc length: 1000 in Euclidean space, 10 in H³ (float32 cosh overflows near 89; a
-scene within the working radius, about 3 from the origin, loses only sub-pixel grazing bands of its
-planes there).
+is the direction; in H³ it is the ray's ideal endpoint, normalize((p + v).xyz), exact for any t; S³
+has no sky (an environment is an error there). `MAX_DIST` is an arc length: 1000 in Euclidean space,
+10 in H³ (float32 cosh overflows near 89; a scene within the working radius, about 3 from the
+origin, loses only sub-pixel grazing bands of its planes there), 2π in S³, where every geodesic
+closes: the first hit within one period is the first hit, and a ray that meets nothing in it reads
+0 exactly.
 
 In a curved space every object is intersected in its own frame: the generated arm moves the ray
 by the object's inverse isometry (`G⁻¹·origin`, `G⁻¹·direction`), the shape's closed form returns
@@ -152,6 +154,15 @@ the arc length t (an isometry preserves it, so it is compared with `hit.t` uncha
 point is taken along the WORLD ray (`ambient_geodesic(ray.origin, ray.direction, t)`), and the
 normal computed in the object's frame is mapped back by the occupant's `isometry_direction`
 (components/ambient/README.md, "Curved spaces").
+In S³ two geodesics join any two points (the short arc of length d and the long arc of length
+2π − d, leaving and arriving in opposite directions), and both carry light. A light sample chooses
+its arc inside the light's body, before the emitter's back-face test, from the stored
+`LightQuery`: a one-sided surface receiver (`!q.two_sided`, `q.n ≠ 0`; in a curved program `n`
+faces the side the receiver is seen from, `light_query_surface(mat, hit, wo)`) takes the arc
+leaving into its upper hemisphere, and anything else takes each arc with probability ½. The MIS
+query `lighting_pdf(q, wo, light_id, light_hit)` takes `wo` at the emitter hit — the arrival
+direction reversed — because only the emitter cosine depends on the arc a ray travelled
+(components/lights/README.md).
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
 never mutated by intersection — it is a pure seed.
@@ -196,8 +207,9 @@ never mutated by intersection — it is a pure seed.
 
 ## Deferred (not this contract)
 
-Further curved ambient occupants (S³ next, then H²×R — docs/claude-2026-11-review/curved-spaces-design.md).
-H³ is registered (`Point` = `vec4`, the hyperboloid model); which components run in it is decided
+Further curved ambient occupants (H²×R next — docs/claude-2026-11-review/curved-spaces-design.md).
+H³ (the hyperboloid model) and S³ (the unit sphere in R⁴) are registered (`Point` = `vec4`); which
+components run in each is decided
 outside the loop: each space-dependent occupant has a GLSL body per space it implements, and the
 Validator rejects a program that uses one without a body (components/ambient/README.md, "Who
 implements what"; the table is components/ambient/support.md).

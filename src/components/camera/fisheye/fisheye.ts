@@ -42,7 +42,7 @@ function maxFov(projection: string): { max: number; inclusive: boolean } {
 export const fisheyeDescriptor: CameraModelDescriptor = {
     type: 'fisheye',
     // One file, checked in both spaces: it is written against the ambient seam alone.
-    glsl: { euclidean: body, hyperbolic: body },
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     authoredParams: [
         { name: 'fov', shape: 'number', required: true, constraint: { kind: 'positive' } },   // full angular field, radians
         { name: 'projection', shape: 'enum', required: true, values: ['equidistant', 'equisolid', 'stereographic', 'orthographic'] },

@@ -47,8 +47,8 @@ export interface LightSelectionDescriptor {
 export const DEFAULT_LIGHT_SELECTION = 'power';
 export const LIGHT_SELECTIONS: Record<string, LightSelectionDescriptor> = {
     // A CDF over the roster: no geometry, so the curved spaces whose lights it selects among.
-    power: { id: 'power', spaces: ['euclidean', 'hyperbolic'] },
-    uniform: { id: 'uniform', spaces: ['euclidean', 'hyperbolic'] },
+    power: { id: 'power', spaces: ['euclidean', 'hyperbolic', 'spherical'] },
+    uniform: { id: 'uniform', spaces: ['euclidean', 'hyperbolic', 'spherical'] },
     bvh: { id: 'bvh', spaces: ['euclidean'] },
 };
 

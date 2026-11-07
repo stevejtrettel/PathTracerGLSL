@@ -4,16 +4,10 @@
 
 import type { Vec3Tuple } from '../../geometry/similarity.js';
 import type { CurvedGeometry, Mat4, Vec4 } from '../isometry.js';
-import { mat4Multiply } from '../isometry.js';
+import { mat4Multiply, mat4Transpose } from '../isometry.js';
 
 /** J = diag(1,1,1,−1), the form's matrix. */
 const J: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1];
-
-function transpose(m: Mat4): Mat4 {
-    const t = new Array<number>(16);
-    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) t[4 * r + c] = m[4 * c + r];
-    return t;
-}
 
 export const hyperbolicGeometry: CurvedGeometry = {
     form: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] - a[3] * b[3],
@@ -52,5 +46,5 @@ export const hyperbolicGeometry: CurvedGeometry = {
     },
 
     // An isometry of the form satisfies gᵀ·J·g = J, so g⁻¹ = J·gᵀ·J.
-    inverse: (g: Mat4): Mat4 => mat4Multiply(J, mat4Multiply(transpose(g), J)),
+    inverse: (g: Mat4): Mat4 => mat4Multiply(J, mat4Multiply(mat4Transpose(g), J)),
 };

@@ -96,9 +96,9 @@ describe('the space gate (descriptor occupants)', () => {
         });
         const st = strategy({}, { camera: { type: 'thinlens', fov: 0.8, aperture: 0.1, focusDistance: 4 } as never, aovs: ['normal'] });
         expect(spaceErrors(s, st)).toEqual([
-            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic)",
-            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic)",
-            "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean, hyperbolic)",
+            "Light 0: its backing primitive 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
+            "Light 0: light kind 'disk' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
+            "Material 'fog': phase model 'hg' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
             "Material 'metal': material model 'ggx' has no testspace implementation (implemented in: euclidean)",
             "Object 1: primitive 'torus' has no testspace implementation (implemented in: euclidean)",
             "Object 1: the primitive bounding its march, 'cylinder' has no testspace implementation (implemented in: euclidean)",
@@ -180,7 +180,7 @@ describe('the hittable light\'s desugared parts', () => {
             try {
                 for (const directLighting of ['none', 'nee'] as const) {
                     expect(spaceErrors(mirrorLit(), strategy({ directLighting }))).toEqual([
-                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean, hyperbolic)",
+                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)",
                     ]);
                 }
             } finally { lambert[SPACE] = body; }
@@ -281,7 +281,7 @@ describe('curvedLimitations (features without a descriptor, resolved estimator o
 
     it('checks the resolved light selection only when the program selects lights', () => {
         const lit = scene(SPACE, (x) => { x.lights.push({ kind: 'point', position: [0, 3, 0], emission: 5 } as never); });
-        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean, hyperbolic)";
+        const power = "estimator.lightSelection 'power' has no testspace implementation (implemented in: euclidean, hyperbolic, spherical)";
         expect(spaceErrors(lit, strategy({ directLighting: 'nee' }))).toContain(power);
         expect(spaceErrors(lit, strategy())).not.toContain(power);
     });

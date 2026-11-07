@@ -22,7 +22,7 @@ void kernel_score_emitter_hit(inout PathState s, Hit hit, int mat, Direction wo,
     // No ternary: ANGLE rejects '?:' on struct operands (ESSL restriction).
     MaterialProperties eprops = props;
     if (mat_emit != mat) eprops = scene_material_properties(mat_emit, hit.p, hit.uv, hit.element, hit.wl);
-    s.radiance += s.throughput * combiner_w_emitter(s, hit) * interaction_surface_emission(mat_emit, wo, hit, eprops);
+    s.radiance += s.throughput * combiner_w_emitter(s, hit, wo) * interaction_surface_emission(mat_emit, wo, hit, eprops);
 }
 
 bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction wo, MaterialProperties props, out InteractionSample bs) {
@@ -30,6 +30,6 @@ bool kernel_sample_continuation(inout PathState s, Hit hit, int mat, Direction w
     bs = interaction_surface_sample(mat, wo, hit, props, random(), random2());
     if (spectrum_is_black(bs.weight)) return false;
     s.throughput *= bs.weight;
-    kernel_record(s, bs.pdf, light_query_surface(mat, hit), (bs.flags & LOBE_DELTA) != 0u);
+    kernel_record(s, bs.pdf, light_query_surface(mat, hit, wo), (bs.flags & LOBE_DELTA) != 0u);
     return true;
 }

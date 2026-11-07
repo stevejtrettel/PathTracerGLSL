@@ -56,6 +56,22 @@ expected values are computed by the fp64 twin `scenes/h3Twins.ts`; `h3Twins.test
 them and checks the twin against the on-axis closed form, an independent Monte Carlo estimate, the
 limit that defines the sky key and a marched ball test. Not yet in a full sweep.
 
+## Curved-space witnesses (S³)
+
+`scenes/s3Witness.ts`: `s3-furnace` (six emissive great spheres, every path Σ_{k≤6} 0.8^k, pinhole
+and fisheye), `s3-long-arc` (a lambert disk receiver lit only through the long arc by a disk light of
+geodesic radius 1.2 facing away from it; a Euclidean radius map would be off by about 3%) and
+`s3-point-light` (the same receiver under point lights above and below it, power and uniform
+selection), against closed forms integrated over the readout window; `s3-long-arc-blocker` (an
+opaque ball about −o on every long arc from the window, beyond the short-arc distance: 0 under every
+estimator; a shadow ray searched only to d reads 0.451 under pt-nee); `s3-medium` (a scattering ball
+lit by two disk lights out of frame, one reachable only through the long arc: pt = pt-nee = pt-mis;
+applying the one-sided arc rule at medium events moves pt-nee 67% away from pt). The expected values
+are computed by the fp64 twin `scenes/s3Twins.ts` (space-free parts in `scenes/curvedTwins.ts`);
+`s3Twins.test.ts` recomputes them and checks the twin against the on-axis closed form, an
+independent Monte Carlo estimate, the blocker's position on every long arc and the lights' absence
+from every camera ray's geodesic. Not yet in a full sweep.
+
 ## Known failing witnesses — current (Sep 25 2026 sweep)
 
 **Read this before diagnosing a red row.** Full sweep after the Sep 25 fixes (CHANGELOG.md):

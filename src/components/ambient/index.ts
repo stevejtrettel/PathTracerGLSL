@@ -13,6 +13,9 @@ import euclideanGLSL from './euclidean/euclidean.glsl?raw';
 import hyperbolicTypesGLSL from './hyperbolic/types.glsl?raw';
 import hyperbolicGLSL from './hyperbolic/hyperbolic.glsl?raw';
 import { hyperbolicGeometry } from './hyperbolic/hyperbolic.js';
+import sphericalTypesGLSL from './spherical/types.glsl?raw';
+import sphericalGLSL from './spherical/spherical.glsl?raw';
+import { sphericalGeometry } from './spherical/spherical.js';
 import type { CurvedGeometry } from './isometry.js';
 
 export interface AmbientDescriptor {
@@ -32,6 +35,7 @@ export interface AmbientDescriptor {
 export const AMBIENT_SPACES: Record<string, AmbientDescriptor> = {
     euclidean: { type: 'euclidean', typesGLSL: euclideanTypesGLSL, glsl: euclideanGLSL },
     hyperbolic: { type: 'hyperbolic', typesGLSL: hyperbolicTypesGLSL, glsl: hyperbolicGLSL, curved: hyperbolicGeometry },
+    spherical: { type: 'spherical', typesGLSL: sphericalTypesGLSL, glsl: sphericalGLSL, curved: sphericalGeometry },
 };
 
 /** The CPU geometry of `space` when it is curved, else undefined (Euclidean, or unregistered —

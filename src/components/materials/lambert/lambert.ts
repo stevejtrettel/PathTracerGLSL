@@ -9,7 +9,7 @@ const body = { origin: 'components/materials/lambert/lambert.glsl', source: lamb
 export const lambertDescriptor: MaterialModelDescriptor = {
     id: 'lambert',
     // One file, checked in both spaces: it is written against the ambient seam alone.
-    glsl: { euclidean: body, hyperbolic: body },
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Fields read (matches lambert.glsl's header): albedo, emission.
     properties: [
         { name: 'albedo', glslType: 'Spectrum', role: 'reflectance', source: 'albedo', default: 0.8, storage: 'field' },

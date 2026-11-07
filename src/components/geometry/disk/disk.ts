@@ -11,6 +11,7 @@
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import diskGLSL from './disk.glsl?raw';
 import diskHyperbolicGLSL from './disk_hyperbolic.glsl?raw';
+import diskSphericalGLSL from './disk_spherical.glsl?raw';
 
 /** The shared unit-vector formula (invLen multiply, canonicalPlane's op pattern) —
  *  compile-time, one source: geometry canonicalize AND the disk light's desugar. */
@@ -31,6 +32,7 @@ export const diskDescriptor: PrimitiveDescriptor = {
     glsl: {
         euclidean: { origin: 'components/geometry/disk/disk.glsl', source: diskGLSL },
         hyperbolic: { origin: 'components/geometry/disk/disk_hyperbolic.glsl', source: diskHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/disk/disk_spherical.glsl', source: diskSphericalGLSL },
     },
     provides: { sdf: false, analytic: true },
     similarityClosed: true,   // orientation lives in the normal row; rotation about it is a symmetry

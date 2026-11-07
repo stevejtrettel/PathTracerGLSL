@@ -5,6 +5,7 @@
 import type { PrimitiveDescriptor } from '../../descriptors.js';
 import sphereGLSL from './sphere.glsl?raw';
 import sphereHyperbolicGLSL from './sphere_hyperbolic.glsl?raw';
+import sphereSphericalGLSL from './sphere_spherical.glsl?raw';
 
 export const sphereDescriptor: PrimitiveDescriptor = {
     type: 'sphere',
@@ -15,6 +16,7 @@ export const sphereDescriptor: PrimitiveDescriptor = {
     glsl: {
         euclidean: { origin: 'components/geometry/sphere/sphere.glsl', source: sphereGLSL },
         hyperbolic: { origin: 'components/geometry/sphere/sphere_hyperbolic.glsl', source: sphereHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/sphere/sphere_spherical.glsl', source: sphereSphericalGLSL },
     },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it

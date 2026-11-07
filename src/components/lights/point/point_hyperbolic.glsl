@@ -5,12 +5,12 @@
 // Provides (struct GENERATED from descriptor rows): point_light_sample().
 // Depends on: LightSample, LIGHT_DELTA, ambient_distance/ambient_direction_to.
 
-LightSample point_light_sample(PointLight l, Point p, vec2 xi) {
-    float d = ambient_distance(p, l.position);
+LightSample point_light_sample(PointLight l, LightQuery q, vec2 xi) {
+    float d = ambient_distance(q.p, l.position);
     float s = sinh(d);
 
     LightSample ls;
-    ls.wi       = ambient_direction_to(p, l.position);
+    ls.wi       = ambient_direction_to(q.p, l.position);
     ls.distance = d;
     ls.radiance = l.intensity / (s * s);   // falloff folded in (delta light, §6.1)
     ls.pdf      = 1.0;                     // per-light pdf; selection pdf applied by the dispatcher

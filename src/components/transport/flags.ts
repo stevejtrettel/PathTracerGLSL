@@ -5,6 +5,7 @@
 
 import type { ProgramDescription } from '../../compiler/plan/types.js';
 import { modelTransmission } from '../materials/index.js';
+import { curvedGeometryOf } from '../ambient/index.js';
 
 export function flags(p: ProgramDescription) {
     const lighting = p.estimator.lighting;
@@ -31,6 +32,9 @@ export function flags(p: ProgramDescription) {
          *  folding the constant `false`. A DECISION read from the link map, never
          *  re-derived here. */
         twoSided: p.materials.twoSidedShading,
+        /** The program's space is curved (ambient README): light_query_surface turns n toward
+         *  the side the receiver is seen from, which the S³ light bodies' arc rule reads. */
+        curved: curvedGeometryOf(p.measurement.ambient) !== undefined,
         envSamplable: p.environmentSamplable,
         /** The env-vs-finite selection draw is live (u_envSelectProb exists); false in
          *  env-only programs, where BOTH selection sides fold to the constant 1. */

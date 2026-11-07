@@ -9,6 +9,7 @@ import type { PrimitiveDescriptor } from '../../descriptors.js';
 import { similarityApplyDirection } from '../similarity.js';
 import planeGLSL from './plane.glsl?raw';
 import planeHyperbolicGLSL from './plane_hyperbolic.glsl?raw';
+import planeSphericalGLSL from './plane_spherical.glsl?raw';
 
 /** Canonical unit-normal form of dot(p,n)+offset=0. Dividing both terms by |n|
  *  preserves the plane and makes the expression a true signed-distance bound. */
@@ -29,6 +30,7 @@ export const planeDescriptor: PrimitiveDescriptor = {
     glsl: {
         euclidean: { origin: 'components/geometry/plane/plane.glsl', source: planeGLSL },
         hyperbolic: { origin: 'components/geometry/plane/plane_hyperbolic.glsl', source: planeHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/plane/plane_spherical.glsl', source: planeSphericalGLSL },
     },
     provides: { sdf: true, analytic: true },
     // THE unbounded shape (impl-plan-sdf-as-shape §2.3): a plane has no finite bound to

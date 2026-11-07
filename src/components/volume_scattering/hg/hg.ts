@@ -11,7 +11,7 @@ const body = { origin: 'components/volume_scattering/hg/hg.glsl', source: phaseH
 export const hgDescriptor: VolumeScatteringModelDescriptor = {
     id: 'hg',
     // One file, checked in both spaces: it is written against the ambient seam alone.
-    glsl: { euclidean: body, hyperbolic: body },
+    glsl: { euclidean: body, hyperbolic: body, spherical: body },
     // Fields read (matches phase_hg.glsl's header): phase_g.
     properties: [
         { name: 'phase_g', glslType: 'float', source: 'phase_g', default: 0, storage: 'field' },

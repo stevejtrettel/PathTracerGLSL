@@ -4,6 +4,41 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Spherical space S³ (curved-space step 3)
+
+[Design](docs/claude-2026-11-review/curved-spaces-design.md) §2.4 and Part 1.
+
+- **The occupant** `components/ambient/spherical/`: the unit sphere in R⁴ (Point and Direction are
+  vec4), MAX_DIST = 2π (exact: every geodesic closes), no sky, the chord-form distance
+  2·atan(|a − b|, |a + b|), the longest-axis tangent frame, `isometry_direction` = v·G⁻¹, and an
+  arc-aware `ambient_aim`: a shadow ray on the long arc leaves along −u with 2π − d left, so an
+  occluder on the far part of a long arc is tested. CPU geometry (exp_o, log_o, the rotation
+  transvection, g⁻¹ = gᵀ); `mat4Transpose` is now shared with H³.
+- **Bodies:** sphere (one atan pair, entry/exit by the inside test, mod 2π), plane (great sphere,
+  first of two roots per period), disk (the first of the two antipodal crossings inside it); point
+  light (I/sin²d per arc) and disk light (area 4π sin²(ρ/2), sin(r/2) = √u·sin(ρ/2)). lambert,
+  pinhole, fisheye and hg are listed under spherical (same files); power and uniform selection and
+  unrolled dispatch list spherical.
+- **Two arcs.** The S³ light bodies choose the arc before the emitter's back-face test
+  (`spherical_light_arc`): a one-sided surface receiver takes the arc leaving into its upper
+  hemisphere with probability 1; a two-sided receiver or a medium event takes each with
+  probability ½ (one extra `random()`). The pdf carries that probability.
+- **Curved light-body signatures:** `<kind>_light_sample(l, LightQuery q, xi)` and
+  `<kind>_light_pdf(l, q, light_p, wo)`, in H³ too. The MIS seam is now
+  `lighting_pdf(q, wo, light_id, light_hit)` with `wo` the arrival direction reversed at the
+  emitter hit, passed by `combiner_w_emitter(s, hit, wo)`; Euclidean arms pass `-wo`, which in E³
+  is the old `s.ray.direction` bit for bit. `light_query_surface(mat, hit, wo)`: in a curved
+  program n faces the side the receiver is seen from.
+- **Trigonometry on the GPU.** SwiftShader's sin and cos are off by up to 1.9e-4 (atan 2e-7, asin
+  7e-5; measured). With them, S³ hit points sat up to 1e-4 off the surface their root names, past
+  the 3e-5 spawn offset, and in `s3-medium` a quarter of the paths through the ball re-spawned on the
+  wrong side and carried the medium outside it (NEE 17% above pt). Every S³ position and body now
+  uses the occupant's `spherical_cos_sin` (|error| ≤ 7e-8) and `spherical_asin` (through atan).
+- **Witnesses** `s3-furnace`, `s3-long-arc`, `s3-long-arc-blocker`, `s3-point-light`,
+  `s3-medium` (tests/witnesses/scenes/s3Witness.ts) with the fp64 twin s3Twins.ts; the
+  space-free twin parts moved to curvedTwins.ts. Demo `spherical` (gallery section "Curved
+  spaces").
+
 ## 2026-11-07 — H³ review fixes: witnesses that can fail, groups, procedural skies
 
 Review of the H³ step (curved-space design §2.3).

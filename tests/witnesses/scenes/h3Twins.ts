@@ -12,20 +12,19 @@
 // checks it against the on-axis closed form and against an independent cosine-sampled estimate.
 // The camera ray of a pixel follows the pinhole and fisheye occupants (pinhole.glsl, fisheye.glsl)
 // with the frame the compiler ships (curvedCameraBasis), and the window is the runner's
-// regionBounds. The sky witnesses read the sky key normalize((p + v).xyz) (h3Twins.test.ts checks it
+// regionBounds (both in curvedTwins.ts, shared with the S³ twin). The sky witnesses read the sky key normalize((p + v).xyz) (h3Twins.test.ts checks it
 // against the direction of γ(t) from o as t grows) and a closed-form ball test (checked against
 // marching the ray).
 
 import type { WitnessRegion } from '../types.js';
 import type { Vec3Tuple } from '../../../src/components/geometry/similarity.js';
 import { hyperbolicGeometry } from '../../../src/components/ambient/hyperbolic/hyperbolic.js';
-import { curvedCameraBasis } from '../../../src/components/camera/basis.js';
+import { curvedCameraRay, curvedFisheyeRay, gaussLegendre, regionMean, type V4 } from './curvedTwins.js';
 
-export type V4 = [number, number, number, number];
+export { gaussLegendre, regionMean, type V4 };
 
 export const form = (a: V4, b: V4): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] - a[3] * b[3];
 const lin = (a: V4, s: number, b: V4, t: number): V4 => [a[0] * s + b[0] * t, a[1] * s + b[1] * t, a[2] * s + b[2] * t, a[3] * s + b[3] * t];
-const unit = (v: V4): V4 => lin(v, 1 / Math.sqrt(form(v, v)), v, 0);
 export const exp = (v: Vec3Tuple): V4 => hyperbolicGeometry.exp(v) as V4;
 
 /** Geodesic distance (acosh is exact enough in fp64 at the separations used here). */
@@ -116,29 +115,13 @@ export function pointIrradiance(x: V4, nx: V4, q: V4, I: number): number {
     return c <= 0 ? 0 : I * c / Math.sinh(dist(x, q)) ** 2;
 }
 
-/** The pinhole camera ray through film point (fx, fy) (pixel units, origin bottom-left). */
-export function cameraRay(pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], fx: number, fy: number): { p: V4; v: V4 } {
-    const b = curvedCameraBasis(hyperbolicGeometry, pose.position, pose.target);
-    const [W, H] = size;
-    const a = ((2 * fx) / W - 1) * (W / H) * Math.tan(fov / 2);
-    const c = ((2 * fy) / H - 1) * Math.tan(fov / 2);
-    const d: V4 = [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++) d[i] = b.forward[i] + a * b.right[i] + c * b.up[i];
-    return { p: b.position as V4, v: unit(d) };
-}
+/** The pinhole camera ray through film point (fx, fy) (curvedTwins.ts, in H³). */
+export const cameraRay = (pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], fx: number, fy: number) =>
+    curvedCameraRay(hyperbolicGeometry, pose, fov, size, fx, fy);
 
-/** The equidistant fisheye ray through film point (fx, fy) (fisheye.glsl: θ = ρ·fov/2 about the
- *  view axis, ρ the aspect-corrected film radius; corners reach past the inscribed circle). */
-export function fisheyeRay(pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], fx: number, fy: number): { p: V4; v: V4 } {
-    const b = curvedCameraBasis(hyperbolicGeometry, pose.position, pose.target);
-    const [W, H] = size;
-    const cx = ((2 * fx) / W - 1) * (W / H), cy = (2 * fy) / H - 1;
-    const rho = Math.hypot(cx, cy);
-    const theta = rho * fov / 2;
-    const d: V4 = [0, 0, 0, 0];
-    for (let i = 0; i < 4; i++) d[i] = Math.cos(theta) * b.forward[i] + Math.sin(theta) * ((cx / rho) * b.right[i] + (cy / rho) * b.up[i]);
-    return { p: b.position as V4, v: unit(d) };
-}
+/** The equidistant fisheye ray through film point (fx, fy) (curvedTwins.ts, in H³). */
+export const fisheyeRay = (pose: { position: Vec3Tuple; target: Vec3Tuple }, fov: number, size: [number, number], fx: number, fy: number) =>
+    curvedFisheyeRay(hyperbolicGeometry, pose, fov, size, fx, fy);
 
 /** The ideal endpoint of the ray (p, v) as a unit vector of R³: normalize((p + v).xyz). */
 export function skyKey(p: V4, v: V4): [number, number, number] {
@@ -153,34 +136,6 @@ export function skyKey(p: V4, v: V4): [number, number, number] {
 export function hitsBall(p: V4, v: V4, c: V4, R: number): boolean {
     const A = -form(p, c), B = -form(v, c);
     return B < 0 && Math.sqrt(A * A - B * B) <= Math.cosh(R);
-}
-
-/** The mean over the runner's readout region (default: the whole frame) of the per-ray RGB radiance
- *  `radiance(p, v)`, each pixel integrated over its footprint (box filter) with sub×sub stratified
- *  points. */
-export function regionMean(
-    ray: (fx: number, fy: number) => { p: V4; v: V4 }, size: [number, number], region: WitnessRegion | undefined,
-    radiance: (p: V4, v: V4) => [number, number, number], sub = 2,
-): [number, number, number] {
-    const [W, H] = size;
-    const r = region ?? { x: 0, y: 0, w: 1, h: 1 };
-    const x0 = Math.max(0, Math.floor(r.x * W)), y0 = Math.max(0, Math.floor(r.y * H));
-    const x1 = Math.min(W, Math.ceil((r.x + r.w) * W)), y1 = Math.min(H, Math.ceil((r.y + r.h) * H));
-    const sum: [number, number, number] = [0, 0, 0];
-    let n = 0;
-    for (let py = y0; py < y1; py++) {
-        for (let px = x0; px < x1; px++) {
-            for (let sy = 0; sy < sub; sy++) {
-                for (let sx = 0; sx < sub; sx++) {
-                    const { p, v } = ray(px + (sx + 0.5) / sub, py + (sy + 0.5) / sub);
-                    const L = radiance(p, v);
-                    sum[0] += L[0]; sum[1] += L[1]; sum[2] += L[2];
-                    n++;
-                }
-            }
-        }
-    }
-    return [sum[0] / n, sum[1] / n, sum[2] / n];
 }
 
 /** A receiver: the lambert disk of geodesic radius rho about o in the plane y = 0 (normal +y). */
@@ -205,24 +160,4 @@ export function windowMean(
         return [L, L, L];
     }, sub);
     return { mean, missed };
-}
-
-/** Gauss–Legendre nodes and weights on [−1, 1] (Newton on the Legendre recurrence). */
-export function gaussLegendre(n: number): [number[], number[]] {
-    const x: number[] = [], w: number[] = [];
-    for (let i = 0; i < n; i++) {
-        let z = Math.cos(Math.PI * (i + 0.75) / (n + 0.5));
-        let dp = 0;
-        for (let it = 0; it < 100; it++) {
-            let p0 = 1, p1 = z;
-            for (let k = 2; k <= n; k++) { const p2 = ((2 * k - 1) * z * p1 - (k - 1) * p0) / k; p0 = p1; p1 = p2; }
-            dp = n * (z * p1 - p0) / (z * z - 1);
-            const dz = p1 / dp;
-            z -= dz;
-            if (Math.abs(dz) < 1e-15) break;
-        }
-        x.push(z);
-        w.push(2 / ((1 - z * z) * dp * dp));
-    }
-    return [x, w];
 }

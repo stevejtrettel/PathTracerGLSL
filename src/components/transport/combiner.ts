@@ -24,7 +24,7 @@ export function combinerFns(f: Flags): ShaderBlock {
     const lines: string[] = [combinerHeader(f)];
 
     // T1's emitter-hit weight (kernel.glsl calls it whenever emission can exist).
-    lines.push('float combiner_w_emitter(PathState s, Hit hit) {');
+    lines.push('float combiner_w_emitter(PathState s, Hit hit, Direction wo) {');
     if (f.nee && f.emitters) {
         lines.push(
             '    // §6.2: a SAMPLABLE emitter found by a non-delta bounce competes with last',
@@ -36,7 +36,8 @@ export function combinerFns(f: Flags): ShaderBlock {
         if (f.mis) {
             // The STORED query (fable-light-bvh §3.2 v1.5): the pmf replays exactly the
             // context the previous vertex's sampler used — byte-identical by construction.
-            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, s.ray.direction, lid, hit));');
+            // wo is the arrival direction reversed at the emitter hit (the kernel's wo).
+            lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, wo, lid, hit));');
         } else {
             lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
         }

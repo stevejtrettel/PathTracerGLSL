@@ -50,17 +50,23 @@ locals inside component bodies (the cameras' look-at frames, for one) still say 
 
 ## Curved spaces
 
-A curved occupant (`hyperbolic/`: H³, curvature −1, the hyperboloid model) stores points and
-tangent vectors as 4-vectors (`Point` and `Direction` are `vec4`) and supplies, besides the
-contract above:
+A curved occupant (`hyperbolic/`: H³, curvature −1, the hyperboloid model; `spherical/`: S³,
+curvature +1, the unit sphere in R⁴) stores points and tangent vectors as 4-vectors (`Point` and
+`Direction` are `vec4`) and supplies, besides the contract above:
 
 - **`Direction isometry_direction(mat4 inverse, Direction v)`** — the world image G·v of a tangent
   vector given in an object's frame, from the object's INVERSE placement G⁻¹ (H³:
-  J·((J·v)·G⁻¹), J = diag(1,1,1,−1); the generated arms map normals with it).
+  J·((J·v)·G⁻¹), J = diag(1,1,1,−1); S³: v·G⁻¹; the generated arms map normals with it).
 - **Its CPU geometry** (`<type>.ts`, the `CurvedGeometry` of `isometry.ts`): the form, exp_o and
   log_o at the origin o = (0,0,0,1), the transvection by a tangent vector at o, and the exact
   inverse of an isometry. Registered as the descriptor's `curved` field; its presence is the one
   fact "this space is curved" (`curvedGeometryOf`).
+
+S³ adds two facts no other space has. Two geodesics join any two points, of lengths d and 2π − d,
+leaving and arriving in opposite directions: `ambient_aim` keeps a shadow ray on the arc it
+travels, and the S³ light bodies choose an arc per sample (`spherical_light_arc`; the lights
+README). And every geodesic closes after 2π: `MAX_DIST` is 2π exactly, there is no sky (an
+environment is an error), and a ray that meets nothing reads 0.
 
 What the compiler does with it (all fp64 on the CPU, compiler/plan/curved.ts):
 
@@ -122,9 +128,9 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 
 ## Status & the honest caveat
 
-Occupants: `euclidean/` and `hyperbolic/` (H³). In H³: sphere, plane and disk shapes; point and
-disk lights; lambert; pinhole and fisheye; hg in homogeneous object media; sky lookup by BSDF
-rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
+Occupants: `euclidean/`, `hyperbolic/` (H³) and `spherical/` (S³). In both curved spaces: sphere,
+plane and disk shapes; point and disk lights; lambert; pinhole and fisheye; hg in homogeneous
+object media; in H³ also sky lookup by BSDF rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
 similarity-placement arms, the environment samplers, equiangular placement, the uv charts, and
@@ -144,6 +150,15 @@ non-identity transform is an error there).
   (a lambert ball reads ρ·L under a constant sky; its placement is the {param}-driven mat4
   uniform). The CPU geometry, the column-major layout and
   `isometry_direction`'s arithmetic are pinned by tests/components/hyperbolic.test.ts.
+- S³ (tests/witnesses/scenes/s3Witness.ts; every occupant and estimator key listed under spherical
+  in support.md is rendered by one of them): `s3-furnace` (six emissive great spheres, Σ_{k≤6} 0.8^k
+  exactly, pinhole and fisheye), `s3-long-arc` (a disk receiver lit only through the long arc by a
+  disk light facing away from it, against the closed form integrated over the window by
+  tests/witnesses/scenes/s3Twins.ts), `s3-long-arc-blocker` (an opaque ball on every long arc
+  beyond the short-arc distance: 0), `s3-point-light` (point lights above and below, power and
+  uniform selection), `s3-medium` (pt = pt-nee = pt-mis for a scattering ball lit through both arcs,
+  the ½ rule). The CPU geometry and the occupant's arc arithmetic are pinned by
+  tests/components/spherical.test.ts.
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

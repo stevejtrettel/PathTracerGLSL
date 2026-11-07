@@ -47,6 +47,12 @@ export function mat4Multiply(a: Mat4, b: Mat4): Mat4 {
     return m;
 }
 
+export function mat4Transpose(m: Mat4): Mat4 {
+    const t = new Array<number>(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) t[4 * r + c] = m[4 * c + r];
+    return t;
+}
+
 export function mat4Apply(m: Mat4, v: Vec4): Vec4 {
     const out: Vec4 = [0, 0, 0, 0];
     for (let r = 0; r < 4; r++) out[r] = m[r] * v[0] + m[4 + r] * v[1] + m[8 + r] * v[2] + m[12 + r] * v[3];

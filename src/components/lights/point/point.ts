@@ -5,12 +5,14 @@ import type { LightKindDescriptor } from '../../descriptors.js';
 import { radiantScalar } from '../power.js';
 import lightPointGLSL from './point.glsl?raw';
 import pointHyperbolicGLSL from './point_hyperbolic.glsl?raw';
+import pointSphericalGLSL from './point_spherical.glsl?raw';
 
 export const pointLightDescriptor: LightKindDescriptor = {
     kind: 'point',
     glsl: {
         euclidean: { origin: 'components/lights/point/point.glsl', source: lightPointGLSL },
         hyperbolic: { origin: 'components/lights/point/point_hyperbolic.glsl', source: pointHyperbolicGLSL },
+        spherical: { origin: 'components/lights/point/point_spherical.glsl', source: pointSphericalGLSL },
     },
     delta: true,   // not hittable: no region, LIGHT_DELTA, no pdf function
     // ISOTROPIC delta: the equiangular delta query may read these rows directly

@@ -92,12 +92,13 @@ classification, region tables ("descriptors declare facts; generators decide").
 1. `geometry/<type>/<type>.glsl` — the math, per the symbol contract.
 2. `geometry/<type>/<type>.ts` — the descriptor; its `glsl` lists the file under each ambient
    space it is implemented in (`{ euclidean: { origin, source } }`; ambient/README.md).
-   A curved body (`<type>_hyperbolic.glsl`) is the shape canonically at the origin o of its own
+   A curved body (`<type>_hyperbolic.glsl`, `<type>_spherical.glsl`) is the shape canonically at the origin o of its own
    frame: its struct is generated from the rows without the point row (folded into the object's
    isometry), a direction row arrives as a tangent vector at o (`Direction(x, y, z, 0.0)`), and it
    provides `<type>_intersect(Ray, <Type>, out float t)` (t = arc length), `Direction
    <type>_normal(Point, <Type>)` and, with `provides.sdf`, `float <type>_sdf(Point, <Type>)`, all
-   in that frame. Curved bodies have no uv chart (a uv-reading material is a limitation row) and
+   in that frame. In S³ the returned t is the first hit in (0, 2π) (every geodesic closes after 2π;
+   a great sphere is crossed twice per period, at antipodal points). Curved bodies have no uv chart (a uv-reading material is a limitation row) and
    no march (sphere, plane and disk are closed forms; a marched object is a limitation row).
 3. One line in `index.ts` (`PRIMITIVES`).
 

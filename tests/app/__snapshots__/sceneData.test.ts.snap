@@ -689,6 +689,16 @@ exports[`scene-data textures (byte fingerprints) > rough-sheet 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-smooth-limit 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > s3-furnace 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-long-arc 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-long-arc-blocker 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-medium 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > s3-point-light 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > sdf-field 1`] = `
 {
   "nodes": "4096x1 ab53262f7e88a773",
@@ -943,6 +953,8 @@ exports[`scene-data textures (byte fingerprints) > spheres 1`] = `
   "records": "4096x1 a2af4e1873a0ca30",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > spherical 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > spot 1`] = `null`;
 
