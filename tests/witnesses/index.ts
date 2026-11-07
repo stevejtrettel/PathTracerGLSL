@@ -2,6 +2,8 @@ import { spectralDispersionSuite } from './scenes/spectralDispersion.js';
 import { spectralBlackbodySuite } from './scenes/spectralBlackbody.js';
 import { blackbodyRoutesSuite } from './scenes/blackbodyRoutes.js';
 import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
+import { filterEdgeSuite } from './scenes/filterEdgeWitness.js';
+import { bokehEdgeSuite } from './scenes/bokehEdgeWitness.js';
 // witnesses/index.ts — the GPU witness registry: the executable form of
 // docs/fable-validation-scenes.md.
 //
@@ -41,7 +43,7 @@ import {
     instanceLightsTwin, instanceLightsSky, instanceLightsRef, instanceLightsNeeStrategy, instanceLightsMisStrategy, instanceLightsRefStrategy,
     glowShell, glowShellNeeStrategy, glowShellMisStrategy, glowShellPtStrategy,
 } from './scenes/instanceLightsWitness.js';
-import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy } from './scenes/furnaceBox.js';
+import { furnaceBox, furnaceStrategy, furnaceVarianceStrategy, furnaceGaussianStrategy } from './scenes/furnaceBox.js';
 import {
     guidesScene, guidesStrategies, GUIDES_WITNESS, WALL_G,
     guidesGrinTraversal, guidesGrinSubstep, guidesGrinSubstepScatter, guidesGrinCapture, guidesGrinElsewhere, guidesGrinStrategies, GUIDES_GRIN_WITNESS,
@@ -118,7 +120,7 @@ import {
     beamFogScene, beamFogNeeStrategy, beamFogMisStrategy,
 } from './scenes/directionalBeamWitness.js';
 import { softbeamWallScene, softbeamNeeStrategy, softbeamMisStrategy } from './scenes/softbeamWitness.js';
-import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy } from './scenes/cameraWitness.js';
+import { cornellBox as camCornell, camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy } from './scenes/cameraWitness.js';
 import {
     transformBake, transformBakeRef, transformNeeStrategy, flattenTree,
     conjugationScene, conjugationBase, CONJ_CAMERA_BASE, CONJ_CAMERA_G,
@@ -166,17 +168,22 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralSkiesSuite,
     ...spectralMediaSuite,
     ...spectralTrackingSuite,
+    ...filterEdgeSuite,
+    ...bokehEdgeSuite,
     'thinlens-zero': {
         scene: camCornell,
-        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy),
+        strategies: posed([0, 1, 4], [0, 1, 0], camPinholeStrategy, camThinlensZeroStrategy, camThinlensZeroBladedStrategy),
         exercises:
-            'thin-lens correctness anchor: aperture = 0 (key 2) must reproduce the pinhole image (key 1) exactly — the lens disk collapses to a point. Both cameras draw xiLens, so the arms share the RNG stream.',
-        expected: 'key 1 (pinhole) and key 2 (thin-lens, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
+            'thin-lens correctness anchor: aperture = 0 must reproduce the pinhole image (key 1) exactly, with the disk pupil (key 2) and with a six-bladed one (key 3) — either pupil collapses to a point. All cameras draw xiLens, so the arms share the RNG stream.',
+        expected: 'keys 1 (pinhole), 2 (thin-lens, aperture 0) and 3 (six blades, aperture 0) are the same image; any visible difference is a frame/focus-math bug',
         witness: {
             spp: 64,
             // Identical-stream arms (only thin-lens\'s normalize(dir·k) round-trip differs
             // in the last fp bits) → the display-space RMSE gate, not χ².
-            checks: [{ kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' }],
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.002, rmse: 0.01, label: 'thin-lens aperture-0 ≡ pinhole' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.002, rmse: 0.01, label: 'six-bladed thin-lens aperture-0 ≡ pinhole' },
+            ],
         },
     },
     'two-light': {
@@ -290,9 +297,9 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     },
     furnace: {
         scene: furnaceBox,
-        strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy),
+        strategies: posed([0, 0, 0], [0, 0, -1], furnaceStrategy, furnaceVarianceStrategy, furnaceGaussianStrategy),
         exercises:
-            'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer',
+            'emission + energy conservation (F-BOX); expect linear-HDR mean = 0.4 everywhere. Key 2 = the VARIANCE accumulation occupant (Welford MRT): same walk, same mean, plus the second-moment buffer. Key 3 = the gaussian pixel filter (a flat field is filter-invariant)',
         expected: 'every pixel = EXACTLY 0.4 in linear HDR (F-BOX: Le/(1−ρ) = 0.2/0.5); key 2 identical (the variance statistic must not touch the mean)',
         witness: {
             spp: 48,
@@ -302,6 +309,10 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // Same RNG stream + same mix() update ⇒ the two means should agree to
                 // fp32 noise, not just statistically — hence the near-zero gates.
                 { kind: 'equality', strategies: [0, 1], meanTol: 0.001, rmse: 0.002, label: 'variance statistic leaves the mean untouched' },
+                // A flat field is the same under every pixel filter, so this arm cannot see a
+                // wrong kernel (filter-edge does). It is a smoke gate: the gaussian links,
+                // and border pixels, whose film points may fall outside the image, stay finite.
+                { kind: 'mean', value: 0.4, tol: 0.008, strategy: 2, label: 'F-BOX 0.4 (gaussian pixel filter; smoke)' },
             ],
         },
     },

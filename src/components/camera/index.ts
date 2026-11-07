@@ -85,10 +85,12 @@ export interface CameraModelDescriptor {
     controls?(cam: CameraDesc): CameraControl[];
     /** Model-unique derived shader values (precomputed uniforms). Omit when none. */
     derived?(cam: CameraDesc): CameraDerived[];
-    /** Model-unique compile-time #defines — for selecting a PROJECTION VARIANT (fisheye
-     *  aliases FISHEYE_THETA to the radial-map function its `projection` picks). This is
-     *  the STRUCTURAL axis: the projection type is part of the integral, so it recompiles —
-     *  distinct from the NUMERIC camera controls (fov/aperture/…), which are always uniforms. */
+    /** Model-unique compile-time #defines — for selecting a projection or pupil shape
+     *  (fisheye aliases FISHEYE_THETA to the radial-map function its `projection` picks; the
+     *  thin lens sets LENS_BLADES and LENS_BLADE_ROTATION for a bladed pupil). This is the
+     *  STRUCTURAL axis: the projection and the pupil shape are part of the integral, so they
+     *  recompile — distinct from the NUMERIC camera controls (fov/aperture/…), which are
+     *  always uniforms. */
     defines?(cam: CameraDesc): Record<string, string>;
 }
 
@@ -96,9 +98,10 @@ export interface CameraModelDescriptor {
  *  camera-specific shapes: 'enum' for structural selectors (fisheye's projection) and
  *  'value-number' for the perspective fov (a finite number OR a `{param}` slider
  *  spelling carrying path/range — the one load-bearing Value<> camera field).
- *  REQUIRED XOR DEFAULT (no camera row declares a default today — every field is
- *  required — so no framework default application exists yet; add it with the first
- *  defaulted row, the lights' applyAuthoredDefaults pattern). */
+ *  A row is required, or optional with the descriptor stating what its absence means (the
+ *  thin lens: no `blades` is the disk, no `bladeRotation` is 0). No camera row declares a
+ *  `default`, so no framework default application exists; add it with the first defaulted
+ *  row, the lights' applyAuthoredDefaults pattern. */
 export interface AuthoredCameraParamSpec {
     name: string;
     shape: 'number' | 'vec3' | 'enum' | 'value-number';

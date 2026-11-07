@@ -32,6 +32,7 @@ const ALLOWED_ROOT_FILES = new Set([
     'custom.ts',                           // geometry shared part (defineSDF — scene-local fields, fable-sdf-contract §5.2)
     'boundCheck.ts',                       // geometry shared part (twin-sampled bound containment — the §3 gate's core)
     'basis.ts',                            // camera shared part (CPU-computed look-at frame → uniforms)
+    'whiteBalance.ts',                     // tonemap shared part (the white-balance matrix, display glue every curve honors)
     'power.ts',                            // lights shared part (radiantScalar — kills the index↔occupant cycle, D5)
     'values.ts',                           // colour shared questions about authored spectrum values
     'spectrumKind.ts',                     // color/spectra shared spectrum-kind contract (docs/claude-spectrum-spec.md)

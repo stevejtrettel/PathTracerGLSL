@@ -4,9 +4,11 @@
 // THE CAMERA IS THE MEASURING DEVICE (measurement.camera), NOT part of the scene — so every
 // NUMERIC camera control is ALWAYS a live uniform, never baked. You can adjust the instrument
 // (pose, fov, aperture, focus) on any scene without a recompile; the constant-vs-driven Model B
-// split that governs scene values does NOT apply here. The one thing that IS structural is the
-// projection TYPE (pinhole vs a fisheye sub-projection) — changing it changes the integral, so
-// it recompiles (fisheye's FISHEYE_THETA function-selector define, NOT a value).
+// split that governs scene values does NOT apply here. What IS structural is the projection
+// TYPE (pinhole vs a fisheye sub-projection) and the pupil's shape (the thin lens's blade count
+// and orientation) — changing either changes the integral, so it recompiles (the descriptors'
+// `defines`: fisheye's FISHEYE_THETA function selector, the thin lens's LENS_BLADES and
+// LENS_BLADE_ROTATION).
 //
 // This feature owns the SHARED camera uniforms — the CPU-computed look-at frame (basis.ts),
 // image size, aspect, and the perspective u_tanFov = tan(fov/2). Every OTHER model-unique

@@ -56,3 +56,11 @@ export const hearthPtStrategy: RenderStrategy = {
     id: 'pt',
     estimator: { ...hearthNeeStrategy.estimator, directLighting: 'none' },
 };
+
+// The pt-nee render shown with the display white at the lamp's default temperature: the
+// lamp's white reads as D65 white, so the ivory cells look neutral (a view change only).
+export const hearthWhiteBalanceStrategy: RenderStrategy = {
+    ...hearthNeeStrategy,
+    id: 'pt-nee-wb',
+    view: { tonemap: { type: 'agx', whiteBalance: 2900 } },
+};

@@ -54,6 +54,8 @@ exports[`scene-data textures (byte fingerprints) > blackbody-lamp-batch 1`] = `
 
 exports[`scene-data textures (byte fingerprints) > blackhole 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > bokeh-edge 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > bounce-budget 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > cacti 1`] = `
@@ -144,6 +146,8 @@ exports[`scene-data textures (byte fingerprints) > expr-const 1`] = `null`;
 exports[`scene-data textures (byte fingerprints) > expr-const-ref 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > field-glass 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > filter-edge 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > flatten-tree 1`] = `null`;
 

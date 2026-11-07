@@ -46,7 +46,8 @@ See [spectral plan §3.2](../../../docs/claude-spectral-implementation-plan.md#3
 ## Status
 
 Six occupants: `pinhole/`, `thinlens/` (defocus — aperture + focusDistance, lens sample
-from `xiLens`; `aperture = 0 ≡ pinhole` witness), `orthographic/` (parallel projection),
+from `xiLens` over a disk or, with `blades`, a regular n-gon pupil; `aperture = 0 ≡ pinhole`
+witness), `orthographic/` (parallel projection),
 `equirect/` (360×180), `fisheye/` (one occupant, four `θ(ρ)` sub-projections behind a
 `projection` sub-parameter, selected by the value `#define FISHEYE_THETA`), `cylindrical/`
 (wide panorama — one `hfov` Width° dial, one focal length → square pixels, vertical follows
@@ -54,4 +55,4 @@ the window). Model-unique params come from each descriptor's `params(cam)`; mode
 compile-time selections from `defines(cam)` (the TAN_FOV mechanism, e.g. fisheye's radial
 map). Changing camera type changes the INTEGRAL — cross-camera images do not converge to
 each other, by design (contrast with everything estimator-side). Deferred: realistic
-multi-element lens, tilt-shift, anamorphic, polygonal bokeh, the fisheye circular mask.
+multi-element lens, tilt-shift, anamorphic, curved blades, the fisheye circular mask.

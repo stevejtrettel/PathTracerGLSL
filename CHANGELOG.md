@@ -85,6 +85,99 @@ roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the
 shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
 deficit that stays near 2.8%.
 
+## 2026-11-07 — Bladed thin-lens pupil and white balance
+
+Integration step 13 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+camera-film plan parts B and C with the review's must-fix items). B is measurement (it changes
+the camera functional W_j); C is view (a fixed linear map of each converged pixel).
+
+**What changed:**
+- Thin lens `blades: n` (an integer ≥ 3) and `bladeRotation` (radians, 0 when not authored): the
+  pupil becomes the regular n-gon of circumradius `aperture`, with a vertex at `bladeRotation`
+  from camera right toward up. Both are compile-time defines (`LENS_BLADES`,
+  `LENS_BLADE_ROTATION`); there is no live rotation control (cut in the integration).
+  `aperture_polygon` transcribes Cycles' `regular_polygon_sample` with its rotation shifted by
+  π/n. Weight 1, so brightness does not depend on the blade count; `aperture = 0` is still the
+  pinhole.
+- `view.tonemap.whiteBalance: <kelvin>` (1000–40000): the Bradford adaptation (pbrt-v4
+  `WhiteBalance`) from the white of a Planck source at that temperature to D65, as one constant
+  matrix on linear sRGB (components/tonemap/whiteBalance.ts), so `blackbody(T)` light renders
+  neutral at `whiteBalance: T`. The display pass folds exposure into it and applies
+  `safe_color(DISPLAY_VIEW * x)`, before the clamp, since the matrix has negative entries. It
+  applies to every tonemap-view picture; on the variance picture it is for looking only. The
+  probe path (`none`) and HDR exports are unbalanced. `blackbodyColor` now also returns the XYZ
+  it integrates, which the matrix reads (one integration).
+- New witness `bokeh-edge` (disk, hexagon, triangle at 0.4 rad); `thinlens-zero` gains a
+  six-blade arm.
+- The `hearth` demo gains a third renderer, `pt-nee-wb` (key 3: key 1 with `whiteBalance: 2900`,
+  the lamp's default temperature), and the glslang test compiles every tonemap's display shader
+  with white balance, so CI parses the `DISPLAY_VIEW` path.
+
+**Measured:**
+- Twin χ² of the polygon warp against exact cell areas (n = 3, 5, 6, 6, 9, assorted rotations,
+  10⁶ samples each) passes, with no sample outside; dropping the √ or shifting the sector angle
+  fails it. White balance: M·rgb_bb(T) = (1, 1, 1) to 1e-5 for T from 1000 to 40000 K; M equals
+  an independent transcription of pbrt's formula through xy chromaticities; a test reads the
+  emitted `DISPLAY_VIEW` back column-major (a transposed matrix fails it).
+- Digest: 273 of 276 scenes identical. `cornell` and `thinlens-zero` differ in their thin-lens
+  programs' text only (the new `#ifdef LENS_BLADES` blocks in thinlens.glsl, and source-map
+  lines); glslang's preprocessor output for both is identical to before. `thinlens-zero` gains
+  the blade renderer; `bokeh-edge` is new.
+- Witnesses (targeted): `bokeh-edge` columns 79–80 read 0.1967 (disk; exact 0.1957), 0.1674
+  (hexagon; exact 0.1670) and 0.0996 (triangle; exact 0.0994), tol 0.006; `thinlens-zero` both
+  arms Δmean 0.00%, rmse 0.00%.
+- Screenshot (SwiftShader, `hearth`, ~40 s each): key 1 reads orange (wall sRGB mean 46/36/23,
+  floor 173/137/92); key 3 reads as under white light (wall 39/37/36, floor 144/144/145).
+
+## 2026-11-07 — Review fixes for the Gaussian pixel filter
+
+- `docs/fable-imagery.md` P3 rewritten to match the code: Gaussian only, untruncated
+  (Box–Muller, weight 1), no tent, verified by the twin χ² and the `filter-edge` witness; a flat
+  field cannot see the kernel, so the furnace's gaussian arm is a smoke test. The stale
+  pixel-filter entry in `docs/claude-improvements-2026-09.md` (2.8) says the same.
+- `pixelFilters.test.ts`: the edge-column test now draws 10⁶ samples from the Gaussian twin and
+  checks the tail fractions past 0.5 and 1.5 px against 1 − Φ(d/σ) (4 binomial σ). With the
+  warp's σ changed to 0.45 it fails (0.1334 vs 0.1587).
+- `filter-edge` gains two report-only noise checks (gaussian RGB and spectral, columns 79 and
+  80), which measure the noise the tolerance rests on: per-pixel σ/µ 7.23% / 1.35% (RGB, the
+  Bernoulli value) and 7.70% / 1.73% (spectral), so the spectral column mean's σ is at most
+  0.0013 and tol 0.006 is 4.5 σ.
+- Digest: 275 of 275 scenes identical. Witnesses (targeted): `filter-edge` 9 of 9,
+  `furnace` and `spectral-furnace` 6 of 6.
+
+## 2026-11-07 — Gaussian pixel filter and a photographic-lens helper
+
+Integration step 2 of the photorealism batch (docs/claude-2026-11-review/photoreal/integration.md;
+plan and review in photoreal/camera-film/). Owner's provisional answer P1/Q5: untruncated
+Gaussian as `measurement.pixel`, always stamped.
+
+**What changed:**
+- `measurement.pixel: 'box' | 'gaussian'` (a components/pixel registry key; default `'box'`).
+  The Validator rejects other values; the pixel feature links the chosen occupant's file. The
+  resolved value is always recorded in `ProgramDescription.measurement`, so every export stamp
+  now states `pixel`.
+- New occupant `pixel/gaussian`: σ = 0.5 px, untruncated, drawn exactly by Box–Muller (pbrt-v4
+  `SampleTwoNormal`), weight 1. The only cutoff is the 24-bit sample stream's, at 2.884 px.
+  `tent` was not built (cut in the integration).
+- `thinLensFromPhoto` (src/authoring/photoLens.ts): focal length, f-number, focus distance (scene
+  units), sensor height and meters per unit, all required, to `{ type: 'thinlens', fov,
+  aperture, focusDistance }` with `aperture = f/2N` and `fov = 2 atan(h/2v)`, v = Ff/(F − f).
+- New witness `filter-edge` (box, gaussian, gaussian spectral, tiled gaussian); `furnace` gains
+  a gaussian smoke arm.
+
+**Measured:**
+- Digest: 273 of 275 scenes identical. `furnace` differs only by its new gaussian renderer
+  (whose main shader differs from the box one only in the pixel block); `filter-edge` is new.
+- Program-description snapshot: 505 programs gain exactly one line, `"pixel": "box"`.
+- Twin χ² (4·10⁶ Box–Muller offsets, 32×32 cells plus outside, against Φ products) passes; the
+  same test with σ = 0.45 fails. Lens helper: object-space blur equals the real lens's at every
+  tested depth to 1e-10 relative; 50 mm f/1.8 at 2 m on 24 mm gives fov 0.459728, aperture
+  0.013889 m.
+- Witnesses (targeted): `filter-edge` column 79 / 80 read 0 / 1 (box), 0.1572 / 0.8422
+  (gaussian; exact 0.1587 / 0.8413) and 0.1573 / 0.8413–0.8433 (spectral), tiled HDR and PNG
+  bit-identical; `furnace` 0.4000 on all three arms; `spectral-furnace` and `cornell-area`
+  (including its tiled check) pass.
+
 ## 2026-10-01 — GRIN programs no longer offset every ray by 0.001
 
 [Plan](docs/claude-grin-spawn-floor-plan.md), reviewed by a fresh agent before code.

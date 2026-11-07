@@ -36,7 +36,7 @@ import { gyroidFieldScene, gyroidFieldStrategy } from './gyroidFieldScene.js';
 import { chromeScene, chromeMisStrategy, chromeNeeStrategy, chromePtStrategy } from './chromeScene.js';
 import { torusRoomScene, torusRoomStrategy, torusRoomPtStrategy } from './torusScene.js';
 import { laserScene, laserSoftScene, laserNeeStrategy, laserMisStrategy } from './laserScene.js';
-import { hearthScene, hearthNeeStrategy, hearthPtStrategy } from './hearthScene.js';
+import { hearthScene, hearthNeeStrategy, hearthPtStrategy, hearthWhiteBalanceStrategy } from './hearthScene.js';
 import { spectralShowcaseScene, spectralShowcaseStrategies } from './spectralShowcaseScene.js';
 import { uvChartsScene, uvChartsNeeStrategy, uvChartsPtStrategy } from './uvChartsScene.js';
 import { exprMaterialsScene, exprMaterialsNeeStrategy, exprMaterialsPtStrategy } from './exprMaterialsScene.js';
@@ -128,7 +128,7 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
         exercises:
             'DEMO — the FIRST triangle meshes (impl-plan-meshes v0): a flat-shaded icosahedron (20 faces, per-face geometric normals — visible facets) beside a smooth icosphere (80 faces, per-vertex normals → barycentric-smooth), both on an analytic quad floor, one point light. Brute-force traversal (no BVH yet); transforms are ray-into-local.',
         expected:
-            'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+            'a faceted red d20 on the left, a smooth blue ball on the right — the flat vs smooth normal modes side by side; both cast/receive shadows from the point light; keys 1 (pt-nee) and 2 (pt) converge to the same image; key 3 is key 1 white-balanced to 2900 K (view.tonemap.whiteBalance): at the default temperature the tiles and the wall show their own colors as under white light (ivory, blue-gray slate, warm gray), not orange',
     },
     'spectral-showcase': {
         scene: spectralShowcaseScene,
@@ -140,11 +140,11 @@ export const demoSuite: Record<string, AnySceneSuiteEntry> = {
     },
     hearth: {
         scene: hearthScene,
-        strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy),
+        strategies: posed([0, 1.7, 4.6], [0, 0.6, 0], hearthNeeStrategy, hearthPtStrategy, hearthWhiteBalanceStrategy),
         exercises:
             'DEMO — the blackbody lamp + the FIRST Hit.uv reader (impl-plan-blackbody-uv): a quad lamp whose emission is {blackbody: {kelvin, scale}} — both dials DRIVEN (temperature normalization is CPU-derived; scale is independent and the power CDF re-weights live) — over a `checker` floor mixing two albedos in Hit.uv (today the placeholder planar xz chart, visibly)',
         expected:
-            'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image',
+            'a candle-warm (2900 K) pool over ivory/slate tiles; drag lamp.kelvin toward 1500 K → ember-red, toward 9000 K → blue-white, with ZERO recompiles (the chrome ball re-reflects the shift); lamp.power scales brightness independently of color; keys 1 (pt-nee) and 2 (pt) converge to the same image; key 3 is key 1 white-balanced to 2900 K (view.tonemap.whiteBalance): at the default temperature the tiles and the wall show their own colors as under white light (ivory, blue-gray slate, warm gray), not orange',
     },
     charts: {
         scene: uvChartsScene,

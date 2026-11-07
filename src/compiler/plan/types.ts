@@ -57,6 +57,9 @@ export interface ProgramDescription {
         shadows: 'opaque-dielectrics';
         color: 'rgb' | 'spectral';
         sensor: string;
+        /** The pixel filter (components/pixel key). Always present: the kernel is part of
+         *  the integral, so stamps state it even at its default. */
+        pixel: string;
         colorModelVersion?: string;
         /** The first-hit pictures kept beside the main picture (components/aov keys, authored
          *  order). PRESENT only when non-empty, so programs without AOVs are unchanged. */

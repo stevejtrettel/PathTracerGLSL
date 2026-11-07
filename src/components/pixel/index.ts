@@ -1,9 +1,8 @@
 // components/pixel/index.ts
-// Pixel-footprint registry (measurement pick-one — the reconstruction kernel h_j(u): where
-// within the pixel a sample lands, and with what weight). `box` is the sole occupant
-// (uniform footprint); tent/gaussian/mitchell slot in as one file + one line each. Carved
-// as a registry but included unconditionally by the pixel feature (the sampler precedent) —
-// a strategy knob arrives with the second occupant.
+// Pixel-filter registry (measurement pick-one: the reconstruction kernel h_j(u), where within
+// and around the pixel a sample lands). Each occupant importance-samples its kernel exactly, so
+// every sample has weight 1. `measurement.pixel` picks one (default 'box'); the Validator
+// gates the value against this registry. Adding a filter = one folder + one line here.
 
 export interface PixelModelDescriptor {
     id: string;
@@ -14,7 +13,12 @@ export interface PixelModelDescriptor {
 }
 
 import boxGLSL from './box/box.glsl?raw';
+import gaussianGLSL from './gaussian/gaussian.glsl?raw';
+
+/** The filter a strategy gets when it does not author `measurement.pixel`. */
+export const DEFAULT_PIXEL_MODEL = 'box';
 
 export const PIXEL_MODELS: Record<string, PixelModelDescriptor> = {
     box: { id: 'box', glsl: boxGLSL, origin: 'components/pixel/box/box.glsl' },
+    gaussian: { id: 'gaussian', glsl: gaussianGLSL, origin: 'components/pixel/gaussian/gaussian.glsl' },
 };

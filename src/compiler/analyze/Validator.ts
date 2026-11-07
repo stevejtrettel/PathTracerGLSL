@@ -4,6 +4,7 @@ import { spectralLimitations } from './spectral.js';
 import { rgbPreviewWarnings } from './rgbPreview.js';
 import { COLOR_MODELS } from '../../components/color/index.js';
 import { SENSORS } from '../../components/sensor/index.js';
+import { PIXEL_MODELS } from '../../components/pixel/index.js';
 import { isDrivenRadiometric, emissionMayBeNonzero } from '../../components/color/values.js';
 import type { SceneFeatures } from './types.js';
 import type { SceneDescription, RenderStrategy, Vec3, PrimitiveObject, MeshObject } from '../types.js';
@@ -28,6 +29,7 @@ import { nodeTexelBound } from '../../components/data/ledger.js';
 import { DATA_TEX_WIDTH } from '../../components/data/pack.js';
 import { CAMERA_MODELS } from '../../components/camera/index.js';
 import { isTonemapSupported } from '../../components/tonemap/index.js';
+import { blackbodyTemperatureRange } from '../../components/color/spectra/blackbody/blackbody.js';
 import { isMediumModelSupported } from '../../components/volume_scattering/index.js';
 import { validateSceneProperties, valueProblems, numberProblems, constantProblem, constraintViolation, slotDomain, isFiniteVec3 } from './propertyValidation.js';
 import { batchPlacementRecordOf } from '../plan/dataTenants.js';
@@ -886,6 +888,7 @@ export function validate(
         ['shadows', strategy.measurement.shadows, ['opaque-dielectrics']],
         ['color', strategy.measurement.color, ['rgb', 'spectral']],
         ['response', strategy.measurement.response, ['radiance']],
+        ['pixel', strategy.measurement.pixel, Object.keys(PIXEL_MODELS)],
     ];
     for (const [field, value, legal] of measurementEnums) {
         if (value !== undefined && !legal.includes(value as string)) {
@@ -926,6 +929,15 @@ export function validate(
     const exposure = strategy.view?.tonemap?.exposure;
     if (exposure !== undefined && (typeof exposure !== 'number' || !Number.isFinite(exposure) || exposure <= 0)) {
         bag.error('invalid-setting', `view.tonemap.exposure must be a finite number > 0 (got ${String(exposure)})`).add();
+    }
+    // White balance becomes a constant matrix in the display shader, computed from the
+    // blackbody's color at that temperature.
+    const whiteBalance = strategy.view?.tonemap?.whiteBalance;
+    const [minKelvin, maxKelvin] = blackbodyTemperatureRange;
+    if (whiteBalance !== undefined && (typeof whiteBalance !== 'number' || !Number.isFinite(whiteBalance)
+        || whiteBalance < minKelvin || whiteBalance > maxKelvin)) {
+        bag.error('invalid-setting',
+            `view.tonemap.whiteBalance must be a temperature in kelvin in [${minKelvin}, ${maxKelvin}] (got ${String(whiteBalance)})`).add();
     }
 
     // Procedural environment: the bake program has no uniforms (v1 pin — a live uniform would

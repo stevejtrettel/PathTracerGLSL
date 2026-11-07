@@ -167,8 +167,8 @@ export const gallerySections: GallerySection[] = [
     },
     {
         title: 'Cameras & view',
-        blurb: 'the camera family, the fisheye sub-projections, accumulation occupants, the first-hit guide pictures, and the tonemap roster',
-        entries: [e('cornell'), e('cornell-fisheye'), e('cornell-oneshot'), e('thinlens-zero'), e('guides', 'guides-grin-traversal', 'guides-grin-substep', 'guides-grin-substep-scatter', 'guides-grin-capture', 'guides-grin-elsewhere'), e('tonemap')],
+        blurb: 'the camera family, the fisheye sub-projections, the lens pupils, the pixel filters, accumulation occupants, the first-hit guide pictures, and the tonemap roster',
+        entries: [e('cornell'), e('cornell-fisheye'), e('cornell-oneshot'), e('thinlens-zero'), e('bokeh-edge'), e('filter-edge'), e('guides', 'guides-grin-traversal', 'guides-grin-substep', 'guides-grin-substep-scatter', 'guides-grin-capture', 'guides-grin-elsewhere'), e('tonemap')],
     },
     {
         title: 'Core validation',

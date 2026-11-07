@@ -282,10 +282,9 @@ one-level child-box lookahead fixes that. Both are variance-only.
 
 ### 2.8 Pixel reconstruction filters
 
-`fable-imagery.md` P3 (tent and Gaussian, importance-sampled so every sample has weight 1)
-is designed and ready. One decision is open there: the Gaussian's σ and truncation (the doc
-suggests σ = 0.5 px, truncated at 2σ). The furnace stays at 0.4 under any filter, which is
-the gate.
+Built (Gaussian only; `fable-imagery.md` P3): `measurement.pixel: 'gaussian'`, σ = 0.5 px,
+untruncated, sampled exactly so every sample has weight 1. A tent filter is not built. The
+`filter-edge` witness is the GPU gate; a flat-field furnace cannot see the kernel.
 
 ### 2.9 Low-discrepancy sampling — worth re-measuring
 
