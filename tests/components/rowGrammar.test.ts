@@ -51,6 +51,7 @@ describe('row grammar (D1) — one vocabulary across families', () => {
                     checkConstraintSane(`${kind}.${p.name}`, p.constraint);
                     checkSpaceConstraints(`${kind}.${p.name}`, p.constraintIn, d.glsl);
                 }
+                for (const space of Object.keys(d.validateAuthoredIn ?? {})) expect(spacesOf(d.glsl), `${kind}: validateAuthoredIn names '${space}'`).toContain(space);
             });
             it(`${kind}: struct rows + derived fields obey kinds-imply-shapes`, () => {
                 for (const p of d.params) checkKindShape(`${kind}.${p.name}`, p.kind, p.shape);
@@ -68,6 +69,7 @@ describe('row grammar (D1) — one vocabulary across families', () => {
                     checkConstraintSane(`${type}.${p.name}`, p.constraint);
                     checkSpaceConstraints(`${type}.${p.name}`, p.constraintIn, d.glsl);
                 }
+                for (const space of Object.keys(d.validateValuesIn ?? {})) expect(spacesOf(d.glsl), `${type}: validateValuesIn names '${space}'`).toContain(space);
             });
         }
     });

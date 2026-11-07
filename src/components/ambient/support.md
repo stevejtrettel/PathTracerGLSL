@@ -14,9 +14,9 @@ not keyed by space.
 |---|---|---|---|---|
 | geometry | sphere | yes | yes | yes |
 | geometry | plane | yes | yes | yes |
-| geometry | box | yes | — | — |
-| geometry | quad | yes | — | — |
-| geometry | cylinder | yes | — | — |
+| geometry | box | yes | yes | yes |
+| geometry | quad | yes | yes | yes |
+| geometry | cylinder | yes | yes | yes |
 | geometry | disk | yes | yes | yes |
 | geometry | torus | yes | — | — |
 | geometry | bottle | yes | — | — |
@@ -24,7 +24,7 @@ not keyed by space.
 | geometry | menger | yes | — | — |
 | geometry | apollonian | yes | — | — |
 | lights | point | yes | yes | yes |
-| lights | quad | yes | — | — |
+| lights | quad | yes | yes | yes |
 | lights | sphere | yes | — | — |
 | lights | disk | yes | yes | yes |
 | lights | spot | yes | — | — |

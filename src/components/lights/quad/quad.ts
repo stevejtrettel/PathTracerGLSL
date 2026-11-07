@@ -6,9 +6,11 @@
 // corner/edge1/edge2/radiance + normal/area (contract-test-checked).
 
 import type { LightKindDescriptor } from '../../descriptors.js';
-import { quadCross, quadNormal } from '../../geometry/index.js';
+import { quadCross, quadNormal, curvedQuadProblems } from '../../geometry/index.js';
 import { radiantScalar } from '../power.js';
 import lightQuadGLSL from './quad.glsl?raw';
+import quadHyperbolicGLSL from './quad_hyperbolic.glsl?raw';
+import quadSphericalGLSL from './quad_spherical.glsl?raw';
 
 function quadArea(edge1: number[], edge2: number[]): number {
     return Math.hypot(...quadCross(edge1, edge2));
@@ -16,7 +18,11 @@ function quadArea(edge1: number[], edge2: number[]): number {
 
 export const quadLightDescriptor: LightKindDescriptor = {
     kind: 'quad',
-    glsl: { euclidean: { origin: 'components/lights/quad/quad.glsl', source: lightQuadGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/lights/quad/quad.glsl', source: lightQuadGLSL },
+        hyperbolic: { origin: 'components/lights/quad/quad_hyperbolic.glsl', source: quadHyperbolicGLSL },
+        spherical: { origin: 'components/lights/quad/quad_spherical.glsl', source: quadSphericalGLSL },
+    },
     delta: false,
     // Authored input (besides kind/emission) — same names as the registry rows for quad.
     authoredParams: [
@@ -61,6 +67,11 @@ export const quadLightDescriptor: LightKindDescriptor = {
         return area < 1e-8
             ? [`quad edges are parallel or near-parallel — area |edge1 × edge2| must be >= 1e-8`]
             : [];
+    },
+    // The backing quad's curved rules (one formula with the shape's).
+    validateAuthoredIn: {
+        hyperbolic: (a) => curvedQuadProblems('hyperbolic', a.edge1 as number[], a.edge2 as number[]),
+        spherical: (a) => curvedQuadProblems('spherical', a.edge1 as number[], a.edge2 as number[]),
     },
     // Light-tree leaf box (fable-light-bvh §5): the four corners.
     treeBounds(v) {

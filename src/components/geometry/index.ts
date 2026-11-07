@@ -43,7 +43,7 @@ import { apollonianDescriptor } from './apollonian/apollonian.js';
 
 export type { PrimitiveDescriptor, PrimitiveEmitCtx, PrimitiveValues, PrimitiveParamSpec } from '../descriptors.js';
 export { canonicalPlane } from './plane/plane.js';
-export { quadCross, quadNormal } from './quad/quad.js';
+export { quadCross, quadNormal, curvedQuadProblems } from './quad/quad.js';
 export { unitVec3 } from './disk/disk.js';
 
 /** Registry insertion order = deterministic emission order for primitive includes. */
@@ -169,17 +169,17 @@ export function emitCtor(d: PrimitiveDescriptor, values: PrimitiveValues, scale?
 }
 
 /** A curved space's struct rows: the point row is folded into the object's placement (an
- *  isometry — compiler/plan/curved.ts), so the struct keeps the intrinsic rows. */
+ *  isometry — compiler/plan/curved.ts), so the struct keeps the intrinsic rows. A vector row (the
+ *  quad's edges) is a tangent vector at the object's origin o, typed Direction like a direction
+ *  row. Derived fields are Euclidean precomputations and are not part of a curved struct. */
 export function curvedRows(d: PrimitiveDescriptor): PrimitiveParamSpec[] {
-    return d.params.filter((f) => f.kind !== 'point');
+    return d.params.filter((f) => f.kind !== 'point').map((f) => (f.kind === 'vector' ? { ...f, kind: 'direction' as const } : f));
 }
 
-/** The struct constructor in a curved space, over curvedRows: numbers as floats, a direction row
- *  as a tangent vector at the object's origin o = (0,0,0,1), `Direction(x, y, z, 0.0)`, a vec3 of
- *  lengths as vec3. A vector row (a parallelogram's edge) has no curved meaning, and derived
- *  fields are Euclidean precomputations; no shape with a curved body has either. */
+/** The struct constructor in a curved space, over curvedRows: numbers as floats, a direction or
+ *  vector row as a tangent vector at the object's origin o = (0,0,0,1), `Direction(x, y, z, 0.0)`,
+ *  a vec3 of lengths as vec3. */
 export function emitCurvedCtor(d: PrimitiveDescriptor, values: PrimitiveValues): string {
-    if (d.derivedFields !== undefined) throw new Error(`geometry: '${d.type}' has derived fields, which have no curved form`);
     const v = resolvePrimitiveValues(d, values);
     const args = curvedRows(d).map((f) => {
         const x = v[f.name]!;

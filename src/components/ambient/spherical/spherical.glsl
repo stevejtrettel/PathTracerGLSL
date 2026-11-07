@@ -7,7 +7,8 @@
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
 //           isometry_direction(); for the S³ bodies, spherical_cos_sin(), spherical_asin(),
-//           spherical_plane_root(), spherical_light_arc() and spherical_light_arc_probability().
+//           spherical_plane_root(), spherical_halfspace(), spherical_crossing(),
+//           spherical_light_arc() and spherical_light_arc_probability().
 // Depends on: Point/Direction (types.glsl), Ray/Frame/LightQuery (structs), PI/TWO_PI and
 //             FP_UNCERTAINTY_REL/ABS (math), random() (the sampler, emitted before this block).
 
@@ -150,6 +151,39 @@ bool spherical_plane_root(Ray ray, vec4 N, out float t) {
     t = mod(atan(-P, W), PI);
     if (t <= 0.0) t += PI;
     return true;
+}
+
+// The box and cylinder bodies, whose shapes lie in the open hemisphere x_w > 0 of their own frame,
+// work along the ray's arc in that hemisphere: with a = p_w, b = v_w, γ_w(t) = A·cos(t − φ),
+// A = √(a² + b²), φ = atan(b, a), and the arc is s = t − φ ∈ (−π/2, π/2). Dividing by cos s turns
+// every condition on γ into one on T = tan s ∈ R (the gnomonic chart along the geodesic).
+// SPHERICAL_T_INF stands for an interval with no end on that side.
+#define SPHERICAL_T_INF 3.0e38
+
+// Narrows the interval [lo, hi] of T to where the ray lies in the half-space x·N ≤ 0 (N a unit
+// 4-vector); false when it becomes empty. With P = p·N, W = v·N, γ(t)·N = P·cos t + W·sin t, and
+// A·cos s·(…) turns it into (aP + bW) + (aW − bP)·T ≤ 0: linear in T.
+bool spherical_halfspace(Ray ray, vec4 N, inout float lo, inout float hi) {
+    float P = dot(ray.origin, N);
+    float W = dot(ray.direction, N);
+    float a = ray.origin.w, b = ray.direction.w;
+    float c0 = a * P + b * W, c1 = a * W - b * P;
+    if (c1 > 0.0) hi = min(hi, -c0 / c1);
+    else if (c1 < 0.0) lo = max(lo, -c0 / c1);
+    else if (c0 > 0.0) return false;
+    return lo <= hi;
+}
+
+// Takes the boundary crossing at T into `best` when it is ahead and earlier: its arc length is
+// t = φ + atan T taken mod 2π, i.e. atan(b + a·T, a − b·T) (the direction (cos(φ + s), sin(φ + s))
+// up to the factor A·cos s > 0). Every crossing comes round again after 2π, so the earliest t > 0
+// among a region's crossings is the next hit, whichever side the origin is on. An infinite end
+// (|T| = SPHERICAL_T_INF) is not a crossing.
+void spherical_crossing(Ray ray, float T, inout float best) {
+    if (abs(T) >= SPHERICAL_T_INF) return;
+    float a = ray.origin.w, b = ray.direction.w;
+    float t = mod(atan(b + a * T, a - b * T), TWO_PI);
+    if (t > 0.0 && t < best) best = t;
 }
 
 // Whether the receiver of query q is a one-sided surface: !q.two_sided with n ≠ 0 (n is the hit's
