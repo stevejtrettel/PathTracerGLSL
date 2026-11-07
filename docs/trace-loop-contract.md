@@ -129,8 +129,9 @@ Direction ambient_aim        (Point from, Direction along, Point to, out float r
                                                                        // shadow-ray aim + arc length left (see below)
 vec3     ambient_sky_key     (Point p, Direction v);                   // what the sky is looked up by, for the ray (p, v)
 ```
-The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`), `MAX_DIST` and
-`fp_uncertainty` (components/ambient/README.md). A space states its geodesic formula once:
+The ambient occupant supplies these, with `Point`/`Direction` (its `types.glsl`) and
+`fp_uncertainty` (components/ambient/README.md); `MAX_DIST` is its descriptor's `farClip`, or the
+measurement's `farClip` when authored, emitted by the compiler just before the occupant's block. A space states its geodesic formula once:
 `ambient_flow` computes its point with `ambient_geodesic`. A missed ray finds the environment at
 `environment_radiance(ambient_sky_key(ray.origin, ray.direction), wl)`; in Euclidean space the key
 is the direction.

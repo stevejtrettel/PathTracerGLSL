@@ -31,5 +31,8 @@ export function resolveMeasurement(scene: SceneDescription, strategy: RenderStra
         ...(COLOR_MODELS[m.color ?? 'rgb'].version ? { colorModelVersion: COLOR_MODELS[m.color ?? 'rgb'].version } : {}),
         // Omitted when there are none, so stamps and programs without AOVs are unchanged.
         ...(m.aovs !== undefined && m.aovs.length > 0 ? { aovs: [...m.aovs] } : {}),
+        // Present only when authored, so programs and stamps without them are unchanged; the
+        // emitted far clip is farClipOf(ambient, farClip) (components/ambient).
+        ...(m.farClip !== undefined ? { farClip: m.farClip } : {}),
     };
 }

@@ -2,8 +2,9 @@
 // Provides: PI, TWO_PI, MARCH_CLEARANCE, SHADOW_BACKOFF, FP_UNCERTAINTY_REL/ABS, build_basis(),
 //           concentric_disk(), schlick_fresnel(),
 //           dielectric_fresnel()
-// The far clip MAX_DIST and fp_uncertainty() depend on the space; the ambient occupant
-// defines them (components/ambient/<type>/<type>.glsl).
+// The far clip MAX_DIST and fp_uncertainty() depend on the space: the compiler emits MAX_DIST
+// from the ambient descriptor (or the measurement's farClip), and the ambient occupant defines
+// fp_uncertainty() (components/ambient/<type>/<type>.glsl).
 
 #define PI 3.14159265359
 #define TWO_PI 6.28318530718

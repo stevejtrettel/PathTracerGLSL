@@ -18,7 +18,8 @@ import interactionGLSL from '../../../glsl/core/interaction.glsl?raw';
 import mathGLSL from '../../../glsl/core/math.glsl?raw';
 import mathMediaGLSL from '../../../glsl/core/math_media.glsl?raw';
 import microfacetGLSL from '../../../glsl/core/microfacet.glsl?raw';
-import { AMBIENT_SPACES } from '../../../components/ambient/index.js';
+import { AMBIENT_SPACES, farClipOf } from '../../../components/ambient/index.js';
+import { formatFloat } from '../../../components/glsl-format.js';
 
 import rayGLSL from '../../../glsl/core/ray.glsl?raw';
 import type { ShaderBlock } from '../ShaderIR.js';
@@ -102,8 +103,10 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         // The colour projection calls the sensor's measurement response.
         { origin: `components/sensor/${sensor.id}/${sensor.id}.glsl`, source: sensor.glsl },
         { origin: `components/color/${color.id}/${color.id}.glsl`, source: color.glsl },
-        // The ambient functions (and MAX_DIST, fp_uncertainty): after core math, whose
+        // The far clip, then the ambient functions (and fp_uncertainty): after core math, whose
         // FP_UNCERTAINTY_* constants fp_uncertainty reads; before ray.glsl, which calls them.
+        // MAX_DIST is the far clip (AmbientDescriptor.farClip, or the measurement's farClip).
+        { origin: 'generated:far-clip', source: `#define MAX_DIST ${formatFloat(farClipOf(plan.program.measurement.ambient, plan.program.measurement.farClip))}` },
         ambient.functions,
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );

@@ -611,6 +611,14 @@ export interface MeasurementDescription {
      *  weight on arrival, so its expected value is that value times the transmittance along
      *  the camera ray; a sample is 0 when no such surface is reached. */
     aovs?: string[];
+    /** Truncation — limit: ∞ (exact when the scene's horizon is nearer). The far clip: an arc
+     *  length past which a segment (camera, BSDF or shadow ray) meets nothing and carries 0,
+     *  and where a missed ray finds the sky. Absent = the ambient space's default (Euclidean:
+     *  1000). Required in a quotient space (`ambientSpace.quotient`), where nothing escapes and
+     *  the clip is the only end of a segment that meets nothing; there it must be at least
+     *  twice the fundamental domain's diameter, so that every light image NEE samples is
+     *  reachable by a BSDF ray. A finite number > 0. */
+    farClip?: number;
 }
 
 /**

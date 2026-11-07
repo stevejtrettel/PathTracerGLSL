@@ -457,6 +457,13 @@ export function validate(
             .add();
     }
 
+    const farClip = strategy.measurement.farClip;
+    if (farClip !== undefined && !(typeof farClip === 'number' && Number.isFinite(farClip) && farClip > 0)) {
+        bag.error('invalid-setting',
+            `measurement.farClip must be a finite number > 0 — the arc length past which a segment meets nothing (got ${String(farClip)})`)
+            .add();
+    }
+
     // Russian roulette's survival CEILING — a probability, same class of rule as
     // envSelectWeight. 1.0 is legal and means "never cap": survival is then the
     // throughput alone, which for a LOSSLESS path (clear glass) is 1 forever, so the

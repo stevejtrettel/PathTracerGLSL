@@ -19,7 +19,6 @@ the color model's types and before the core structs:
 before `ray.glsl`:
 
 ```glsl
-#define MAX_DIST ...                                       // the far clip, an arc length
 float fp_uncertainty(Point p);                             // positional error of an fp-accurate point
 Point ambient_geodesic(Point o, Direction d, float t);     // the point at arc length t along the geodesic
 Ray   ambient_flow(Ray r, float t);                        // the ray moved by t: the point AND the arrival velocity
@@ -36,6 +35,11 @@ vec3  ambient_sky_key(Point p, Direction v);               // where the sky is l
 
 `ambient_flow` computes its point with `ambient_geodesic`, so a space states its geodesic
 formula once.
+
+**`farClip`** (a descriptor field) — the space's default far clip, an arc length: nothing
+beyond it is geometry, and the environment is found there. The compiler emits
+`#define MAX_DIST <farClip>` just before the occupant's block, with the measurement's
+`farClip` in its place when one is authored (`farClipOf`).
 
 Euclidean space unpacks these to `o + t·d`, `dot`, `normalize`, `length(to − from)` and the
 direction itself — which is why components write the `ambient_*` names instead of the raw

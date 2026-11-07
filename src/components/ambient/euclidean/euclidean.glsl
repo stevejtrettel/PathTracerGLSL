@@ -1,14 +1,11 @@
 // Euclidean ambient geometry: flat R³, geodesics are straight lines, the metric is the dot
 // product everywhere. The contract each occupant meets is components/ambient/README.md.
-// Provides: MAX_DIST, fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
+// Provides: fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_direction_to(), ambient_aim(), ambient_sky_key()
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
-
-// MAX_DIST — the far clip: nothing beyond it is geometry, and the environment is found there
-// (by missed BSDF rays AND by environment NEE — they must agree). An ABSOLUTE length, so it
-// is a scene-scale truncation: geometry or an ambient medium extending past 1000 units is cut.
-#define MAX_DIST 1000.0
+// The far clip MAX_DIST is emitted just before this block (the descriptor's farClip, or the
+// measurement's).
 
 // Positional error bound of a floating-point-accurate point: 256 ulps of its largest
 // coordinate, floored near the origin (the constants and their source are in core math).

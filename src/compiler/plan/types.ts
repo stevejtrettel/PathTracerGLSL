@@ -61,6 +61,9 @@ export interface ProgramDescription {
         /** The first-hit pictures kept beside the main picture (components/aov keys, authored
          *  order). PRESENT only when non-empty, so programs without AOVs are unchanged. */
         aovs?: string[];
+        /** The authored far clip (MeasurementDescription.farClip). PRESENT only when authored;
+         *  absent = the ambient occupant's default (farClipOf). */
+        farClip?: number;
     };
     /** Defines the computation (taxonomy §3): no field here may change the converged
      *  image — §11.2 cross-strategy convergence is the enforcement. */

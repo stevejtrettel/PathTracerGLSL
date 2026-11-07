@@ -4,8 +4,8 @@ The flat-space occupant of the metric seam. Its functions are trivial here preci
 they can be non-trivial in a curved space:
 
 - `types.glsl`: `Point` and `Direction` are `vec3` — R³ coordinates.
-- `MAX_DIST = 1000` — the far clip, an absolute length where missed rays and environment NEE
-  both find the sky.
+- `farClip: 1000` (descriptor field, emitted as `MAX_DIST`) — the far clip, an absolute
+  length where missed rays and environment NEE both find the sky.
 - `fp_uncertainty(p)` — 256 ulps of the largest coordinate, floored near the origin (the
   constants and their source are in core math).
 - `ambient_geodesic(o, d, t) = o + d·t` — straight lines are the geodesics.
