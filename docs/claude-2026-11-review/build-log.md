@@ -84,3 +84,22 @@ Integration branch `integrate` (../PTG-integrate): quotient, photo-camera, photo
 photo-materials at e83eb54 merged; `npm run shoot` (real-GPU renders, b9a9a6a); six photographic
 scenes (f6782f8), renders in renders/photo/ (gitignored). Materials after e83eb54 (sheen, metals,
 measured colors) and branch `curved` are not merged there yet.
+
+## 2026-11-07 (day) — Seifert–Weber, curved shapes, curved SDFs, H²×R; integration
+
+Lean protocol from midday on (one full vitest per step, reviewers read and mutation-test, one
+heavy job at a time through a lock). All counts below are measured on SwiftShader, targeted runs.
+
+| branch (worktree) | what | evidence |
+|---|---|---|
+| `sw` (../PTG-sw): 861f175, 8f9ca2a, 3886843, ad0899e, c108153, efc5c34 | `curved` merged into `quotient`; Seifert–Weber in H³: group data (FACE_N, PAIRING), locked `Hit` gains `image` and `arrival`, the teleporting walk with renormalization, 13-image NEE/MIS, camera reduced into D, Validator rules; demo `seifert-weber-room` | windows witness 11/11 exact (0–3 crossings, misses); twist 1/10 bug fails 6/11 (two windows survive by a dodecahedral symmetry, so the plan's "every image moves" was wrong and is corrected); pt-nee = pt-mis Δ 0.00%, image-index bug caught at 2.58%; walk counter: 0 capped, drift ≤ 9.5e-6 |
+| `cv-shapes` (../PTG-cv-shapes): 6ad0465…3317dc0 | H³/S³ box (geodesic planes), tube-about-a-geodesic cylinder with caps, quad, quad light (exact chart-uniform pdf); size domains in the Validator | 17/17 checks; windows equal fp64 twins to 4 digits; quad light 0.1750 vs 0.1749918 (H³), long-arc-only 0.3238 vs 0.3237615 (S³); pdf w³→w² bug fails as predicted |
+| `cv-sdf` (../PTG-cv-sdf): 6d50b71…c165e63 | marching along geodesics in H³/S³: `defineSDF` with curved bodies (ball, plane, tube, smooth CSG), marched sphere, H³ Klein-chart door for Euclidean fields; demos `hyperbolic-sculpture`, `spherical-sculpture` | 18 checks pass; marched vs closed-form ball Δ 0.03%; furnaces exact; blends match fp64 twins; reviews caught two S³ interval bugs (fixed) |
+| `cv-h2r` (../PTG-cv-h2r): 0335ce2…076dca1 | H²×R: occupant, falloff J = d²·sinh(D_H)/D_H (Jacobi fields), horizontal/vertical planes, horizontal disk, capped vertical cylinder, metric ball by convex Newton, point/disk lights; demo `h2xr` colonnade | 23/23 exact checks; isotropic d² falloff fails all 15 point-light checks; GPU runs found and fixed NaN far out and a furnace shortfall |
+| `integrate` (../PTG-integrate): 801adb7…66029d5 | claudeapp + quotient + photo-camera + photo-textures + photo-materials (8a52887) + sw at 861f175; `npm run shoot`; six photographs (9012f94) | full vitest 4789 pass at af47ffc; 135/135 witness checks; frames bit-identical to every branch tip |
+
+Open for the owner: the weak mutation in H²×R (`isometry_direction` without stripping the height
+shift: 1 of 15 checks); under the pinned seed the χ² gate cannot see an MIS-weight bug between
+pt-nee and pt-mis (only the 1% mean gate does) — likely true of the torus witnesses too, unchecked;
+nine or more marched objects in a curved space need `objectDispatch: 'unrolled'`; new photoreal
+materials and bump mapping are errors in curved spaces.
