@@ -628,7 +628,8 @@ export interface MeasurementDescription {
      *  reachable by a BSDF ray. In a quotient filled with a homogeneous fog of extinction σ
      *  the clip's error is bounded per pixel and channel by (N+1)²·e^{−σ·farClip}·Le_max
      *  (N = maxBounces, Le_max the largest emitted radiance, the fog's glow ε/σ included;
-     *  components/quotient/README.md); without fog it has no stated bound. A finite
+     *  components/quotient/README.md derives the glow term, which the quotients plan's bound
+     *  leaves out); without fog it has no stated bound. A finite
      *  number > 0. */
     farClip?: number;
 }

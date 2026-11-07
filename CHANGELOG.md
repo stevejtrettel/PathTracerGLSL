@@ -18,18 +18,28 @@ you finish a batch of work, add a dated entry here — not to CLAUDE.md.
   arms read constants, and the media shadow walker runs through the walk unchanged.
 - The declared bound (quotient README, `measurement.farClip`): with fog of extinction σ the far
   clip changes a pixel by at most (N+1)²·e^{−σR}·Le_max per channel, Le_max including the fog's
-  glow ε/σ.
+  glow ε/σ. The plan derives the bound for a fog that does not glow; the glow term is derived in
+  the quotient README (thought through, not checked numerically).
+- Equiangular medium light sampling is a Validator error in a quotient: it places the vertex by
+  the light's position in D and samples none of its images. (It also needs delta lights, which a
+  quotient rejects; the rule states its own reason so that relaxing either cannot bias silently.)
 - Witnesses: `torus-fog` (an emitting absorbing fog with a black sphere; eight windows certified
   by a float64 twin as seeing one sphere image through 0–5 face crossings, or nothing within R),
   `torus-crystal-fog` (≡ its unrolled crystal in the same fog) and `torus-lights-fog` (pt ≡ pt-nee ≡
-  pt-mis ≡ pt-mis with the light tree, in fog).
+  pt-mis ≡ pt-mis with the light tree, in fog), registered at 1,024 spp.
 
-**Measured:** non-quotient programs unchanged (digest: 278 of 278 existing scenes identical in
-every part). `torus-fog` 8/8 windows equal to the twin to 4 digits; with the walk's distance sum
-broken, the five windows seen across faces fail (e.g. 0.1746 against 0.4768). Crystal twin in
-fog: Δmean 0.00%, rmse 0.63%. `torus-lights-fog`: Δmean 0.94%, χ²ᵣ 1.27 at 256 spp, and 0.33%,
-χ²ᵣ 1.45 at 1,024 spp. The mean gap shrinks with samples; the slight χ² rise is recorded and its
-cause is untested.
+**Measured:** non-quotient programs unchanged: digest 278 of 278 existing scenes identical in
+every part, and `npm run frames -- compare` (the plan's gate, Q1.6 vitest 5) bit-exact, 30 of
+30 pictures, between 0c6a425 and 2f88c4d (recorded by the reviewer with WITNESS_PORT=3205;
+the comparison rerun here) and again after the review fixes. `torus-fog` 8/8 windows equal to
+the twin to 4 digits; with the walk's distance sum broken, the five windows seen across faces
+fail (e.g. 0.1746 against 0.4768). Crystal twin in fog: Δmean 0.00%, rmse 0.63%.
+`torus-lights-fog`: Δmean 0.94%, χ²ᵣ 1.27 at 256 spp, and 0.33%, χ²ᵣ 1.45 at 1,024 spp. The
+mean gap shrinks with samples; the slight χ² rise is recorded and its cause is untested.
+
+**Open:** no check catches a missing `quotient_reduce` at medium event points. With that line
+removed, `torus-lights-fog` still passed (Δmean 0.28%, χ²ᵣ 1.37). `torus-crystal-fog` (pt only)
+and `torus-fog` (no scattering) cannot catch it by construction.
 
 ## 2026-11-07 — The cube 3-torus: a first closed manifold (quotients plan Q1a)
 

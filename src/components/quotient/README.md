@@ -58,9 +58,22 @@ carries 0.
 
   where N = `maxBounces`, I_N is the image with no clip and I_{N,R} the rendered one, and Le_max
   is the largest emitted radiance: of every light and emissive surface, and the fog's own glow
-  ε/σ (a fog segment's glow is ε·(1 − e^{−σt})/σ ≤ ε/σ). Choose R by this number: e.g. N = 8,
-  σ = 0.5, R = 24 gives 81·e^{−12}·Le_max ≈ 5e−4·Le_max. The derivation is in
-  docs/claude-2026-11-review/quotients-plan.md, Part 1, "What is declared", item 2.
+  ε/σ. Choose R by this number: e.g. N = 8, σ = 0.5, R = 24 gives 81·e^{−12}·Le_max ≈
+  5e−4·Le_max.
+
+  The plan derives the bound for a fog that does not glow, with Le_max the emitters' radiance
+  (docs/claude-2026-11-review/quotients-plan.md, Part 1, "What is declared", item 2). The glow
+  term is derived here and not in the plan; it is thought through, not checked numerically.
+  Two steps of the plan's argument change when ε > 0:
+  - *What the clip removes.* Along a segment from x in direction ω whose first surface is at t\*,
+    the radiance is ∫₀^{t\*} e^{−σs}[ε + σ_s·L_s(x_s)] ds + e^{−σt\*}·L_surf. Clipping at R < t\*
+    removes the part beyond R, which is exactly e^{−σR}·L(x_R, ω): e^{−σR} times all the radiance
+    arriving at x_R, the glow beyond R included. That is the plan's per-segment factor.
+  - *The largest N-truncated radiance.* With a = e^{−σt\*}, the radiance with at most n events
+    satisfies L_n ≤ (1 − a)·ε/σ + a·Le + [(1 − a)·σ_s/σ + a·ρ]·L_{n−1}, where ρ ≤ 1 is the
+    surface albedo. The first two terms are a convex combination of ε/σ and Le, so they are at
+    most Le_max, and the bracket is at most 1. So L_n ≤ Le_max + L_{n−1}, and L_N ≤ (N+1)·Le_max,
+    the plan's L_sup bound with this Le_max.
 
 ## Validator rules
 
@@ -76,6 +89,11 @@ medium arms need no position in D, and with no medium boundary nothing about the
 follow a ray across faces. A heterogeneous or GRIN ambient medium, and any material with a medium
 that an object uses (null interfaces, GRIN, glass interiors), are errors: they need the density
 read at reduced points along a segment, or region state carried across faces.
+
+No equiangular medium light sampling (`mediumLightSampling: 'equiangular'`): it places the medium
+vertex by the light's position in D (`lighting_query_delta`) and samples none of its images. It
+also needs delta lights, which a quotient rejects; the quotient rule stands on its own, so
+relaxing either rule cannot make it a silent bias.
 
 ## Occupants
 

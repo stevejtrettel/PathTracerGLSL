@@ -106,6 +106,15 @@ describe('quotient Validator rules', () => {
         })).toEqual([]);
     });
 
+    it('rejects equiangular medium light sampling', () => {
+        expect(quotientErrors((s, st) => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1, sigma_s: 0.3 } };
+            s.ambientMedium = 'fog';
+            st.estimator.directLighting = 'nee';
+            st.estimator.mediumLightSampling = 'equiangular';
+        }).some((m) => /mediumLightSampling 'equiangular'/.test(m))).toBe(true);
+    });
+
     it('rejects a heterogeneous or GRIN ambient medium, objects with media, null interfaces and GRIN', () => {
         expect(quotientErrors((s) => {
             s.materials.fog = { model: 'none', medium: { sigma_a: { kind: 'glsl', source: '0.1 + 0.05 * p.x' }, majorant: 0.2 } };

@@ -98,6 +98,12 @@ export function validateQuotient(scene: SceneDescription, strategy: RenderStrate
             bag.error('invalid-setting', `${label}: ambientMedium '${name}' is heterogeneous (an expression coefficient) — only a homogeneous fog is supported in a quotient`).add();
         }
     }
+    // Equiangular placement reads the light's own position: it samples no image of the light,
+    // so in a quotient it would miss every image but the one in D. (It also needs delta lights,
+    // which a quotient rejects; this rule states the reason of its own.)
+    if (strategy.estimator.mediumLightSampling === 'equiangular') {
+        bag.error('invalid-setting', `${label}: mediumLightSampling 'equiangular' is not supported in a quotient — it places the medium vertex by the light's position in D, not by the light's images; use 'vertex'`).add();
+    }
 
     // Objects: inside D by m, or an unrotated box spanning whole periods (lattice-invariant along
     // those axes); emitters strictly inside, so each image is one translate.

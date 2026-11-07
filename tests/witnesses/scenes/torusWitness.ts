@@ -18,7 +18,7 @@
 // NEE's image table and MIS's identification of the hit image agree (the argument is in
 // docs/claude-2026-11-review/quotients-plan.md, Q1.1 and Q1.4).
 //
-// FOG (plan Q1b; sections at the end of this file): `torus-fog` checks the fog's glow along
+// FOG (sections at the end of this file): `torus-fog` checks the fog's glow along
 // distances summed across faces against a float64 twin, with a black occluder (exact);
 // `torus-crystal-fog` is the crystal twin in a scattering fog; `torus-lights-fog` is the
 // estimator equality in a scattering fog.

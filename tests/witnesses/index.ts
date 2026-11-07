@@ -2649,7 +2649,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             + 'medium event points reduced into D; pt / pt-nee / pt-mis (power) / pt-mis (light tree)',
         expected: 'all four keys converge to the same image',
         witness: {
-            spp: 256,
+            spp: 1024,   // at 256 spp the nee/mis mean gap read 0.94% against the 1% gate; 0.33% here
             checks: [
                 { kind: 'equality', strategies: [1, 2, 3], meanTol: 0.01, label: 'pt-nee ≡ pt-mis (power) ≡ pt-mis (bvh) in fog: shared event coverage, χ²' },
                 { kind: 'equality', strategies: [0, 1, 2, 3], meanTol: 0.01, rmse: 0.25, label: 'pt anchor in fog (path-found light images) tripwire' },

@@ -92,6 +92,15 @@ lossless region whose index is 1 at both ends. Measured over 1704 deterministic 
 the last drift, inside the wall rather than at it (grin.glsl, grin_finish); the floor's deeper
 entry point had partly cancelled that.
 
+**`torus-lights-fog` (open items, Nov 7 2026).** Registered at 1,024 spp: at 256 spp the
+nee/mis/mis-bvh mean gap read 0.94% against the 1% gate, a margin that any change in how many
+random numbers the program draws could cross; at 1,024 spp it reads 0.33%. Its χ²ᵣ rose from
+1.27 (256 spp) to 1.45 (1,024 spp); whether the excess is fireflies or a small bias is untested
+(compare the open roughness-0.15 pt-nee deficit in the 3-torus, CLAUDE.md). This witness does
+not catch a missing `quotient_reduce` at medium event points: with the reduction removed from
+the generated loop it still passed (Δmean 0.28%, χ²ᵣ 1.37, pt rmse 11.20%). No check catches
+that error yet.
+
 **Thin dielectrics are one-sided (open defect, no witness yet).** On a FRONT-face hit of a
 zero-thickness surface the dispatcher reports `region_to` = the surface's own region, which
 carries the material's index, so a thin glass sheet refracts as if entering glass and never

@@ -244,9 +244,11 @@ How a program is assembled:
   `measurement.farClip`): a generated cell walk, NEE over a 27-image table with partition MIS,
   medium event points reduced into the fundamental domain. Validator rules: no sky, delta
   lights, unbounded or driven geometry, or media other than a homogeneous ambient fog; objects
-  inside the fundamental domain except period-spanning unrotated boxes. With fog the far clip's
-  error is bounded per pixel by (N+1)²·e^{−σR}·Le_max (components/quotient/README.md;
-  docs/claude-2026-11-review/quotients-plan.md, Milestone Q1).
+  inside the fundamental domain except period-spanning unrotated boxes; no equiangular medium
+  sampling. With fog the far clip's error is bounded per pixel by (N+1)²·e^{−σR}·Le_max
+  (docs/claude-2026-11-review/quotients-plan.md, Part 1, for a fog that does not glow;
+  components/quotient/README.md extends it to a glowing fog, with ε/σ in Le_max; thought through,
+  not checked numerically).
 - Tooling: the witness runner, shader dumps, CI.
 
 **Not built / deferred:** curved spaces (the `ambient_*` seam exists; only Euclidean is
