@@ -76,8 +76,8 @@ copied here until the owner accepts them.
 21. **The real GPU may be used** for renders ("you can definitely use the gpu").
 22. **Curved spaces tonight: design + step 1**, and the owner expects a lot more work done than
     proposed ("i kind of think you can get a lot done here").
-23. Question 7 (the five small confirmed bugs) was not answered. Any bug fix made overnight is
-    a provisional choice, logged under "Provisional choices" below.
+23. **Bugs are fixed as they are found**: "you can fix bugs as you find them of course". Each
+    fix is its own commit with its evidence.
 
 ## Provisional choices (model's choices, unconfirmed by the owner)
 
