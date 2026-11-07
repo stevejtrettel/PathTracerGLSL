@@ -36,7 +36,7 @@ import type { RenderPlan, PlacedScene, ScenePlan, ScenePrimitiveObject, SceneMes
 import { isDrivenPlacement } from './types.js';
 import { sceneMeshes } from '../../components/intersection/mesh/mesh.js';
 import { meshLocalBox } from '../../components/intersection/mesh/topology.js';
-import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads, objectDispatchOf } from './dataTenants.js';
+import { dataTenantsOf, keepsLocalFrame, materialReadsUv, lightRosterOf, authoredLightEmission, batchNeedsInterior, batchPlacementRecordOf, lightBatchesOf, samplesBatchLights, dataReadsOf, unionDataReads, objectDispatchOf, LIGHT_BACKING_MODEL } from './dataTenants.js';
 import { planDataLayout } from '../../components/data/ledger.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
@@ -280,12 +280,12 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
     // Each light's values are made here. The data layout sizes the light table and tree from
     // the same list, so they cannot disagree.
     //
-    // An authored HITTABLE light desugars to an emissive region: a synthesized material (the
-    // backing model is lambert with albedo 0 — the only site that chooses it) and an object of
-    // the kind's backing primitive. The material's emission is the same value the light's rows
-    // were built from (authoredLightEmission), so the hit side and the sampler agree exactly
-    // (any mismatch makes pt and pt-nee converge to different images). An emissive OBJECT's
-    // region id is its scene index.
+    // An authored HITTABLE light desugars to an emissive region: a synthesized material of
+    // model LIGHT_BACKING_MODEL (lambert, albedo 0) and an object of the kind's backing
+    // primitive. The material's emission is the same value the light's rows were built from
+    // (authoredLightEmission), so the hit side and the sampler agree exactly (any mismatch
+    // makes pt and pt-nee converge to different images). An emissive OBJECT's region id is
+    // its scene index.
     const lights: SceneLight[] = lightRosterOf(scene).map((entry, id): SceneLight => {
         const d = LIGHT_KINDS[entry.kind];
         if ('authored' in entry.source) {
@@ -298,8 +298,8 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             materials.push({
                 id: matId,
                 name: `__light_${id}`,
-                model: 'lambert',
-                values: resolveMaterialValues('lambert', { albedo: [0.0, 0.0, 0.0], emission: authoredLightEmission(light.emission) as MaterialProperty }),
+                model: LIGHT_BACKING_MODEL,
+                values: resolveMaterialValues(LIGHT_BACKING_MODEL, { albedo: [0.0, 0.0, 0.0], emission: authoredLightEmission(light.emission) as MaterialProperty }),
                 medium: null,
             });
             const regionId = objectIndex++;

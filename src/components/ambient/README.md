@@ -62,15 +62,19 @@ being correct there (a point light falls off as 1/r² in E³ and 1/sinh² r in H
   traversal, object dispatch) carry a `spaces` list.
 - **The gate**: the Validator checks each occupant at its registry gate with `spaceGate`
   (compiler/analyze/curved.ts), one message: `<occupant> has no <space> implementation
-  (implemented in: …)`. A light kind is gated with the primitive backing it; a marched
-  primitive with the primitive bounding its march; an emissive object with its light kind; a
-  phase model and an env chart where the program links them.
+  (implemented in: …)`. A hittable light kind is gated with the primitive and the material
+  model backing it (`LIGHT_BACKING_MODEL`); a marched primitive with the chain of primitives
+  bounding its march (`marchBoundTypes`, the chain the generator links); an emissive object
+  the program samples (under next-event estimation) with its light kind; a phase model and
+  an env chart where the program links them.
 - **Features without a descriptor** are rows of `SPACE_LIMITATIONS`, checked by
   `curvedLimitations(scene, strategy, features)` on resolved values, together with the
   estimator occupants the program resolves to (defaults applied, including the size-based
   table dispatch): mesh objects, instanced objects, scale ≠ 1, tracking media, GRIN media,
   an ambient medium, equiangular medium NEE, an environment, an environment sampled as a
-  light, emissive objects sampled as lights.
+  light, emissive objects sampled as lights. Under pure path tracing nothing samples an
+  emissive object, so it renders in any space its shape and material implement; under
+  next-event estimation `sampleAsLight: false` leaves it to BSDF hits (MIS weight 1).
 - **The table**: [`support.md`](support.md) is generated from all of the above by
   tests/components/spaceSupport.test.ts (`npx vitest run -u` rewrites it). Shared files with
   no descriptor (ray.glsl, the shadow walkers, microfacet.glsl) are not in it: the witnesses

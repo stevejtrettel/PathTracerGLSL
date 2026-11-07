@@ -109,6 +109,18 @@ export function primitiveBounds(type: string, values: PrimitiveValues): AABB | n
     return null;
 }
 
+/** The primitives whose `<type>_interval` a marched `type` calls, in chain order: its march
+ *  bound (an analytic object of a possibly different primitive), that bound's own bound, and
+ *  so on, until a bound is 'self' or 'unbounded'. Empty when the march needs no other
+ *  primitive. The intersection generator links these and the Validator gates them. */
+export function marchBoundTypes(type: string): string[] {
+    const chain: string[] = [];
+    for (let mb = PRIMITIVES[type]?.marchBound; typeof mb === 'object' && !chain.includes(mb.type); mb = PRIMITIVES[mb.type]?.marchBound) {
+        chain.push(mb.type);
+    }
+    return chain;
+}
+
 /** Backend resolution (B1 — shape, not backend): auto = analytic if provided, else
  *  sdf; an explicit pin wins (the Validator rejects pins the primitive can't honor).
  *  undefined = unregistered type or unhonorable pin — callers diagnose. */

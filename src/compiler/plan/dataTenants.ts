@@ -7,7 +7,7 @@
 // components/data. Geometry-slot convention (encoded HERE, nowhere else): standalone
 // meshes in sceneMeshes order, THEN mesh prototypes in batch-ordinal order.
 
-import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission, RenderStrategy } from '../types.js';
+import type { SceneDescription, ObjectDescription, MeshObject, PrimitiveObject, InstancedObject, ValueParam, BlackbodyValue, DataReads, LightEmission, RenderStrategy, MaterialModel } from '../types.js';
 import type { ProgramDescription } from './types.js';
 import { resolveColorProperty } from './values.js';
 import { isMeshObject, isPrimitiveObject, hasConstantNonzeroEmission, isGlslExpression } from '../types.js';
@@ -208,6 +208,13 @@ export function samplableEmitterObjects(scene: SceneDescription): EmitterObject[
     return out;
 }
 
+/** The emissive objects a renderer samples as lights: the census (samplableEmitterObjects)
+ *  when next-event estimation is on; none under pure path tracing, which finds every emitter
+ *  by BSDF hits and links no light kind for it. */
+export function sampledEmitterObjects(scene: SceneDescription, strategy: RenderStrategy): EmitterObject[] {
+    return strategy.estimator.directLighting !== 'none' ? samplableEmitterObjects(scene) : [];
+}
+
 /** One light-roster entry: the kind, and where it came from — an authored light (index into
  *  scene.lights) or an emissive object (index into scene.objects, which is also its region
  *  id). */
@@ -225,6 +232,12 @@ export interface LightRosterEntry {
 export function authoredLightEmission(e: LightEmission): number[] | ValueParam<number[]> | BlackbodyValue {
     return resolveColorProperty(e, [0, 0, 0]) as number[] | ValueParam<number[]> | BlackbodyValue;
 }
+
+/** The material model behind an authored hittable light (a kind with a region). The Planner
+ *  desugars such a light to an object of the kind's primitive carrying a synthesized
+ *  material of this model (albedo 0, the light's emission); the Validator gates the model
+ *  together with the light kind and that primitive. */
+export const LIGHT_BACKING_MODEL: MaterialModel = 'lambert';
 
 /** THE light registry, in light-id order (= selection-CDF order): authored lights (scene
  *  order), then emissive analytic objects, then emissive meshes (samplableEmitterObjects'

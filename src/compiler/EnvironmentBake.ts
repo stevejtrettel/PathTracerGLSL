@@ -13,7 +13,7 @@
 
 import type { SceneDescription, CompiledRenderer } from './types.js';
 import fullscreenVertGLSL from '../glsl/shared/fullscreen.vert.glsl?raw';
-import { ENV_CHARTS } from '../components/env/index.js';
+import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../components/env/index.js';
 import { bodyFor } from '../components/descriptors.js';
 
 export const DEFAULT_ENV_TABLE_SIZE: [number, number] = [512, 256];
@@ -27,7 +27,7 @@ export function envTableSize(env: { tableSize?: [number, number] }, chart: strin
     return env.tableSize ?? DEFAULT_ENV_TABLE_SIZE;
 }
 
-export function compileEnvironmentBake(scene: SceneDescription, chart: string = 'equirect'): CompiledRenderer | null {
+export function compileEnvironmentBake(scene: SceneDescription, chart: string = DEFAULT_ENV_CHART): CompiledRenderer | null {
     const env = scene.environment;
     if (env?.type !== 'procedural') return null;
 

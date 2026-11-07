@@ -16,12 +16,12 @@ import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
 import { MATERIAL_MODELS, EMISSION_KEY } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
-import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights, marchedObjectCount } from '../plan/dataTenants.js';
+import { samplableEmitterObjects, sampledEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights, marchedObjectCount, LIGHT_BACKING_MODEL } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
 import { ACCUMULATORS } from '../../components/accumulator/index.js';
 import { AOVS } from '../../components/aov/index.js';
 import { ENV_CHARTS, DEFAULT_ENV_CHART } from '../../components/env/index.js';
-import { PRIMITIVES, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
+import { PRIMITIVES, marchBoundTypes, primitiveBounds, primitiveIsBounded, resolveBackend, resolvePrimitiveValues, type PrimitiveParamSpec } from '../../components/geometry/index.js';
 import { BOUND_FIELDS, checkBoundContainment, checkConservativeness } from '../../components/geometry/boundCheck.js';
 import { MARCHED_TABLE_THRESHOLD, MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL, DEFAULT_OBJECT_DISPATCH } from '../../components/intersection/index.js';
 import { meshClosedness } from '../../components/intersection/mesh/topology.js';
@@ -99,11 +99,13 @@ export function validate(
                 .add();
             continue;
         }
-        // A light kind and the primitive backing it run together, so both must implement the space.
+        // A hittable light kind runs together with the primitive and the material model backing
+        // it (the Planner's desugar), so all three must implement the space.
         gateSpace(`Light ${i}`, `light kind '${light.kind}'`, spacesOf(d.glsl));
         if (d.region !== undefined) {
             const backing = PRIMITIVES[d.region.primitive];
             if (backing !== undefined) gateSpace(`Light ${i}`, `its backing primitive '${d.region.primitive}'`, spacesOf(backing.glsl));
+            gateSpace(`Light ${i}`, `its backing material model '${LIGHT_BACKING_MODEL}'`, spacesOf(MATERIAL_MODELS[LIGHT_BACKING_MODEL]!.glsl));
         }
         // Authored-input schema (C7 parity with geometry): unknown keys warn (typo class),
         // missing required / wrong shape error, then the row's declarative constraint
@@ -310,9 +312,10 @@ export function validate(
         }
     }
 
-    // Emissive objects are lights too: their light kind must implement the space (the shape
-    // itself is gated with the object).
-    for (const emitter of samplableEmitterObjects(scene)) {
+    // An emissive object the program samples is a light too: its light kind must implement the
+    // space (the shape itself is gated with the object). Under pure path tracing nothing
+    // samples it and its light kind is not linked.
+    for (const emitter of sampledEmitterObjects(scene, strategy)) {
         gateSpace(`Object ${emitter.index}`, `light kind '${emitter.kind}'`, spacesOf(LIGHT_KINDS[emitter.kind].glsl));
     }
 
@@ -1536,12 +1539,14 @@ function validateGeometryObject(
     // carry their own diagnostics.
     const backend = desc !== undefined ? resolveBackend(type, obj.backend) : undefined;
     if (!desc || backend === undefined) return;
-    // The shape's body, and for a marched shape the analytic primitive bounding its march.
+    // The shape's body, and for a marched shape the primitives bounding its march (the chain
+    // the intersection generator links).
     gateSpace(label, `primitive '${type}'`, spacesOf(desc.glsl));
-    const bound = desc.marchBound;
-    if (backend === 'sdf' && bound !== undefined && bound !== 'self' && bound !== 'unbounded') {
-        const boundDesc = PRIMITIVES[bound.type];
-        if (boundDesc !== undefined) gateSpace(label, `the primitive bounding its march, '${bound.type}'`, spacesOf(boundDesc.glsl));
+    if (backend === 'sdf') {
+        for (const boundType of marchBoundTypes(type)) {
+            const boundDesc = PRIMITIVES[boundType];
+            if (boundDesc !== undefined) gateSpace(label, `the primitive bounding its march, '${boundType}'`, spacesOf(boundDesc.glsl));
+        }
     }
     const params = (obj.parameters ?? {}) as Record<string, unknown>;
     const schema = desc.params;

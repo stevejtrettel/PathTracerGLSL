@@ -38,7 +38,8 @@ emitting-side normal is ONE compile-time formula shared with the backing geometr
 side and sample side agree bit-exactly by construction.
 
 **Descriptor** (`<kind>.ts`): `kind`, `glsl` (the file per ambient space it is implemented
-in; ambient/README.md — a kind is gated together with the primitive backing it), `delta`, `authoredParams` (the kind's
+in; ambient/README.md — a hittable kind is gated together with the primitive and the
+material model backing it, `LIGHT_BACKING_MODEL` in compiler/plan/dataTenants.ts), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
 loop derives unknown-key/required/shape checks from it and runs `validateAuthored`
 only on well-shaped input; the desugar-totality contract test keeps it honest

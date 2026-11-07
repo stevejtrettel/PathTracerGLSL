@@ -24,6 +24,7 @@ import {
     emitSignedDistance,
     emitSdfIntersect,
     emitSdfNormal,
+    marchBoundTypes,
 } from '../../../components/geometry/index.js';
 import {
     classifySimilarity,
@@ -128,26 +129,17 @@ export function contributeIntersection(plan: RenderPlan): FeatureContribution {
     ]);
     // A MARCH BOUND is an analytic object of a possibly DIFFERENT primitive (a torus
     // bounds with a cylinder — impl-plan-sdf-as-shape §2.2), and the marched arm calls
-    // that primitive's `<type>_interval` over its struct. So the present set is closed
-    // under the bound relation for the types whose arms CALL the interval — the
-    // residual (unrolled) and instanced arms. A TABLED marched type's interval is the
-    // TLAS node box (impl-plan-sdf-accel T4), so its bound type is NOT dragged in
-    // (fable-sdf-contract B5 trimmed the previous everyone-closure). The fixpoint
-    // stands: a two-step bound chain must not be a link error discovered on the GPU.
-    const intervalSeeds = new Set<string>([
+    // that primitive's `<type>_interval` over its struct. So the present set gains the
+    // bound chain (marchBoundTypes, the one closure the Validator gates too) of each type
+    // whose arm CALLS the interval — the residual (unrolled) and instanced arms. A TABLED
+    // marched type's interval is the TLAS node box (impl-plan-sdf-accel T4), so its bound
+    // type is not linked.
+    const intervalSeeds = [
         ...plan.objects.filter((o) => o.intersect === 'march' && !(tableMode && o.tabled === true)).map((o) => o.type),
         ...plan.instanceBatches.flatMap((b) =>
             b.prototype.backend === 'primitive' && b.prototype.intersect === 'march' ? [b.prototype.shapeType] : []),
-    ]);
-    for (let grew = true; grew;) {
-        grew = false;
-        for (const type of [...intervalSeeds]) {
-            const mb = PRIMITIVES[type]?.marchBound;
-            if (mb === undefined || mb === 'self' || mb === 'unbounded') continue;
-            if (!presentTypes.has(mb.type)) { presentTypes.add(mb.type); grew = true; }
-            if (!intervalSeeds.has(mb.type)) { intervalSeeds.add(mb.type); grew = true; }
-        }
-    }
+    ];
+    for (const type of intervalSeeds) for (const bound of marchBoundTypes(type)) presentTypes.add(bound);
     const present = Object.values(PRIMITIVES).filter((d) => presentTypes.has(d.type));
     // Marching tolerances BEFORE the generated march block: march_epsilon()/
     // NORMAL_EPSILON are consumed ONLY by the generated intersects/normals now, so

@@ -14,6 +14,7 @@ import { MATERIAL_MODELS } from '../../src/components/materials/index.js';
 import { PRIMITIVES } from '../../src/components/geometry/index.js';
 import { CAMERA_MODELS } from '../../src/components/camera/index.js';
 import { OBJECT_DISPATCHES } from '../../src/components/intersection/index.js';
+import { LIGHT_KINDS, LIGHT_SELECTIONS } from '../../src/components/lights/index.js';
 import type { SpaceBodies, SpaceList } from '../../src/components/descriptors.js';
 import type { SceneDescription, RenderStrategy, ObjectDescription, PrimitiveObject } from '../../src/compiler/types.js';
 
@@ -115,6 +116,110 @@ describe('the space gate (descriptor occupants)', () => {
         const reasons = spaceErrors(s, strategy({ directLighting: 'nee' }));
         expect(reasons).toContain("Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean)");
         expect(reasons).toContain("estimator.envSampler: environment chart 'equirect' has no testspace implementation (implemented in: euclidean)");
+    });
+});
+
+describe('a marched shape\'s bound chain', () => {
+    it('gates every primitive in the chain the generator links, not only the first bound', () => {
+        // No registered bound has a bound of its own, so lengthen the chain for this test: the
+        // torus marches inside a cylinder, made to march inside a box.
+        const torus = PRIMITIVES.torus.glsl as Writable<SpaceBodies>;
+        const cylinder = PRIMITIVES.cylinder as { marchBound: typeof PRIMITIVES.cylinder.marchBound };
+        const bound = cylinder.marchBound;
+        torus[SPACE] = torus.euclidean;
+        (PRIMITIVES.cylinder.glsl as Writable<SpaceBodies>)[SPACE] = PRIMITIVES.cylinder.glsl.euclidean;
+        cylinder.marchBound = { type: 'box', values: () => ({ center: [0, 0, 0], halfExtents: [1, 1, 1] }) };
+        try {
+            const s = scene(SPACE, (x) => {
+                x.objects = [{ type: 'torus', parameters: { ringRadius: 1, tubeRadius: 0.2 }, material: 'matte' } as ObjectDescription];
+            });
+            expect(spaceErrors(s, strategy())).toEqual([
+                "Object 0: the primitive bounding its march, 'box' has no testspace implementation (implemented in: euclidean)",
+            ]);
+        } finally {
+            cylinder.marchBound = bound;
+            delete torus[SPACE];
+            delete (PRIMITIVES.cylinder.glsl as Writable<SpaceBodies>)[SPACE];
+        }
+    });
+});
+
+describe('the hittable light\'s desugared parts', () => {
+    // A disk light runs as the disk kind, a disk primitive and a material of
+    // LIGHT_BACKING_MODEL (lambert): give the test space every other occupant of a mirror
+    // sphere lit by a disk light, and check the Validator and the compiler agree on lambert.
+    function withDiskLightBodies(run: () => void): void {
+        const local: Array<() => void> = [];
+        const add = (glsl: SpaceBodies) => {
+            const bodies = glsl as Writable<SpaceBodies>;
+            bodies[SPACE] = glsl.euclidean;
+            local.push(() => { delete bodies[SPACE]; });
+        };
+        add(MATERIAL_MODELS.mirror!.glsl);
+        add(PRIMITIVES.disk.glsl);
+        add(LIGHT_KINDS.disk.glsl);
+        const power = LIGHT_SELECTIONS.power as { spaces: SpaceList };
+        const before = power.spaces;
+        power.spaces = [...before, SPACE];
+        local.push(() => { power.spaces = before; });
+        try { run(); } finally { for (const undo of local.reverse()) undo(); }
+    }
+    const mirrorLit = () => scene(SPACE, (x) => {
+        x.objects = [sphere(0, 'shiny')];
+        x.materials = { shiny: { model: 'mirror' } };
+        x.lights.push({ kind: 'disk', position: [0, 3, 0], normal: [0, -1, 0], radius: 0.5, emission: 5 } as never);
+    });
+
+    it('rejects the light when the backing material model has no body for the space', () => {
+        withDiskLightBodies(() => {
+            const lambert = MATERIAL_MODELS.lambert!.glsl as Writable<SpaceBodies>;
+            const body = lambert[SPACE];
+            delete lambert[SPACE];
+            try {
+                for (const directLighting of ['none', 'nee'] as const) {
+                    expect(spaceErrors(mirrorLit(), strategy({ directLighting }))).toEqual([
+                        "Light 0: its backing material model 'lambert' has no testspace implementation (implemented in: euclidean)",
+                    ]);
+                }
+            } finally { lambert[SPACE] = body; }
+        });
+    });
+
+    it('passes and compiles the light when every desugared part has a body', () => {
+        withDiskLightBodies(() => {
+            for (const directLighting of ['none', 'nee'] as const) {
+                const st = strategy({ directLighting });
+                expect(errors(mirrorLit(), st)).toEqual([]);
+                expect(() => new Compiler().compileScene(mirrorLit(), [st])).not.toThrow();
+            }
+        });
+    });
+});
+
+describe('emissive objects (design §2.3: not light-sampled in curved spaces)', () => {
+    const lamp = () => scene(SPACE, (x) => {
+        x.materials.lamp = { model: 'lambert', albedo: 0, emission: 4 };
+        x.objects.push(sphere(2, 'lamp'));
+    });
+    const sampled = [
+        "Object 1: light kind 'sphere' has no testspace implementation (implemented in: euclidean)",
+        'emissive objects sampled as lights: not implemented in testspace space (implemented in: euclidean)',
+    ];
+
+    it('passes and compiles under pure path tracing, where BSDF hits find them', () => {
+        expect(errors(lamp(), strategy())).toEqual([]);
+        expect(() => new Compiler().compileScene(lamp(), [strategy()])).not.toThrow();
+    });
+
+    it('rejects one the census would sample under NEE, and passes it with sampleAsLight: false', () => {
+        const reasons = spaceErrors(lamp(), strategy({ directLighting: 'nee' }));
+        for (const reason of sampled) expect(reasons).toContain(reason);
+        const pathOnly = scene(SPACE, (x) => {
+            x.materials.lamp = { model: 'lambert', albedo: 0, emission: 4, sampleAsLight: false };
+            x.objects.push(sphere(2, 'lamp'));
+        });
+        const pathOnlyReasons = spaceErrors(pathOnly, strategy({ directLighting: 'nee' }));
+        for (const reason of sampled) expect(pathOnlyReasons).not.toContain(reason);
     });
 });
 

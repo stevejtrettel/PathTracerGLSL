@@ -15,7 +15,7 @@ import type { SceneFeatures } from './types.js';
 import type { SpaceList } from '../../components/descriptors.js';
 import { LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION } from '../../components/lights/index.js';
 import { MESH_TRAVERSALS, INSTANCE_ACCELS, OBJECT_DISPATCHES, DEFAULT_MESH_TRAVERSAL, DEFAULT_INSTANCE_ACCEL } from '../../components/intersection/index.js';
-import { samplableEmitterObjects, objectDispatchOf } from '../plan/dataTenants.js';
+import { sampledEmitterObjects, objectDispatchOf } from '../plan/dataTenants.js';
 
 /** The message for an occupant that has no implementation in the program's space, or null
  *  when it has one. `occupant` names it (`light kind 'disk'`); `implementedIn` is its
@@ -65,8 +65,10 @@ export const SPACE_LIMITATIONS: readonly SpaceLimitation[] = [
         present: (_scene, _strategy, features) => features.environment.samplable,
     },
     {
+        // Under pure path tracing nothing samples them: BSDF hits find them, so they render.
+        // Under NEE, sampleAsLight: false leaves an object to BSDF hits (MIS weight 1).
         feature: 'emissive objects sampled as lights', spaces: ['euclidean'],
-        present: (scene) => samplableEmitterObjects(scene).length > 0,
+        present: (scene, strategy) => sampledEmitterObjects(scene, strategy).length > 0,
     },
 ];
 

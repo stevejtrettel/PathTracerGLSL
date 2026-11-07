@@ -60,6 +60,22 @@ function supportTable(): string {
 }
 
 describe('space bodies', () => {
+    // Every occupant runs somewhere: the body contract tests (tests/helpers/spaceBodies.ts)
+    // check every body an occupant has, which proves nothing for an occupant with none.
+    it('every occupant has at least one body, and every estimator occupant at least one space', () => {
+        const bodiless = Object.entries(FAMILIES).flatMap(([family, registry]) => Object.entries(registry)
+            .filter(([, d]) => d !== undefined && spacesOf(d.glsl).length === 0)
+            .map(([key]) => `${family} '${key}'`));
+        const listedRegistries: Record<string, Record<string, { spaces: SpaceList }>> = {
+            'light selection': LIGHT_SELECTIONS, 'mesh traversal': MESH_TRAVERSALS,
+            'instance traversal': INSTANCE_ACCELS, 'object dispatch': OBJECT_DISPATCHES,
+        };
+        const spaceless = Object.entries(listedRegistries).flatMap(([family, registry]) => Object.entries(registry)
+            .filter(([, d]) => d.spaces.length === 0)
+            .map(([key]) => `${family} '${key}'`));
+        expect([...bodiless, ...spaceless]).toEqual([]);
+    });
+
     // A body travels with its origin (one file may be listed under several spaces), so the
     // origin must name the file the source came from: source maps and the digest report it.
     for (const [family, registry] of Object.entries(FAMILIES)) {

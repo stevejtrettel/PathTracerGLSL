@@ -53,7 +53,7 @@ export function envVariantSuffix(chart: string, compensation: boolean): string {
     return (chart === 'octahedral' ? '_oct' : '') + (compensation ? '_comp' : '');
 }
 
-/** A chart's program blocks, from the chart registry (D3): the files its GLSL calls into
+/** A chart's program blocks, from the chart registry: the files its GLSL calls into
  *  (`needs`), then the chart's body for the program's space. */
 function chartBlocks(chart: string, space: string) {
     const d = ENV_CHARTS[chart];
