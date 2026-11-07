@@ -500,6 +500,12 @@ export interface PrimitiveDescriptor {
      *  impl-plan-tlas). Absent = UNBOUNDED (e.g. plane): cannot be an instance prototype
      *  (Validator-rejected). Finite analytic primitives (sphere/quad/disk) declare it. */
     bounds?(values: PrimitiveValues): AABB;
+    /** The radius of a ball about the shape's point row (its center; the origin when it has
+     *  none) that contains the shape: a geodesic ball in a curved space, where the shape sits
+     *  at o with its canonical rows (the point row removed). Read by the Seifert–Weber
+     *  Validator rule, which needs each object inside the dodecahedron D. Absent = no such
+     *  bound is declared. */
+    ballBound?(values: PrimitiveValues): number;
     /** THE MARCH BOUND (impl-plan-sdf-as-shape §2.2, owner-decided Aug 10 2026): the
      *  ANALYTIC OBJECT that bounds this shape's surface, so a marched intersect runs
      *  only over the interval where the ray is inside it. Required of every primitive

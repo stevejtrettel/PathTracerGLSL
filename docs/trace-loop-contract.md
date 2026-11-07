@@ -47,7 +47,12 @@ Ray  →  scene_intersect  →  Hit  →  interaction (sample/eval/emission)  �
    fp-scale for analytic roots via `spawn_eps_fp`, `MARCH_CLEARANCE` for marched commits,
    fp-scale for triangle hits too. `ray_spawn`'s escape offset is the one reader; the
    dispatcher seeds the conservative default so a missed fill degrades instead of reading
-   garbage).
+   garbage), the **arrival direction** (`arrival` — the ray's unit velocity at `p`, in `p`'s
+   chart; the transport's `wo` is `−arrival`), and the **image** of the hit (`image` — in a
+   quotient space, which image of the scene the ray hit, relative to the chart of its origin,
+   as an index into the program's NEE image table, −1 when it is not in the table; 0 in
+   programs without a quotient). The dispatcher sets both; a quotient walk sets `image` once
+   more (see "Quotient spaces" below).
 4. **Interaction** — the scattering event (surface BSDF and medium phase unified): `sample` returns
    the next direction + weight; `eval`/`emission` for NEE/MIS.
 5. **`make_ray`** — spawn the continuation ray from the hit; iterate.
@@ -63,9 +68,11 @@ struct Ray { Point origin; Direction direction; Wavelengths wl; }; // no search 
   that point alone. Only the *space* changes (Euclidean → line, H³ → hyperbolic geodesic,
   S³ → great circle, Schwarzschild → light path). Same `Ray`.
 - **`ray.direction` is the direction at the origin.** Anything that needs the direction where the
-  ray ARRIVES — `wo` at a surface hit, the side test in `scene_intersect`, the continuation through
-  a null interface, a medium event's incident direction — reads `ambient_flow(ray, t).direction`.
-  In Euclidean space the two are the same vector; in a curved space they are not.
+  ray ARRIVES reads the flow: `scene_intersect` stores `ambient_flow(ray, hit.t).direction` on
+  `hit.arrival` (its side test reads it there, and so does `wo` at a surface hit); the
+  continuation through a null interface and a medium event's incident direction read
+  `ambient_flow(ray, t).direction` themselves. In Euclidean space the two are the same vector; in
+  a curved space they are not.
 - `scene_intersect` seeds `Hit.wl` from `Ray.wl`; geometry helpers preserve it.
   `ray_spawn` inherits `Hit.wl`; local-frame rays preserve wavelengths without spatial scaling.
 - `direction` is a **unit** tangent — unit *in the metric*.
@@ -164,6 +171,19 @@ leaving into its upper hemisphere, and anything else takes each arc with probabi
 query `lighting_pdf(q, wo, light_id, light_hit)` takes `wo` at the emitter hit — the arrival
 direction reversed — because only the emitter cosine depends on the arc a ray travelled
 (components/lights/README.md).
+
+**Quotient spaces** (components/quotient). In M = X/Γ the scene is one copy inside a fundamental
+domain D, and `scene_intersect` is a generated walk: it queries that copy with the ray clipped at
+the face where it leaves D (`scene_intersect_cell`, today's dispatcher), and if it finds nothing,
+moves the ray across the face by the paired isometry and repeats. So `hit.t` is summed over the
+cells crossed, and `hit.p`, the frame, `ng` and `arrival` are in D's chart (the cell query's). The
+flow of the original ray is in the wrong chart after a crossing, which is why `wo` reads
+`hit.arrival`. The walk sets `hit.image` from what it crossed: in the 3-torus the cell index, in
+the Seifert–Weber space the crossing count (0 → image 0, one crossing through face f → 1 + f,
+more → −1). The image-aware light sampler draws an image of the table and runs the light sampler
+at the query moved by that image's map; the MIS pdf reads `hit.image` and moves the stored query
+the same way (−1: density 0, so that BSDF hit keeps weight 1).
+
 The **running nearest lives on `hit.t`** (not on the Ray, and not `inout Ray`): each backend reads
 `hit.t` as its far bound and, on a closer hit, fills the whole Hit and shrinks `hit.t`. The Ray is
 never mutated by intersection — it is a pure seed.

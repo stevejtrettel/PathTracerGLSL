@@ -94,6 +94,127 @@ cube 3-torus).
   4096 spp 575 s; sponge 244 s; plaza 240 s; pavilion 330 s; window 997 s. Pictures in the
   gitignored renders/photo/.
 
+## 2026-11-07 — Seifert–Weber GPU witnesses, a walk counter and a demo (quotients plan Q2.6)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Q2.6 witnesses 1–3. The first renders of a
+Seifert–Weber program.
+
+**What was built:**
+- `seifert-weber-windows` (tests/witnesses/scenes/seifertWeberWitness.ts): three emissive spheres
+  of different colors at generic positions in D, pt, maxBounces 0, farClip 6, fov 0.5. Eleven pixel
+  windows are certified by a float64 twin (tests/helpers/seifertWeberTwin.ts) with a one-pixel
+  margin as seeing one sphere through 0, 1, 2 or 3 face crossings, or nothing within the far clip.
+  The twin builds Γ from the closed forms itself, lists the cells that can meet each window's view
+  cone by a breadth-first search over face-adjacent cells, and intersects every pixel ray with every
+  sphere image in them (brute force over the cover, not the walk); it also walks each certified ray
+  in float64 and requires the walk's cell to be the image's. tests/witnesses/seifertWeberWindows.test.ts
+  re-derives every window from the scene as authored.
+- `seifert-weber-lights`: a disk light 0.62 along face 0's direction facing the face (so D is lit
+  mostly by its copies across the faces; the copy across face 1 shines in through face 1) and three
+  lambert balls; pt = pt-nee = pt-mis, maxBounces 3, farClip 8, 256 spp.
+- The runner's `walk-counter` check (tools/witness.mjs `renderWalkCounter`, report only): the
+  strategy's own program with counters added at fixed anchors of the generated Seifert–Weber walk
+  (the render fails if an anchor is missing): capped segments, the most faces one segment crossed,
+  the largest constraint drift after a crossing.
+- Demo `seifert-weber-room` in the gallery's "Curved spaces" section: beads in D's 20 corners and at
+  its 30 edge midpoints, set as close to the faces as the Validator allows, so around every vertex of
+  the tiling 20 corner beads meet in a node and around every edge 5 beads close into a ring; a
+  two-sided lamp at the center (two disk lights back to back) and two small balls; pt-mis and pt,
+  farClip 6.
+- `pixelWindowRegion` (tests/witnesses/types.ts): the runner region of a pixel window, now shared by
+  the torus fog windows and these.
+
+**Measured (SwiftShader, WITNESS_PORT 3208):**
+- `seifert-weber-windows`: 11 of 11 windows exact (each reads its sphere's emission to 4 digits, or
+  0). With TWIST = π/5 in place of 3π/5, 6 of 11 fail: the five crossing windows the twin predicts
+  and one miss window. The two crossing windows that still pass both cross faces 1, 8, 10: the two
+  twists differ by a 1/5 turn, a symmetry of D, and along that face path the inserted symmetries
+  compose to the identity (the wrong walk meets the same sphere at the same arc length to 1e-14 in
+  the twin). The plan's sentence "moves every image beyond 2r_in" was corrected accordingly.
+- `seifert-weber-lights`: pt-nee ≡ pt-mis Δmean 0.00%, χ²ᵣ 0.01; pt tripwire Δmean 0.00%, rmse
+  20.6% (gate 25%); σ/µ pt-mis 18.1%, pt 19.7%. With the image index off by one (`first_face` for
+  `1 + first_face` in quotient_image_index) the frame means differ by 2.58% and both
+  equality checks fail. Under the pinned salt pt-nee and pt-mis draw the same numbers, so their χ²
+  stays near 0 (0.03) even under that bug: the 1% mean gate is what catches it. An earlier light
+  (radius 0.22, normal mostly along the face) let the same bug through (Δmean 0.08%) and failed the
+  pt tripwire on noise (rmse 33%); that is why the light faces the face.
+- Walk counter: windows (160×120×16 camera rays, cap 56): 0 capped segments, at most 11 faces in a
+  segment, drift ≤ 9.5e-6; lights (160×120×256 pt-mis paths with bounce and shadow segments, cap 64):
+  0 capped, at most 17 faces, drift ≤ 1.14e-5. With the cap set to 6 it counted 24,880 capped camera
+  segments (at most 7 faces), so it counts.
+- Non-quotient output: no program source changed (the only file under src/ touched is the
+  seifert-weber.md note). `npm run digest` on HEAD (exported tree) against this tree: 295 of 295
+  existing scenes identical in every part; the three new scenes are the only additions. Frames were
+  not recorded: no code a frame case compiles changed.
+- Vitest (full suite, load average 22–30): 4,714 passed, 5 timed out (5 s limit; no assertion
+  failed) in 4 files, which pass with --testTimeout=300000 (1,188 of 1,188); 9 snapshots written,
+  all additions for the three new scenes. tsc clean. The new seifertWeberWindows.test.ts: 19 of 19.
+
+**Open:** neither scene has been in a full sweep. The M2 GPU's builtins and FMA contraction are
+still not measured (the counter runs only on SwiftShader here). The demo was composed on
+SwiftShader renders at 320×240 and up to 96 spp only.
+
+## 2026-11-07 — The Seifert–Weber space: group data, walk, image-aware NEE (quotients plan Q2 core)
+
+[Plan](docs/claude-2026-11-review/quotients-plan.md), Milestone Q2: Q2.1–Q2.3, Q2.5 and vitest
+1–3 of Q2.6. The GPU witnesses (Q2.6 witnesses 1–3) are not built yet.
+
+**What was built:**
+- **The locked `Hit` gains `int image` and `Direction arrival`** (decision 1, at the plan's
+  recommendation, provisionally). The dispatcher sets `image = 0` and `arrival =
+  ambient_flow(ray, t).direction` (its side test reads it there); a quotient walk sets `image`
+  once more. The transport's `wo` is `−hit.arrival`. In the 3-torus the walk reports
+  `quotient_image_index(k)` of the cell it reached, and the rounding formula `quotient_image`
+  is gone, so the field has one meaning in every program; image-aware NEE/MIS are written over
+  two occupant maps (`quotient_image_query`, `quotient_image_direction`), the identity on
+  directions in the torus. docs/trace-loop-contract.md describes both fields and the quotient
+  walk.
+- **`components/quotient/seifert-weber/`**: the group in float64 from closed forms (inradius
+  0.99638, circumradius 1.90285, 12 face normals, pairings T(−2r_in·u)·R(u, 3π/5) and their
+  inverses), emitted once as float32 const arrays `FACE_N[12]`, `PAIRING[12]`; the exit face
+  and the renormalized crossing (static GLSL); the 13-image table (0: the light in D, 1 + f: its
+  copy across face f, seen from `PAIRING[f]·x`, directions carried back by `PAIRING[f xor 1]`)
+  and the crossing-count image index; the camera pose reduced into D on the CPU (`swReduce`).
+  Image-aware MIS moves only the query, not the departure direction the plan's Q2.3 first
+  listed (`PAIRING[f]·wi`): the cover's pdf reads the light point and `wo` at the emitter (the
+  reversed `hit.arrival`), both already in D's chart. The plan line now says so.
+- **The generated walk** (intersection.ts): the cell query clipped at the exit face, then the
+  crossing; `hit.t` summed, `hit.image` from the crossings (0, 1 + first face, or −1);
+  `QUOTIENT_MAX_CROSSINGS = ⌈4·farClip⌉ + 32`, a miss for `scene_intersect` and occluded for
+  `scene_intersect_any`, so the cap only removes light.
+- **Validator** (Q2.5): every object's and light's bounding ball inside D by `EPS_INTERFACE`
+  (a new `ballBound` fact on the sphere and disk descriptors; the placement isometry is one
+  function shared with the Planner, `curvedConstantPlacement`), no unbounded or driven objects,
+  no media (`ambientFog: false`), no sky or delta lights, `farClip ≥ 2R_c + 2r_in = 5.80`.
+
+**Measured:**
+- Vitest (tests first; each new check shown failing): the group data (SO⁺(3,1) to 1e-12,
+  face i → face i xor 1, 6 edge cycles of 5 with product I, one vertex class, a free action, each
+  of 20,000 points of the ball of radius 3 in exactly one cell; a twist of 1/10 turn fails the
+  edge cycles and the free action), Kac's mean 0.9571 against 0.9599 over 198,000 segments; the
+  float32 walk (drift ≤ 1.4e-5, zero-length runs ≤ 6, at most 15/18/28 crossings in windows of
+  6/8/16 against caps 56/64/96; without renormalizing, all 2,000 rays stick); the partition-MIS
+  twin at 120,000 paths per estimator: pt 0.5422 ± 0.0047, pt-nee 0.5326 ± 0.0043, pt-mis 0.5412
+  ± 0.0043, W1 −93σ, the membership control (MIS counting only 0-crossing hits) +13.8σ (60,000
+  paths gave only +9.9σ, so the budget was doubled), and a wrong direction map fails pt-nee and
+  pt-mis by 17σ and 14σ.
+- SwiftShader runs the step over the emitted tables (4,096 rays × 100 crossings, 4,096 aimed at
+  vertices and edges × 30) with drift ≤ 1.4e-5, no stuck ray, zero-length runs ≤ 6; its `atanh`
+  is within 2.4e-7 on [0, tanh 2R_c] and `inversesqrt` within 9e-8 relative, so they need no
+  replacement (unlike S³'s sin and cos).
+- Gates for the `Hit` change: `npm run digest` (295 scenes) differs only by the lines named
+  above — the two Hit fields with their comments, `hit.image = 0;`, the stored arrival and its
+  side test, and `wo = −hit.arrival` in all 554 main programs; in the 13 torus programs also the
+  occupant's maps, the walk's image line and the wrappers; source-map line numbers otherwise.
+  `npm run frames -- compare`: 30 of 30 pictures bit-identical. The five torus witnesses, before and
+  after: 15 of 15 checks pass with identical numbers, and the 27 rendered pictures they cache (frames, means and variances) are bit-identical, compared by hash (pinned salt). `h3-disk-light` passes (4 of 4). The
+  Seifert–Weber parts add nothing to any existing program (digest: 295 of 295 scenes identical
+  between the two commits).
+
+**Open:** the plan's GPU witnesses for Seifert–Weber (patch-unrolling first-hit windows,
+estimator equality, the cap counter) are the next step; no SW program has been rendered yet.
+The M2 GPU's builtins and FMA contraction are not measured.
+
 ## 2026-11-07 — Curved spaces and the cube 3-torus in one tree
 
 The H³/S³ work and the 3-torus work, built side by side from the same commit, merged. Where

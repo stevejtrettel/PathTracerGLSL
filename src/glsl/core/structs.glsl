@@ -54,6 +54,17 @@ struct Hit {
                         // marched commits.
                         // ray_spawn's escape offset is the ONE reader. The dispatcher seeds
                         // the conservative default so a missed arm degrades, never garbage.
+    int image;          // which image of the scene the ray hit, relative to the chart of the
+                        // ray's origin, as an index into the program's NEE image table
+                        // (components/quotient); −1 when it is not in the table; 0 in programs
+                        // without a quotient. Set by the dispatcher (0) and once more by a
+                        // quotient walk. Read by the image-aware MIS pdf and pt-nee's emitter
+                        // weight.
+    Direction arrival;  // the ray's unit velocity at p, in p's chart: the arrival direction
+                        // (the transport's wo is −arrival). The dispatcher sets it to
+                        // ambient_flow(ray, t).direction for the ray it was given; a quotient
+                        // walk gives it the current cell's ray, in D's chart, where the flow of
+                        // the original ray would be in the wrong chart.
 };
 
 // Placeholder planar-uv chart scale — the ONE truth for every Hit.uv writer (the SDF

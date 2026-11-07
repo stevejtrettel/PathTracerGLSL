@@ -41520,6 +41520,653 @@ exports[`ProgramDescription structural snapshot (the link map) > sdf-table-twin 
 }
 `;
 
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-lights + pt 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": 1.1,
+      "position": [
+        0.15,
+        -0.1,
+        -0.7,
+      ],
+      "target": [
+        0,
+        0.3,
+        1,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 8,
+    "maxBounces": 3,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-lights + pt-mis 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": 1.1,
+      "position": [
+        0.15,
+        -0.1,
+        -0.7,
+      ],
+      "target": [
+        0,
+        0.3,
+        1,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 8,
+    "maxBounces": 3,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-lights + pt-nee 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "nee",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": 1.1,
+      "position": [
+        0.15,
+        -0.1,
+        -0.7,
+      ],
+      "target": [
+        0,
+        0.3,
+        1,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 8,
+    "maxBounces": 3,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-room + pt 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": {
+        "default": 1.2,
+        "max": 1.8,
+        "min": 0.4,
+        "param": "camera.fov",
+      },
+      "position": [
+        0.45,
+        0.4,
+        0.6,
+      ],
+      "target": [
+        -0.4,
+        -0.1,
+        -0.6,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 6,
+    "maxBounces": 6,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-room + pt-mis 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": true,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": {
+      "method": "mis",
+      "selection": "power",
+    },
+    "mediumLightSampling": "vertex",
+    "russianRoulette": {
+      "startDepth": 3,
+    },
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": true,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": true,
+    "surfacePdf": true,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": {
+        "default": 1.2,
+        "max": 1.8,
+        "min": 0.4,
+        "param": "camera.fov",
+      },
+      "position": [
+        0.45,
+        0.4,
+        0.6,
+      ],
+      "target": [
+        -0.4,
+        -0.1,
+        -0.6,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 6,
+    "maxBounces": 6,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "agx",
+    },
+  },
+}
+`;
+
+exports[`ProgramDescription structural snapshot (the link map) > seifert-weber-windows + pt 1`] = `
+{
+  "dispersion": null,
+  "emitters": {
+    "driven": false,
+    "lightingPdf": false,
+    "samplable": true,
+  },
+  "environment": {
+    "type": "none",
+  },
+  "environmentPdf": false,
+  "environmentSamplable": false,
+  "environmentSelectionLive": false,
+  "estimator": {
+    "accumulation": {
+      "type": "average",
+    },
+    "envSampler": {
+      "chart": "equirect",
+      "compensation": false,
+    },
+    "lighting": null,
+    "mediumLightSampling": "vertex",
+    "russianRoulette": null,
+    "volumeSampling": "none",
+    "wavelengths": undefined,
+  },
+  "intersection": {
+    "anyQuery": false,
+    "classes": {
+      "instanced": false,
+      "mesh": false,
+      "primitive": true,
+    },
+    "drivenPlacement": false,
+    "instanceAccel": "tlas",
+    "meshTraversal": "bvh",
+    "objectDispatch": "unrolled",
+  },
+  "materials": {
+    "materialsReadUv": false,
+    "models": [
+      "lambert",
+    ],
+    "regionLookup": "baked",
+    "surfaceEval": false,
+    "surfacePdf": false,
+    "twoSidedShading": false,
+  },
+  "measurement": {
+    "ambient": "hyperbolic",
+    "camera": {
+      "fov": 0.5,
+      "position": [
+        -0.12,
+        -0.08,
+        0.5,
+      ],
+      "target": [
+        0.3,
+        0.1,
+        -1,
+      ],
+      "type": "pinhole",
+    },
+    "color": "rgb",
+    "farClip": 6,
+    "maxBounces": 0,
+    "maxNullCrossings": 32,
+    "microfacet": "single-scattering",
+    "pixel": "box",
+    "quotient": {
+      "kind": "seifert-weber",
+    },
+    "response": "radiance",
+    "scattering": "full",
+    "sensor": "ideal",
+    "shadows": "opaque-dielectrics",
+  },
+  "media": {
+    "deflecting": false,
+    "emission": false,
+    "heterogeneousArms": false,
+    "mediumEval": false,
+    "mediumPdf": false,
+    "models": [],
+    "nullInterfaces": false,
+    "present": false,
+    "scatteringArms": false,
+    "scatteringMedia": [],
+    "shadowWalker": false,
+    "weightedAbsorptionArms": false,
+  },
+  "spectrumKinds": [],
+  "view": {
+    "tonemap": {
+      "exposure": undefined,
+      "type": "reinhard",
+    },
+  },
+}
+`;
+
 exports[`ProgramDescription structural snapshot (the link map) > shadow-aim-far + pt 1`] = `
 {
   "dispersion": null,

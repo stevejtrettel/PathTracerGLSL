@@ -49,12 +49,15 @@ export interface AmbientSpaceDescription {
     /** A closed manifold M = X/Γ: the scene is one copy inside a fundamental domain D, and a ray
      *  leaving D through a face continues from the paired face (components/quotient/README.md).
      *  `torus`: the cube 3-torus E³/(Lx·Z × Ly·Z × Lz·Z), D = [−L/2, L/2]³ around the origin, so
-     *  coordinates authored in D read as in plain E³. Euclidean only. */
+     *  coordinates authored in D read as in plain E³. Euclidean only.
+     *  `seifert-weber`: the Seifert–Weber dodecahedral space H³/Γ, D the regular dodecahedron
+     *  about the origin with dihedral angle 72° (inradius 0.996, circumradius 1.903). Hyperbolic
+     *  only. */
     quotient?: QuotientDescription;
 }
 
 /** The quotient group (components/quotient registry key `kind`) and its parameters. */
-export type QuotientDescription = { kind: 'torus'; size: Vec3 };
+export type QuotientDescription = { kind: 'torus'; size: Vec3 } | { kind: 'seifert-weber' };
 
 // --- Environment (what a missed ray sees) ---
 //
@@ -690,7 +693,8 @@ export interface MeasurementDescription {
      *  and where a missed ray finds the sky. Absent = the ambient space's default (Euclidean:
      *  1000). Required in a quotient space (`ambientSpace.quotient`), where nothing escapes and
      *  the clip is the only end of a segment that meets nothing; there it must be at least
-     *  twice the fundamental domain's diameter, so that every light image NEE samples is
+     *  the quotient's floor (the 3-torus: twice the fundamental domain's diameter; the
+     *  Seifert–Weber space: 2R_c + 2r_in = 5.80), so that every light image NEE samples is
      *  reachable by a BSDF ray. In a quotient filled with a homogeneous fog of extinction σ
      *  the clip's error is bounded per pixel and channel by (N+1)²·e^{−σ·farClip}·Le_max
      *  (N = maxBounces, Le_max the largest emitted radiance, the fog's glow ε/σ included;

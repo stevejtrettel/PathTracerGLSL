@@ -24,8 +24,10 @@ import type { ParameterMetadata } from '../../types.js';
 import type { DiagnosticBag } from '../../../errors/core/DiagnosticBag.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import { cameraModel, type CameraControl, type CameraDerived } from '../../../components/camera/index.js';
-import { cameraBasis, curvedCameraBasis } from '../../../components/camera/basis.js';
+import { cameraBasis, curvedCameraBasis, type CurvedCameraBasis } from '../../../components/camera/basis.js';
 import { curvedGeometryOf } from '../../../components/ambient/index.js';
+import type { CurvedGeometry } from '../../../components/ambient/isometry.js';
+import { QUOTIENTS } from '../../../components/quotient/index.js';
 import { bodyFor } from '../../../components/descriptors.js';
 import type { Vec3Tuple } from '../../../components/geometry/similarity.js';
 
@@ -89,9 +91,19 @@ export function contributeCamera(plan: RenderPlan, _bag: DiagnosticBag): Feature
     // memoized on the pose values so a frame runs cameraBasis once, not once per vector.
     // In a curved space the frame is curvedCameraBasis's (the target-centered up rule) and all
     // four vectors are vec4: the camera point exp_o(position) and a tangent frame there.
+    // In a quotient whose walk needs every ray to start in D (Seifert–Weber), the pose is then
+    // moved into D by the group, its frame carried along (the occupant's reduceCamera).
     const geom = curvedGeometryOf(plan.program.measurement.ambient);
+    const quotient = plan.program.measurement.quotient;
+    const reduce = quotient !== undefined ? QUOTIENTS[quotient.kind]?.reduceCamera : undefined;
+    const curvedFrame = (g: CurvedGeometry, position: Vec3Tuple, target: Vec3Tuple): CurvedCameraBasis => {
+        const b = curvedCameraBasis(g, position, target);
+        if (reduce === undefined) return b;
+        const r = reduce(b.position, [b.forward, b.right, b.up]);
+        return { position: r.point, forward: r.vectors[0], right: r.vectors[1], up: r.vectors[2] };
+    };
     const frameOf = (position: Vec3Tuple, target: Vec3Tuple): Record<'position' | 'forward' | 'right' | 'up', number[]> =>
-        geom !== undefined ? curvedCameraBasis(geom, position, target) : { position, ...cameraBasis(position, target) };
+        geom !== undefined ? curvedFrame(geom, position, target) : { position, ...cameraBasis(position, target) };
     let memoKey = '';
     let memoBasis = frameOf(pose.position as Vec3Tuple, pose.target as Vec3Tuple);
     const basisFor = (position: Vec3Tuple, target: Vec3Tuple) => {

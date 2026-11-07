@@ -30,4 +30,6 @@ export const sphereDescriptor: PrimitiveDescriptor = {
         const r = v.radius as number;
         return { min: [c[0] - r, c[1] - r, c[2] - r], max: [c[0] + r, c[1] + r, c[2] + r] };
     },
+    // The ball itself.
+    ballBound: (v) => v.radius as number,
 };

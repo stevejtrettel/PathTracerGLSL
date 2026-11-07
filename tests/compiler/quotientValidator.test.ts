@@ -209,3 +209,95 @@ describe('quotient Validator rules', () => {
         expect(quotientErrors((s) => { s.ambientSpace.quotient = { kind: 'torus', size: [1, 0, 1] }; }).some((m) => /size must be/.test(m))).toBe(true);
     });
 });
+
+// The Seifert–Weber rules (docs/claude-2026-11-review/quotients-plan.md, Q2.5): every object's and
+// light's bounding ball inside D by the margin (⟨N_i, c⟩ ≤ −sinh(r + m) for every face), no
+// unbounded or driven objects, no media, and farClip ≥ 2R_c + 2r_in = 5.80. D's inradius is
+// 0.996, so a ball of radius r about exp_o(v) is inside exactly when |v| + r + m ≤ 0.996 along a
+// face direction (and with more room toward the vertices).
+describe('Seifert–Weber Validator rules', () => {
+    const PHI = (1 + Math.sqrt(5)) / 2;
+    const face0 = [0, 1 / Math.hypot(1, PHI), PHI / Math.hypot(1, PHI)];
+    const along = (d: number): [number, number, number] => [d * face0[0], d * face0[1], d * face0[2]];
+    function swScene(): SceneDescription {
+        return {
+            id: 'sw',
+            ambientSpace: { type: 'hyperbolic', quotient: { kind: 'seifert-weber' } },
+            objects: [{ type: 'sphere', parameters: { center: [0.2, -0.1, 0.1], radius: 0.3 }, material: 'm' }],
+            materials: { m: { model: 'lambert', albedo: 0.6 }, glow: { model: 'lambert', albedo: 0, emission: 5, sampleAsLight: false } },
+            lights: [{ kind: 'disk', position: [-0.3, 0.3, 0], normal: [0, -1, 0], radius: 0.2, emission: 5 }],
+        };
+    }
+    function swStrategy(): RenderStrategy {
+        return {
+            id: 'pt-mis',
+            measurement: { camera: { type: 'pinhole', fov: 0.8, position: [0, 0, 0.5], target: [0, 0, 0] }, maxBounces: 4, farClip: 6 },
+            estimator: { directLighting: 'mis', russianRoulette: null, accumulation: { type: 'average' } },
+            view: { tonemap: { type: 'reinhard' } },
+        };
+    }
+    function swErrors(mutate: (s: SceneDescription, st: RenderStrategy) => void = () => {}): string[] {
+        const s = swScene(), st = swStrategy();
+        mutate(s, st);
+        const bag = new DiagnosticBag('test');
+        validate(analyze(s), s, st, bag);
+        return bag.getErrors().map((e) => e.message);
+    }
+    const ball = (center: [number, number, number], radius: number, material = 'm'): ObjectDescription =>
+        ({ type: 'sphere', parameters: { center, radius }, material });
+
+    it('accepts the base scene and an emissive ball reached by BSDF rays only', () => {
+        expect(swErrors()).toEqual([]);
+        expect(swErrors((s) => { s.objects.push(ball([0, -0.4, -0.3], 0.1, 'glow')); })).toEqual([]);
+    });
+
+    it('requires farClip ≥ 2R_c + 2r_in', () => {
+        expect(swErrors((_s, st) => { delete st.measurement.farClip; }).some((m) => /farClip is required.*2R_c \+ 2r_in = 5\.798/.test(m))).toBe(true);
+        expect(swErrors((_s, st) => { st.measurement.farClip = 5.79; }).some((m) => /below 2R_c \+ 2r_in = 5\.798/.test(m))).toBe(true);
+        expect(swErrors((_s, st) => { st.measurement.farClip = 5.8; })).toEqual([]);
+    });
+
+    it('requires every bounding ball inside D by the margin', () => {
+        // Along face 0's direction: 0.5 + 0.49 + m < 0.9964 passes, 0.5 + 0.497 + m does not.
+        expect(swErrors((s) => { s.objects.push(ball(along(0.5), 0.49)); })).toEqual([]);
+        expect(swErrors((s) => { s.objects.push(ball(along(0.5), 0.497)); }).some((m) => /object 1 crosses a face of D/.test(m))).toBe(true);
+        // Inside D, but closer to face 0 than the margin (0.5 + 0.496 < 0.99638 < 0.5 + 0.496 + m).
+        expect(swErrors((s) => { s.objects.push(ball(along(0.5), 0.496)); }).some((m) => /object 1 crosses a face of D/.test(m))).toBe(true);
+        // A transform moves the ball: placed at exp_o(0.8·u_0) it crosses face 0.
+        expect(swErrors((s) => { s.objects.push({ ...(ball([0, 0, 0], 0.25) as PrimitiveObject), transform: { position: along(0.8) } }); })
+            .some((m) => /object 1 crosses a face of D/.test(m))).toBe(true);
+        // Toward a vertex D reaches R_c = 1.90: a ball at distance 1.2 from o fits there.
+        const v = [1, 1, 1].map((x) => x / Math.sqrt(3));
+        expect(swErrors((s) => { s.objects.push(ball([1.2 * v[0], 1.2 * v[1], 1.2 * v[2]], 0.1)); })).toEqual([]);
+        // A disk object is bounded by its radius.
+        expect(swErrors((s) => { s.objects.push({ type: 'disk', parameters: { center: along(0.6), radius: 0.45, normal: [1, 0, 0] }, material: 'm' }); })
+            .some((m) => /object 1 crosses a face of D/.test(m))).toBe(true);
+    });
+
+    it('requires every light inside D, and rejects delta lights', () => {
+        expect(swErrors((s) => { s.lights[0] = { kind: 'disk', position: along(0.85), normal: [0, -1, 0], radius: 0.2, emission: 5 }; })
+            .some((m) => /light 0 \(disk\) is not inside D/.test(m))).toBe(true);
+        expect(swErrors((s) => { s.lights.push({ kind: 'point', position: [0, 0, 0], emission: 1 }); }).some((m) => /delta light/.test(m))).toBe(true);
+    });
+
+    it('rejects unbounded and driven objects, media and an environment', () => {
+        expect(swErrors((s) => { s.objects.push({ type: 'plane', parameters: { normal: [0, 1, 0], offset: 0.5 }, material: 'm' }); })
+            .some((m) => /unbounded/.test(m))).toBe(true);
+        expect(swErrors((s) => { s.objects.push({ ...(ball([0, 0, 0], 0.1) as PrimitiveObject), transform: { position: { param: 'p', default: [0, 0, 0] } } }); })
+            .some((m) => /driven/.test(m))).toBe(true);
+        expect(swErrors((s) => {
+            s.materials.ink = { model: 'none', medium: { sigma_a: 0.1, sigma_s: 0.2 } };
+            s.objects.push(ball([0, -0.4, 0], 0.1, 'ink'));
+        }).some((m) => /quotient 'seifert-weber': material 'ink' has a medium/.test(m))).toBe(true);
+        expect(swErrors((s) => {
+            s.materials.fog = { model: 'none', medium: { sigma_a: 0.1 } };
+            s.ambientMedium = 'fog';
+        }).some((m) => /quotient 'seifert-weber': ambientMedium 'fog' — no fog is supported in this quotient/.test(m))).toBe(true);
+        expect(swErrors((s) => { s.environment = { type: 'constant', color: [1, 1, 1] }; }).some((m) => /no sky/.test(m))).toBe(true);
+    });
+
+    it('rejects the kind on the wrong space', () => {
+        expect(swErrors((s) => { s.ambientSpace.type = 'euclidean'; }).some((m) => /acts on the hyperbolic space/.test(m))).toBe(true);
+        expect(swErrors((s) => { s.ambientSpace.quotient = { kind: 'torus', size: [1, 1, 1] }; }).some((m) => /acts on the euclidean space/.test(m))).toBe(true);
+    });
+});

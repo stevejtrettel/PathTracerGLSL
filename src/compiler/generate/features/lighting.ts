@@ -968,17 +968,21 @@ function generateLightingPdfBvh(layout: LightTableLayout, slot: LightTreeSlotBak
 // ============================================================================
 // Image-aware NEE and MIS in a quotient (components/quotient/README.md, partition MIS)
 // ============================================================================
-// A lamp in D is seen from x along one geodesic per image. NEE picks image j of the occupant's
-// table S uniformly and runs the cover's sampler for the lights in D at the query moved by image
-// j's map: the lamp's image j seen from x is the lamp seen from x − shift(j), and directions and
-// distances are invariant under the translation. The image is drawn with a fresh random() (the
+// A lamp in D is seen from x along one geodesic per image. Image j of the occupant's table S is
+// g_j⁻¹L, the lamp L in D carried by a deck isometry g_j, and d(x, g_j⁻¹y) = d(g_j x, y): the
+// image seen from x is the lamp in D seen from the moved query g_j x. NEE picks j uniformly, runs
+// the cover's sampler for the lights in D at quotient_image_query(q, j), and carries the sampled
+// direction back to q.p with quotient_image_direction(j, ·) (the identity in the 3-torus, where
+// g_j is a translation). The distance needs no map. The image is drawn with a fresh random() (the
 // light tree's convention), so xi reaches the sampler untouched.
 //
-// MIS needs NEE's density for the image a BSDF ray hit: quotient_image names it (−1 outside S),
-// and an image outside S has density 0, so the power heuristic gives that BSDF hit weight 1.
-// This is unbiased because BSDF sampling covers every path. The MIS side replays the stored
-// query, and the recovered j is the j NEE drew for that image, so the moved query is the same
-// bits on both sides.
+// MIS needs NEE's density for the image a BSDF ray hit: the walk names it in hit.image (−1
+// outside S), and an image outside S has density 0, so the power heuristic gives that BSDF hit
+// weight 1. This is unbiased because BSDF sampling covers every path. The cover's pdf reads the
+// light point and wo at the emitter (the reversed hit.arrival), both already in D's chart, so it
+// needs only the moved query and no departure direction at q.p. The MIS side replays the stored
+// query, and hit.image is the j NEE draws for that image, so the moved query is the same bits on
+// both sides.
 
 function generateQuotientLightSampling(imageCount: number): string {
     const n = formatFloat(imageCount);
@@ -986,10 +990,9 @@ function generateQuotientLightSampling(imageCount: number): string {
         '// Image-aware NEE (quotient): one image of the table, uniformly, then the cover\'s sampler.',
         'LightSample lighting_sample(LightQuery q, vec2 xi, Wavelengths wl) {',
         `    int j = min(int(random() * ${n}), ${imageCount - 1});`,
-        '    LightQuery qj = q;',
-        '    qj.p = q.p - quotient_image_shift(j);                   // image j of every light, seen from q.p',
-        '    LightSample ls = lighting_sample_cover(qj, xi, wl);',
-        `    ls.pdf /= ${n};                                          // wi and distance are translation-invariant`,
+        '    LightSample ls = lighting_sample_cover(quotient_image_query(q, j), xi, wl);   // image j of every light',
+        '    ls.wi = quotient_image_direction(j, ls.wi);              // back at q.p; the distance is invariant',
+        `    ls.pdf /= ${n};`,
         '    return ls;',
         '}',
     ].join('\n');
@@ -1000,11 +1003,9 @@ function generateQuotientLightingPdf(imageCount: number): string {
     return [
         '// Image-aware MIS pdf (quotient): NEE\'s density for the image the BSDF ray hit; 0 outside the table.',
         'float lighting_pdf(LightQuery q, Direction wo, int light_id, Hit light_hit) {',
-        '    int j = quotient_image(q.p, -wo, light_hit);            // -wo: the departure direction at q.p (E³)',
+        '    int j = light_hit.image;',
         '    if (j < 0) return 0.0;                                  // NEE never samples it: BSDF weight 1',
-        '    LightQuery qj = q;',
-        '    qj.p = q.p - quotient_image_shift(j);',
-        `    return lighting_pdf_cover(qj, wo, light_id, light_hit) / ${n};`,
+        `    return lighting_pdf_cover(quotient_image_query(q, j), wo, light_id, light_hit) / ${n};`,
         '}',
     ].join('\n');
 }

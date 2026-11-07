@@ -1762,6 +1762,9 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
         lines.push('    hit.wl = ray.wl;');
         lines.push('    hit.t = MAX_DIST;   // running nearest = far clip; rest of hit undefined until a backend fills it');
     }
+    lines.push(cell
+        ? '    hit.image = 0;   // the image in this query\'s own chart; the walk names the image it reached'
+        : '    hit.image = 0;   // no quotient: the scene has one image');
     lines.push('    hit.eps = MARCH_CLEARANCE;   // conservative seed (the largest tier) — every arm overwrites; a missed arm degrades, never garbage');
     lines.push('    bool found = false;');
     if (arms.primitive) lines.push('    if (primitive_intersect(ray, hit)) found = true;');   // bounded by hit.t → only closer
@@ -1772,8 +1775,9 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
     lines.push('        // §4.2/§4.3: one outside-probe along the outward normal; owner covers its own side.');
     lines.push('        // Which side the ray is on, and where the probe lands, are GEOMETRIC facts: both use');
     lines.push('        // the geometric normal ng, never an interpolated or perturbed shading normal.');
+    lines.push('        hit.arrival = ambient_flow(ray, hit.t).direction;   // the velocity at hit.p, in its chart');
     lines.push('        int outside = scene_region_at(ambient_geodesic(hit.p, hit.ng, EPS_INTERFACE));');
-    lines.push('        if (ambient_dot(ambient_flow(ray, hit.t).direction, hit.ng, hit.p) < 0.0) {   // the arrival direction, at hit.p');
+    lines.push('        if (ambient_dot(hit.arrival, hit.ng, hit.p) < 0.0) {');
     lines.push('            hit.region_from = outside;              // entering the owner');
     lines.push('            hit.region_to   = hit.region_owner;');
     lines.push('        } else {');
@@ -1813,16 +1817,25 @@ function generateSceneIntersect(arms: { primitive: boolean; mesh: boolean; insta
 // Quotient walks (components/quotient): scene_intersect / scene_intersect_any across the cells
 // ============================================================================
 // Generated, not static: scene_intersect_any_cell exists only where the any-hit query is planned
-// (anyQuery), so the any-hit walk is gated exactly like today's scene_intersect_any. The lattice
+// (anyQuery), so the any-hit walk is gated exactly like today's scene_intersect_any. The group
 // math they call is the occupant's static block.
 
 function generateQuotientWalks(kind: string, anyQuery: boolean): string {
-    if (kind !== 'torus') throw new Error(`quotient '${kind}' has no walk (Validator should have rejected it)`);
+    const walk = kind === 'torus' ? torusWalk : kind === 'seifert-weber' ? seifertWeberWalk : undefined;
+    if (walk === undefined) throw new Error(`quotient '${kind}' has no walk (Validator should have rejected it)`);
+    return [
+        `// Generated ${kind} walk (components/quotient/${kind}/${kind}.md)`,
+        ...walk(false),
+        ...(anyQuery ? ['', ...walk(true)] : []),
+    ].join('\n');
+}
+
+function torusWalk(any: boolean): string[] {
     // The walk of components/quotient/torus/torus.md, transcribed from the float32 twin
     // (tests/components/quotient/torusWalk.test.ts): the cell of the origin, then cells in order of
     // arc length; each query sees the ray translated by −L∘k and started at the cell's entry point,
     // clipped to the cell's exit, so its first hit is the nearest hit of the lifted scene.
-    const walk = (any: boolean): string[] => [
+    return [
         any ? 'bool scene_intersect_any(Ray ray, float maxDist) {' : 'bool scene_intersect(Ray ray, out Hit hit) {',
         '    vec3 k = floor(ray.origin / TORUS_PERIOD + 0.5);                // the cell of the origin',
         '    vec3 s = vec3(ray.direction.x >= 0.0 ? 1.0 : -1.0,',
@@ -1840,6 +1853,7 @@ function generateQuotientWalks(kind: string, anyQuery: boolean): string {
         ] : [
             '        if (scene_intersect_cell(local, min(t_exit, MAX_DIST) - t_enter, hit)) {',
             '            hit.t += t_enter;                                        // arc length from ray.origin',
+            '            hit.image = quotient_image_index(k);                     // cell k, in the coordinates of ray.origin',
             '            return true;',
             '        }',
             '        if (t_exit >= MAX_DIST) return false;                        // the far clip',
@@ -1851,9 +1865,44 @@ function generateQuotientWalks(kind: string, anyQuery: boolean): string {
         '    return false;   // not reached: TORUS_MAX_CELLS bounds every segment of length ≤ MAX_DIST',
         '}',
     ];
+}
+
+function seifertWeberWalk(any: boolean): string[] {
+    // The walk of components/quotient/seifert-weber/seifert-weber.md, whose step is the float32
+    // twin's (tests/components/quotient/seifertWeberWalk.test.ts): the ray (its origin in D)
+    // queries the scene copy in D clipped at the face where it leaves D; if it meets nothing
+    // there, it moves to the face and through the face's pairing, renormalized, and repeats. The
+    // hit is in D's chart; its image is named by the crossings made (quotient_image_index). A
+    // segment that would cross more than QUOTIENT_MAX_CROSSINGS faces ends: a miss, or occluded
+    // for a shadow ray, so the cap only ever removes light.
     return [
-        '// Generated torus walk (components/quotient/torus/torus.md)',
-        ...walk(false),
-        ...(anyQuery ? ['', ...walk(true)] : []),
-    ].join('\n');
+        any ? 'bool scene_intersect_any(Ray ray, float maxDist) {' : 'bool scene_intersect(Ray ray, out Hit hit) {',
+        '    Ray r = ray;                                                     // the current cell\'s ray, in D\'s chart',
+        '    float t_acc = 0.0;                                               // arc length from ray.origin to r.origin',
+        ...(any ? [] : ['    int first_face = -1;']),
+        '    for (int n = 0; n <= QUOTIENT_MAX_CROSSINGS; n++) {             // n: the faces crossed so far',
+        '        int face;',
+        '        float tau = seifert_weber_exit(r, face);',
+        '        float t_exit = atanh(tau);',
+        ...(any ? [
+            '        if (scene_intersect_any_cell(r, min(t_exit, maxDist - t_acc))) return true;',
+            '        t_acc += t_exit;',
+            '        if (t_acc >= maxDist) return false;',
+        ] : [
+            '        if (scene_intersect_cell(r, min(t_exit, MAX_DIST - t_acc), hit)) {',
+            '            hit.t += t_acc;                                          // arc length from ray.origin',
+            '            hit.image = quotient_image_index(n, first_face);',
+            '            return true;',
+            '        }',
+            '        t_acc += t_exit;',
+            '        if (t_acc >= MAX_DIST) return false;                         // the far clip',
+        ]),
+        '        r = seifert_weber_cross(r, tau, face);',
+        ...(any ? [] : ['        if (n == 0) first_face = face;']),
+        '    }',
+        any
+            ? '    return true;    // the crossing cap: occluded (the cap only ever removes light)'
+            : '    return false;   // the crossing cap: a miss (the cap only ever removes light)',
+        '}',
+    ];
 }

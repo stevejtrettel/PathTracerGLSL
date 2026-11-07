@@ -25,6 +25,7 @@
 
 import type { SceneDescription, RenderStrategy, Transform, Vec3, ObjectDescription } from '../../../src/compiler/types.js';
 import { withPose } from '../../../src/authoring/strategy.js';
+import { pixelWindowRegion } from '../types.js';
 
 // ---- crystal twin ------------------------------------------------------------------------------
 
@@ -199,13 +200,8 @@ export const FOG_WINDOWS: FogWindow[] = [
     { x0: 151, y0: 31, nx: 8, ny: 8, cell: 'miss', value: 0.864665 },
 ];
 
-/** The runner's region (fractions, tools/witness.mjs regionBounds: floor(x·W) … ceil((x+w)·W))
- *  that selects exactly the window's pixels; the half-pixel offsets keep rounding off the
- *  floor and ceil. */
-export const fogWindowRegion = (w: FogWindow) => ({
-    x: (w.x0 + 0.5) / FOG_IMAGE[0], y: (w.y0 + 0.5) / FOG_IMAGE[1],
-    w: (w.nx - 1) / FOG_IMAGE[0], h: (w.ny - 1) / FOG_IMAGE[1],
-});
+/** The runner's region that selects exactly the window's pixels. */
+export const fogWindowRegion = (w: FogWindow) => pixelWindowRegion(w, FOG_IMAGE);
 
 export const torusFog: SceneDescription = {
     id: 'torus-fog',

@@ -41,6 +41,10 @@ import {
     torusCrystal, torusCrystalRef, torusCrystalStrategy, torusLights, torusLightsStrategies,
     torusFog, torusFogStrategy, FOG_WINDOWS, FOG_IMAGE, fogWindowRegion, torusCrystalFog, torusCrystalFogRef, torusLightsFog,
 } from './scenes/torusWitness.js';
+import {
+    seifertWeberWindows, seifertWeberWindowsStrategy, SW_WINDOWS, SW_WINDOWS_IMAGE, swWindowValue, swWindowRegion, SW_WINDOWS_CAP,
+    seifertWeberLights, seifertWeberLightsStrategies, SW_LIGHTS_CAP,
+} from './scenes/seifertWeberWitness.js';
 
 import { twoLightScene, twoLightPowerStrategy, twoLightUniformStrategy, twoLightBvhStrategy } from './scenes/twoLightScene.js';
 import { hundredSpheres, hundredNeePowerStrategy, hundredNeeBvhStrategy, hundredMisPowerStrategy, hundredMisBvhStrategy } from './scenes/hundredSpheres.js';
@@ -2922,6 +2926,54 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 // Identical stream; the small tolerances absorb only the rounding of α in fp32
                 // against the host-computed literal (the expr-const tolerances).
                 { kind: 'twin', other: { scene: 'rough-furnace' }, meanTol: 0.002, rmse: 0.01, label: 'per-hit α ≡ host α' },
+            ],
+        },
+    },
+    'seifert-weber-windows': {
+        scene: seifertWeberWindows,
+        strategies: [seifertWeberWindowsStrategy],
+        exercises:
+            'the Seifert–Weber walk (components/quotient/seifert-weber): three emissive spheres of different colors at '
+            + 'generic positions in the dodecahedral domain D, pt with maxBounces 0 and farClip 6; every pixel reads the '
+            + 'emission of the first sphere image within 6, seen through up to 8 face crossings, or 0',
+        expected:
+            'each window certified by the float64 twin (brute force over the sphere images in the cover, '
+            + 'tests/witnesses/seifertWeberWindows.test.ts) reads its sphere\'s emission exactly, or 0; a wrong pairing '
+            + '(twist, face order, chart) shows a different sphere or nothing in the windows seen across a face',
+        witness: {
+            size: SW_WINDOWS_IMAGE,
+            spp: 16,
+            checks: [
+                ...SW_WINDOWS.map((w) => ({
+                    kind: 'mean' as const,
+                    value: swWindowValue(w),
+                    tol: 1e-3,
+                    region: swWindowRegion(w),
+                    source: { tier: 'exact' as const, from: 'float64 twin over the sphere images in the cover, one-pixel margin' },
+                    label: w.sphere === 'miss'
+                        ? `window (${w.x0}, ${w.y0}): nothing within R`
+                        : `window (${w.x0}, ${w.y0}): sphere ${w.sphere} through ${w.crossings} face crossing${w.crossings === 1 ? '' : 's'}`,
+                })),
+                { kind: 'walk-counter', cap: SW_WINDOWS_CAP, label: 'walk counter, camera rays (report only)' },
+            ],
+        },
+    },
+    'seifert-weber-lights': {
+        scene: seifertWeberLights,
+        strategies: seifertWeberLightsStrategies,
+        exercises:
+            'partition MIS in the Seifert–Weber space (components/quotient/seifert-weber): NEE samples one of 13 images of '
+            + 'a disk light near face 0 (the light in D and its copies across the 12 faces), MIS names the image a BSDF ray '
+            + 'hit by its crossing count (0 density beyond one crossing); three lambert balls, maxBounces 3, farClip 8; '
+            + 'pt / pt-nee / pt-mis',
+        expected: 'all three keys converge to the same image',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [1, 2], meanTol: 0.01, label: 'pt-nee ≡ pt-mis: shared event coverage, χ²' },
+                { kind: 'equality', strategies: [0, 1, 2], meanTol: 0.01, rmse: 0.25, label: 'pt anchor (path-found light images) tripwire' },
+                { kind: 'noise', strategies: [2, 0], label: 'σ/µ report: pt-mis (13 images) against pt' },
+                { kind: 'walk-counter', strategy: 2, cap: SW_LIGHTS_CAP, label: 'walk counter, pt-mis paths and shadow rays (report only)' },
             ],
         },
     },

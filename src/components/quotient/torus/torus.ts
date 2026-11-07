@@ -1,7 +1,7 @@
 // The cube 3-torus occupant: facts about the lattice Γ = Lx·Z × Ly·Z × Lz·Z and TypeScript twins
 // of the numbering in torus.glsl (the vitest twins and the Validator read these).
 
-import type { Vec3 } from '../../../compiler/types.js';
+import type { QuotientDescription, Vec3 } from '../../../compiler/types.js';
 import { formatFloat, formatVec3 } from '../../glsl-format.js';
 import type { QuotientDescriptor } from '../index.js';
 import torusGLSL from './torus.glsl?raw';
@@ -34,10 +34,18 @@ export const TORUS: QuotientDescriptor = {
     space: 'euclidean',
     glsl: torusGLSL,
     imageCount: 27,
-    diameter: (q) => torusDiameter(q.size),
+    // Every image L∘c + y (y in D, c in {−1, 0, 1}³) is within |x − y| + |L∘c| ≤ 2·diam(D) of x.
+    farClipFloor: (q) => ({ value: 2 * torusDiameter(torusSize(q)), formula: '2·diam(D)' }),
     defines: (q, farClip) => ({
-        TORUS_PERIOD: formatVec3(q.size),
-        TORUS_MAX_CELLS: String(torusMaxCells(q.size, farClip)),
+        TORUS_PERIOD: formatVec3(torusSize(q)),
+        TORUS_MAX_CELLS: String(torusMaxCells(torusSize(q), farClip)),
         TORUS_BIG: formatFloat(3.0e38),
     }),
+    ambientFog: true,
 };
+
+/** The periods of a torus quotient (the descriptor is only ever handed its own kind). */
+function torusSize(q: QuotientDescription): Vec3 {
+    if (q.kind !== 'torus') throw new Error(`the torus occupant was handed a '${q.kind}' quotient`);
+    return q.size;
+}

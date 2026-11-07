@@ -41,8 +41,8 @@ export function combinerFns(f: Flags): ShaderBlock {
             lines.push('    return power_heuristic(s.prev_bsdf_pdf, lighting_pdf(s.prev_query, wo, lid, hit));');
         } else if (f.quotient) {
             // An image outside NEE's table has NEE density 0, so its BSDF hit keeps weight 1
-            // (partition MIS); quotient_image names the image this ray hit.
-            lines.push('    if (quotient_image(s.ray.origin, s.ray.direction, hit) < 0) return 1.0;   // an image NEE never samples');
+            // (partition MIS); the walk names the image this ray hit on hit.image.
+            lines.push('    if (hit.image < 0) return 1.0;   // an image NEE never samples');
             lines.push('    return 0.0;   // NEE already counted it at the previous vertex');
         } else {
             lines.push('    return 0.0;   // NEE already counted it at the previous vertex');

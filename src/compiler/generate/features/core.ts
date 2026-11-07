@@ -133,15 +133,17 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
         ambient.functions,
         { origin: 'glsl/core/ray.glsl', source: rayGLSL },
     );
-    // The quotient occupant's lattice math (components/quotient), included whole like the ambient
+    // The quotient occupant's group math (components/quotient), included whole like the ambient
     // occupant's block: the generated walks (intersection) and image-aware NEE/MIS (lighting)
-    // call it. Its constants are defines (the group's data and the walk's loop bound).
+    // call it. Its scalar constants are defines (the group's data and the walk's loop bound);
+    // tables are const arrays, emitted just before the block.
     const defines: Record<string, string> = {};
     const quotient = plan.program.measurement.quotient;
     if (quotient !== undefined) {
         const q = QUOTIENTS[quotient.kind];
         if (q === undefined) throw new Error(`quotient '${quotient.kind}' has no occupant (Validator should have rejected it)`);
         Object.assign(defines, q.defines(quotient, farClip));
+        if (q.constants !== undefined) blocks.push({ origin: `generated:quotient-constants`, source: q.constants(quotient) });
         blocks.push({ origin: `components/quotient/${q.kind}/${q.kind}.glsl`, source: q.glsl });
     }
     // Helpers of the spectrum kinds this program evaluates at wavelengths (Planck, index formulas).

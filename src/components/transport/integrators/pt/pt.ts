@@ -432,7 +432,7 @@ function walk(p: ProgramDescription, f: Flags): ShaderBlock {
     }
     lines.push(
         '        MaterialProperties props = scene_material_properties(mat, hit.p, hit.uv, hit.element, hit.wl);',
-        '        Direction wo = -ambient_flow(s.ray, hit.t).direction;   // back along the arrival direction',
+        '        Direction wo = -hit.arrival;   // back along the arrival direction',
     );
     if (f.perturbed) {
         // A bumped material shades in its perturbed frame. Every later reader — the guides, NEE's

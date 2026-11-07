@@ -1,16 +1,18 @@
 // The cube 3-torus E³/Γ, Γ = Lx·Z × Ly·Z × Lz·Z: pure lattice math, no calls into the program.
-// Provides: quotient_image_index(), quotient_image_shift(), quotient_image(), quotient_reduce(),
-//           torus_face_times().
+// Provides: quotient_image_index(), quotient_image_shift(), quotient_image_query(),
+//           quotient_image_direction(), quotient_reduce(), torus_face_times().
 // Depends on: TORUS_PERIOD (vec3, the periods L), TORUS_BIG (a face time that never wins),
-//             Point/Direction (ambient types), Ray/Hit (structs).
+//             Point/Direction (ambient types), Ray/LightQuery (structs).
 //
 // The fundamental domain is D = [−L/2, L/2]³ (componentwise); cell k ∈ Z³ is D + L∘k (∘ is the
 // componentwise product). The generated walk (scene_intersect) visits the cells a ray crosses
 // and queries the one scene copy in D with the ray translated by −L∘k, so the hit it reports is
-// in D's chart: its point is (origin + direction·t) − L∘k, up to rounding.
+// in D's chart: its point is (origin + direction·t) − L∘k, up to rounding. k is the absolute
+// cell index in the coordinates of the ray's origin, and the walk reports its image as
+// hit.image = quotient_image_index(k).
 //
 // The NEE image table S is the 27 translations L∘c, c ∈ {−1, 0, 1}³. Image j names
-// c_j = (j/9, (j/3)%3, j%3) − 1, and the index and the shift below are this one numbering.
+// c_j = (j/9, (j/3)%3, j%3) − 1, and the index and the maps below are this one numbering.
 
 // The image of cell k in the table, or −1 when k is not in {−1, 0, 1}³.
 int quotient_image_index(vec3 k) {
@@ -22,11 +24,16 @@ Point quotient_image_shift(int j) {
     return TORUS_PERIOD * (vec3(float(j / 9), float((j / 3) % 3), float(j % 3)) - 1.0);
 }
 
-// The image a ray from x along wi hit: the walk reported h.p = (x' + wi·h.t) − L∘k for its origin
-// x', so (x + wi·h.t − h.p)/L is the integer vector k up to the spawn offset |x' − x| and the
-// rounding of points within the far clip, both far below L/2. Rounding it recovers k exactly.
-int quotient_image(Point x, Direction wi, Hit h) {
-    return quotient_image_index(round((x + wi * h.t - h.p) / TORUS_PERIOD));
+// The query seen from image j: the lights in D seen from the returned query are image j of the
+// lights seen from q (its point moved by −L∘c_j; a translation leaves the normal unchanged).
+LightQuery quotient_image_query(LightQuery q, int j) {
+    q.p = q.p - quotient_image_shift(j);
+    return q;
+}
+
+// A direction at the moved query's point carried back to q.p: a translation leaves it unchanged.
+Direction quotient_image_direction(int j, Direction v) {
+    return v;
 }
 
 // The point of D equivalent to p (p − L∘k for the cell k containing p).

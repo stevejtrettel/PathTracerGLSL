@@ -11,6 +11,13 @@ import type { SceneDescription, RenderStrategy } from '../../src/compiler/types.
  */
 export interface WitnessRegion { x: number; y: number; w: number; h: number }
 
+/** The region that selects exactly the pixels [x0, x0 + nx) × [y0, y0 + ny) (origin bottom-left)
+ *  of a W×H frame. The runner reads floor(x·W) … ceil((x + w)·W) (tools/witness.mjs
+ *  regionBounds); the half-pixel offsets keep the rounding off the floor and the ceiling. */
+export const pixelWindowRegion = (win: { x0: number; y0: number; nx: number; ny: number }, [W, H]: [number, number]): WitnessRegion => ({
+    x: (win.x0 + 0.5) / W, y: (win.y0 + 0.5) / H, w: (win.nx - 1) / W, h: (win.ny - 1) / H,
+});
+
 /**
  * WHERE A `mean` CHECK'S EXPECTED VALUE CAME FROM — and therefore what a miss MEANS.
  *
@@ -165,6 +172,22 @@ export type WitnessCheck =
           /** Strategy index into `strategies` (default 0). */
           strategy?: number;
           tileSize?: number;
+          label?: string;
+      }
+    | {
+          /**
+           * REPORT-ONLY statistics of the Seifert–Weber cell walk (components/quotient/
+           * seifert-weber), counted on the GPU by the strategy's own program with counters added
+           * at fixed points of the generated walk (tools/witness.mjs renderWalkCounter): the
+           * segments that reached the crossing cap, the most faces one segment crossed, and the
+           * largest constraint defect max(|⟨p,p⟩ + 1|, |⟨p,v⟩|, |⟨v,v⟩ − 1|) of a ray state after
+           * a crossing, over the spec's size and spp. Always passes; `cap` is the program's
+           * QUOTIENT_MAX_CROSSINGS, printed beside the count.
+           */
+          kind: 'walk-counter';
+          /** Strategy index into `strategies` (default 0). */
+          strategy?: number;
+          cap: number;
           label?: string;
       };
 
