@@ -13,8 +13,9 @@
 // Depends on: microfacet_reflect_* (core), microfacet_conductor_gain, MaterialProperties,
 //             Hit, InteractionSample, LOBE_REFLECTION, SPECTRUM_ZERO/ONE, schlick_fresnel
 //             (core math).
-// The TS twin in ggx.test.ts is the tested ground truth for the lobe and this model —
-// line-for-line transcription, change one change both (§11.3 runs against the twin).
+// The TS twin in ggx.test.ts is the tested ground truth for this model (the lobe's twin is
+// components/materials/microfacetTwin.ts) — line-for-line transcription, change one change both
+// (§11.3 runs against the twin).
 
 // Schlick's hemispherical average 2∫₀¹ F(μ) μ dμ = f0 + (1 − f0)/21: the F_avg of the
 // conductor energy gain (microfacet_energy.glsl).

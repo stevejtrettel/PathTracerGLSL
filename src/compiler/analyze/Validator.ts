@@ -884,6 +884,15 @@ export function validate(
             bag.error('invalid-setting', `measurement.${field} must be one of ${legal.map((v) => `'${v}'`).join(' | ')} (got ${JSON.stringify(value)})`).add();
         }
     }
+    // Energy compensation covers every microfacet model in the scene or none: a model whose
+    // gain is not built would render single-scattering under a measurement that says otherwise.
+    if (strategy.measurement.microfacet === 'energy-compensated') {
+        for (const [name, mat] of Object.entries(scene.materials)) {
+            if (mat.model !== 'none' && MATERIAL_MODELS[mat.model]?.microfacet?.energy === 'not-built') {
+                bag.error('invalid-setting', `Material '${name}': model '${mat.model}' has no energy-compensation gain; measurement.microfacet 'energy-compensated' cannot render it (use 'single-scattering')`).add();
+            }
+        }
+    }
 
     // First-hit pictures (components/aov): registry names, each at most once. RGB only: a
     // spectral program has no RGB albedo to report yet (spectral AOVs are a recorded follow-up).
@@ -1225,6 +1234,11 @@ export function validate(
                 // coat_fdr) is read once per material; a per-instance value would need a
                 // per-instance derived column, which the table does not have. A field with a
                 // per-hit form (ggx roughness → alpha) is computed from the attribute itself.
+                if (row.role === 'optical') {
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} cannot vary per instance — an optical constant takes a constant, a scalar {param} or a named spectrum kind`)
+                        .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
+                    continue;
+                }
                 const derived = hostDerivedFieldFedBy(model, key);
                 if (derived !== undefined) {
                     bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}', which is computed once per material on the host`)

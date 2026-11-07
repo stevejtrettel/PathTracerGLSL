@@ -127,10 +127,10 @@ export function contributeCore(plan: RenderPlan): FeatureContribution {
     // carries it once. AFTER the ambient occupant (the frame maps call ambient_dot).
     // Then the energy gains those models call (materials/microfacet_energy): the table
     // lookups under 'energy-compensated', otherwise a gain of 1 for each kind present. A
-    // model declaring energy 'none' calls no gain, so it links neither.
+    // model declaring energy 'none' or 'not-built' calls no gain, so it links neither.
     const textures = [...(color.textures ?? [])];
     const microfacet = plan.program.materials.models.flatMap((m) => MATERIAL_MODELS[m]?.microfacet ?? []);
-    const gains = [...new Set(microfacet.flatMap(({ energy }) => energy === 'none' ? [] : [energy]))];
+    const gains = [...new Set(microfacet.flatMap(({ energy }) => energy === 'conductor' || energy === 'dielectric' ? [energy] : []))];
     if (microfacet.length > 0) blocks.push({ origin: 'glsl/core/microfacet.glsl', source: microfacetGLSL });
     if (gains.length > 0) {
         if (plan.program.measurement.microfacet === 'energy-compensated') {

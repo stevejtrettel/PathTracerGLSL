@@ -75,6 +75,12 @@ exports[`scene-data textures (byte fingerprints) > clamp 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > clamp-ref 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > conductor-gold 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > conductor-perfect-ref 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > conjugation 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > conjugation-base 1`] = `null`;
@@ -980,6 +986,8 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
   "records": "4096x1 6c9d2fd456f110cf",
 }
 `;
+
+exports[`scene-data textures (byte fingerprints) > veach-metals 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
 

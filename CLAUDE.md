@@ -93,8 +93,9 @@ How a program is assembled:
   Cauchy and Sellmeier. A kind answers every question the compiler asks about its values
   (allowed roles, live sliders, its own checks, RGB stand-in, GLSL). Outside that folder nothing
   tests for a particular kind (tests/components/spectrumKinds.test.ts). The slot's role
-  (reflectance, coefficient, emission, index) sets the domain, checked the same way in RGB and
-  spectral programs; the spectral model adds only reflectance ≤ 1 and the media ceilings.
+  (reflectance, coefficient, emission, index, optical) sets the domain, checked the same way in
+  RGB and spectral programs; the spectral model adds only reflectance ≤ 1, the media ceilings
+  and no RGB triple in an optical slot (a metal's η, κ).
   Temperature and brightness are decoupled: `kelvin` sets a blackbody's color, `scale` its
   brightness.
 - **Which scene objects are lights** has one answer: `samplableEmitterObjects` in

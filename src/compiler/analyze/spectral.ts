@@ -5,9 +5,11 @@ import { MATERIAL_MODELS } from '../../components/materials/index.js';
 
 /** Where the spectral model narrows a role's domain. Every spectrum slot is already checked
  *  against its role's domain in both colour models (propertyValidation.ts); the spectral lift
- *  adds two limits on plain values: reflectance at most 1 (the bounded lift), and the media
- *  ceilings its tracking bound is certified for (spectral README, "Tracking bound"). A named
- *  kind's numbers are checked against the domains it declares (propertyValidation.ts). */
+ *  adds three limits on plain values: reflectance at most 1 (the bounded lift), the media
+ *  ceilings its tracking bound is certified for (spectral README, "Tracking bound"), and no RGB
+ *  triple in an optical slot (a triple of optical constants says nothing about the wavelengths
+ *  between its channels, and lifting it would guess). A named kind's numbers are checked
+ *  against the domains it declares (propertyValidation.ts). */
 export function spectralLimitations(scene: SceneDescription): string[] {
     const reasons: string[] = [];
     // Every component of a plain constant, a slider default and both slider bounds is at most
@@ -45,6 +47,8 @@ export function spectralLimitations(scene: SceneDescription): string[] {
             }
         }
         for (const row of MATERIAL_MODELS[mat.model]?.properties ?? []) {
+            if (row.role === 'optical' && Array.isArray(mat[row.source]))
+                reasons.push(`spectral material '${name}' property '${row.source}' is an RGB triple; an optical constant in a spectral program takes a number, a scalar {param} or a named spectrum kind such as { measured: … }`);
             if (row.role !== 'reflectance') continue;
             const value = mat[row.source] ?? row.default;
             // Expressions author RGB in [0,1] at every evaluated point; their source and live

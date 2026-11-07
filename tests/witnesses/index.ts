@@ -2,6 +2,7 @@ import { spectralDispersionSuite } from './scenes/spectralDispersion.js';
 import { spectralBlackbodySuite } from './scenes/spectralBlackbody.js';
 import { blackbodyRoutesSuite } from './scenes/blackbodyRoutes.js';
 import { spectralGaussianSuite } from './scenes/spectralGaussian.js';
+import { conductorSuite } from './scenes/conductorWitness.js';
 // witnesses/index.ts — the GPU witness registry: the executable form of
 // docs/fable-validation-scenes.md.
 //
@@ -167,6 +168,7 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
     ...spectralBlackbodySuite,
     ...blackbodyRoutesSuite,
     ...spectralGaussianSuite,
+    ...conductorSuite,
     ...spectralDispersionSuite,
     ...spectralMaterialsSuite,
     ...microfacetEnergySuite,

@@ -15,9 +15,9 @@
 // GGX roughness parameter α = roughness² clamped ≥ 1e-3 (the derived field mp.alpha,
 // assigned by the material lookup; letting α → 0 produces fireflies,
 // not a mirror: author true specular as a delta model).
-// The TS twin in components/materials/ggx/ggx.test.ts is the tested ground truth for
-// D/G1/sample and the reflection lobe — line-for-line transcription, change one change both
-// (§11.3).
+// The TS twin in components/materials/microfacetTwin.ts is the tested ground truth for D/G1/sample
+// and the reflection lobe — line-for-line transcription, change one change both (§11.3 runs
+// against it from each model's twin test).
 
 // Local shading frame, n = +z. Frame vectors are orthonormal in the ambient metric, so
 // projection goes through ambient_dot (Euclidean unpacks to dot).

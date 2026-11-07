@@ -118,6 +118,15 @@ const cases: Record<string, Mutation> = {
     'albedo slider default above its max': set((s) => { s.materials.m.albedo = { param: 'm.a', default: 0.9, min: 0, max: 0.5 }; }),
     'kelvin slider default above its max': set((s) => { s.lights[0].emission = blackbody({ param: 'lamp.k', default: 6000, min: 2000, max: 4000 }); }),
     'expression parameter default above its max': set((s) => { s.materials.m.albedo = { kind: 'glsl', source: 'vec3(u_m_g)', params: [{ param: 'm.g', default: 5, min: 0, max: 1 }] }; }),
+    // Optical constants (a metal's eta and k) and the measured kind. Triples are RGB-only.
+    'measured gold conductor': set((s) => { s.materials.m = { model: 'conductor', eta: { measured: 'metal-Au-eta' }, k: { measured: 'metal-Au-k' } }; }),
+    'measured as albedo': set((s) => { s.materials.m.albedo = { measured: 'metal-Au-eta' }; }),
+    'measured unknown table': set((s) => { s.materials.m = { model: 'rough_conductor', eta: { measured: 'metal-Fe-eta' }, k: { measured: 'metal-Au-k' }, roughness: 0.3 }; }),
+    'conductor eta as an RGB triple': set((s) => { s.materials.m = { model: 'conductor', eta: [0.2, 0.4, 1.5], k: 2 }; }),
+    'conductor eta as a number and k as a scalar slider': set((s) => { s.materials.m = { model: 'conductor', eta: 0.5, k: { param: 'm.k', default: 3, min: 0.5, max: 8 } }; }),
+    'conductor k as a vec3 slider': set((s) => { s.materials.m = { model: 'conductor', k: { param: 'm.k', default: [1, 2, 3] } }; }),
+    'conductor eta as an expression': set((s) => { s.materials.m = { model: 'conductor', eta: { kind: 'glsl', source: 'vec3(0.5)' } }; }),
+    'conductor k slider min 0': set((s) => { s.materials.m = { model: 'conductor', k: { param: 'm.k', default: 2, min: 0, max: 8 } }; }),
 };
 
 function outcome(mutate: Mutation, color: 'rgb' | 'spectral') {

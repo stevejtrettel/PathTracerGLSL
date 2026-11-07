@@ -12,6 +12,9 @@
 // A material row that feeds a derived field computed only on the host (MaterialDerivedSpec.fn,
 // no per-hit form) takes only a constant or a slider: the derived value is computed from the
 // row's numbers, and a formula or a named kind has no numbers there.
+// An optical row (a metal's η, κ) takes a constant, a scalar slider (a float widget) or a named
+// kind: a formula's RGB result and a colored slider have no per-wavelength reading in a spectral
+// program, and one rule serves both color models.
 // A formula's numbers are not known before the render; its domain is the author's contract.
 
 import { GLSL_EXPRESSION_KEYS, isGlslExpression, isValueParam, SETTING_ROLES, type SceneDescription } from '../types.js';
@@ -62,6 +65,10 @@ export function validateSceneProperties(scene: SceneDescription, bag: Diagnostic
                 const kind = namedKindOf(value);
                 if (derived !== undefined && (kind !== undefined || isGlslExpression(value))) {
                     report([`${label} feeds the derived field '${derived.name}', which is computed on the host: it takes a constant or a {param}, not ${kind === undefined ? 'an expression' : `a ${kind.label} value`}`]);
+                    continue;
+                }
+                if (field.role === 'optical' && (isGlslExpression(value) || (isValueParam(value as never) && Array.isArray((value as { default?: unknown }).default)))) {
+                    report([`${label} is an optical constant: it takes a constant, a scalar {param} or a named spectrum kind, not ${isGlslExpression(value) ? 'an expression' : 'a vec3 {param}'}`]);
                     continue;
                 }
                 report(valueProblems(value, rowSetting(field), label));

@@ -4,6 +4,53 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Measured metals: `conductor`, `rough_conductor`, the `optical` role, the `measured` kind
+
+Integration step 12 of the photorealism batch (conductor plan and review; owner decision P1/Q3,
+provisional). Single scattering only.
+
+**What:**
+- `d65StandIn(g)` (color/spectra/standIn.ts): the Gaussian kind's daylight projection, now shared
+  (separate refactor commit; digest identical).
+- Spectrum role `optical`: a metal's η or κ, a Spectrum per wavelength lane, never
+  hero-collapsed; lifts like a coefficient (identity in RGB, exact for gray values in spectral
+  programs). An optical slot takes a constant, a scalar `{param}` (a float slider on a vec3
+  uniform) or a named kind; not an expression, a vec3 slider or a per-instance attribute. In a
+  spectral program an RGB triple there is an error (the spectral model's third limitation).
+- Spectrum kind `measured`: `{ measured: 'metal-Au-eta' }` and the other nine pbrt-v4 tables
+  (Ag, Al, Au, Cu, CuZn; eta and k), copied verbatim with source URL, commit and line numbers;
+  Apache-2.0 text at public/licenses/pbrt-v4.txt. Spectral programs evaluate a table per lane
+  (binary search over const arrays, linear interpolation); RGB programs use its d65StandIn.
+  The kind contract's `glsl` became a function of the values in use, so a program links one
+  helper per table it names; `ProgramDescription.spectrumKinds` records each kind with its
+  values.
+- `conductor_fresnel` in glsl/core/math.glsl (Mitsuba 3's real form, one clamped root; reference
+  implementations §7c), TS twin materials/conductor/fresnel.ts.
+- Materials `conductor` (delta, weight F) and `rough_conductor` (the shared F-free GGX lobe times
+  F(|ωₒ·h|)), rows `eta` (default 0) and `k` (default 1, > 0): the defaults are a perfect mirror.
+  `rough_conductor` declares `microfacet: { energy: 'not-built' }`;
+  `measurement.microfacet: 'energy-compensated'` rejects it.
+- The GGX lobe twin and the §11.3 harness moved from ggx.test.ts to
+  materials/microfacetTwin.ts, so ggx and rough_conductor tests share one copy.
+
+**Measured:** rough_conductor.test.ts: twin vs pbrt's complex FrComplex ≤ 1e-12 (five metals,
+360–830 nm), float32 within 4e-6 of double, limits, 0 ≤ F ≤ 1, χ²/triple/pdf for gold (450 and
+650 nm), aluminium and F ≡ 1. Witnesses (SwiftShader, 14/14): `conductor-gold` spectral reads
+(1.0219, 0.7822, 0.3435) at 0° and (0.9939, 0.8056, 0.4358) at 70° against (1.0218, 0.7823,
+0.3435) and (0.9939, 0.8056, 0.4359); RGB (0.9747, 0.8034, 0.3560) and (0.9713, 0.8171, 0.4449),
+exact; `conductor-perfect` ⇄ `-ref` Δmean 0.00%, rmse 0.00% on pt-mis, pt-nee and pt;
+`veach-metals` mis ≡ nee Δmean 1.10% (RGB), 0.52% (spectral), pt tripwire 1.25%. Reruns,
+15/15: `mirror`, `veach-mis`, `furnace`, `eta`, `spectral-mirror`, `spectral-materials`,
+`spectral-gaussian-plane`; `npm run witness:color` 17 cases pass, 5 defects rejected. Digest: every
+synchronous suite scene's shader text differs only by math.glsl's new function and two comment
+pointers (microfacet.glsl, ggx.glsl), and the rest only by source-map line numbers; closures,
+uniforms, parameters, scene data and warnings identical. RGB gold is slightly worse than
+Schlick with the right f0 (worst 0.047 against 0.029); aluminium much better (0.002 against
+0.118).
+
+**Not built:** the energy gain for rough_conductor (F_avg per lane), expression or per-instance
+η/κ, correction for the outside medium's index.
+
 ## 2026-11-07 — The F-free GGX reflection lobe in microfacet.glsl (refactor)
 
 Integration step 11 of the photorealism batch (conductor review, item 2): the prerequisite for

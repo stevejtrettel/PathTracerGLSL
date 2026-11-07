@@ -934,8 +934,10 @@ export function resolveMaterialValues(
     if (model === 'none') return values;
     for (const row of MATERIAL_MODELS[model]?.properties ?? []) {
         const v = authored[row.source];
-        values[row.source] = row.role === 'index' && namedKindOf(v) !== undefined ? v as SpectralIndex : row.glslType === 'Spectrum'
-            ? resolveColorProperty(v, [row.default, row.default, row.default])
+        // An optical slider is a scalar (a float widget); its vec3 uniform broadcasts it.
+        values[row.source] = row.role === 'index' && namedKindOf(v) !== undefined ? v as SpectralIndex
+            : row.role === 'optical' && isValueParam(v) ? v as ValueParam<number>
+            : row.glslType === 'Spectrum' ? resolveColorProperty(v, [row.default, row.default, row.default])
             : resolveScalarProperty(v, row.default);
     }
     return values;
