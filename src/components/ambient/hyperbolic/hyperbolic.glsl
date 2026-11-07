@@ -5,7 +5,8 @@
 // Provides: fp_uncertainty(), ambient_geodesic(), ambient_flow(), ambient_dot(),
 //           ambient_normalize(), ambient_frame(), ambient_parallel_transport(),
 //           ambient_distance(), ambient_direction_to(), ambient_aim(), ambient_sky_key(),
-//           isometry_direction(); for the H³ bodies, hyperbolic_form() and hyperbolic_plane_root().
+//           isometry_direction(); for the H³ bodies, hyperbolic_form(), hyperbolic_on_model(),
+//           hyperbolic_plane_root(), hyperbolic_halfspace() and hyperbolic_interval_hit().
 // Depends on: Point/Direction (types.glsl), Ray/Frame (structs), FP_UNCERTAINTY_REL/ABS (math).
 
 // The far clip MAX_DIST (an arc length; nothing beyond it is geometry) is emitted just before
@@ -124,6 +125,35 @@ bool hyperbolic_plane_root(Ray ray, vec4 N, out float t) {
     if (P * W >= 0.0 || abs(W) <= abs(P)) return false;
     t = 0.5 * log((W - P) / (W + P));
     return true;
+}
+
+// The intervals of the box and cylinder bodies are intervals of X = e^{2t} ∈ (0, ∞) along the ray;
+// HYPERBOLIC_X_INF stands for an interval with no upper end.
+#define HYPERBOLIC_X_INF 3.0e38
+
+// Narrows the interval [lo, hi] of X = e^{2t} to where the ray lies in the half-space ⟨x, N⟩ ≤ 0
+// (N a unit spacelike 4-vector); false when it becomes empty. Along γ(t),
+// ⟨γ(t), N⟩ = P·cosh t + W·sinh t = (e^{−t}/2)·((P + W)·X + (P − W)) with P = ⟨p, N⟩, W = ⟨v, N⟩,
+// so the condition is linear in X: an upper end (W − P)/(P + W) when P + W > 0, a lower end when
+// P + W < 0, and all or nothing (the sign of P − W) when P + W = 0.
+bool hyperbolic_halfspace(Ray ray, vec4 N, inout float lo, inout float hi) {
+    float P = hyperbolic_form(ray.origin, N);
+    float W = hyperbolic_form(ray.direction, N);
+    float c1 = P + W;
+    if (c1 > 0.0) hi = min(hi, (W - P) / c1);
+    else if (c1 < 0.0) lo = max(lo, (W - P) / c1);
+    else if (P - W > 0.0) return false;
+    return lo <= hi;
+}
+
+// The first boundary crossing ahead of a region whose points along the ray are X ∈ [lo, hi]: the
+// entry ½·log lo when lo > 1 (the origin is outside), else the exit ½·log hi when hi > 1 (the
+// origin is inside; an interval with no upper end has no exit). Floor 0: escape is ray_spawn's
+// offset.
+bool hyperbolic_interval_hit(float lo, float hi, out float t) {
+    if (lo > 1.0) { t = 0.5 * log(lo); return true; }
+    if (hi > 1.0 && hi < HYPERBOLIC_X_INF) { t = 0.5 * log(hi); return true; }
+    return false;
 }
 
 // The world image G·v of a tangent vector v given in an object's frame, where `inverse` is the

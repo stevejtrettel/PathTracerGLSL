@@ -188,6 +188,11 @@ export function validate(
                 bag.error('invalid-setting', `Light ${i}: ${msg}`).add();
             }
         }
+        // The coupled rules the kind's body in the program's space adds.
+        const inSpace = d.validateAuthoredIn?.[space];
+        if (shapesOk && inSpace !== undefined) {
+            for (const msg of inSpace(authored)) bag.error('invalid-setting', `Light ${i} (${light.kind}): ${msg} in ${space} space`).add();
+        }
     }
 
     // --- Per-object GEOMETRY validation, ONE truth (validateGeometryObject): backend
@@ -1608,7 +1613,8 @@ function validateGeometryObject(
     // Coupled degeneracy rules come from the DESCRIPTOR (C5: the last primitive
     // name-branch died here — quad's parallel-edges rule lives on quad.ts, ONE
     // formula with the quad light's). Runs only over well-shaped required rows.
-    if (desc?.validateValues !== undefined) {
+    const valuesInSpace = desc?.validateValuesIn?.[space];
+    if (desc !== undefined && (desc.validateValues !== undefined || valuesInSpace !== undefined)) {
         const rowsOk = desc.params.every((s) => {
             const v = obj.parameters[s.name];
             if (v === undefined) return !s.required;
@@ -1618,8 +1624,15 @@ function validateGeometryObject(
             // RESOLVED values (fable-sdf-contract §3's pin): a rule reading an
             // optional row (menger's iterations, apollonian's morph) must see the
             // default, not undefined — the same contract every descriptor function has.
-            for (const msg of desc.validateValues(resolvePrimitiveValues(desc, obj.parameters))) {
+            const resolved = resolvePrimitiveValues(desc, obj.parameters);
+            for (const msg of desc.validateValues?.(resolved) ?? []) {
                 bag.error('invalid-setting', `${label} (${type}): ${msg}`)
+                    .withOriginal('scene', path)
+                    .add();
+            }
+            // The coupled rules the shape's body in the program's space adds.
+            for (const msg of valuesInSpace?.(resolved) ?? []) {
+                bag.error('invalid-setting', `${label} (${type}): ${msg} in ${space} space`)
                     .withOriginal('scene', path)
                     .add();
             }

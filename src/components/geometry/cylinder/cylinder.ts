@@ -5,16 +5,23 @@
 // stage 4 (Aug 10 2026): the interval intersector (slab ∩ tube).
 
 import type { PrimitiveDescriptor } from '../../descriptors.js';
+import { SPHERICAL_HALF_EXTENT } from '../../ambient/spherical/spherical.js';
 import cylinderGLSL from './cylinder.glsl?raw';
+import cylinderHyperbolicGLSL from './cylinder_hyperbolic.glsl?raw';
+import cylinderSphericalGLSL from './cylinder_spherical.glsl?raw';
 
 export const cylinderDescriptor: PrimitiveDescriptor = {
     type: 'cylinder',
     params: [
         { name: 'center', kind: 'point', shape: 'vec3', required: false, default: [0, 0, 0] },
-        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
-        { name: 'halfHeight', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' } },
+        { name: 'radius', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_HALF_EXTENT } },
+        { name: 'halfHeight', kind: 'length', shape: 'number', required: true, constraint: { kind: 'positive' }, constraintIn: { spherical: SPHERICAL_HALF_EXTENT } },
     ],
-    glsl: { euclidean: { origin: 'components/geometry/cylinder/cylinder.glsl', source: cylinderGLSL } },
+    glsl: {
+        euclidean: { origin: 'components/geometry/cylinder/cylinder.glsl', source: cylinderGLSL },
+        hyperbolic: { origin: 'components/geometry/cylinder/cylinder_hyperbolic.glsl', source: cylinderHyperbolicGLSL },
+        spherical: { origin: 'components/geometry/cylinder/cylinder_spherical.glsl', source: cylinderSphericalGLSL },
+    },
     provides: { sdf: true, analytic: true },
     // The march bound (impl-plan-sdf-as-shape §2.2): its own analytic form bounds it
     // exactly, so a marched arm is confined to precisely this shape's interval.

@@ -55,14 +55,17 @@ side and sample side agree bit-exactly by construction.
 **Descriptor** (`<kind>.ts`): `kind`, `glsl` (the file per ambient space it is implemented
 in; ambient/README.md — a hittable kind is gated together with the primitive and the
 material model backing it, `LIGHT_BACKING_MODEL` in compiler/plan/dataTenants.ts; in a curved
-space the point row is the backing region's isometry applied to o and the direction rows the
-same isometry applied to them at o, 4-vectors — compiler/plan/curved.ts; the H³ bodies,
+space the point row is the backing region's isometry applied to o (the region's anchor: the quad
+light's `corner` row holds the quad's center) and the direction and vector rows the same isometry
+applied to them at o, 4-vectors in `PlannedLight.world` (`values` keeps the authored rows, which the
+selection power reads; a curved struct has no derived fields) — compiler/plan/curved.ts; the H³ bodies,
 `<kind>_hyperbolic.glsl`, use the area density sinh² r in place of r², the S³ bodies,
 `<kind>_spherical.glsl`, sin² r and the arc rule above), `delta`, `authoredParams` (the kind's
 AUTHORED input schema — fields besides `kind`/`emission`; the Validator's generic
 loop derives unknown-key/required/shape/constraint checks from it, including a row's
 `constraintIn` (the further domain a space's body requires: the S³ disk light's radius lies
-in (0, π), `SPHERICAL_RADIUS`), and runs `validateAuthored`
+in (0, π), `SPHERICAL_RADIUS`), and runs `validateAuthored` and `validateAuthoredIn` (the coupled
+rules a space's body adds: the curved quad light's orthogonal edges and bounded rectangle)
 only on well-shaped input; the desugar-totality contract test keeps it honest
 against the desugar functions in both drift directions), `params` (rows = generated
 struct fields = ctor order; radiometric rows are `Spectrum`; geometric rows carry a
@@ -114,7 +117,9 @@ Each selection occupant lists the ambient `spaces` it is implemented in (ambient
 ## Invariants & witnesses
 
 pt / pt-nee / pt-mis converge on cornell-area, X-GLASS, X-FOG (§11.2), and in curved spaces on the
-h3-* and s3-* witnesses (s3-long-arc: a light reached only through the long arc; s3-medium: the ½
+h3-* and s3-* witnesses (h3-quad-light, s3-quad-light: the curved quad light, sampled uniformly in
+the plane's Klein / gnomonic chart with the exact area density 1/(4·T(a)·T(b)·w³);
+s3-long-arc: a light reached only through the long arc; s3-medium: the ½
 rule at medium events; s3-long-arc-blocker: an occluder on the far part of a long arc); a shadow ray is aimed
 at the sampled light point (`ambient_aim`) and stops `SHADOW_BACKOFF` (math.glsl) short of it, so a light's own
 surface does not block it (shadow-aim-march, shadow-aim-far). Deferred: spherical-rectangle quads (Ureña), two-sided quads,

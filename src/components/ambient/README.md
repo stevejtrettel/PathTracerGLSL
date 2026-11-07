@@ -72,7 +72,9 @@ travels, and the S³ light bodies choose an arc per sample (`spherical_light_arc
 README). And every geodesic closes after 2π: `MAX_DIST` is 2π exactly, there is no sky (an
 environment is an error), and a ray that meets nothing reads 0. A geodesic radius lies below π,
 the diameter of the space: the sphere, disk and disk-light radius rows declare `SPHERICAL_RADIUS`
-as their spherical `constraintIn`, and the Validator rejects a radius ≥ π.
+as their spherical `constraintIn`, and the Validator rejects a radius ≥ π. A box's half-sizes and a
+cylinder's radius and half-height lie below π/2 (`SPHERICAL_HALF_EXTENT`): the shape then lies in
+the open hemisphere about its center, which the S³ box and cylinder bodies rely on.
 
 What the compiler does with it (all fp64 on the CPU, compiler/plan/curved.ts):
 
@@ -135,7 +137,7 @@ entry for each occupant checked in the new space, and the limitation rows it lif
 ## Status & the honest caveat
 
 Occupants: `euclidean/`, `hyperbolic/` (H³) and `spherical/` (S³). In both curved spaces: sphere,
-plane and disk shapes; point and disk lights; lambert; pinhole and fisheye; hg in homogeneous
+plane, disk, box, cylinder and quad shapes; point, disk and quad lights; lambert; pinhole and fisheye; hg in homogeneous
 object media; in H³ also sky lookup by BSDF rays (support.md has the full table). Places that are Euclidean beyond the seam and need new
 bodies, not just an occupant: the other light samplers (Euclidean solid-angle constructions;
 their files carry a METRIC EXEMPTION note), rayleigh's `build_basis`, the SDF march and the
@@ -165,6 +167,17 @@ non-identity transform is an error there).
   uniform selection), `s3-medium` (pt = pt-nee = pt-mis for a scattering ball lit through both arcs,
   the ½ rule). The CPU geometry and the occupant's arc arithmetic are pinned by
   tests/components/spherical.test.ts.
+- Box, cylinder, quad and the quad light, both spaces (tests/witnesses/scenes/curvedShapesWitness.ts):
+  `h3-shapes`, `s3-shapes` (a rotated box, a tilted cylinder and a quad under a point light; readout
+  windows on a box face, the tube, a cap and the quad, and in S³ a box face lit only through the
+  long arc, against the fp64 transcriptions of tests/witnesses/scenes/curvedShapeTwins.ts) and
+  `h3-quad-light`, `s3-quad-light` (the direct-lighting receiver under a quad light, in S³ through
+  the long arc; pt = pt-nee = pt-mis = the quadrature over the quad). The transcriptions are checked
+  against marched membership (chart coordinates and axis distances, not the bodies' face normals),
+  normals against finite differences, and the quad light's density against the Gauss–Bonnet area by
+  tests/components/curvedShapes.test.ts. box_sdf and cylinder_sdf, read only for containment
+  (scene_region_at), are checked there as transcriptions; no witness fills a curved box or cylinder
+  with a medium.
 - A change to the seam that is a respelling must leave every Euclidean scene bit-identical
   (`npm run frames -- compare`).
 - The gate and the limitation rows are exercised with a test-only space registered in memory

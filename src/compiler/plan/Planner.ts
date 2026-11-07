@@ -41,7 +41,7 @@ import { dataTenantsOf, keepsLocalFrame, materialReadsUv, materialHasExpression,
 import { planDataLayout } from '../../components/data/ledger.js';
 import { curvedGeometryOf } from '../../components/ambient/index.js';
 import { placementIsometry, type CurvedGeometry } from '../../components/ambient/isometry.js';
-import { curvedShape, curvedLightValues, curvedConstantPlacement } from './curved.js';
+import { curvedShape, curvedLightWorld, curvedConstantPlacement } from './curved.js';
 import { resolveMeasurement } from './measurement.js';
 import { AOVS } from '../../components/aov/index.js';
 import { planPictures, pictureBuffer, bufferRef, ACCUMULATION_BUFFER } from './pictures.js';
@@ -232,10 +232,8 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             // Curved: the closed form in the object's own frame (a marched object is rejected in
             // curved spaces — SPACE_LIMITATIONS), placed by its isometry.
             const index = objectIndex++;
-            objects.push({
-                index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name,
-                ...curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index),
-            });
+            const { parameters, isometry } = curvedPlacement(geom, obj.type, obj.parameters, obj.transform, index);
+            objects.push({ index, materialId: matId, type: obj.type, intersect: 'closed-form', name: obj.name, parameters, isometry });
             continue;
         }
 
@@ -314,7 +312,7 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             // Row defaults applied once by the framework (the record the Validator judged).
             const authored = applyAuthoredDefaults(d, light as unknown as Record<string, unknown>);
             const values = d.toValues(authored, authoredLightEmission(light.emission));
-            if (d.region === undefined) return { id, kind: entry.kind, values: geom === undefined ? values : curvedLightValues(geom, d, values) };
+            if (d.region === undefined) return { id, kind: entry.kind, values, ...(geom === undefined ? {} : { world: curvedLightWorld(geom, d, values) }) };
             const matId = materialIndex++;
             materials.push({
                 id: matId,
@@ -325,14 +323,12 @@ export function planScene(scene: SceneDescription, bag: DiagnosticBag): ScenePla
             });
             const regionId = objectIndex++;
             if (geom !== undefined) {
-                // Curved: the region is placed by the isometry its point row makes, and the light's
-                // rows are that isometry applied (curvedLightValues), so the sampled disk is the
-                // disk rays hit.
-                objects.push({
-                    index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form',
-                    ...curvedPlacement(geom, d.region.primitive, d.region.parameters(authored), undefined, regionId),
-                });
-                return { id, kind: entry.kind, regionId, values: curvedLightValues(geom, d, values) };
+                // Curved: the region is placed by the isometry its anchor makes, and the light's world
+                // rows are that isometry applied (curvedLightWorld), so the sampled disk or quad is the
+                // one rays hit.
+                const { parameters, isometry, pre } = curvedPlacement(geom, d.region.primitive, d.region.parameters(authored), undefined, regionId);
+                objects.push({ index: regionId, materialId: matId, type: d.region.primitive, intersect: 'closed-form', parameters, isometry });
+                return { id, kind: entry.kind, regionId, values, world: curvedLightWorld(geom, d, values, pre) };
             }
             // Canonicalization (the disk's unit normal) is the same formula the kind's toValues
             // applies, so hit side and sample side stay bit-identical.
@@ -931,16 +927,16 @@ export function buildDrivenPlacement(transform: Transform, index: number): Drive
     };
 }
 
-/** A curved object's intrinsic parameters and its placement: the inverse of
- *  g = T(position)·R(rotation)·T(point row), baked when the transform is constant, a mat4 uniform
- *  when it is {param}-driven. */
-function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; isometry: IsometryPlacement } {
+/** A curved object's intrinsic parameters, its anchor `pre` (curvedShape) and its placement: the
+ *  inverse of g = T(position)·R(rotation)·T(pre), baked when the transform is constant, a mat4
+ *  uniform when it is {param}-driven. */
+function curvedPlacement(geom: CurvedGeometry, type: string, rawParameters: Record<string, number | number[]>, transform: Transform | undefined, index: number): { parameters: Record<string, number | number[]>; pre: Vec3Tuple; isometry: IsometryPlacement } {
     if (isDrivenTransform(transform)) {
         const { parameters, pre } = curvedShape(type, rawParameters);
-        return { parameters, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
+        return { parameters, pre, isometry: buildDrivenIsometry(geom, transform!, pre, index) };
     }
-    const { parameters, g } = curvedConstantPlacement(geom, type, rawParameters, transform);
-    return { parameters, isometry: { kind: 'constant', inverse: geom.inverse(g) } };
+    const { parameters, pre, g } = curvedConstantPlacement(geom, type, rawParameters, transform);
+    return { parameters, pre, isometry: { kind: 'constant', inverse: geom.inverse(g) } };
 }
 
 /** The curved-space lowering of a driven transform: one mat4 uniform `u_object<i>Isometry`, the
@@ -1069,14 +1065,15 @@ function resolveMedium(med: MediumDescription): PlannedMedium {
  *  the pbrt worldRadius for `power(values, ctx)` (impl-plan-directional-beam P6).
  *  VARIANCE-ONLY by contract (selection weights; cdf_rescale keeps them unbiased), so
  *  coarse by license: folded analytic objects through the bounds fact (unbounded
- *  primitives — plane — and local-frame/driven objects skipped), closed meshes as
+ *  primitives — plane — and local-frame/driven/curved objects skipped), closed meshes as
  *  placed spheres around their local boxes; SDF objects and instance batches skipped.
  *  Nothing boundable → 10, the constant the directional descriptor's ctx-fallback twins. */
 function sceneWorldRadius(analytic: ScenePrimitiveObject[], meshes: SceneMesh[]): number {
     let r = 0;
     let any = false;
     for (const o of analytic) {
-        if (o.placement !== undefined) continue;   // local-frame parameters are not world boxes
+        // Local-frame parameters (a similarity's or a curved isometry's) are not world boxes.
+        if (o.placement !== undefined || o.isometry !== undefined) continue;
         const b = primitiveBounds(o.type, o.parameters) ?? undefined;
         if (b === undefined) continue;
         // Max corner norm of the world AABB: per-axis worst magnitude, combined.

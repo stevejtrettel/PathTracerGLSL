@@ -133,8 +133,8 @@ describe('H³ Validator rules', () => {
     });
 
     it('rejects an occupant with no H³ body, naming it', () => {
-        const box = { ...h3Furnace, objects: [{ type: 'box', parameters: { halfSize: [0.3, 0.3, 0.3] }, material: 'furnace' }] } as SceneDescription;
-        expect(errorsOf(box, furnace)).toContain("primitive 'box' has no hyperbolic implementation");
+        const torus = { ...h3Furnace, objects: [{ type: 'torus', parameters: { ringRadius: 0.4, tubeRadius: 0.1 }, material: 'furnace' }] } as SceneDescription;
+        expect(errorsOf(torus, furnace)).toContain("primitive 'torus' has no hyperbolic implementation");
         const sun = { ...h3DiskLight, lights: [{ kind: 'directional', direction: [0, -1, 0], emission: 1 }] } as SceneDescription;
         expect(errorsOf(sun, posedNee)).toContain("light kind 'directional' has no hyperbolic implementation");
     });

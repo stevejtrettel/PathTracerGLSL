@@ -13,6 +13,12 @@ import { mat4Transpose } from '../isometry.js';
  *  SpaceConstraints entry. */
 export const SPHERICAL_RADIUS: RowConstraint = { kind: 'interval', min: 0, max: Math.PI };
 
+/** The domain of a half-extent in S³ that must stay below π/2: a box's half-sizes, a cylinder's
+ *  radius and half-height. The shape then lies in the open hemisphere about its center, where its
+ *  bounding great spheres enclose it; at π/2 a pair of a box's faces (or a cylinder's caps)
+ *  coincide, and a tube of radius ≥ π/2 about a great circle is no longer the region about it. */
+export const SPHERICAL_HALF_EXTENT: RowConstraint = { kind: 'interval', min: 0, max: Math.PI / 2 };
+
 export const sphericalGeometry: CurvedGeometry = {
     form: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3],
 

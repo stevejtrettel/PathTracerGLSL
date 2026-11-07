@@ -46,6 +46,7 @@ export const gallerySections: GallerySection[] = [
         blurb: 'hyperbolic space H³ in the hyperboloid model (geodesic balls, planes and disks, curved light falloff, the sky at infinity) and spherical space S³ (two arcs between any two points, the antipodal lens, no sky)',
         entries: [e('hyperbolic'), e('h3-furnace'), e('h3-disk-light'), e('h3-point-light'), e('h3-medium'), e('h3-sky'), e('h3-sky-ball'),
             e('spherical'), e('s3-furnace'), e('s3-long-arc'), e('s3-long-arc-blocker'), e('s3-point-light'), e('s3-medium'),
+            e('h3-shapes'), e('s3-shapes'), e('h3-quad-light'), e('s3-quad-light'),
             e('seifert-weber-room')],
     },
     {

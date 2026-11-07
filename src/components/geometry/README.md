@@ -67,7 +67,10 @@ A primitive supplies:
    declares `kind` (point | vector | direction | length — how it transforms under a
    similarity), `shape`, `required`, `default`, `constraint`, and `constraintIn`: the further
    domain a space's body requires, keyed by space — an S³ sphere or disk radius lies in (0, π),
-   `SPHERICAL_RADIUS`), the declared surface
+   `SPHERICAL_RADIUS`; an S³ box half-size or cylinder radius and half-height in (0, π/2),
+   `SPHERICAL_HALF_EXTENT`), `validateValuesIn` (the coupled rules a space's body adds: a bounded H³
+   box or quad, a curved quad's orthogonal edges), `curvedAnchor` (the authored point a curved
+   placement carries o's image to when it is not the point row: the quad's center), the declared surface
    (`provides.sdf` / `provides.analytic`), flat facts (`thin`),
    and — only when genuinely irregular — the `derivedFields`/`derivedCtorFields`
    pair (quad: the precompiled one-sided normal, a compile-time literal shared with
@@ -96,12 +99,19 @@ classification, region tables ("descriptors declare facts; generators decide").
    space it is implemented in (`{ euclidean: { origin, source } }`; ambient/README.md).
    A curved body (`<type>_hyperbolic.glsl`, `<type>_spherical.glsl`) is the shape canonically at the origin o of its own
    frame: its struct is generated from the rows without the point row (folded into the object's
-   isometry), a direction row arrives as a tangent vector at o (`Direction(x, y, z, 0.0)`), and it
+   isometry, with the anchor), a direction or vector row arrives as a tangent vector at o
+   (`Direction(x, y, z, 0.0)`), derived fields are not part of it, and it
    provides `<type>_intersect(Ray, <Type>, out float t)` (t = arc length), `Direction
    <type>_normal(Point, <Type>)` and, with `provides.sdf`, `float <type>_sdf(Point, <Type>)`, all
    in that frame. In S³ the returned t is the first hit in (0, 2π) (every geodesic closes after 2π;
    a great sphere is crossed twice per period, at antipodal points). Curved bodies have no uv chart (a uv-reading material is a limitation row) and
-   no march (sphere, plane and disk are closed forms; a marched object is a limitation row).
+   no march (sphere, plane, disk, box, cylinder and quad are closed forms; a marched object is a
+   limitation row). Box and cylinder intersect as intervals of the ray's parameter in which every
+   half-space is linear — X = e^{2t} in H³ (`hyperbolic_halfspace`), T = tan(t − φ) on the ray's arc
+   in x_w > 0 in S³ (`spherical_halfspace`) — and the hit is the first boundary crossing ahead. The
+   curved quad is the rectangle centered at corner + (edge1 + edge2)/2 with half-widths |edgeᵢ|/2
+   (orthogonal edges); the torus has no curved body (no closed-form intersection, and no curved march
+   yet). Definitions and derivations: docs/claude-2026-11-review/curved/next-shapes-plan.md.
 3. One line in `index.ts` (`PRIMITIVES`).
 
 Placement (constant folds, wrapper tiers, driven uniforms), regions, and epsilons

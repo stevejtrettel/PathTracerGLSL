@@ -323,6 +323,50 @@ roughness-0.15 scene, pt-nee against pt (which has no NEE), at 16× and 64× the
 (4,096 and 16,384 spp) under independent salts: heavy tails predict a deficit that keeps
 shrinking into the noise band of a median-of-means estimate over blocks; a bias predicts a
 deficit that stays near 2.8%.
+
+## 2026-11-07 — Curved box, cylinder, quad and quad light (H³ and S³)
+
+[Plan](docs/claude-2026-11-review/curved/next-shapes-plan.md) (reviewed once; design §2.5).
+
+- **Box** in both curved spaces: the region bounded by three pairs of totally geodesic planes at
+  geodesic distances halfSize from the center (a Euclidean box in the Klein / gnomonic chart; its
+  dihedral angles are not right angles). **Cylinder**: the tube of geodesic radius r about a
+  geodesic, capped by the planes perpendicular to it at ±halfHeight (in S³ a Clifford-type solid
+  torus, not convex: a geodesic can cross it in two arcs). **Quad**: the rectangle centered at
+  corner + (edge1 + edge2)/2 with half-widths |edgeᵢ|/2 in the plane the edges span — the
+  Euclidean quad exactly when the edges are orthogonal (required in curved spaces). Torus: not built
+  (no closed-form intersection; the curved march does not exist).
+- **Roots**: every half-space is linear in X = e^{2t} (H³) or in T = tan(t − φ) on the ray's arc in
+  x_w > 0 (S³), so box and cylinder intersect as intervals (`hyperbolic_halfspace`,
+  `spherical_halfspace`, `spherical_crossing` in the occupants) and the hit is the first boundary
+  crossing ahead. The H³ tube discriminant uses the cancellation-free D = S²(S² − (|P|² − |V|²)) −
+  (P×V)²: float32 sign errors ≤ 0.03% of a ±2% grazing band at r = 0.01, distance 3 (naive form
+  2.1%; curved/primitive-bodies/f32_tube.ts).
+- **Quad light** in both spaces: uniform sampling in the plane's Klein / gnomonic chart with the
+  exact area density 1/(4·T(a)·T(b)·w³), w = the sample's 4th coordinate in the light's frame (not
+  uniform in area, but exact); the normal is the 4D cross product of the world edges and center;
+  the S³ body takes the disk light's arc rule.
+- **Wiring** (curved-only; every Euclidean scene's digest is identical): `curvedAnchor` (the quad's
+  center is its placement anchor), vector rows as tangent vectors (`Direction`) in curved structs,
+  no derived fields in curved structs, `PlannedLight.world` for a curved light's mapped rows (the
+  selection power reads the authored `values`), `validateValuesIn` / `validateAuthoredIn` (coupled
+  rules per space: bounded H³ box Σ tanh² h < 1 and quad sinh a·sinh b < 1, orthogonal curved quad
+  edges, S³ quad edges < π), `SPHERICAL_HALF_EXTENT` = (0, π/2) on the S³ box half-sizes and
+  cylinder radius and half-height. sceneWorldRadius skips curved objects (their parameters are in
+  their own frame). The 13 existing curved programs change only by the occupants' new helpers.
+- **Verification**: fp64 transcriptions (tests/witnesses/scenes/curvedShapeTwins.ts) checked
+  against marched membership from chart coordinates and axis distances (|Δt| < 1e-8, S³ two-arc
+  geodesics included), normals against finite differences and outwardness, the quad light's
+  density against the Gauss–Bonnet area (tests/components/curvedShapes.test.ts; four mutations of
+  the transcriptions each fail it). Witnesses `h3-shapes`, `s3-shapes` (point light, windows on a
+  box face, tube, cap, quad, and in S³ a face lit only through the long arc) and `h3-quad-light`,
+  `s3-quad-light` (pt = pt-nee = pt-mis = quadrature): 17 of 17 exact checks pass, e.g. H³ quad
+  light pt-nee 0.1750 / pt-mis 0.1750 / pt 0.1767 vs 0.1749918, S³ 0.3238 / 0.3238 / 0.3241 vs
+  0.3237615. Mutations: w³ → w² in the quad-light pdf gives pt-nee 0.1606 (H³) and 0.3864 (S³),
+  the values the twin predicts, and fails 5 checks; the tube normal's y-part sign flipped fails the
+  tube windows (H³ 0.0913 vs 0.1083, S³ 0.2362 vs 0.2120; predicted 0.0913, 0.2360). Dropping the tube normal's C/s factors renders identically:
+  ambient_frame projects every vector of that plane onto the same tangent line.
+
 ## 2026-11-07 — S³ review fixes: the light query's normal, radius domains
 
 Review of the S³ step (curved-space design §2.4).

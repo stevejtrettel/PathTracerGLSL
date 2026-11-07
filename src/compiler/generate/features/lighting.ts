@@ -115,7 +115,7 @@ export function contributeLighting(plan: RenderPlan): FeatureContribution {
                 ...presentKinds.map((kind) => {
                     const d = LIGHT_KINDS[kind];
                     const sn = kind[0].toUpperCase() + kind.slice(1) + 'Light';
-                    return structFromRows(sn, [...d.params, ...(d.derivedFields ?? [])]);
+                    return structFromRows(sn, curved ? curvedLightRows(d) : [...d.params, ...(d.derivedFields ?? [])]);
                 })].join('\n'),
         });
     }
@@ -418,21 +418,33 @@ function lightRef(l: PlannedLight, wl: string): string {
     return `light_get_${l.id}(${wl})`;
 }
 
+/** A curved space's light struct rows: a vector row (the quad light's edges) is a tangent vector,
+ *  typed Direction like a direction row, and derived fields (Euclidean precomputations) are not
+ *  part of it — the curved bodies compute what they need from the rows. */
+function curvedLightRows(d: LightKindDescriptor): LightKindDescriptor['params'] {
+    return d.params.map((r) => (r.kind === 'vector' ? { ...r, kind: 'direction' as const } : r));
+}
+
 function lightCtor(l: PlannedLight, color: 'rgb' | 'spectral', curved: boolean): string {
     const d = lightKind(l);
     const structName = d.kind[0].toUpperCase() + d.kind.slice(1) + 'Light';
     const args = d.params.map((row) => {
         // The constant/driven split is emitValue's: a driven radiometric row reads its uniform
         // (for a HITTABLE light the SAME one the synthesized material's emission declares),
-        // a constant row bakes its literal via the row's formatter. In a curved space the point
-        // and direction rows hold 4-vectors (compiler/plan/curved.ts).
-        const fmt = (row.shape === 'number' ? formatFloat
-            : curved && (row.kind === 'point' || row.kind === 'direction') ? formatVec4
-                : formatVec3) as (x: never) => string;
+        // a constant row bakes its literal via the row's formatter. In a curved space the rows
+        // naming a point or a tangent vector are the world 4-vectors of l.world
+        // (compiler/plan/curved.ts).
+        if (curved && (row.kind === 'point' || row.kind === 'direction' || row.kind === 'vector')) {
+            const world = l.world?.[row.name];
+            if (world === undefined) throw new Error(`lighting: curved light ${l.id} has no world value for row '${row.name}'`);
+            return formatVec4(world);
+        }
+        const fmt = (row.shape === 'number' ? formatFloat : formatVec3) as (x: never) => string;
         return row.role !== undefined
             ? emitSpectrum(l.values[row.name] as ParamValue, row.role, { wl: 'wl', color })
             : emitValue(l.values[row.name] as ParamValue, fmt);
     });
+    if (curved) return `${structName}(${args.join(', ')})`;
     // Derived fields (quad normal/area) read GEOMETRY rows, constant in v1 — pass RESOLVED
     // values so the signature stays on concrete numbers (the driven-row substitution is inert
     // here: geometry is never driven in Stage A).

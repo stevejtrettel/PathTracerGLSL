@@ -171,7 +171,7 @@ function torusPlacement(size: Vec3): PlacementRules {
 function ballPlacement(geom: CurvedGeometry, ballInside: (c: Vec4, r: number) => boolean): PlacementRules {
     const m = QUOTIENT_MARGIN;
     // The ball about g·o: the shape sits at o with its canonical rows, placed by g (a light's
-    // backing primitive by its point row alone, as curvedLightValues places the light).
+    // backing primitive by its point row alone, as curvedLightWorld places the light).
     const ball = (type: string, parameters: Record<string, number | number[]>, transform: Transform | undefined): { c: Vec4; r: number } | null => {
         const { parameters: canonical, g } = curvedConstantPlacement(geom, type, parameters, transform);
         const r = primitiveBallBound(type, canonical);

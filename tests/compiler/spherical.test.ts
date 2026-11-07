@@ -111,10 +111,10 @@ describe('S³ Validator rules', () => {
             .toContain('an ambient medium: not implemented in spherical space');
         const marched = { ...s3Furnace, objects: [{ type: 'sphere', parameters: { radius: 0.3 }, material: 'furnace', backend: 'sdf' }] } as SceneDescription;
         expect(errorsOf(marched, furnace)).toContain('marched objects: not implemented in spherical space');
-        const box = { ...s3Furnace, objects: [{ type: 'box', parameters: { halfSize: [0.3, 0.3, 0.3] }, material: 'furnace' }] } as SceneDescription;
-        expect(errorsOf(box, furnace)).toContain("primitive 'box' has no spherical implementation");
-        const quad = { ...s3LongArc, lights: [{ kind: 'quad', corner: [0, 1, 0], edge1: [0.2, 0, 0], edge2: [0, 0, 0.2], emission: 1 }] } as SceneDescription;
-        expect(errorsOf(quad, posedNee)).toContain("light kind 'quad' has no spherical implementation");
+        const torus = { ...s3Furnace, objects: [{ type: 'torus', parameters: { ringRadius: 0.4, tubeRadius: 0.1 }, material: 'furnace' }] } as SceneDescription;
+        expect(errorsOf(torus, furnace)).toContain("primitive 'torus' has no spherical implementation");
+        const sphereLight = { ...s3LongArc, lights: [{ kind: 'sphere', position: [0, 1, 0], radius: 0.2, emission: 1 }] } as SceneDescription;
+        expect(errorsOf(sphereLight, posedNee)).toContain("light kind 'sphere' has no spherical implementation");
     });
 
     it('rejects a ball, disk or disk-light radius of π or more, and accepts one just below π', () => {

@@ -568,6 +568,11 @@ export interface PlannedLight {
      *  is CPU-recomputed on change (`resolveLightValues` → `computeSelectPdf`). Geometry rows
      *  stay constant in v1 (driven light geometry = Stage B). Mirrors PlannedMedium.values. */
     values: Record<string, number | number[] | ValueParam<number> | ValueParam<number[]> | BlackbodyValue>;
+    /** In a curved space: the rows that name a point or a tangent vector (point, direction and
+     *  vector kinds) as world 4-vectors, the isometry of the light's backing region applied
+     *  (compiler/plan/curved.ts curvedLightWorld). The struct is built from these; `values` keeps
+     *  the authored rows, which the selection power reads. */
+    world?: Record<string, number[]>;
     /** The emitter's region id (quad/sphere/mesh) — feeds the generated light_of table. */
     regionId?: number;
     /** Planner-stamped scene context for `power(values, ctx)` (impl-plan-directional-beam

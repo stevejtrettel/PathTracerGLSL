@@ -71,6 +71,11 @@ export type RowConstraint =
  *  the space). A key names a space the occupant has a body for (contract test). */
 export type SpaceConstraints = { readonly [space: string]: RowConstraint };
 
+/** Coupled rules a space's body adds over several rows, keyed by AMBIENT_SPACES key (the coupled
+ *  counterpart of SpaceConstraints): messages the Validator emits verbatim, over well-shaped
+ *  values. A key names a space the occupant has a body for (contract test). */
+export type SpaceRules<V> = { readonly [space: string]: (values: V) => string[] };
+
 /** A light row value: a constant, or (driven-lights Stage A) a `ValueParam` on a RADIOMETRIC
  *  row. `power`/`derivedCtorFields` receive RESOLVED values (no ValueParam) by contract —
  *  the caller projects authored radiometric forms via `resolveLightValues` first. */
@@ -323,6 +328,9 @@ export interface LightKindDescriptor {
     };
     valuesFromRegion?(parameters: Record<string, number | number[]>, Le: number[] | BlackbodyValue): Record<string, LightRowValue>;
     validateAuthored?(authored: Record<string, unknown>): string[];
+    /** The coupled rules the kind's body in a space adds (the curved quad light: orthogonal
+     *  edges and a bounded rectangle), over the same well-shaped authored record. */
+    validateAuthoredIn?: SpaceRules<Record<string, unknown>>;
     /** Struct rows, keyed into PlannedLight.values (row order = ctor order; the
      *  struct is GENERATED from them — A1). */
     params: LightParamSpec[];
@@ -561,6 +569,13 @@ export interface PrimitiveDescriptor {
      *  (`constraint`); this is for multi-row facts only (quad's parallel-edges — the
      *  area couples edge1 AND edge2). Runs after the C7 shape loop passes. */
     validateValues?(values: PrimitiveValues): string[];
+    /** The coupled rules the shape's body in a space adds (SpaceRules), over the same
+     *  resolved values: the curved quad's orthogonal edges, a bounded H³ box. */
+    validateValuesIn?: SpaceRules<PrimitiveValues>;
+    /** In a curved space, the authored point the placement carries the shape's frame origin o
+     *  to (the pre-translation of compiler/plan/curved.ts), when that is not its point row: the
+     *  quad's center corner + (edge1 + edge2)/2. Absent: the point row (o when there is none). */
+    curvedAnchor?(values: PrimitiveValues): [number, number, number];
     /** SCENE-LOCAL marker (fable-sdf-contract §5.2): this descriptor was minted by
      *  `defineSDF` in a scene module, not authored as a components/geometry folder.
      *  The folder/structure/registry contract tests cover folder occupants only —
