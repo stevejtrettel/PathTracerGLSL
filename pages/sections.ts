@@ -111,7 +111,7 @@ export const gallerySections: GallerySection[] = [
             e('two-light'), e('hundred-spheres'), e('instance-lights', 'instance-lights-ref'), e('instance-lights-sky'), e('glow-shell'), e('accel-triple'), e('embers'), e('cornell-area'), e('cornell-area-glass'), e('fog-area'), e('fog-area-ignored'),
             e('orb'), e('cornell-disk'), e('shadow-aim-march'), e('shadow-aim-far'), e('shadow-aim-fog'),
             e('disk-bake', 'disk-bake-ref'),
-            e('spot'), e('veach-mis'),
+            e('spot'), e('veach-mis'), e('veach-mis-varying'),
             e('sun'), e('beam-wall'), e('beam-slab'), e('beam-fog'), e('laser'),
             e('softbeam-wall'), e('laser-soft'),
         ],
@@ -127,7 +127,7 @@ export const gallerySections: GallerySection[] = [
         entries: [
             e('eta'), e('cornell-glass'), e('analytic-glass'), e('submerged'),
             e('regions-transformed', 'regions-transformed-ref'),
-            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('region-overlap'),
+            e('rough-smooth-limit'), e('rough-mis'), e('glass-inclusion'), e('rough-furnace'), e('rough-furnace-expr'), e('region-overlap'),
             e('rough-grin', 'rough-grin-ref'),
             e('rough-sheet'),
         ],

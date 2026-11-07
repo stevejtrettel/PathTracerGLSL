@@ -472,11 +472,11 @@ exports[`spectrum diagnostics > blackbody as rough_dielectric roughness 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a blackbody value",
+  - Material 'glass': roughness: blackbody is an emission form",
     },
     "validator": {
       "errors": [
-        "Material 'glass': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a blackbody value",
+        "Material 'glass': roughness: blackbody is an emission form",
       ],
       "warnings": [],
     },
@@ -484,11 +484,11 @@ exports[`spectrum diagnostics > blackbody as rough_dielectric roughness 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'glass': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a blackbody value",
+  - Material 'glass': roughness: blackbody is an emission form",
     },
     "validator": {
       "errors": [
-        "Material 'glass': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a blackbody value",
+        "Material 'glass': roughness: blackbody is an emission form",
       ],
       "warnings": [],
     },
@@ -704,11 +704,11 @@ exports[`spectrum diagnostics > cauchy as ggx roughness 1`] = `
   "rgb": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a Cauchy value",
+  - Material 'm': roughness: Cauchy is an index form",
     },
     "validator": {
       "errors": [
-        "Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a Cauchy value",
+        "Material 'm': roughness: Cauchy is an index form",
       ],
       "warnings": [],
     },
@@ -716,11 +716,11 @@ exports[`spectrum diagnostics > cauchy as ggx roughness 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a Cauchy value",
+  - Material 'm': roughness: Cauchy is an index form",
     },
     "validator": {
       "errors": [
-        "Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not a Cauchy value",
+        "Material 'm': roughness: Cauchy is an index form",
       ],
       "warnings": [],
     },
@@ -1028,12 +1028,39 @@ exports[`spectrum diagnostics > expression as ggx roughness 1`] = `
 {
   "rgb": {
     "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+  "spectral": {
+    "compile": {
+      "warnings": [
+        "Feature 'transport' provides seam 'light_query_medium' but nothing requires it — dead generated code (gate its emission on the Planner decision that links it)",
+      ],
+    },
+    "validator": {
+      "errors": [],
+      "warnings": [],
+    },
+  },
+}
+`;
+
+exports[`spectrum diagnostics > expression as plastic coat_eta 1`] = `
+{
+  "rgb": {
+    "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not an expression",
+  - Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
     },
     "validator": {
       "errors": [
-        "Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not an expression",
+        "Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
       ],
       "warnings": [],
     },
@@ -1041,11 +1068,11 @@ exports[`spectrum diagnostics > expression as ggx roughness 1`] = `
   "spectral": {
     "compile": {
       "threw": "CompilationError: Compilation failed (1 error):
-  - Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not an expression",
+  - Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
     },
     "validator": {
       "errors": [
-        "Material 'm': roughness feeds the derived field 'alpha', which is computed on the host: it takes a constant or a {param}, not an expression",
+        "Material 'm': coat_eta feeds the derived field 'coat_fdr', which is computed on the host: it takes a constant or a {param}, not an expression",
       ],
       "warnings": [],
     },

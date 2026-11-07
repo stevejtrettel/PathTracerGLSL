@@ -4,6 +4,45 @@ What was built, fixed, and measured, newest first. This is the project's history
 code works now, read [CLAUDE.md](CLAUDE.md), the docs it points to, and the code itself. When
 you finish a batch of work, add a dated entry here — not to CLAUDE.md.
 
+## 2026-11-07 — Derived material fields computed per hit when their input varies
+
+Integration step 6 of the photorealism batch (owner decision P1, Q1; the image-textures
+review's must-fix 5).
+
+**What:** a derived material field (`MaterialDerivedSpec`) may declare a per-hit form `glsl`
+beside its host form `fn`. When every input is a constant or a `{param}`, nothing changes: the
+host computes it (a literal or a compute-closure uniform). When an input varies over the
+surface (a GLSL expression or a per-instance attribute), the material lookup computes it per
+hit from the inputs' struct fields, after assigning them:
+`props.alpha = max(1e-3, props.roughness * props.roughness);`. The microfacet α is declared
+once (`components/materials/microfacet.ts`) and used by `ggx` and `rough_dielectric`. A field
+without a per-hit form (plastic's `coat_fdr`, a quadrature) keeps the rule that its input is a
+constant or a `{param}`, now also for per-instance attributes. So an expression or per-instance
+roughness compiles; a Cauchy or blackbody value on a roughness row gets the row's own message
+("Cauchy is an index form"). This reverses the recorded rule "GLSL never recomputes a pure
+function of its own rows" for spatial inputs only.
+
+**Witnesses added:** `rough-furnace-expr` (twin of `rough-furnace` with each roughness written
+as a formula for its constant) and `veach-mis-varying` (one GGX material on the four plates,
+roughness 0.05 → 0.6 along x; pt-mis, pt-nee and pt agree).
+
+**Measured:**
+- Digest: of the 277 existing suite scenes, 255 are identical. The other 22 (every scene with
+  `ggx` or `rough_dielectric`) differ only in GLSL comment text: rewritten comments in
+  `ggx.glsl`, `rough_dielectric.glsl` and `microfacet.glsl`, with the same line count. A script
+  compared the kept text with `//` comments removed and found 0 differences in 98 differing
+  parts. Code-only changes, before the comments were edited, gave 277 of 277 identical. There
+  are 2 new scenes.
+- Contract test: the per-hit form of α, evaluated as JavaScript, equals `fn` exactly on an
+  11-point grid. A compiler test checks the emitted lines (literal, uniform, per-hit for
+  expression and per-instance roughness, in RGB and spectral) and runs glslang on them.
+- Witnesses (SwiftShader): `rough-furnace-expr` against `rough-furnace` Δmean 0.00%, rmse
+  0.00%. `veach-mis-varying`: mis vs nee Δmean 0.04% (χ²ᵣ 0.01), pt Δmean 0.32% (rmse 84% ≤
+  120%). These existing witnesses pass unchanged: `veach-mis`, `rough-smooth-limit` (0.5543),
+  `rough-furnace` (background 1.0000; 0.9999 / 0.9978 / 0.9021), and `rough-mis` (nee vs mis
+  0.23%; the pt tripwire rmse 39.76% against its 40% gate, rerun alone after the first run
+  timed out under load).
+
 ## 2026-11-07 — `plastic`: a smooth clear coat over a Lambertian base
 
 Integration step 3 of the photorealism batch

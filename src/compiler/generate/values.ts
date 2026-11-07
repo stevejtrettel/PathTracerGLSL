@@ -19,6 +19,8 @@
 //      (always a uniform).
 //   5. DERIVED from other params once per frame (CDF, camera basis, cos/sin, aspect)? → DERIVED
 //      (a CPU `compute` closure → uniform / float[] — NEVER recomputed per-thread on the GPU).
+//      A derived material field whose input varies over the surface is not of this category:
+//      it is computed per hit (MaterialDerivedSpec.glsl).
 //   6. Otherwise an authored SCENE value (albedo, emission, ior, sky color)          → SCENE_VALUE
 //      (THIS file — emitValue / mintValueUniform).
 //

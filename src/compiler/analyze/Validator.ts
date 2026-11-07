@@ -11,7 +11,7 @@ import { isGlslExpression, isHeterogeneousMedium, isValueParam, mediumRoutesToTr
 import { isRadiometric } from '../../components/descriptors.js';
 import { paramToUniform } from '../../components/glsl-format.js';
 import type { DiagnosticBag } from '../../errors/core/DiagnosticBag.js';
-import { MATERIAL_MODELS, EMISSION_KEY, derivedFieldFedBy } from '../../components/materials/index.js';
+import { MATERIAL_MODELS, EMISSION_KEY, hostDerivedFieldFedBy } from '../../components/materials/index.js';
 import { LIGHT_KINDS, LIGHT_SELECTIONS, DEFAULT_LIGHT_SELECTION, applyAuthoredDefaults } from '../../components/lights/index.js';
 import { samplableEmitterObjects, isSamplableEmitterShape, regionLightKind, batchLightEligible, batchNeedsInterior, lightBatchesOf, samplesBatchLights } from '../plan/dataTenants.js';
 import { AMBIENT_SPACES } from '../../components/ambient/index.js';
@@ -1220,12 +1220,13 @@ export function validate(
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }
-                // A row feeding a derived field (ggx roughness → alpha) is read once per
-                // material on the host; a per-instance value would need a per-instance
-                // derived column, which the table does not have.
-                const derived = derivedFieldFedBy(model, key);
+                // A row feeding a derived field computed only on the host (plastic coat_eta →
+                // coat_fdr) is read once per material; a per-instance value would need a
+                // per-instance derived column, which the table does not have. A field with a
+                // per-hit form (ggx roughness → alpha) is computed from the attribute itself.
+                const derived = hostDerivedFieldFedBy(model, key);
                 if (derived !== undefined) {
-                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}' — per-instance derived rows are deferred (the derived value is computed once per material)`)
+                    bag.error('invalid-setting', `Object ${i} (instanced): attributes.${key} feeds the derived field '${derived.name}', which is computed once per material on the host`)
                         .withOriginal('scene', [`objects[${i}]`, 'attributes']).add();
                     continue;
                 }

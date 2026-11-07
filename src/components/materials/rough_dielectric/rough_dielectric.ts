@@ -5,6 +5,7 @@
 // compile-time NEE guard).
 
 import type { MaterialModelDescriptor } from '../../descriptors.js';
+import { microfacetAlpha } from '../microfacet.js';
 import roughDielectricGLSL from './rough_dielectric.glsl?raw';
 
 export const roughDielectricDescriptor: MaterialModelDescriptor = {
@@ -18,12 +19,9 @@ export const roughDielectricDescriptor: MaterialModelDescriptor = {
         { name: 'transmittance', glslType: 'Spectrum', role: 'reflectance', source: 'transmittance', default: 1, storage: 'field' },
         { name: 'ior', glslType: 'float', role: 'index', source: 'ior', default: 1.5, storage: 'region-table', constraint: { kind: 'positive' } },
     ],
-    // D4 derived, SHARED with ggx by name + type (the union dedupes; the fn is the same
-    // declaration, so the two can never disagree about the floor).
-    derived: [{
-        name: 'alpha', glslType: 'float', inputs: ['roughness'],
-        fn: (v) => Math.max(1e-3, (v.roughness as number) * (v.roughness as number)),
-    }],
+    // alpha = max(1e-3, roughness²): the declaration ggx uses too, so the struct union
+    // holds one field and the two models agree on the floor.
+    derived: [microfacetAlpha],
     usesMicrofacet: true,
     albedo: { row: 'transmittance' },   // 1 for clear glass, the tint for tinted glass
     capabilities: {

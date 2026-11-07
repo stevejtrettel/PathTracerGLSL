@@ -20,7 +20,7 @@
 // lobe's (1−F) against (1−F), leaving G1(wi) [× eta² × tint]. If a future edit needs the
 // full f·|cos|/pdf quotient at the sampling site, something has drifted.
 //
-// Fields read: mp.alpha (D4 derived host-side: max(1e-3, roughness²) — the α floor is
+// Fields read: mp.alpha (the derived field max(1e-3, roughness²) — the α floor is
 // the house convention; author true smooth glass as `dielectric`, since a runtime
 // delta flip would break the compile-time NEE guard), mp.transmittance (interface tint;
 // interior absorption is the medium's job, §4.4). ior is region-indexed.

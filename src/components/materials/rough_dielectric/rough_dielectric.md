@@ -20,7 +20,8 @@ same material; dispersion is the third and awaits the spectral era).
 
 With the shading frame's `n` toward `region_from`, `wo` is always in the upper
 hemisphere and `η = n_i/n_t` comes from the hit's regions. `α = max(1e-3, roughness²)`
-is derived host-side (D4).
+is the derived field `alpha` (components/materials/microfacet.ts), computed on the host for a
+constant or {param} roughness and per hit for one that varies over the surface.
 
 **Sampling.** Draw a visible microfacet normal `m` by VNDF; `F = dielectric_fresnel(wo·m, η)`
 picks the lobe (`uc < F` → reflect about `m`, else refract through it). TIR is not a

@@ -24,7 +24,7 @@ export const MATERIAL_MODELS: Partial<Record<MaterialModel, MaterialModelDescrip
     plastic: plasticDescriptor,
 };
 
-/** The model's STRUCT surface (D4): its rows plus its derived fields as pseudo-rows —
+/** The model's STRUCT surface: its rows plus its derived fields as pseudo-rows —
  *  ONE list for the struct union, the lookup's default lines, and the resolver, so a
  *  derived field can never drift from the fields the occupant reads. Derived pseudo-rows
  *  carry the declared colour role, with default 0 outside the model's own arms. */
@@ -41,11 +41,18 @@ export function modelStructFields(d: MaterialModelDescriptor): PropertySchema[] 
     ];
 }
 
-/** The derived field (computed on the host by `fn`) that the model's row `source` feeds, if any.
- *  A derived value is computed once per material from the row's numbers, so its inputs
- *  take only a constant or a {param}, and cannot vary per instance. */
-export function derivedFieldFedBy(id: MaterialModel, source: string): MaterialDerivedSpec | undefined {
-    return MATERIAL_MODELS[id]?.derived?.find((d) => d.inputs.includes(source));
+/** The derived field without a per-hit form (computed only on the host by `fn`) that the
+ *  model's row `source` feeds, if any. Such a value is computed once per material from the
+ *  row's numbers, so the row takes only a constant or a {param}, and cannot vary per
+ *  instance. A row feeding a field with a per-hit form (`glsl`) takes any value its own
+ *  checks allow. */
+export function hostDerivedFieldFedBy(id: MaterialModel, source: string): MaterialDerivedSpec | undefined {
+    return MATERIAL_MODELS[id]?.derived?.find((d) => d.inputs.includes(source) && !hasPerHitForm(d));
+}
+
+/** The derived field can be computed per hit in GLSL (MaterialDerivedSpec.glsl). */
+export function hasPerHitForm(d: MaterialDerivedSpec): d is MaterialDerivedSpec & { glsl(fields: Record<string, string>): string } {
+    return d.glslType === 'float' && d.glsl !== undefined;
 }
 
 /** Lookup that throws on unregistered models — the Validator rejects them upstream

@@ -104,6 +104,7 @@ import {
 } from './scenes/roughDielectricWitness.js';
 import { mirrorScene, mirrorNeeStrategy, mirrorPtStrategy } from './scenes/mirrorWitness.js';
 import { plasticFurnaceScene, plasticChromaScene, PLASTIC_CHROMA_CENTER } from './scenes/plasticWitness.js';
+import { roughFurnaceExpr, veachMisVarying } from './scenes/derivedRoughnessWitness.js';
 import {
     cornellDisk, cornellDiskNeeStrategy, cornellDiskMisStrategy, cornellDiskPtStrategy,
     diskBake, diskBakeRef, diskBakeStrategy,
@@ -2328,6 +2329,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
             ],
         },
     },
+    'veach-mis-varying': {
+        scene: veachMisVarying,
+        strategies: posed([0, 1.3, 5.5], [0, 0.55, 0], veachMisStrategy, veachNeeStrategy, veachPtStrategy),
+        exercises:
+            'GGX roughness authored as a formula of the shading point (0.05 → 0.6 along x, one material on all four '
+            + 'plates): α = max(1e-3, roughness²) is computed per hit in the material lookup, and every scoring '
+            + 'site (BSDF sample, its MIS pdf, NEE eval and pdf) must read the same per-hit α',
+        expected:
+            'keys 1 (pt-mis), 2 (pt-nee), 3 (pt) converge to the same image, each plate a gradient from a sharp '
+            + 'reflection (left) to a broad one (right); divergence implicates a scoring site reading α from another point',
+        witness: {
+            spp: 256,
+            checks: [
+                { kind: 'equality', strategies: [0, 1], meanTol: 0.03, label: 'varying-roughness GGX mis ≡ nee' },
+                { kind: 'equality', strategies: [0, 2], meanTol: 0.03, rmse: 1.2, label: 'varying-roughness GGX pt tripwire' },
+            ],
+        },
+    },
     // ── Rough dielectric (fable-rough-dielectric §5) ────────────────────────────
     // All four gates are PRE-CALIBRATION estimates until the owner's first sweep
     // (impl-plan-rough-dielectric T4); the energy numbers are RECORDED there, since
@@ -2597,6 +2616,24 @@ export const witnessSuite: Record<string, SceneSuiteEntry> = {
                 { kind: 'mean', value: 0.98, tol: 0.06, region: { x: 0.18, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.05 throughput' },
                 { kind: 'mean', value: 0.94, tol: 0.1, region: { x: 0.47, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.2 throughput' },
                 { kind: 'mean', value: 0.85, tol: 0.15, region: { x: 0.76, y: 0.46, w: 0.06, h: 0.08 }, label: 'roughness 0.5 throughput' },
+            ],
+        },
+    },
+    'rough-furnace-expr': {
+        scene: roughFurnaceExpr,
+        strategies: posed([0, 0, 4.2], [0, 0, 0], roughFurnaceStrategy),
+        exercises:
+            'rough-furnace with each roughness authored as a GLSL formula evaluating to its constant: α is computed per '
+            + 'hit in the material lookup instead of on the host',
+        expected:
+            'the same image as rough-furnace up to float rounding: same integrand, same random numbers, α equal to '
+            + 'the host value within rounding',
+        witness: {
+            spp: 64,
+            checks: [
+                // Identical stream; the small tolerances absorb only the rounding of α in fp32
+                // against the host-computed literal (the expr-const tolerances).
+                { kind: 'twin', other: { scene: 'rough-furnace' }, meanTol: 0.002, rmse: 0.01, label: 'per-hit α ≡ host α' },
             ],
         },
     },

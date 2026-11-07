@@ -3,9 +3,9 @@
 // The distribution machinery (D, Smith G₁, VNDF sampling, the frame maps) is SHARED
 // stdlib in glsl/core/microfacet.glsl (fable-rough-dielectric §4) — this file is the
 // conductor MODEL: Schlick Fresnel, the reflection lobe, and nothing else.
-// Fields read: mp.f0 (normal-incidence reflectance), mp.alpha (DERIVED host-side, D4:
-// max(1e-3, roughness²) — the descriptor's `derived` declaration; the shader never
-// recomputes it). Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta
+// Fields read: mp.f0 (normal-incidence reflectance), mp.alpha (the derived field
+// max(1e-3, roughness²), assigned by the material lookup; this file never recomputes it).
+// Convention: alpha clamped ≥ 1e-3 — author true mirrors as a delta
 // model instead (§3.1); letting alpha→0 here produces fireflies, not a mirror.
 // Provides: ggx_eval(), ggx_sample(), ggx_pdf(), ggx_emission().
 // Depends on: microfacet_* (core), MaterialProperties, Hit/Frame, InteractionSample,
@@ -17,7 +17,7 @@ Spectrum ggx_eval(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wil.z * wol.z <= 0.0) return SPECTRUM_ZERO;         // reflection-only model
-    float a = mp.alpha;                                     // derived host-side (D4): max(1e-3, roughness²)
+    float a = mp.alpha;                                     // derived field: max(1e-3, roughness²)
     vec3 h = normalize(wil + wol);
     Spectrum F = schlick_fresnel(mp.f0, abs(dot(wol, h)));
     // bare f (§2.2): D·F·G / (4 cos_i cos_o), NO extra cos_i here
@@ -29,7 +29,7 @@ InteractionSample ggx_sample(Direction wo, Hit hit, MaterialProperties mp, float
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     float side = wol.z < 0.0 ? -1.0 : 1.0;                  // canonical side (undone at exit)
     wol *= side;
-    float a = mp.alpha;                                     // derived host-side (D4)
+    float a = mp.alpha;                                     // derived field
     vec3 h = microfacet_sample_vndf(wol, a, u);             // visible microfacet normal (Heitz 2018)
 
     vec3 wil = reflect(-wol, h);
@@ -53,7 +53,7 @@ float ggx_pdf(Direction wi, Direction wo, Hit hit, MaterialProperties mp) {
     vec3 wil = microfacet_to_local(hit.frame, hit.p, wi);
     vec3 wol = microfacet_to_local(hit.frame, hit.p, wo);
     if (wil.z * wol.z <= 0.0) return 0.0;
-    float a = mp.alpha;                                     // derived host-side (D4)
+    float a = mp.alpha;                                     // derived field
     vec3 h = normalize(wil + wol);
     // Side-symmetric by construction (G1 uses |z|, D uses z²) — no canonicalization needed.
     return microfacet_G1(wol, a) * microfacet_D(h, a) / (4.0 * abs(wol.z));   // MUST match ggx_sample's pdf — §11.3 checks this

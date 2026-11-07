@@ -6,15 +6,15 @@
 import { emissionMayBeNonzero } from '../../../components/color/values.js';
 import { COLOR_MODELS, type ColorModelDescriptor } from '../../../components/color/index.js';
 import { emitSpectrum, emitIndex, glslValue, type SpectrumSite } from '../color.js';
-import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression, type IndexProperty } from '../../types.js';
-import type { RenderPlan, PlannedMaterial, PlannedMedium, PlannedUniform } from '../../plan/types.js';
+import { isHeterogeneousMedium, isEmissiveMedium, mediumRoutesToTracking, mediumWeightsAbsorption, mediumMayScatter, mediumIsDeflecting, isValueParam, isGlslExpression, SETTING_ROLES, mediumSettingRole, type Vec3, type ValueParam, type MaterialModel, type GlslExpression, type IndexProperty } from '../../types.js';
+import { isAttributeValue, type RenderPlan, type PlannedMaterial, type PlannedMedium, type PlannedUniform } from '../../plan/types.js';
 import type { ParameterMetadata } from '../../types.js';
 import { emptyContribution, type FeatureContribution } from './types.js';
 import type { ShaderBlock } from '../ShaderIR.js';
 import { formatFloat, formatVec3 } from '../../../components/glsl-format.js';
 import { emitValue, mintValueUniform, type ParamValue } from '../values.js';
 
-import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, EMISSION_KEY } from '../../../components/materials/index.js';
+import { MATERIAL_MODELS, materialModel, modelStructFields, modelTwoSidedShading, hasPerHitForm, EMISSION_KEY } from '../../../components/materials/index.js';
 import type { MaterialDerivedSpec } from '../../../components/descriptors.js';
 import { isRadiometric } from '../../../components/descriptors.js';
 import { VOLUME_SCATTERING_MODELS } from '../../../components/volume_scattering/index.js';
@@ -58,8 +58,9 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
             return d !== undefined ? modelStructFields(d) : [];
         }),
     );
-    // DERIVED material fields (D4): per-material expressions — a baked literal for
-    // constant inputs, a `u_<name>_<id>` compute-closure uniform for driven ones.
+    // DERIVED material fields: per-material expressions — a baked literal for constant
+    // inputs, a `u_<name>_<id>` compute-closure uniform for driven ones, the per-hit form
+    // over the struct fields when an input varies over the surface.
     const site: SpectrumSite = { wl: 'wl', color: plan.program.measurement.color };
     const derivedByMat = new Map<number, DerivedExpr[]>();
     for (const mat of plan.materials) {
@@ -244,7 +245,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
     // DERIVED σ̄ uniforms for {param}-driven tracking media (batch 2) — no parameter
     // metadata of their own: they ride the σ params' sliders through their closures.
     for (const m of majorants.values()) if (m.uniform) uniforms.push(m.uniform);
-    // DERIVED material-field uniforms (D4) — same discipline as the majorants.
+    // DERIVED material-field uniforms — same discipline as the majorants.
     for (const list of derivedByMat.values()) for (const e of list) if (e.uniform) uniforms.push(e.uniform);
 
     // T4 seams: the §3.3/§3.4 interaction surface + capability gates (+ media seams when live).
@@ -329,7 +330,7 @@ export function contributeMaterials(plan: RenderPlan): FeatureContribution {
 // Generated material lookup (per-scene codegen)
 // ============================================================================
 
-/** A D4 derived field's emitted form for ONE material: the expression the lookup arm
+/** A derived field's emitted form for ONE material: the expression the lookup arm
  *  assigns, plus the uniform when any input is driven (the majorantSpec pattern). */
 type DerivedExpr = { name: string; expr: string; uniform?: PlannedUniform };
 
@@ -347,6 +348,18 @@ function resolveDerivedInputs(mat: PlannedMaterial, inputs: string[], params: Re
 }
 
 function materialDerivedExpr(mat: PlannedMaterial, s: MaterialDerivedSpec, site: SpectrumSite): DerivedExpr {
+    // An input that varies over the surface (an expression or a per-instance attribute) has no
+    // host value: the field is computed per hit from the struct fields its inputs were just
+    // assigned to. Only a field with a per-hit form takes such inputs (Validator).
+    const varies = s.inputs.some((src) => isGlslExpression(mat.values[src]) || isAttributeValue(mat.values[src]));
+    if (varies) {
+        if (!hasPerHitForm(s)) {
+            throw new Error(`derived field '${s.name}' of material ${mat.id} has an input that varies over the surface and no per-hit form (Validator should have rejected it)`);
+        }
+        const rows = materialModel(mat.model as MaterialModel).properties;
+        const fields = Object.fromEntries(s.inputs.map((src) => [src, `props.${rows.find((r) => r.source === src)!.name}`]));
+        return { name: s.name, expr: s.glsl(fields) };
+    }
     // A Spectrum field is emitted by its value's kind: the CPU constant itself, or the derived
     // uniform, a number computed outside the kind (the expression binding).
     const spectrum = (v: ParamValue) => s.glslType === 'Spectrum' ? emitSpectrum(v, s.role, site) : null;
@@ -402,7 +415,7 @@ function generateMaterialLookup(materials: PlannedMaterial[], fields: PropertySc
                 : emitValue(raw as ParamValue, fmt, { instance: 'element' });
             body.push(`${target} = ${resolved};`);
         }
-        // DERIVED fields (D4): assigned after the rows they derive from.
+        // DERIVED fields: assigned after the rows they derive from (a per-hit form reads them).
         for (const e of derivedByMat.get(mat.id) ?? []) {
             body.push(`        props.${e.name} = ${e.expr};`);
         }

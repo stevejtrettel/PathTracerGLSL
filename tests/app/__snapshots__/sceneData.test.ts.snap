@@ -669,6 +669,8 @@ exports[`scene-data textures (byte fingerprints) > regions-transformed-ref 1`] =
 
 exports[`scene-data textures (byte fingerprints) > rough-furnace 1`] = `null`;
 
+exports[`scene-data textures (byte fingerprints) > rough-furnace-expr 1`] = `null`;
+
 exports[`scene-data textures (byte fingerprints) > rough-grin 1`] = `null`;
 
 exports[`scene-data textures (byte fingerprints) > rough-grin-ref 1`] = `null`;
@@ -970,6 +972,8 @@ exports[`scene-data textures (byte fingerprints) > two-light 1`] = `
 `;
 
 exports[`scene-data textures (byte fingerprints) > veach-mis 1`] = `null`;
+
+exports[`scene-data textures (byte fingerprints) > veach-mis-varying 1`] = `null`;
 
 exports[`scene-data textures — instanced sphere lights with per-instance emission > instance-lights with an emission attribute 1`] = `
 {
